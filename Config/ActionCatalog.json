@@ -1,0 +1,67 @@
+{
+    "version": "1.0",
+    "description": "Cross-app unified intent catalog for DPS",
+    "core_intents": [
+        {
+            "intent": "browse_feed",
+            "priority": "core",
+            "description": "Browse home feed content"
+        },
+        {
+            "intent": "open_post",
+            "priority": "core",
+            "description": "Open a post from feed"
+        },
+        {
+            "intent": "read_post",
+            "priority": "core",
+            "description": "Read post details"
+        },
+        {
+            "intent": "read_comments",
+            "priority": "core",
+            "description": "Read comments under post"
+        },
+        {
+            "intent": "reply_post",
+            "priority": "core",
+            "description": "Reply to post (comment)"
+        },
+        {
+            "intent": "reply_comment",
+            "priority": "core",
+            "description": "Reply to a comment"
+        }
+    ],
+    "extended_intents": [
+        {
+            "intent": "check_dm",
+            "priority": "extended",
+            "description": "Open and read direct messages"
+        },
+        {
+            "intent": "explore_group",
+            "priority": "extended",
+            "description": "Browse group/community/category spaces"
+        },
+        {
+            "intent": "follow_entity",
+            "priority": "extended",
+            "description": "Follow account/community/product entity"
+        },
+        {
+            "intent": "share_content",
+            "priority": "extended",
+            "description": "Share content"
+        },
+        {
+            "intent": "edit_profile",
+            "priority": "rare",
+            "description": "Modify profile settings (rare and controlled)"
+        }
+    ],
+    "default_fallback_order": [
+        "read_post",
+        "browse_feed"
+    ]
+}

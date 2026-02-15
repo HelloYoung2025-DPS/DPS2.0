@@ -27,6 +27,7 @@
 | [子项目调用架构.md](子项目调用架构.md) | 子项目开发指南 | 开发者 |
 | [MultiPlatformFramework.md](MultiPlatformFramework.md) | 多平台框架（英文） | 开发者 |
 | [PersonaSchema_MultiPlatform.md](PersonaSchema_MultiPlatform.md) | Persona Schema 规范（英文） | 开发者 |
+| [UnifiedIntentArchitecture.md](UnifiedIntentArchitecture.md) | 统一意图架构（跨 App 执行层） | 开发者 |
 
 ### 详细流程图
 

@@ -16,6 +16,9 @@
 | ValidationRules.json | 画像验证规则 |
 | Apps.json | APP定义（Reddit、BabyCenter） |
 | PersonaPrompt.txt | 画像生成母模板 v2.8 |
+| ActionCatalog.json | 统一跨平台意图目录 |
+| UserStrategy.json | 全局用户策略（成功率/拟人度/AI直控提示） |
+| IntentMappings/*.json | 各平台意图映射与回退链 |
 
 ## 配置优先级
 

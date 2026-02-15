@@ -41,9 +41,15 @@ public class SessionRunner
     // 统一引擎数据（v4.5）
     private static string _operationsJson = "";
     private static string _platformConfig = "";
+    private static string _intentMappingJson = "";
+    private static string _userStrategyJson = "";
     
     // 页面状态追踪
     private static string _currentPage = "unknown";
+    
+    // AI 控制策略
+    private static bool _aiDirectExecution = true;
+    private static bool _notifyHumanOnAiControl = false;
     
     /// <summary>
     /// 模块入口点
@@ -184,6 +190,10 @@ public class SessionRunner
                 CoreHelper.LogWarn(TAG, "操作配置不存在: " + opsPath + "，将回退到旧模块模式");
             }
             
+            // ========== 加载统一意图映射与全局用户策略 ==========
+            LoadUserStrategy(projectRoot);
+            LoadIntentMapping(projectRoot, platformName);
+            
             // 初始化页面状态
             _currentPage = "unknown";
             
@@ -282,6 +292,15 @@ public class SessionRunner
                 
                 // 加权随机选择动作
                 string selectedAction = WeightedChoice(actionTypes, adjustedWeights);
+                string selectedIntent = ResolveIntentForAction(selectedAction);
+                
+                CoreHelper.SetVar("current_action", selectedAction);
+                CoreHelper.SetVar("current_intent", selectedIntent);
+                
+                if (_aiDirectExecution && ShouldNotifyHumanForIntent(selectedIntent))
+                {
+                    NotifyHumanControl(selectedAction, selectedIntent, platformName);
+                }
                 
                 // Step 2: RuleEngine 帖子评估门控
                 // 读取当前帖子数据（由平台模块 Browse 操作或 unified engine 写入）
@@ -310,9 +329,6 @@ public class SessionRunner
                 
                 CoreHelper.Log(TAG, string.Format("执行动作: {0} (energy={1:F2})", selectedAction, _energy));
                 
-                // 设置当前动作类型供子项目使用
-                CoreHelper.SetVar("current_action", selectedAction);
-                
                 // 执行实际动作
                 string actionResult = "PENDING";
                 try {
@@ -321,7 +337,7 @@ public class SessionRunner
                     // v4.5: 使用统一引擎执行
                     if (!string.IsNullOrEmpty(_operationsJson))
                     {
-                        actionResult = ExecuteWithUnifiedEngine(selectedAction, currentPlatform, projectRoot);
+                        actionResult = ExecuteWithUnifiedEngine(selectedAction, selectedIntent, currentPlatform, projectRoot);
                     }
                     else
                     {
@@ -697,7 +713,7 @@ public class SessionRunner
     /// 将 SessionRunner 动作名映射到 operations JSON 中的操作名，
     /// 并处理页面状态转换逻辑（如 read_post 需要先 open_post）。
     /// </summary>
-    private static string ExecuteWithUnifiedEngine(string sessionAction, string platformName, string projectRoot)
+    private static string ExecuteWithUnifiedEngine(string sessionAction, string sessionIntent, string platformName, string projectRoot)
     {
         // 先检测当前页面状态
         string xml = CoreHelper.GetLayout();
@@ -712,9 +728,17 @@ public class SessionRunner
             }
         }
         
-        // 映射 SessionRunner 动作名 → operations JSON 操作名序列
-        // 某些动作可能需要多步操作（如 read_post = open_post → read_post）
-        string[] opSequence = MapActionToOperations(sessionAction, _currentPage);
+        string effectiveIntent = ResolveIntentWithFallback(sessionIntent);
+        CoreHelper.SetVar("effective_intent", effectiveIntent);
+        
+        // 优先按统一意图映射执行，找不到时回退到旧动作映射
+        string[] opSequence = GetOperationsByIntent(effectiveIntent, _currentPage);
+        if (opSequence.Length == 0)
+        {
+            // 映射 SessionRunner 动作名 → operations JSON 操作名序列
+            // 某些动作可能需要多步操作（如 read_post = open_post → read_post）
+            opSequence = MapActionToOperations(sessionAction, _currentPage);
+        }
         
         if (opSequence.Length == 0)
         {
@@ -804,6 +828,272 @@ public class SessionRunner
         // 设置结果变量
         CoreHelper.SetVar("action_result", lastResult);
         return lastResult;
+    }
+    
+    /// <summary>
+    /// 加载全局用户策略配置（跨平台统一）
+    /// </summary>
+    private static void LoadUserStrategy(string projectRoot)
+    {
+        string strategyPath = projectRoot + "Config\\UserStrategy.json";
+        _userStrategyJson = "";
+        _aiDirectExecution = true;
+        _notifyHumanOnAiControl = false;
+        
+        if (!File.Exists(strategyPath))
+        {
+            CoreHelper.Log(TAG, "UserStrategy.json 不存在，使用默认策略");
+            CoreHelper.SetVar("strategy_success_weight", "1.0");
+            CoreHelper.SetVar("strategy_humanization_weight", "1.0");
+            return;
+        }
+        
+        _userStrategyJson = CoreHelper.ReadFile(strategyPath);
+        
+        string balanceJson = JsonHelper.ExtractObject(_userStrategyJson, "decision_balance");
+        double successWeight = JsonHelper.GetDouble(balanceJson, "success_weight", 1.0);
+        double humanizationWeight = JsonHelper.GetDouble(balanceJson, "humanization_weight", 1.0);
+        
+        CoreHelper.SetVar("strategy_success_weight", successWeight.ToString("F2"));
+        CoreHelper.SetVar("strategy_humanization_weight", humanizationWeight.ToString("F2"));
+        
+        string aiControl = JsonHelper.ExtractObject(_userStrategyJson, "ai_control");
+        string directExecution = JsonHelper.Get(aiControl, "direct_execution");
+        string notifyHuman = JsonHelper.Get(aiControl, "notify_human");
+        
+        _aiDirectExecution = (directExecution != "false");
+        _notifyHumanOnAiControl = (notifyHuman == "true");
+        
+        CoreHelper.SetVar("ai_direct_execution", _aiDirectExecution ? "true" : "false");
+        CoreHelper.SetVar("ai_notify_human", _notifyHumanOnAiControl ? "true" : "false");
+        
+        CoreHelper.Log(TAG, string.Format("用户策略: success={0:F2}, humanization={1:F2}, ai_direct={2}, notify_human={3}",
+            successWeight, humanizationWeight, _aiDirectExecution, _notifyHumanOnAiControl));
+    }
+    
+    /// <summary>
+    /// 加载平台意图映射配置
+    /// </summary>
+    private static void LoadIntentMapping(string projectRoot, string platformName)
+    {
+        _intentMappingJson = "";
+        string mappingPath = projectRoot + "Config\\IntentMappings\\" + platformName + "_intents.json";
+        
+        if (!File.Exists(mappingPath))
+        {
+            CoreHelper.LogWarn(TAG, "意图映射不存在，使用内置动作映射: " + mappingPath);
+            return;
+        }
+        
+        _intentMappingJson = CoreHelper.ReadFile(mappingPath);
+        CoreHelper.SetVar("intent_mapping_loaded", "true");
+        CoreHelper.Log(TAG, "已加载意图映射: " + platformName);
+    }
+    
+    /// <summary>
+    /// 将当前会话动作映射为统一意图
+    /// </summary>
+    private static string ResolveIntentForAction(string action)
+    {
+        if (!string.IsNullOrEmpty(_intentMappingJson))
+        {
+            string actionMap = JsonHelper.ExtractObject(_intentMappingJson, "action_to_intent");
+            if (!string.IsNullOrEmpty(actionMap))
+            {
+                string mappedIntent = JsonHelper.Get(actionMap, action);
+                if (!string.IsNullOrEmpty(mappedIntent))
+                {
+                    return mappedIntent;
+                }
+            }
+        }
+        
+        // 默认映射，兼容旧配置
+        if (action == "browse") return "browse_feed";
+        if (action == "read_post") return "read_post";
+        if (action == "like") return "open_post";
+        if (action == "comment") return "reply_post";
+        if (action == "post") return "reply_post";
+        return "browse_feed";
+    }
+    
+    /// <summary>
+    /// 解析意图回退链，返回可执行的意图
+    /// </summary>
+    private static string ResolveIntentWithFallback(string intent)
+    {
+        if (string.IsNullOrEmpty(intent))
+        {
+            return "browse_feed";
+        }
+        
+        if (IsIntentSupported(intent))
+        {
+            return intent;
+        }
+        
+        string[] fallbacks = GetIntentFallbacks(intent);
+        for (int i = 0; i < fallbacks.Length; i++)
+        {
+            if (IsIntentSupported(fallbacks[i]))
+            {
+                CoreHelper.Log(TAG, string.Format("意图回退: {0} -> {1}", intent, fallbacks[i]));
+                CoreHelper.SetVar("intent_fallback_from", intent);
+                CoreHelper.SetVar("intent_fallback_to", fallbacks[i]);
+                return fallbacks[i];
+            }
+        }
+        
+        if (IsIntentSupported("browse_feed"))
+        {
+            CoreHelper.Log(TAG, string.Format("意图回退: {0} -> browse_feed", intent));
+            CoreHelper.SetVar("intent_fallback_from", intent);
+            CoreHelper.SetVar("intent_fallback_to", "browse_feed");
+            return "browse_feed";
+        }
+        
+        return intent;
+    }
+    
+    /// <summary>
+    /// 判断某个意图是否在平台映射中可执行（存在且有 operations）
+    /// </summary>
+    private static bool IsIntentSupported(string intent)
+    {
+        if (string.IsNullOrEmpty(_intentMappingJson) || string.IsNullOrEmpty(intent))
+        {
+            return false;
+        }
+        
+        string intentsSection = JsonHelper.ExtractObject(_intentMappingJson, "intents");
+        if (string.IsNullOrEmpty(intentsSection))
+        {
+            return false;
+        }
+        
+        string intentJson = JsonHelper.ExtractObject(intentsSection, intent);
+        if (string.IsNullOrEmpty(intentJson))
+        {
+            return false;
+        }
+        
+        string[] ops = JsonHelper.GetArray(intentJson, "operations");
+        return ops.Length > 0;
+    }
+    
+    /// <summary>
+    /// 获取意图回退链
+    /// </summary>
+    private static string[] GetIntentFallbacks(string intent)
+    {
+        if (string.IsNullOrEmpty(_intentMappingJson) || string.IsNullOrEmpty(intent))
+        {
+            return new string[0];
+        }
+        
+        string intentsSection = JsonHelper.ExtractObject(_intentMappingJson, "intents");
+        string intentJson = JsonHelper.ExtractObject(intentsSection, intent);
+        if (string.IsNullOrEmpty(intentJson))
+        {
+            return new string[0];
+        }
+        
+        return JsonHelper.GetArray(intentJson, "fallback_intents");
+    }
+    
+    /// <summary>
+    /// 根据统一意图获取操作序列
+    /// </summary>
+    private static string[] GetOperationsByIntent(string intent, string currentPage)
+    {
+        if (string.IsNullOrEmpty(_intentMappingJson) || string.IsNullOrEmpty(intent))
+        {
+            return new string[0];
+        }
+        
+        string intentsSection = JsonHelper.ExtractObject(_intentMappingJson, "intents");
+        string intentJson = JsonHelper.ExtractObject(intentsSection, intent);
+        if (string.IsNullOrEmpty(intentJson))
+        {
+            return new string[0];
+        }
+        
+        string[] rawOps = JsonHelper.GetArray(intentJson, "operations");
+        if (rawOps.Length == 0)
+        {
+            return new string[0];
+        }
+        
+        var ops = new List<string>();
+        for (int i = 0; i < rawOps.Length; i++)
+        {
+            string opName = rawOps[i];
+            if (string.IsNullOrEmpty(opName)) continue;
+            
+            // 如果已经在详情页，跳过重复 open_post
+            if (currentPage == "post_detail" && opName == "open_post")
+            {
+                continue;
+            }
+            
+            // 过滤配置中不存在的操作，避免执行器报错
+            string opDef = JsonHelper.ExtractObject(_operationsJson, opName);
+            if (string.IsNullOrEmpty(opDef))
+            {
+                continue;
+            }
+            
+            ops.Add(opName);
+        }
+        
+        return ops.ToArray();
+    }
+    
+    /// <summary>
+    /// 判断当前意图是否需要发送人工提示
+    /// </summary>
+    private static bool ShouldNotifyHumanForIntent(string intent)
+    {
+        if (!_notifyHumanOnAiControl || string.IsNullOrEmpty(intent))
+        {
+            return false;
+        }
+        
+        string aiControl = JsonHelper.ExtractObject(_userStrategyJson, "ai_control");
+        if (string.IsNullOrEmpty(aiControl))
+        {
+            return true;
+        }
+        
+        string[] notifyIntents = JsonHelper.GetArray(aiControl, "notify_intents");
+        if (notifyIntents.Length == 0)
+        {
+            return true;
+        }
+        
+        for (int i = 0; i < notifyIntents.Length; i++)
+        {
+            if (string.Equals(notifyIntents[i], intent, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// AI 直控执行时向人工发送提示（日志 + 变量）
+    /// </summary>
+    private static void NotifyHumanControl(string action, string intent, string platform)
+    {
+        string message = string.Format("[HUMAN_PROMPT] platform={0}, action={1}, intent={2}, mode=AI_DIRECT_EXECUTION",
+            platform, action, intent);
+        CoreHelper.Log(TAG, message);
+        CoreHelper.SetVar("human_prompt_text", message);
+        CoreHelper.SetVar("human_prompt_platform", platform);
+        CoreHelper.SetVar("human_prompt_action", action);
+        CoreHelper.SetVar("human_prompt_intent", intent);
     }
     
     /// <summary>

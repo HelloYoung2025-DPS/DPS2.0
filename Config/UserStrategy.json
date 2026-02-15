@@ -1,0 +1,28 @@
+{
+    "version": "1.0",
+    "description": "Global cross-app user strategy",
+    "decision_balance": {
+        "success_weight": 1.0,
+        "humanization_weight": 1.0
+    },
+    "ai_control": {
+        "enabled": true,
+        "direct_execution": true,
+        "notify_human": true,
+        "notify_intents": [
+            "reply_post",
+            "reply_comment",
+            "check_dm",
+            "edit_profile"
+        ],
+        "notify_format": "HUMAN_PROMPT"
+    },
+    "core_rollout": {
+        "minimum_core_intents": 6,
+        "enforce_before_extended": true
+    },
+    "profile_edit_policy": {
+        "rare_action": true,
+        "only_on_major_persona_upgrade": true
+    }
+}

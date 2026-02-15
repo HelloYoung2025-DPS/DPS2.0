@@ -1,0 +1,85 @@
+{
+    "platform": "instagram",
+    "version": "1.0",
+    "intents": {
+        "browse_feed": {
+            "operations": [
+                "browse"
+            ],
+            "fallback_intents": []
+        },
+        "open_post": {
+            "operations": [
+                "open_post"
+            ],
+            "fallback_intents": [
+                "browse_feed"
+            ]
+        },
+        "read_post": {
+            "operations": [
+                "open_post",
+                "view_post",
+                "back_to_feed"
+            ],
+            "fallback_intents": [
+                "browse_feed"
+            ]
+        },
+        "read_comments": {
+            "operations": [
+                "open_post",
+                "view_post",
+                "back_to_feed"
+            ],
+            "fallback_intents": [
+                "read_post",
+                "browse_feed"
+            ]
+        },
+        "reply_post": {
+            "operations": [
+                "open_post",
+                "comment",
+                "back_to_feed"
+            ],
+            "fallback_intents": [
+                "read_post",
+                "browse_feed"
+            ]
+        },
+        "reply_comment": {
+            "operations": [
+                "open_post",
+                "comment",
+                "back_to_feed"
+            ],
+            "fallback_intents": [
+                "reply_post",
+                "read_post",
+                "browse_feed"
+            ]
+        },
+        "check_dm": {
+            "operations": [],
+            "fallback_intents": [
+                "browse_feed"
+            ]
+        },
+        "edit_profile": {
+            "operations": [],
+            "fallback_intents": [
+                "browse_feed"
+            ]
+        }
+    },
+    "action_to_intent": {
+        "browse": "browse_feed",
+        "read_post": "read_post",
+        "like": "open_post",
+        "comment": "reply_post",
+        "post": "reply_post",
+        "follow": "follow_entity",
+        "share": "share_content"
+    }
+}
