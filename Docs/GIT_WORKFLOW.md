@@ -78,6 +78,22 @@ If using remote:
 git push origin main --tags
 ```
 
+## 5.1) One-command release (recommended)
+
+Use the helper script:
+
+```bash
+./scripts/release.sh v4.6.0 "release: v4.6.0 major upgrade"
+```
+
+The script will:
+
+- Validate version format (`vX.Y.Z`)
+- Ensure there are changes to commit
+- Create one commit
+- Create annotated tag
+- Show push command
+
 ## 6) Useful commands
 
 View history:

@@ -46,7 +46,7 @@ DPS_v4.1/
 
 详细步骤见 `QUICK_START.txt`
 
-> Git 协作与版本发布建议见 `Docs/GIT_WORKFLOW.md`
+> Git 协作与版本发布建议见 `Docs/GIT_WORKFLOW.md`（支持 `scripts/release.sh` 一键发版）
 
 ---
 
