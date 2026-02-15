@@ -1,0 +1,17 @@
+{
+    "version": "1.0",
+    "description": "系统维护配置",
+    "retention": {
+        "log_retention_days": 30,
+        "memory_retention_days": 180,
+        "backup_retention_days": 30
+    },
+    "disk_space": {
+        "warning_threshold_gb": 1,
+        "critical_threshold_gb": 0.5
+    },
+    "schedule": {
+        "auto_maintenance_enabled": false,
+        "run_at_time": "03:00"
+    }
+}

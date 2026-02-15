@@ -1,0 +1,69 @@
+{
+    "version": "1.0",
+    "field_evolution_rules": {
+        "personality.optimism_level": {
+            "volatility": "moderate",
+            "max_change_per_week": 0.1,
+            "max_change_per_month": 0.3
+        },
+        "personality.anxiety_prone": {
+            "volatility": "high",
+            "max_change_per_week": 0.2,
+            "max_change_per_month": 0.5
+        },
+        "interests_and_hobbies.primary_hobbies[].passion_level": {
+            "volatility": "moderate",
+            "max_change_per_week": 0.05,
+            "max_change_per_month": 0.15
+        },
+        "health_and_wellness.mental_health.current_status": {
+            "volatility": "high",
+            "allowed_values": [
+                "thriving",
+                "stable",
+                "struggling",
+                "crisis"
+            ]
+        },
+        "career.occupation": {
+            "volatility": "very_low",
+            "max_changes_per_year": 1,
+            "restricted_during": [
+                "PP0",
+                "PP1"
+            ]
+        },
+        "values_and_contradictions.core_values": {
+            "volatility": "very_low",
+            "max_change_per_month": 0.05
+        },
+        "_extensions.skills.*": {
+            "volatility": "low",
+            "max_new_skills_per_month": 1
+        }
+    },
+    "stage_specific_rules": {
+        "T1": {
+            "high_volatility_fields": [
+                "emotional_patterns.mood_variability"
+            ],
+            "restricted_changes": [
+                "career.current_status"
+            ]
+        },
+        "PP0": {
+            "high_volatility_fields": [
+                "emotional_patterns.emotional_volatility",
+                "health_and_wellness.mental_health.current_status"
+            ],
+            "restricted_changes": [
+                "career.occupation"
+            ]
+        }
+    },
+    "validation": {
+        "max_fields_changed_per_evolution": 10,
+        "require_reasoning_for_major_changes": true,
+        "major_change_threshold": 0.3
+    }
+}

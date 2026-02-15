@@ -1,0 +1,43 @@
+{
+    "version": "1.0",
+    "apps": {
+        "reddit": {
+            "name": "Reddit",
+            "full_name": "Reddit (r/BabyBumps & related)",
+            "enabled": true,
+            "data_path": "Data/Reddit",
+            "primary_communities": [
+                "BabyBumps",
+                "Mommit",
+                "Parenting",
+                "beyondthebump"
+            ],
+            "settings": {
+                "default_sort": "hot",
+                "max_posts_per_browse": 20,
+                "comment_min_length": 10,
+                "comment_max_length": 500
+            }
+        },
+        "babycenter": {
+            "name": "BabyCenter",
+            "full_name": "BabyCenter Community",
+            "enabled": false,
+            "data_path": "Data/BabyCenter",
+            "primary_communities": [
+                "Pregnancy",
+                "Baby",
+                "Toddler"
+            ],
+            "settings": {
+                "default_sort": "recent",
+                "max_posts_per_browse": 15,
+                "comment_min_length": 20,
+                "comment_max_length": 1000
+            }
+        }
+    },
+    "device_app_mapping": {
+        "default": "reddit"
+    }
+}

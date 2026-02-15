@@ -1,0 +1,134 @@
+{
+    "version": "1.0",
+    "stages": {
+        "TTC": {
+            "name": "trying_to_conceive",
+            "display_name": "备孕期",
+            "session_duration_modifier": 1.0,
+            "night_activity_probability": 0.08,
+            "attention_span_modifier": 1.0,
+            "sessions_per_day": 6,
+            "avg_session_minutes": 12,
+            "mental_health_multiplier": 1.0,
+            "primary_concerns": [
+                "trying_to_conceive",
+                "ovulation_tracking",
+                "prenatal_vitamins"
+            ]
+        },
+        "T1": {
+            "name": "trimester_1",
+            "display_name": "孕早期",
+            "week_range": [
+                1,
+                13
+            ],
+            "session_duration_modifier": 0.85,
+            "night_activity_probability": 0.12,
+            "attention_span_modifier": 0.9,
+            "sessions_per_day": 7,
+            "avg_session_minutes": 10,
+            "mental_health_multiplier": 0.8,
+            "primary_concerns": [
+                "morning_sickness",
+                "prenatal_appointments",
+                "first_trimester_anxiety"
+            ]
+        },
+        "T2": {
+            "name": "trimester_2",
+            "display_name": "孕中期",
+            "week_range": [
+                14,
+                27
+            ],
+            "session_duration_modifier": 1.0,
+            "night_activity_probability": 0.10,
+            "attention_span_modifier": 1.0,
+            "sessions_per_day": 7,
+            "avg_session_minutes": 12,
+            "mental_health_multiplier": 1.1,
+            "primary_concerns": [
+                "baby_kicks",
+                "anatomy_scan",
+                "nursery_planning"
+            ]
+        },
+        "T3": {
+            "name": "trimester_3",
+            "display_name": "孕晚期",
+            "week_range": [
+                28,
+                42
+            ],
+            "session_duration_modifier": 0.9,
+            "night_activity_probability": 0.12,
+            "attention_span_modifier": 0.9,
+            "sessions_per_day": 6,
+            "avg_session_minutes": 11,
+            "mental_health_multiplier": 0.9,
+            "primary_concerns": [
+                "birth_plan",
+                "hospital_bag",
+                "labor_signs"
+            ]
+        },
+        "PP0": {
+            "name": "postpartum_early",
+            "display_name": "产后早期",
+            "month_range": [
+                0,
+                3
+            ],
+            "session_duration_modifier": 0.6,
+            "night_activity_probability": 0.25,
+            "attention_span_modifier": 0.75,
+            "sessions_per_day": 10,
+            "avg_session_minutes": 7,
+            "mental_health_multiplier": 0.6,
+            "primary_concerns": [
+                "newborn_sleep",
+                "breastfeeding",
+                "postpartum_recovery"
+            ]
+        },
+        "PP1": {
+            "name": "postpartum_later",
+            "display_name": "产后中期",
+            "month_range": [
+                4,
+                12
+            ],
+            "session_duration_modifier": 0.8,
+            "night_activity_probability": 0.15,
+            "attention_span_modifier": 0.85,
+            "sessions_per_day": 8,
+            "avg_session_minutes": 9,
+            "mental_health_multiplier": 0.85,
+            "primary_concerns": [
+                "sleep_training",
+                "starting_solids",
+                "baby_milestones"
+            ]
+        },
+        "NP": {
+            "name": "not_pregnant_parenting",
+            "display_name": "育儿期",
+            "month_range": [
+                13,
+                999
+            ],
+            "session_duration_modifier": 1.0,
+            "night_activity_probability": 0.08,
+            "attention_span_modifier": 1.0,
+            "sessions_per_day": 6,
+            "avg_session_minutes": 12,
+            "mental_health_multiplier": 1.0,
+            "primary_concerns": [
+                "family_routines",
+                "child_development",
+                "parenting_tips"
+            ]
+        }
+    }
+}

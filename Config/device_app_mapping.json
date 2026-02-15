@@ -1,0 +1,22 @@
+{
+    "version": "1.0",
+    "description": "Maps devices to social media platforms for multi-platform automation",
+    "devices": {
+        "device_001": {
+            "platform": "reddit",
+            "device_name": "Pixel 6 Pro",
+            "notes": "Primary Reddit automation device"
+        },
+        "device_002": {
+            "platform": "instagram",
+            "device_name": "Samsung Galaxy S21",
+            "notes": "Instagram automation device"
+        },
+        "device_003": {
+            "platform": "reddit",
+            "device_name": "OnePlus 9",
+            "notes": "Secondary Reddit device"
+        }
+    },
+    "default_platform": "reddit"
+}

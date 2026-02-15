@@ -1,0 +1,35 @@
+{
+    "version": "1.0",
+    "description": "DPS v4.5 扩展注册表 - 定义所有可用扩展及其配置",
+    "extensions": [
+        {
+            "name": "IPLocation",
+            "category": "DataSource",
+            "module": "Extensions/DataSources/IPLocationExtension.cs",
+            "enabled": true,
+            "config": {
+                "update_interval_hours": 24,
+                "cache_duration_hours": 1,
+                "providers": [
+                    "https://api.ipify.org",
+                    "https://ipapi.co/{ip}/json/"
+                ]
+            }
+        },
+        {
+            "name": "Weather",
+            "category": "DataSource",
+            "module": "Extensions/DataSources/WeatherExtension.cs",
+            "enabled": true,
+            "config": {
+                "update_interval_hours": 1,
+                "use_mcp": true,
+                "fallback_to_simulation": true,
+                "impact_factors": {
+                    "activity_level": 0.2,
+                    "mood": 0.3
+                }
+            }
+        }
+    ]
+}

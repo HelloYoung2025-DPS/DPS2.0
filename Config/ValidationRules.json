@@ -1,0 +1,119 @@
+{
+    "version": "1.0",
+    "critical_fields": [
+        {
+            "path": "_meta.persona_id",
+            "type": "string",
+            "required": true,
+            "pattern": "^P-\\d{10}-[A-Z0-9]{6}$"
+        },
+        {
+            "path": "_meta.version",
+            "type": "string",
+            "required": true
+        },
+        {
+            "path": "basic_info.name",
+            "type": "string",
+            "required": true,
+            "min_length": 2
+        },
+        {
+            "path": "basic_info.birth_date",
+            "type": "date",
+            "required": true,
+            "format": "yyyy-MM-dd"
+        },
+        {
+            "path": "basic_info.current_age",
+            "type": "integer",
+            "required": true,
+            "min": 18,
+            "max": 45
+        },
+        {
+            "path": "maternal_stage.stage_code",
+            "type": "enum",
+            "required": true,
+            "allowed": [
+                "TTC",
+                "T1",
+                "T2",
+                "T3",
+                "PP0",
+                "PP1",
+                "NP"
+            ]
+        },
+        {
+            "path": "career.occupation",
+            "type": "string",
+            "required": true
+        },
+        {
+            "path": "personality.TypingSkillLevel",
+            "type": "enum",
+            "required": true,
+            "allowed": [
+                "regular",
+                "proficient"
+            ]
+        }
+    ],
+    "logical_consistency_rules": [
+        {
+            "rule_id": "pregnancy_consistency",
+            "description": "如果 is_pregnant=true，必须有 conception_date 和 due_date",
+            "condition": "pregnancy_status.is_pregnant == true",
+            "requirements": [
+                {
+                    "field": "pregnancy_status.conception_date",
+                    "must_exist": true
+                },
+                {
+                    "field": "pregnancy_status.due_date",
+                    "must_exist": true
+                }
+            ]
+        },
+        {
+            "rule_id": "children_consistency",
+            "description": "如果有孩子，children 数组不能为空",
+            "condition": "_computed.total_children_count > 0",
+            "requirements": [
+                {
+                    "field": "children",
+                    "must_be_array": true,
+                    "min_length": 1
+                }
+            ]
+        },
+        {
+            "rule_id": "stage_pregnancy_consistency",
+            "description": "T1/T2/T3 阶段必须 is_pregnant=true",
+            "condition": "maternal_stage.stage_code IN ['T1','T2','T3']",
+            "requirements": [
+                {
+                    "field": "pregnancy_status.is_pregnant",
+                    "must_equal": true
+                }
+            ]
+        }
+    ],
+    "auto_fix_rules": [
+        {
+            "issue": "missing_typing_skill",
+            "fix": "random_select",
+            "options": [
+                "regular",
+                "proficient"
+            ]
+        },
+        {
+            "issue": "age_out_of_range",
+            "fix": "clamp",
+            "min": 18,
+            "max": 45
+        }
+    ]
+}

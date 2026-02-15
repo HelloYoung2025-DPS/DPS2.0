@@ -1,0 +1,51 @@
+===============================================
+DPS v4.5 初始化检查清单
+===============================================
+
+【目录结构检查】
+
+[ ] Modules/Core/       - 4个.cs文件 (CoreHelper, JsonHelper, AIService, FileHelper)
+[ ] Modules/            - 10个业务模块.cs文件
+[ ] ZDProjects/         - ModuleLoader.cs + *_OwnCode.cs 文件
+[ ] Config/             - 8个配置文件
+[ ] Persons/            - 目录存在
+[ ] Memory/             - 目录存在
+[ ] Data/               - 目录存在
+[ ] Logs/               - 目录存在
+[ ] Reports/            - 目录存在
+
+-----------------------------------------------
+
+【配置文件检查】
+
+[ ] Config/AIConfig.json         - API Key已填写
+[ ] Config/StageConfig.json      - 阶段参数完整
+[ ] Config/BehaviorConfig.json   - 行为参数完整
+[ ] Config/ExtensionsConfig.json - 扩展配置完整
+[ ] Config/EvolutionRules.json   - 进化规则完整
+[ ] Config/ValidationRules.json  - 验证规则完整
+[ ] Config/Apps.json             - APP定义完整
+[ ] Config/PersonaPrompt.txt     - 母模板存在
+
+-----------------------------------------------
+
+【ZD变量检查】
+
+[ ] project_root     - 已设置正确路径
+[ ] device_id        - 已设置设备ID
+[ ] current_app      - 已设置APP名称
+[ ] persona_json     - 变量已创建
+[ ] session_plan_json - 变量已创建
+
+-----------------------------------------------
+
+【功能测试】
+
+[ ] 运行初始化动作 - 无错误
+[ ] 生成首个画像 - Persons/下有文件
+[ ] 每日更新测试 - 画像更新成功
+[ ] 日志记录测试 - Logs/下有日志
+
+===============================================
+全部打勾后，系统即可正常使用
+===============================================

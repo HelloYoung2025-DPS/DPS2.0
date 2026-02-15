@@ -1,0 +1,436 @@
+// =====================================================
+// CoreHelper.cs - 核心辅助函数库
+// 供其他模块调用的公共函数
+// ⚠️ C# 5.0 语法 - 禁止使用 $""、?.、nameof() 等
+// v4.0.1 - 修复 WriteFileAtomic、添加 CountOccurrences、ValidateDeviceId
+// =====================================================
+using System;
+using System.IO;
+using System.Text;
+using System.Collections.Generic;
+
+/// <summary>
+/// 核心辅助函数库
+/// 所有方法都是静态的，接收 project 对象作为第一个参数
+/// </summary>
+public class CoreHelper
+{
+    private static dynamic _project;
+    private static dynamic _instance;
+    
+    /// <summary>
+    /// 初始化辅助函数库（仅 project）
+    /// </summary>
+    public static void Init(object projectObj)
+    {
+        _project = projectObj;
+    }
+    
+    /// <summary>
+    /// 初始化辅助函数库（project + ZD instance）
+    /// </summary>
+    public static void Init(object projectObj, object instanceObj)
+    {
+        _project = projectObj;
+        _instance = instanceObj;
+    }
+    
+    /// <summary>
+    /// 单独注入 ZD instance（供 ModuleLoader 在 Init 之后调用）
+    /// </summary>
+    public static void InitInstance(object instanceObj)
+    {
+        _instance = instanceObj;
+    }
+    
+    /// <summary>
+    /// 获取 DroidInstance 对象
+    /// </summary>
+    public static dynamic GetDroid()
+    {
+        if (_instance == null)
+        {
+            LogErr("CoreHelper", "DroidInstance 未初始化，请先调用 InitInstance()");
+            return null;
+        }
+        return _instance.DroidInstance;
+    }
+    
+    /// <summary>
+    /// 获取 DroidInstance.Input（点击、滑动等输入操作）
+    /// </summary>
+    public static dynamic GetInput()
+    {
+        dynamic droid = GetDroid();
+        if (droid == null) return null;
+        return droid.Input;
+    }
+    
+    /// <summary>
+    /// 获取 DroidInstance.Hierarchy（UI 层级树）
+    /// </summary>
+    public static dynamic GetHierarchy()
+    {
+        dynamic droid = GetDroid();
+        if (droid == null) return null;
+        return droid.Hierarchy;
+    }
+    
+    /// <summary>
+    /// 获取 DroidInstance.App（应用管理）
+    /// </summary>
+    public static dynamic GetApp()
+    {
+        dynamic droid = GetDroid();
+        if (droid == null) return null;
+        return droid.App;
+    }
+    
+    /// <summary>
+    /// 便捷方法：获取当前 UI 布局 XML
+    /// </summary>
+    public static string GetLayout()
+    {
+        dynamic hierarchy = GetHierarchy();
+        if (hierarchy == null) return "";
+        try
+        {
+            return hierarchy.GetLayout();
+        }
+        catch (Exception ex)
+        {
+            LogErr("CoreHelper", "GetLayout 失败: " + ex.Message);
+            return "";
+        }
+    }
+    
+    /// <summary>
+    /// 检查 instance 是否已初始化
+    /// </summary>
+    public static bool HasInstance()
+    {
+        return _instance != null;
+    }
+    
+    // ========== 日志函数 ==========
+    
+    public static void Log(string message)
+    {
+        if (_project != null)
+        {
+            _project.SendInfoToLog(message);
+        }
+    }
+    
+    public static void Log(string tag, string message)
+    {
+        Log(string.Format("[{0}] {1}", tag, message));
+    }
+    
+    public static void LogWarn(string message)
+    {
+        if (_project != null)
+        {
+            _project.SendWarningToLog(message);
+        }
+    }
+    
+    public static void LogWarn(string tag, string message)
+    {
+        LogWarn(string.Format("[{0}] {1}", tag, message));
+    }
+    
+    public static void LogErr(string message)
+    {
+        if (_project != null)
+        {
+            _project.SendErrorToLog(message);
+        }
+    }
+    
+    public static void LogErr(string tag, string message)
+    {
+        LogErr(string.Format("[{0}] {1}", tag, message));
+    }
+    
+    // ========== 变量函数 ==========
+    
+    /// <summary>
+    /// 获取变量值
+    /// </summary>
+    public static string GetVar(string name, string defaultValue)
+    {
+        try
+        {
+            string v = _project.Variables[name].Value;
+            return string.IsNullOrEmpty(v) ? defaultValue : v;
+        }
+        catch
+        {
+            return defaultValue;
+        }
+    }
+    
+    /// <summary>
+    /// 设置变量值
+    /// 注意：变量必须在 ZD 项目中预先创建，否则设置会失败
+    /// </summary>
+    public static void SetVar(string name, string value)
+    {
+        try
+        {
+            _project.Variables[name].Value = value ?? "";
+        }
+        catch
+        {
+            // 变量不存在时静默忽略（避免日志刷屏）
+            // 如需调试，取消下行注释
+            // LogWarn("CoreHelper", "SetVar: 变量 '" + name + "' 不存在，请在ZD中创建");
+        }
+    }
+    
+    /// <summary>
+    /// 获取整数变量
+    /// </summary>
+    public static int GetVarInt(string name, int defaultValue)
+    {
+        string v = GetVar(name, "");
+        int result;
+        if (int.TryParse(v, out result))
+        {
+            return result;
+        }
+        return defaultValue;
+    }
+    
+    /// <summary>
+    /// 获取布尔变量
+    /// </summary>
+    public static bool GetVarBool(string name, bool defaultValue)
+    {
+        string v = GetVar(name, "").ToLower();
+        if (v == "true" || v == "1" || v == "yes") return true;
+        if (v == "false" || v == "0" || v == "no") return false;
+        return defaultValue;
+    }
+    
+    // ========== 文件函数 ==========
+    
+    /// <summary>
+    /// 确保目录存在
+    /// </summary>
+    public static void EnsureDir(string dirPath)
+    {
+        if (!Directory.Exists(dirPath))
+        {
+            Directory.CreateDirectory(dirPath);
+        }
+    }
+    
+    /// <summary>
+    /// 读取文件内容
+    /// </summary>
+    public static string ReadFile(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return "";
+        }
+        return File.ReadAllText(path, Encoding.UTF8);
+    }
+    
+    /// <summary>
+    /// 写入文件（自动创建目录）
+    /// </summary>
+    public static void WriteFile(string path, string content)
+    {
+        string dir = Path.GetDirectoryName(path);
+        EnsureDir(dir);
+        File.WriteAllText(path, content, Encoding.UTF8);
+    }
+    
+    /// <summary>
+    /// 追加文件内容
+    /// </summary>
+    public static void AppendFile(string path, string content)
+    {
+        string dir = Path.GetDirectoryName(path);
+        EnsureDir(dir);
+        File.AppendAllText(path, content, Encoding.UTF8);
+    }
+    
+    /// <summary>
+    /// 安全写入（原子操作，带异常处理）
+    /// </summary>
+    public static void WriteFileAtomic(string path, string content)
+    {
+        string dir = Path.GetDirectoryName(path);
+        EnsureDir(dir);
+        
+        string tmp = path + ".tmp";
+        File.WriteAllText(tmp, content, Encoding.UTF8);
+        
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Replace(tmp, path, path + ".bak", true);
+            }
+            else
+            {
+                File.Move(tmp, path);
+            }
+        }
+        catch (Exception replaceEx)
+        {
+            // File.Replace 失败时回退到直接覆盖
+            // 常见原因：跨卷操作、权限问题、文件被锁定
+            if (File.Exists(tmp))
+            {
+                File.Copy(tmp, path, true);
+                try { File.Delete(tmp); } catch (Exception delEx) { /* 临时文件删除失败可忽略，不影响主逻辑 */ }
+            }
+        }
+    }
+    
+    // ========== JSON 函数（手动解析）==========
+    
+    /// <summary>
+    /// 获取 JSON 字段值
+    /// </summary>
+    public static string JGet(string json, string key)
+    {
+        return JsonHelper.Get(json, key);
+    }
+    
+    /// <summary>
+    /// 获取嵌套 JSON 字段值（如 "_meta.created_at"）
+    /// </summary>
+    public static string JGetNested(string json, string path)
+    {
+        return JsonHelper.GetNested(json, path);
+    }
+    
+    /// <summary>
+    /// 设置 JSON 字段值
+    /// </summary>
+    public static string JSet(string json, string key, string newValue, bool isString)
+    {
+        return JsonHelper.Set(json, key, newValue, isString);
+    }
+    
+    // ========== 时间函数 ==========
+    
+    /// <summary>
+    /// 获取今天日期 (yyyy-MM-dd)
+    /// </summary>
+    public static string GetToday()
+    {
+        return DateTime.Now.ToString("yyyy-MM-dd");
+    }
+    
+    /// <summary>
+    /// 获取当前时间戳 (yyyy-MM-dd HH:mm:ss)
+    /// </summary>
+    public static string GetNow()
+    {
+        return DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+    }
+    
+    /// <summary>
+    /// 获取ISO时间戳
+    /// </summary>
+    public static string GetNowISO()
+    {
+        return DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss");
+    }
+    
+    // ========== 工具函数 ==========
+    
+    /// <summary>
+    /// 安全解析整数
+    /// </summary>
+    public static int SafeParseInt(string s, int defaultValue)
+    {
+        int result;
+        if (int.TryParse(s, out result))
+        {
+            return result;
+        }
+        return defaultValue;
+    }
+    
+    /// <summary>
+    /// 安全解析双精度
+    /// </summary>
+    public static double SafeParseDouble(string s, double defaultValue)
+    {
+        double result;
+        // BUG-03 fix: 使用 InvariantCulture 确保 "0.5" 在任何 locale 下都正确解析
+        if (double.TryParse(s, System.Globalization.NumberStyles.Float | System.Globalization.NumberStyles.AllowLeadingSign,
+            System.Globalization.CultureInfo.InvariantCulture, out result))
+        {
+            return result;
+        }
+        return defaultValue;
+    }
+    
+    /// <summary>
+    /// 规范化路径（确保以反斜杠结尾）
+    /// </summary>
+    public static string NormalizePath(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return "";
+        return path.EndsWith("\\") ? path : path + "\\";
+    }
+    
+    /// <summary>
+    /// 计算字符串出现次数
+    /// </summary>
+    public static int CountOccurrences(string text, string pattern)
+    {
+        if (string.IsNullOrEmpty(text) || string.IsNullOrEmpty(pattern))
+            return 0;
+        
+        int count = 0;
+        int idx = 0;
+        while ((idx = text.IndexOf(pattern, idx)) != -1)
+        {
+            count++;
+            idx++;
+        }
+        return count;
+    }
+    
+    /// <summary>
+    /// 验证设备ID是否安全（防止路径遍历攻击）
+    /// </summary>
+    public static bool ValidateDeviceId(string deviceId)
+    {
+        if (string.IsNullOrEmpty(deviceId))
+            return false;
+        
+        // 检查路径遍历字符
+        if (deviceId.Contains("..") || deviceId.Contains("/") || 
+            deviceId.Contains("\\") || deviceId.Contains(":"))
+            return false;
+        
+        // 检查非法文件名字符
+        char[] invalidChars = Path.GetInvalidFileNameChars();
+        foreach (char c in invalidChars)
+        {
+            if (deviceId.IndexOf(c) >= 0)
+                return false;
+        }
+        
+        return true;
+    }
+    
+    /// <summary>
+    /// 获取安全的设备ID（如果无效则返回默认值）
+    /// </summary>
+    public static string GetSafeDeviceId(string deviceId, string defaultValue)
+    {
+        return ValidateDeviceId(deviceId) ? deviceId : defaultValue;
+    }
+}

@@ -1,0 +1,167 @@
+# DPS v4.5 "Persona" 快速开始指南
+
+## 📋 项目概述
+
+DPS v4.5 是一个动态人物画像系统，专为 ZennoDroid 设计。
+
+**v4.5 新特性：**
+- 🌐 多平台支持：Reddit + Instagram 完整互动功能
+- 🧩 核心模块：HumanizationEngine, UILocator, ErrorRecovery, PlatformBase
+- 🚀 编译缓存：第二次运行从 ~500ms 降至 <10ms
+- 🔧 健壮的 JSON 解析器：正确处理嵌套对象和转义字符
+- 📊 API 错误检测：自动检测并报告 AI API 错误
+
+---
+
+## 📋 第一步：配置 API Key
+
+编辑 `Config/AIConfig.json`，将占位符替换为您的真实 API Key：
+
+```json
+{
+  "models": {
+    "primary": {
+      "api_key": "YOUR_GEMINI_API_KEY_HERE"  ← 替换这里
+    }
+  }
+}
+```
+
+获取 API Key:
+- Gemini: https://aistudio.google.com/apikey
+- OpenAI: https://platform.openai.com/api-keys
+
+---
+
+## 📋 第二步：在 ZennoDroid 中创建项目
+
+### 2.1 创建必需变量
+
+在 ZennoDroid 项目设置中创建以下变量（参见 `ZDProjects/VARIABLES.md`）：
+
+| 变量名 | 示例值 | 必需 |
+|--------|--------|------|
+| `project_root` | `C:\DPS_v4.1` | ✅ |
+| `device_id` | `device_001` | ✅ |
+| `ai_config_json` | (留空) | |
+| `stage_config_json` | (留空) | |
+| `behavior_config_json` | (留空) | |
+| `persona_json` | (留空) | |
+| `session_plan_json` | (留空) | |
+| `effective_date` | (留空) | |
+| `run_result` | (留空) | |
+| `action_count` | (留空) | |
+| `last_error` | (留空) | |
+| `_init_status` | (留空) | |
+
+### 2.2 创建 Own Code 动作
+
+将以下文件的**完整代码**复制到 ZennoDroid 的 "Own Code" 动作块中：
+
+1. `ZDProjects/Initializer_OwnCode.cs` → 创建"初始化"动作
+2. `ZDProjects/Main_OwnCode.cs` → 创建"主入口"动作
+3. `ZDProjects/PersonaCreate_OwnCode.cs` → 创建"画像生成"动作
+4. `ZDProjects/DailyUpdate_OwnCode.cs` → 创建"每日更新"动作
+5. `ZDProjects/SessionRunner_OwnCode.cs` → 创建"会话执行"动作
+
+---
+
+## 📋 第三步：运行顺序
+
+### 首次运行（新画像）
+
+```
+1. [初始化] Initializer → 创建目录结构
+2. [手动] 设置 project_root 和 device_id 变量
+3. [主入口] Main → 返回 "NEED_CREATE_PERSONA"
+4. [画像生成] PersonaCreate → 调用AI生成画像
+5. [主入口] Main → 返回 "READY"
+6. [会话执行] SessionRunner → 执行模拟会话
+```
+
+### 日常运行
+
+```
+1. Main → 加载配置 + 检查每日更新
+   ├─ 如果返回 "NEED_DAILY_UPDATE"
+   │  └─ 执行 DailyUpdate
+   └─ 返回 "READY"
+2. SessionRunner → 执行会话
+```
+
+---
+
+## 📋 项目结构
+
+```
+DPS_v4.1/
+├── Config/                 # 配置文件
+│   ├── AIConfig.json       # ⚠️ 需要填写 API Key
+│   ├── StageConfig.json    # 阶段参数配置
+│   ├── BehaviorConfig.json # 行为参数配置
+│   └── PersonaPrompt.txt   # 画像生成提示词
+│
+├── Modules/                # 业务逻辑模块
+│   ├── Core/               # 核心工具 (CoreHelper, JsonHelper, AIService, FileHelper)
+│   └── *.cs                # 10个业务模块
+│
+├── ZDProjects/             # ⭐ ZennoDroid Own Code（直接使用）
+│   ├── README.md           # 使用说明
+│   ├── ModuleLoader.cs     # 模块加载器模板（含编译缓存）
+│   ├── Initializer_OwnCode.cs
+│   ├── Main_OwnCode.cs
+│   ├── PersonaCreate_OwnCode.cs
+│   ├── DailyUpdate_OwnCode.cs
+│   ├── SessionRunner_OwnCode.cs
+│   ├── WeeklyEvolve_OwnCode.cs
+│   ├── ReportGen_OwnCode.cs
+│   └── Maintenance_OwnCode.cs
+│
+├── Persons/                # 画像存储（运行时生成）
+├── Memory/                 # 记忆存储（运行时生成）
+├── Logs/                   # 日志目录（运行时生成）
+└── Reports/                # 报告目录（运行时生成）
+```
+
+---
+
+## ⚠️ 常见问题
+
+### Q: 代码在 Visual Studio 中显示错误
+
+这是正常的！Own Code 不是标准 C# 语法：
+- 没有 `using` 语句
+- 没有 `class` 定义
+- 使用 `Func<>` / `Action<>` 委托
+
+只需复制粘贴到 ZennoDroid 即可正常运行。
+
+### Q: 提示 "IZennoPosterProjectModel 找不到"
+
+在编辑器中会显示此错误，但在 ZennoDroid 运行时会正确识别。
+
+### Q: API 调用失败
+
+1. 检查 `Config/AIConfig.json` 中的 API Key 是否正确
+2. 确认网络连接正常
+3. 查看 ZennoDroid 日志获取详细错误
+
+### Q: 变量未设置错误
+
+确保在 ZennoDroid 中**预先创建**所有需要的变量（见 VARIABLES.md）。
+
+---
+
+## 📞 关键文件说明
+
+| 文件 | 必须修改 | 说明 |
+|------|----------|------|
+| `Config/AIConfig.json` | ✅ 是 | 填写 API Key |
+| `ZDProjects/*.cs` | ❌ 否 | 直接复制使用 |
+| `CodeBlocks/*.txt` | ❌ 否 | 仅作参考 |
+
+---
+
+版本: v4.5.0
+最后更新: 2026-02-07
+架构: 动态编译 + 编译缓存 + 多平台支持

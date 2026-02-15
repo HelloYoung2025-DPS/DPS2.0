@@ -1,0 +1,376 @@
+{
+    "version": "2.0",
+    "platforms": {
+        "reddit": {
+            "name": "Reddit",
+            "package_name": "com.reddit.frontpage",
+            "enabled": true,
+            "rate_limits": {
+                "max_actions_per_hour": 120,
+                "max_likes_per_hour": 40,
+                "max_comments_per_hour": 20,
+                "max_follows_per_hour": 15,
+                "min_action_delay_ms": 2000,
+                "max_action_delay_ms": 8000
+            },
+            "ui_selectors": {
+                "post_unit": {
+                    "strategy": "resource-id",
+                    "value": "post_unit",
+                    "fallback_strategy": "class",
+                    "fallback_value": "android.widget.FrameLayout"
+                },
+                "post_footer": {
+                    "strategy": "resource-id",
+                    "value": "post_footer"
+                },
+                "upvote_button": {
+                    "strategy": "resource-id",
+                    "value": "post_footer_first_child",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Upvote"
+                },
+                "downvote_button": {
+                    "strategy": "content-desc",
+                    "value": "Downvote"
+                },
+                "comment_button": {
+                    "strategy": "resource-id",
+                    "value": "comment_button",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Comment"
+                },
+                "share_button": {
+                    "strategy": "resource-id",
+                    "value": "share_button",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Share"
+                },
+                "follow_button": {
+                    "strategy": "resource-id",
+                    "value": "follow_button",
+                    "fallback_strategy": "text",
+                    "fallback_value": "Follow"
+                },
+                "comment_input": {
+                    "strategy": "resource-id",
+                    "value": "comment_input",
+                    "fallback_strategy": "class",
+                    "fallback_value": "android.widget.EditText"
+                },
+                "submit_button": {
+                    "strategy": "resource-id",
+                    "value": "submit_comment",
+                    "fallback_strategy": "text",
+                    "fallback_value": "Post"
+                },
+                "post_title": {
+                    "strategy": "resource-id",
+                    "value": "post_title"
+                },
+                "post_body": {
+                    "strategy": "resource-id",
+                    "value": "post_body"
+                },
+                "subreddit_name": {
+                    "strategy": "resource-id",
+                    "value": "subreddit_name"
+                },
+                "author_name": {
+                    "strategy": "resource-id",
+                    "value": "author_name"
+                },
+                "toolbar": {
+                    "strategy": "resource-id",
+                    "value": "toolbar"
+                },
+                "back_button": {
+                    "strategy": "content-desc",
+                    "value": "Navigate up"
+                }
+            },
+            "page_signatures": {
+                "feed": {
+                    "threshold": 0.5,
+                    "signals": [
+                        { "strategy": "resource-id", "value": "post_unit", "weight": 0.4 },
+                        { "strategy": "resource-id", "value": "toolbar", "weight": 0.2 },
+                        { "strategy": "resource-id", "value": "post_footer", "weight": 0.3 },
+                        { "strategy": "resource-id", "value": "subreddit_name", "weight": 0.1 }
+                    ]
+                },
+                "post_detail": {
+                    "threshold": 0.5,
+                    "signals": [
+                        { "strategy": "resource-id", "value": "post_title", "weight": 0.3 },
+                        { "strategy": "resource-id", "value": "post_body", "weight": 0.2 },
+                        { "strategy": "resource-id", "value": "comment_input", "weight": 0.3 },
+                        { "strategy": "resource-id", "value": "author_name", "weight": 0.2 }
+                    ]
+                },
+                "comment": {
+                    "threshold": 0.6,
+                    "signals": [
+                        { "strategy": "resource-id", "value": "comment_input", "weight": 0.5 },
+                        { "strategy": "class", "value": "android.widget.EditText", "weight": 0.3 },
+                        { "strategy": "resource-id", "value": "submit_comment", "weight": 0.2 }
+                    ]
+                },
+                "profile": {
+                    "threshold": 0.5,
+                    "signals": [
+                        { "strategy": "resource-id", "value": "author_name", "weight": 0.3 },
+                        { "strategy": "resource-id", "value": "follow_button", "weight": 0.4 },
+                        { "strategy": "text-contains", "value": "karma", "weight": 0.3 }
+                    ]
+                }
+            },
+            "action_weights": {
+                "browse": 40,
+                "like": 30,
+                "comment": 15,
+                "follow": 10,
+                "share": 5
+            },
+            "scroll_config": {
+                "min_scroll_distance": 800,
+                "max_scroll_distance": 1200,
+                "scroll_duration_ms": 500
+            },
+            "error_thresholds": {
+                "max_ui_not_found": 5,
+                "max_app_crashes": 3,
+                "max_network_errors": 10
+            }
+        },
+        "instagram": {
+            "name": "Instagram",
+            "package_name": "com.instagram.android",
+            "enabled": true,
+            "rate_limits": {
+                "max_actions_per_hour": 60,
+                "max_likes_per_hour": 30,
+                "max_comments_per_hour": 10,
+                "max_follows_per_hour": 20,
+                "min_action_delay_ms": 3000,
+                "max_action_delay_ms": 12000
+            },
+            "ui_selectors": {
+                "post_unit": {
+                    "strategy": "resource-id",
+                    "value": "media_container",
+                    "fallback_strategy": "resource-id",
+                    "fallback_value": "media_image"
+                },
+                "like_button": {
+                    "strategy": "resource-id",
+                    "value": "like_button",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Like"
+                },
+                "comment_button": {
+                    "strategy": "resource-id",
+                    "value": "comment_button",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Comment"
+                },
+                "share_button": {
+                    "strategy": "resource-id",
+                    "value": "share_button",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Share"
+                },
+                "follow_button": {
+                    "strategy": "resource-id",
+                    "value": "follow_button",
+                    "fallback_strategy": "text",
+                    "fallback_value": "Follow"
+                },
+                "comment_input": {
+                    "strategy": "resource-id",
+                    "value": "comment_composer_text_view",
+                    "fallback_strategy": "class",
+                    "fallback_value": "android.widget.EditText"
+                },
+                "submit_button": {
+                    "strategy": "resource-id",
+                    "value": "post_button",
+                    "fallback_strategy": "text",
+                    "fallback_value": "Post"
+                },
+                "profile_username": {
+                    "strategy": "resource-id",
+                    "value": "profile_username"
+                },
+                "media_image": {
+                    "strategy": "resource-id",
+                    "value": "media_image"
+                },
+                "username_label": {
+                    "strategy": "resource-id",
+                    "value": "row_feed_photo_profile_name"
+                },
+                "caption_text": {
+                    "strategy": "resource-id",
+                    "value": "row_feed_comment_textview_layout"
+                },
+                "toolbar": {
+                    "strategy": "resource-id",
+                    "value": "action_bar_container"
+                },
+                "back_button": {
+                    "strategy": "content-desc",
+                    "value": "Back"
+                },
+                "home_tab": {
+                    "strategy": "content-desc",
+                    "value": "Home",
+                    "fallback_strategy": "resource-id",
+                    "fallback_value": "tab_icon"
+                }
+            },
+            "page_signatures": {
+                "feed": {
+                    "threshold": 0.5,
+                    "signals": [
+                        { "strategy": "resource-id", "value": "media_container", "weight": 0.3 },
+                        { "strategy": "resource-id", "value": "row_feed_photo_profile_name", "weight": 0.3 },
+                        { "strategy": "resource-id", "value": "like_button", "weight": 0.2 },
+                        { "strategy": "resource-id", "value": "action_bar_container", "weight": 0.2 }
+                    ]
+                },
+                "post_detail": {
+                    "threshold": 0.5,
+                    "signals": [
+                        { "strategy": "resource-id", "value": "media_image", "weight": 0.3 },
+                        { "strategy": "resource-id", "value": "like_button", "weight": 0.2 },
+                        { "strategy": "resource-id", "value": "row_feed_comment_textview_layout", "weight": 0.3 },
+                        { "strategy": "resource-id", "value": "comment_button", "weight": 0.2 }
+                    ]
+                },
+                "comment": {
+                    "threshold": 0.6,
+                    "signals": [
+                        { "strategy": "resource-id", "value": "comment_composer_text_view", "weight": 0.5 },
+                        { "strategy": "class", "value": "android.widget.EditText", "weight": 0.3 },
+                        { "strategy": "resource-id", "value": "post_button", "weight": 0.2 }
+                    ]
+                },
+                "profile": {
+                    "threshold": 0.5,
+                    "signals": [
+                        { "strategy": "resource-id", "value": "profile_username", "weight": 0.3 },
+                        { "strategy": "resource-id", "value": "follow_button", "weight": 0.3 },
+                        { "strategy": "text-contains", "value": "posts", "weight": 0.2 },
+                        { "strategy": "text-contains", "value": "followers", "weight": 0.2 }
+                    ]
+                }
+            },
+            "action_weights": {
+                "browse": 50,
+                "like": 35,
+                "comment": 5,
+                "follow": 8,
+                "share": 2
+            },
+            "scroll_config": {
+                "min_scroll_distance": 1000,
+                "max_scroll_distance": 1400,
+                "scroll_duration_ms": 600
+            },
+            "error_thresholds": {
+                "max_ui_not_found": 3,
+                "max_app_crashes": 2,
+                "max_network_errors": 8
+            }
+        },
+        "tiktok": {
+            "name": "TikTok",
+            "package_name": "com.zhiliaoapp.musically",
+            "enabled": false,
+            "rate_limits": {
+                "max_actions_per_hour": 100,
+                "max_likes_per_hour": 50,
+                "max_comments_per_hour": 15,
+                "max_follows_per_hour": 25,
+                "min_action_delay_ms": 2500,
+                "max_action_delay_ms": 10000
+            },
+            "ui_selectors": {
+                "post_unit": { "strategy": "resource-id", "value": "video_container" },
+                "like_button": { "strategy": "resource-id", "value": "like_button" },
+                "comment_button": { "strategy": "resource-id", "value": "comment_button" },
+                "share_button": { "strategy": "resource-id", "value": "share_button" },
+                "follow_button": { "strategy": "resource-id", "value": "follow_button" }
+            },
+            "page_signatures": {},
+            "action_weights": {
+                "browse": 60,
+                "like": 25,
+                "comment": 5,
+                "follow": 8,
+                "share": 2
+            },
+            "scroll_config": {
+                "min_scroll_distance": 1200,
+                "max_scroll_distance": 1600,
+                "scroll_duration_ms": 400
+            },
+            "error_thresholds": {
+                "max_ui_not_found": 5,
+                "max_app_crashes": 3,
+                "max_network_errors": 10
+            }
+        },
+        "facebook": {
+            "name": "Facebook",
+            "package_name": "com.facebook.katana",
+            "enabled": false,
+            "rate_limits": {
+                "max_actions_per_hour": 80,
+                "max_likes_per_hour": 35,
+                "max_comments_per_hour": 12,
+                "max_follows_per_hour": 15,
+                "min_action_delay_ms": 3500,
+                "max_action_delay_ms": 15000
+            },
+            "ui_selectors": {
+                "post_unit": { "strategy": "resource-id", "value": "story_container" },
+                "like_button": { "strategy": "resource-id", "value": "like_button" },
+                "comment_button": { "strategy": "resource-id", "value": "comment_button" },
+                "share_button": { "strategy": "resource-id", "value": "share_button" },
+                "follow_button": { "strategy": "resource-id", "value": "add_friend_button" }
+            },
+            "page_signatures": {},
+            "action_weights": {
+                "browse": 45,
+                "like": 30,
+                "comment": 10,
+                "follow": 10,
+                "share": 5
+            },
+            "scroll_config": {
+                "min_scroll_distance": 900,
+                "max_scroll_distance": 1300,
+                "scroll_duration_ms": 550
+            },
+            "error_thresholds": {
+                "max_ui_not_found": 4,
+                "max_app_crashes": 2,
+                "max_network_errors": 8
+            }
+        }
+    },
+    "device_platform_mapping": {
+        "default": "reddit",
+        "device_001": "reddit",
+        "device_002": "instagram"
+    },
+    "global_settings": {
+        "session_duration_minutes": 30,
+        "cooldown_between_sessions_minutes": 60,
+        "max_errors_before_stop": 10,
+        "enable_action_logging": true,
+        "log_path": "Logs/Actions"
+    }
+}

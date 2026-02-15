@@ -1,0 +1,63 @@
+{
+    "version": "1.0",
+    "extensions": {
+        "ip_location": {
+            "enabled": true,
+            "update_interval_hours": 24,
+            "providers": [
+                "https://api.ipify.org?format=json",
+                "https://ipapi.co/{ip}/json/"
+            ],
+            "cache_duration_hours": 1
+        },
+        "weather": {
+            "enabled": true,
+            "update_interval_hours": 1,
+            "use_mcp": true,
+            "fallback_to_simulation": true,
+            "impact_factors": {
+                "activity_level": 0.2,
+                "mood": 0.3
+            }
+        },
+        "skills": {
+            "enabled": true,
+            "max_skills": 10,
+            "decay_enabled": true,
+            "decay_check_days": 30,
+            "decay_rate_per_month": 0.1,
+            "level_progression": {
+                "beginner_to_intermediate": {
+                    "min_days": 30,
+                    "min_practice_sessions": 12
+                },
+                "intermediate_to_advanced": {
+                    "min_days": 90,
+                    "min_practice_sessions": 40
+                }
+            }
+        }
+    },
+    "hooks": {
+        "weather_impact": {
+            "sunny": {
+                "activity_boost": 0.1,
+                "mood_boost": 0.1
+            },
+            "rainy": {
+                "activity_boost": 0.15,
+                "indoor_preference": 0.3
+            },
+            "cold": {
+                "session_reduction": 0.1
+            },
+            "hot": {
+                "session_reduction": 0.15
+            }
+        },
+        "ip_mismatch": {
+            "caution_level": 0.3,
+            "reduced_posting": true
+        }
+    }
+}

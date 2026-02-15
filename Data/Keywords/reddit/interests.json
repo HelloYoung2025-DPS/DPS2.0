@@ -1,0 +1,67 @@
+{
+    "version": "1.0",
+    "description": "Reddit 兴趣关键词库 - 从 Persona 提取 + 手动补充",
+    "persona_extracted": {
+        "primary_interests": [
+            "pregnancy",
+            "second trimester",
+            "anatomy scan",
+            "prenatal",
+            "baby bump",
+            "due date",
+            "nursery",
+            "maternity",
+            "20 week",
+            "glucose screening",
+            "nesting"
+        ],
+        "hobby_keywords": [
+            "baking",
+            "sourdough",
+            "toddler snacks",
+            "prenatal yoga",
+            "pelvic floor",
+            "nursery decor",
+            "home organization",
+            "indoor plants",
+            "succulents",
+            "thrillers",
+            "parenting books"
+        ],
+        "life_stage_keywords": [
+            "toddler",
+            "potty training",
+            "big kid bed",
+            "double stroller",
+            "second baby",
+            "age gap",
+            "sibling",
+            "daycare",
+            "working mom",
+            "maternity leave",
+            "Texas"
+        ],
+        "career_keywords": [
+            "marketing",
+            "e-commerce",
+            "work life balance",
+            "remote work",
+            "career and kids"
+        ]
+    },
+    "manual_additions": {
+        "subreddits": [
+            "BabyBumps",
+            "toddlers",
+            "Mommit",
+            "beyondthebump",
+            "pregnant",
+            "Parenting",
+            "workingmoms",
+            "Austin",
+            "Baking",
+            "PregnancyAfterOne"
+        ],
+        "trending_topics": []
+    }
+}

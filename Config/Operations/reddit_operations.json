@@ -1,0 +1,116 @@
+{
+    "platform": "reddit",
+    "version": "1.0",
+    "operations": {
+        "browse": {
+            "description": "浏览 feed 并滚动",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "开始浏览 Reddit feed" },
+                { "action": "find", "selector": "post_unit", "save_as": "posts", "on_fail": "abort" },
+                { "action": "delay", "min_ms": 3000, "max_ms": 8000 },
+                { "action": "scroll", "direction": "down", "distance": 900, "duration": 500 },
+                { "action": "delay", "min_ms": 1500, "max_ms": 4000 },
+                { "action": "refresh_layout" },
+                { "action": "verify", "selector": "post_unit", "on_fail": "retry", "max_retries": 3, "retry_delay_ms": 1500 },
+                { "action": "set_var", "name": "last_action", "value": "browse" }
+            ]
+        },
+        "like": {
+            "description": "对当前可见帖子点赞（upvote）",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "执行 Reddit upvote" },
+                { "action": "find", "selector": "post_unit", "save_as": "target_post", "on_fail": "skip" },
+                { "action": "find", "selector": "upvote_button", "save_as": "upvote_btn", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1500 },
+                { "action": "tap", "context_ref": "upvote_btn", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 800, "max_ms": 2000 },
+                { "action": "set_var", "name": "last_action", "value": "like" }
+            ]
+        },
+        "open_post": {
+            "description": "打开帖子详情页",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "打开帖子详情" },
+                { "action": "find", "selector": "post_title", "save_as": "title", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200 },
+                { "action": "tap", "context_ref": "title", "on_fail": "abort" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000 },
+                { "action": "refresh_layout" },
+                { "action": "require", "page": "post_detail", "on_fail": "abort" }
+            ]
+        },
+        "read_post": {
+            "description": "阅读帖子内容（模拟阅读时间）",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "阅读帖子内容" },
+                { "action": "find", "selector": "post_body", "save_as": "body", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 5000, "max_ms": 15000 },
+                { "action": "scroll", "direction": "down", "distance": 400, "duration": 600 },
+                { "action": "delay", "min_ms": 3000, "max_ms": 8000 },
+                { "action": "set_var", "name": "last_action", "value": "read_post" }
+            ]
+        },
+        "comment": {
+            "description": "在帖子详情页发表评论",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "执行 Reddit 评论" },
+                { "action": "find", "selector": "comment_input", "save_as": "input_box", "on_fail": "abort" },
+                { "action": "delay", "min_ms": 800, "max_ms": 2000 },
+                { "action": "tap", "context_ref": "input_box", "on_fail": "abort" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2500 },
+                { "action": "type", "var": "ai_comment_text", "on_fail": "abort" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000 },
+                { "action": "find", "selector": "submit_button", "save_as": "submit_btn", "on_fail": "abort" },
+                { "action": "tap", "context_ref": "submit_btn", "on_fail": "abort" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000 },
+                { "action": "set_var", "name": "last_action", "value": "comment" }
+            ]
+        },
+        "follow": {
+            "description": "关注帖子作者",
+            "steps": [
+                { "action": "log", "message": "执行 Reddit 关注" },
+                { "action": "find", "selector": "author_name", "save_as": "author", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "author", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000 },
+                { "action": "refresh_layout" },
+                { "action": "find", "selector": "follow_button", "save_as": "follow_btn", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1500 },
+                { "action": "tap", "context_ref": "follow_btn", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000 },
+                { "action": "back" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2000 },
+                { "action": "set_var", "name": "last_action", "value": "follow" }
+            ]
+        },
+        "share": {
+            "description": "分享帖子",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "执行 Reddit 分享" },
+                { "action": "find", "selector": "share_button", "save_as": "share_btn", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1500 },
+                { "action": "tap", "context_ref": "share_btn", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000 },
+                { "action": "back" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2000 },
+                { "action": "set_var", "name": "last_action", "value": "share" }
+            ]
+        },
+        "back_to_feed": {
+            "description": "从详情页返回 feed",
+            "steps": [
+                { "action": "log", "message": "返回 feed" },
+                { "action": "back" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000 },
+                { "action": "refresh_layout" },
+                { "action": "verify", "selector": "post_unit", "on_fail": "retry", "max_retries": 3, "retry_delay_ms": 2000 }
+            ]
+        }
+    }
+}

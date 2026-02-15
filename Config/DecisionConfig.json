@@ -1,0 +1,103 @@
+{
+    "version": "1.0",
+    "description": "DPS v4.5 行为决策系统配置",
+    "rule_engine": {
+        "hot_score": {
+            "weights": {
+                "upvotes": 0.4,
+                "comments": 0.3,
+                "time_decay": 0.3
+            },
+            "time_decay_half_life_minutes": 120,
+            "min_upvotes_threshold": 5
+        },
+        "activity_score": {
+            "weights": {
+                "recent_comments_ratio": 0.5,
+                "comment_frequency": 0.3,
+                "unique_authors": 0.2
+            },
+            "recent_window_minutes": 60
+        },
+        "relevance_score": {
+            "weights": {
+                "keyword_match": 0.5,
+                "subreddit_match": 0.3,
+                "topic_similarity": 0.2
+            },
+            "min_keyword_matches": 1
+        }
+    },
+    "ai_engine": {
+        "enabled": true,
+        "use_for_decisions": [
+            "comment_content",
+            "relevance_deep",
+            "engagement_quality"
+        ],
+        "skip_for_decisions": [
+            "like_simple",
+            "scroll_continue"
+        ],
+        "timeout_ms": 15000,
+        "fallback_to_rules": true
+    },
+    "decision_thresholds": {
+        "click_post": {
+            "min_score": 0.3,
+            "max_score": 1.0
+        },
+        "like_post": {
+            "min_score": 0.4,
+            "max_score": 1.0
+        },
+        "comment_post": {
+            "min_score": 0.6,
+            "max_score": 1.0
+        },
+        "reply_comment": {
+            "min_score": 0.7,
+            "max_score": 1.0
+        },
+        "continue_browsing": {
+            "min_score": 0.2,
+            "max_score": 1.0
+        }
+    },
+    "persona_weights": {
+        "interest_match_weight": 0.35,
+        "personality_alignment_weight": 0.20,
+        "current_concern_weight": 0.25,
+        "hobby_relevance_weight": 0.15,
+        "random_exploration_weight": 0.05
+    },
+    "fatigue_model": {
+        "enabled": true,
+        "initial_energy": 1.0,
+        "decay_per_action": {
+            "browse": 0.02,
+            "read": 0.05,
+            "like": 0.03,
+            "comment": 0.10
+        },
+        "recovery_per_pause_sec": 0.01,
+        "min_energy_to_comment": 0.3,
+        "min_energy_to_like": 0.15
+    },
+    "comment_decision": {
+        "min_post_age_minutes": 5,
+        "max_post_age_hours": 48,
+        "min_comments_to_reply": 2,
+        "max_comment_length": 500,
+        "min_comment_length": 15,
+        "prefer_questions": true,
+        "avoid_controversial": true
+    },
+    "memory": {
+        "max_browsed_posts": 500,
+        "max_liked_posts": 200,
+        "max_commented_posts": 100,
+        "cleanup_after_days": 30,
+        "dedup_window_hours": 24
+    }
+}

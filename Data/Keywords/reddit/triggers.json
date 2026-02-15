@@ -1,0 +1,44 @@
+{
+    "version": "1.0",
+    "description": "Reddit 触发词和回避话题",
+    "avoid_topics": {
+        "keywords": [
+            "loss stories",
+            "extreme parenting",
+            "SIDS",
+            "childhood illness",
+            "politics",
+            "controversial medical",
+            "anti-vax",
+            "formula shaming",
+            "mommy wars"
+        ],
+        "description": "这些话题会让 Persona 不舒服，应该跳过"
+    },
+    "sensitive_topics": {
+        "keywords": [
+            "sleep training",
+            "breastfeeding vs formula",
+            "screen time guilt",
+            "postpartum depression",
+            "anxiety",
+            "miscarriage"
+        ],
+        "description": "这些话题需要谨慎处理，降低互动概率"
+    },
+    "engagement_boosters": {
+        "keywords": [
+            "toddler milestones",
+            "baby kicks",
+            "nursery ideas",
+            "pregnancy cravings",
+            "second pregnancy",
+            "Austin moms",
+            "baking recipes",
+            "pregnancy yoga",
+            "maternity fashion",
+            "baby names"
+        ],
+        "description": "这些话题会提高互动概率"
+    }
+}

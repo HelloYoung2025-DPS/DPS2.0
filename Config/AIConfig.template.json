@@ -1,0 +1,43 @@
+{
+    "version": "4.5",
+    "description": "DPS v4.5 AI service config template",
+    "models": {
+        "primary": {
+            "provider": "gemini",
+            "model": "gemini-3-flash-preview",
+            "api_key": "YOUR_PRIMARY_API_KEY",
+            "base_url": "https://generativelanguage.googleapis.com/v1beta",
+            "timeout_ms": 60000,
+            "max_tokens": 8192,
+            "temperature": 0.7
+        },
+        "fallback": {
+            "provider": "openai",
+            "model": "claude-sonnet-4-5-thinking",
+            "api_key": "YOUR_FALLBACK_API_KEY",
+            "base_url": "https://deeprouter.top/v1",
+            "timeout_ms": 60000,
+            "max_tokens": 4096,
+            "temperature": 0.7
+        },
+        "backup": {
+            "provider": "openai",
+            "model": "gpt-5.2-2025-12-11",
+            "api_key": "YOUR_BACKUP_API_KEY",
+            "base_url": "https://api.shubiaobiao.com/v1",
+            "timeout_ms": 30000,
+            "max_tokens": 2048,
+            "temperature": 0.7
+        }
+    },
+    "retry_config": {
+        "max_retries": 3,
+        "retry_delay_ms": 1000,
+        "backoff_multiplier": 2.0
+    },
+    "usage_limits": {
+        "daily_request_limit": 1000,
+        "hourly_request_limit": 100,
+        "cost_alert_threshold_usd": 10.0
+    }
+}

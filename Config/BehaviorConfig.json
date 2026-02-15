@@ -1,0 +1,65 @@
+{
+    "version": "1.0",
+    "actions": {
+        "browse": {
+            "weight_base": 0.50,
+            "duration_sec_min": 30,
+            "duration_sec_max": 90,
+            "scroll_speed_base": 1.0
+        },
+        "read_post": {
+            "weight_base": 0.30,
+            "duration_sec_min": 20,
+            "duration_sec_max": 70,
+            "read_speed_wpm": 200
+        },
+        "like": {
+            "weight_base": 0.15,
+            "probability_base": 0.35,
+            "min_interest_score": 0.5
+        },
+        "comment": {
+            "weight_base": 0.04,
+            "probability_base": 0.12,
+            "min_length": 10,
+            "max_length": 500,
+            "typing_speed_wpm_base": 40
+        },
+        "post": {
+            "weight_base": 0.01,
+            "probability_base": 0.02,
+            "cooldown_hours": 24
+        }
+    },
+    "typing": {
+        "regular": {
+            "wpm_min": 30,
+            "wpm_max": 50,
+            "error_rate_min": 0.08,
+            "error_rate_max": 0.15
+        },
+        "proficient": {
+            "wpm_min": 50,
+            "wpm_max": 80,
+            "error_rate_min": 0.03,
+            "error_rate_max": 0.08
+        }
+    },
+    "scrolling": {
+        "pause_probability": 0.30,
+        "pause_duration_ms_min": 500,
+        "pause_duration_ms_max": 3000,
+        "scroll_pixels_min": 200,
+        "scroll_pixels_max": 600
+    },
+    "reading": {
+        "attention_check_interval_sec": 30,
+        "distraction_probability": 0.15,
+        "skip_probability": 0.10
+    },
+    "session": {
+        "min_duration_minutes": 3,
+        "max_duration_minutes": 30,
+        "max_read_cycles": 8
+    }
+}

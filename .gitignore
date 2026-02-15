@@ -1,0 +1,34 @@
+# Secrets
+Config/AIConfig.json
+Config/AIConfig.local.json
+*.key
+*.pem
+*.p12
+
+# Runtime data
+Logs/
+Reports/
+Memory/
+Persons/
+Data/Cache/
+Stats/
+
+# Local notes / IDE
+.obsidian/
+.sisyphus/
+.DS_Store
+*.swp
+*.swo
+
+# Large exports / local dumps
+opencode_sessions_export.tsv
+session_*_full.md
+session_*_transcript.md
+nul
+
+# Build / temp
+bin/
+obj/
+*.tmp
+*.bak
+

@@ -1,0 +1,137 @@
+{
+    "platform": "instagram",
+    "version": "1.0",
+    "operations": {
+        "browse": {
+            "description": "浏览 Instagram feed 并滚动",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "开始浏览 Instagram feed" },
+                { "action": "find", "selector": "post_unit", "save_as": "posts", "on_fail": "abort" },
+                { "action": "delay", "min_ms": 3000, "max_ms": 10000 },
+                { "action": "scroll", "direction": "down", "distance": 1100, "duration": 600 },
+                { "action": "delay", "min_ms": 2000, "max_ms": 5000 },
+                { "action": "refresh_layout" },
+                { "action": "verify", "selector": "post_unit", "on_fail": "retry", "max_retries": 3, "retry_delay_ms": 2000 },
+                { "action": "set_var", "name": "last_action", "value": "browse" }
+            ]
+        },
+        "like": {
+            "description": "对当前可见帖子点赞",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "执行 Instagram 点赞" },
+                { "action": "find", "selector": "post_unit", "save_as": "target_post", "on_fail": "skip" },
+                { "action": "find", "selector": "like_button", "save_as": "like_btn", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 800, "max_ms": 2000 },
+                { "action": "tap", "context_ref": "like_btn", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2500 },
+                { "action": "set_var", "name": "last_action", "value": "like" }
+            ]
+        },
+        "double_tap_like": {
+            "description": "双击图片点赞（Instagram 特有）",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "执行 Instagram 双击点赞" },
+                { "action": "find", "selector": "media_image", "save_as": "image", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200 },
+                { "action": "tap", "context_ref": "image", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 80, "max_ms": 200 },
+                { "action": "tap", "context_ref": "image", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2500 },
+                { "action": "set_var", "name": "last_action", "value": "double_tap_like" }
+            ]
+        },
+        "open_post": {
+            "description": "打开帖子详情（点击图片）",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "打开帖子详情" },
+                { "action": "find", "selector": "media_image", "save_as": "image", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1500 },
+                { "action": "tap", "context_ref": "image", "on_fail": "abort" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000 },
+                { "action": "refresh_layout" },
+                { "action": "require", "page": "post_detail", "on_fail": "abort" }
+            ]
+        },
+        "view_post": {
+            "description": "查看帖子内容（模拟阅读）",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "查看帖子内容" },
+                { "action": "find", "selector": "caption_text", "save_as": "caption", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 4000, "max_ms": 12000 },
+                { "action": "scroll", "direction": "down", "distance": 300, "duration": 500 },
+                { "action": "delay", "min_ms": 2000, "max_ms": 6000 },
+                { "action": "set_var", "name": "last_action", "value": "view_post" }
+            ]
+        },
+        "comment": {
+            "description": "在帖子下发表评论",
+            "steps": [
+                { "action": "log", "message": "执行 Instagram 评论" },
+                { "action": "find", "selector": "comment_button", "save_as": "comment_btn", "on_fail": "abort" },
+                { "action": "delay", "min_ms": 800, "max_ms": 2000 },
+                { "action": "tap", "context_ref": "comment_btn", "on_fail": "abort" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000 },
+                { "action": "refresh_layout" },
+                { "action": "find", "selector": "comment_input", "save_as": "input_box", "on_fail": "abort" },
+                { "action": "tap", "context_ref": "input_box", "on_fail": "abort" },
+                { "action": "delay", "min_ms": 800, "max_ms": 2000 },
+                { "action": "type", "var": "ai_comment_text", "on_fail": "abort" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000 },
+                { "action": "find", "selector": "submit_button", "save_as": "submit_btn", "on_fail": "abort" },
+                { "action": "tap", "context_ref": "submit_btn", "on_fail": "abort" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 5000 },
+                { "action": "set_var", "name": "last_action", "value": "comment" }
+            ]
+        },
+        "follow": {
+            "description": "关注帖子作者",
+            "steps": [
+                { "action": "log", "message": "执行 Instagram 关注" },
+                { "action": "find", "selector": "username_label", "save_as": "username", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "username", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 2500, "max_ms": 5000 },
+                { "action": "refresh_layout" },
+                { "action": "require", "page": "profile", "on_fail": "skip" },
+                { "action": "find", "selector": "follow_button", "save_as": "follow_btn", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 800, "max_ms": 2000 },
+                { "action": "tap", "context_ref": "follow_btn", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000 },
+                { "action": "back" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000 },
+                { "action": "set_var", "name": "last_action", "value": "follow" }
+            ]
+        },
+        "share": {
+            "description": "分享帖子",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "执行 Instagram 分享" },
+                { "action": "find", "selector": "share_button", "save_as": "share_btn", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 800, "max_ms": 2000 },
+                { "action": "tap", "context_ref": "share_btn", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 2500, "max_ms": 5000 },
+                { "action": "back" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2500 },
+                { "action": "set_var", "name": "last_action", "value": "share" }
+            ]
+        },
+        "back_to_feed": {
+            "description": "返回 feed 页面",
+            "steps": [
+                { "action": "log", "message": "返回 feed" },
+                { "action": "back" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000 },
+                { "action": "refresh_layout" },
+                { "action": "verify", "selector": "post_unit", "on_fail": "retry", "max_retries": 3, "retry_delay_ms": 2000 },
+                { "action": "find", "selector": "home_tab", "save_as": "home", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "home", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000 }
+            ]
+        }
+    }
+}
