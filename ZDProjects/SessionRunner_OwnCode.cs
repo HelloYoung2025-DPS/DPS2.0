@@ -131,7 +131,8 @@ try {
     string modulePath = root + "Modules\\SessionRunner.cs";
     project.SendInfoToLog("[SessionRunner] 加载模块: " + modulePath);
     
-    object result = RunModule(modulePath, "Run", new object[] { project });
+    // BUG-01 fix: 同时传递 instance，供 CoreHelper.InitInstance 注入 DroidInstance
+    object result = RunModule(modulePath, "Run", new object[] { project, instance });
     return result != null ? result.ToString() : "ERROR: 模块执行失败";
 }
 catch (System.Exception ex) {

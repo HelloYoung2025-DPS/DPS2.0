@@ -92,7 +92,7 @@ public class DailyUpdate
                 }
             }
             
-            // 4. 更新孕周
+            // 4. 更新孕周（带边界校验）
             if (personaJson.Contains("\"is_pregnant\": true") || personaJson.Contains("\"is_pregnant\":true"))
             {
                 var conceptionMatch = Regex.Match(personaJson,
@@ -103,38 +103,88 @@ public class DailyUpdate
                     if (DateTime.TryParse(conceptionMatch.Groups[1].Value, out conceptionDate))
                     {
                         int totalDays = (int)(DateTime.Now - conceptionDate).TotalDays;
-                        int weeks = totalDays / 7;
-                        int days = totalDays % 7;
-                        int trimester = weeks <= 13 ? 1 : (weeks <= 27 ? 2 : 3);
                         
-                        personaJson = Regex.Replace(personaJson,
-                            "\"current_week\"\\s*:\\s*\\d+",
-                            "\"current_week\": " + weeks);
-                        personaJson = Regex.Replace(personaJson,
-                            "\"current_days\"\\s*:\\s*\\d+",
-                            "\"current_days\": " + days);
-                        personaJson = Regex.Replace(personaJson,
-                            "\"trimester\"\\s*:\\s*\\d+",
-                            "\"trimester\": " + trimester);
-                        
-                        // 更新阶段码
-                        string newStage = weeks <= 13 ? "T1" : (weeks <= 27 ? "T2" : "T3");
-                        var oldStageMatch = Regex.Match(personaJson,
-                            "\"stage_code\"\\s*:\\s*\"([^\"]+)\"");
-                        if (oldStageMatch.Success && oldStageMatch.Groups[1].Value != newStage)
+                        if (totalDays < 0)
                         {
-                            CoreHelper.Log(TAG, "阶段转换: " + oldStageMatch.Groups[1].Value + " -> " + newStage);
-                            personaJson = Regex.Replace(personaJson,
-                                "\"stage_code\"\\s*:\\s*\"[^\"]+\"",
-                                "\"stage_code\": \"" + newStage + "\"");
+                            CoreHelper.LogErr(TAG, "conception_date 在未来，跳过孕周更新: " + conceptionDate.ToString("yyyy-MM-dd"));
+                            CoreHelper.SetVar("last_error", "conception_date_future");
                         }
-                        
-                        CoreHelper.Log(TAG, string.Format("孕周更新: {0}周{1}天, 孕期{2}", weeks, days, trimester));
+                        else
+                        {
+                            int weeks = totalDays / 7;
+                            int days = totalDays % 7;
+                            
+                            if (weeks < 0) weeks = 0;
+                            if (days < 0) days = 0;
+                            
+                            int trimester = weeks <= 13 ? 1 : (weeks <= 27 ? 2 : 3);
+                            
+                            personaJson = Regex.Replace(personaJson,
+                                "\"current_week\"\\s*:\\s*-?\\d+",
+                                "\"current_week\": " + weeks);
+                            personaJson = Regex.Replace(personaJson,
+                                "\"current_days\"\\s*:\\s*-?\\d+",
+                                "\"current_days\": " + days);
+                            personaJson = Regex.Replace(personaJson,
+                                "\"trimester\"\\s*:\\s*\\d+",
+                                "\"trimester\": " + trimester);
+                            
+                            string newStage = weeks <= 13 ? "T1" : (weeks <= 27 ? "T2" : "T3");
+                            var oldStageMatch = Regex.Match(personaJson,
+                                "\"stage_code\"\\s*:\\s*\"([^\"]+)\"");
+                            if (oldStageMatch.Success && oldStageMatch.Groups[1].Value != newStage)
+                            {
+                                CoreHelper.Log(TAG, "阶段转换: " + oldStageMatch.Groups[1].Value + " -> " + newStage);
+                                personaJson = Regex.Replace(personaJson,
+                                    "\"stage_code\"\\s*:\\s*\"[^\"]+\"",
+                                    "\"stage_code\": \"" + newStage + "\"");
+                            }
+                            
+                            CoreHelper.Log(TAG, string.Format("孕周更新: {0}周{1}天, 孕期{2}", weeks, days, trimester));
+                        }
                     }
                 }
             }
             
-            // 5. 更新季节
+            // 5. 产后阶段转换（PP0 → PP1 → NP）
+            var currentStageMatch = Regex.Match(personaJson, "\"stage_code\"\\s*:\\s*\"([^\"]+)\"");
+            if (currentStageMatch.Success)
+            {
+                string currentStage = currentStageMatch.Groups[1].Value;
+                
+                if (currentStage == "PP0" || currentStage == "PP1")
+                {
+                    var deliveryMatch = Regex.Match(personaJson, "\"delivery_date\"\\s*:\\s*\"([^\"]+)\"");
+                    if (deliveryMatch.Success)
+                    {
+                        DateTime deliveryDate;
+                        if (DateTime.TryParse(deliveryMatch.Groups[1].Value, out deliveryDate))
+                        {
+                            int monthsSinceDelivery = ((DateTime.Now.Year - deliveryDate.Year) * 12) + DateTime.Now.Month - deliveryDate.Month;
+                            
+                            string newStage = currentStage;
+                            if (currentStage == "PP0" && monthsSinceDelivery >= 3)
+                            {
+                                newStage = "PP1";
+                            }
+                            else if (currentStage == "PP1" && monthsSinceDelivery >= 12)
+                            {
+                                newStage = "NP";
+                            }
+                            
+                            if (newStage != currentStage)
+                            {
+                                CoreHelper.Log(TAG, "产后阶段转换: " + currentStage + " -> " + newStage + " (产后" + monthsSinceDelivery + "个月)");
+                                personaJson = Regex.Replace(personaJson,
+                                    "\"stage_code\"\\s*:\\s*\"[^\"]+\"",
+                                    "\"stage_code\": \"" + newStage + "\"");
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 6. 更新季节
             string season = "winter";
             int month = DateTime.Now.Month;
             if (month >= 3 && month <= 5) season = "spring";
@@ -148,7 +198,7 @@ public class DailyUpdate
                 "\"current_month\"\\s*:\\s*\\d+",
                 "\"current_month\": " + month);
             
-            // 6. 保存更新后的画像
+            // 7. 保存更新后的画像
             string personaPath = projectRoot + "Persons\\" + deviceId + ".json";
             CoreHelper.WriteFile(personaPath, personaJson);
             

@@ -134,7 +134,7 @@ public class Main
             // 生成会话计划
             CoreHelper.Log(TAG, "[会话] 生成会话计划...");
             
-            string stageCode = JsonHelper.Get(personaJson, "stage_code");
+            string stageCode = JsonHelper.GetNested(personaJson, "maternal_stage.stage_code");
             if (string.IsNullOrEmpty(stageCode)) stageCode = "T2";
             
             // 从配置获取阶段参数

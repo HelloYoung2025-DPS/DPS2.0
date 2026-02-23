@@ -1,5 +1,51 @@
 # DPS v4.5 更新日志
 
+## [4.5.2] - 2026-02-17
+
+### 🐛 Bug 修复 (P0 级别)
+
+#### ModuleLoader.cs - 缓存管理优化
+- **修复**: 缓存失效不检测依赖文件删除
+  - 引入 `CacheEntry` 结构化缓存条目（方法 + 依赖快照 + 访问时间）
+  - 实现依赖文件删除检测（对比缓存快照与当前文件列表）
+  - 添加路径规范化函数避免大小写/分隔符导致重复键
+- **修复**: 缓存无界增长导致内存泄漏
+  - 实现 LRU 缓存淘汰机制（上限 32 个条目）
+  - 添加 `EvictOldestCacheEntry` 自动清理旧缓存
+
+#### SessionRunner.cs - 并发安全性
+- **修复**: 静态状态跨会话串扰
+  - 移除静态 `_random`，改用 `[ThreadStatic]` 的 `_threadRandom`
+  - 添加 `GetRandom()` 方法（线程安全的随机数生成器）
+  - 创建 `SessionState` 类封装疲劳模型状态
+  - 所有疲劳变量改为 `SessionState` 实例字段
+- **修复**: 配置异常导致运行时崩溃
+  - `GetActionDelay` 添加 min/max 边界校验
+  - 添加溢出保护（上限 3600 秒）
+  - 自动修正 min/max 颠倒情况
+
+#### MemoryManager.cs - 并发写入保护
+- **修复**: 并发写入导致数据丢失
+  - 添加文件级锁机制（`GetFileLock` 按路径获取锁对象）
+  - `RecordInteractionWithScore` 使用 `lock` 包裹读改写操作
+
+#### DailyUpdate.cs - 数据完整性
+- **修复**: 未来 conception_date 产生负孕周
+  - 添加 `totalDays < 0` 检测（跳过更新并记录错误）
+  - 添加负值保护（weeks/days 归零）
+  - 修改正则表达式支持负数匹配
+- **新增**: 产后阶段转换逻辑
+  - PP0 → PP1（产后 3 个月）
+  - PP1 → NP（产后 12 个月）
+  - 基于 `delivery_date` 自动计算并转换阶段
+
+### 📝 技术细节
+- 所有修复严格遵守 C# 5.0 语法约束
+- 保持原有代码风格和注释规范
+- 通过语法验证和关键点验证
+
+---
+
 ## [4.5.1] - 2026-02-13
 
 ### 🔧 Config-Driven Selectors (Phase 3)

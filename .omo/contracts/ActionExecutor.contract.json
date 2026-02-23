@@ -1,0 +1,119 @@
+{
+  "module": "ActionExecutor",
+  "version": "1.0.0",
+  "file": "Modules/Core/ActionExecutor.cs",
+  "updated_at": "2026-02-23",
+  "contract_format": "1.0",
+  "callable": [
+    {
+      "name": "Execute",
+      "params": [
+        {
+          "name": "operationsJson",
+          "type": "string"
+        },
+        {
+          "name": "operationName",
+          "type": "string"
+        },
+        {
+          "name": "platformConfig",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": "执行单个操作步骤：从 operationsJson 中查找 operationName 的定义，按步骤执行（tap/swipe/input/wait 等），更新内部上下文。返回 SUCCESS/SKIP/ERROR:..."
+    },
+    {
+      "name": "GetContext",
+      "params": [
+        {
+          "name": "key",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": "获取执行上下文中的数据（如 target_post、post_title、post_subreddit、post_upvotes、post_comment_count、post_timestamp），供 SessionRunner 提取帖子信息"
+    },
+    {
+      "name": "SetContext",
+      "params": [
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "value",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": "设置执行上下文数据，操作步骤执行过程中用于传递中间状态"
+    },
+    {
+      "name": "ClearContext",
+      "params": [],
+      "returns": "void",
+      "description": "清空执行上下文，每次新操作序列开始前调用"
+    }
+  ],
+  "shared_state": {
+    "reads": [
+      {
+        "name": "project_root",
+        "type": "ZD变量",
+        "description": "项目根目录路径（用于加载 Operations/*.json）"
+      },
+      {
+        "name": "screen_width",
+        "type": "ZD变量",
+        "description": "屏幕宽度（像素），用于坐标计算"
+      },
+      {
+        "name": "screen_height",
+        "type": "ZD变量",
+        "description": "屏幕高度（像素），用于坐标计算"
+      },
+      {
+        "name": "PlatformsConfig.json",
+        "type": "配置",
+        "description": "平台配置（选择器、页面签名等）"
+      },
+      {
+        "name": "Operations/*.json",
+        "type": "文件",
+        "description": "各平台操作定义 JSON 文件（步骤序列、选择器、等待条件）"
+      }
+    ],
+    "writes": [
+      {
+        "name": "action_result",
+        "type": "ZD变量",
+        "description": "最近一次操作执行结果（SUCCESS/SKIP/ERROR）"
+      },
+      {
+        "name": "last_action_log",
+        "type": "ZD变量",
+        "description": "最近一次操作的详细日志信息"
+      }
+    ]
+  },
+  "types_defined": [],
+  "depends_on": [
+    "CoreHelper",
+    "Count",
+    "JsonHelper",
+    "PageDetector",
+    "SelectorEngine"
+  ],
+  "depended_by": [
+    "SessionRunner"
+  ],
+  "side_effects": [
+    "DroidInstance device operation",
+    "Thread.Sleep",
+    "ZD variable write",
+    "logging"
+  ],
+  "stability": "stable"
+}

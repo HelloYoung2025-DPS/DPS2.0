@@ -11,6 +11,28 @@ using System.Collections.Generic;
 public static class MemoryManager
 {
     private static string _basePath = "";
+    private static readonly object _locksGuard = new object();
+    private static readonly Dictionary<string, object> _fileLocks = new Dictionary<string, object>();
+    private const int MAX_FILE_LOCKS = 256;
+    
+    private static object GetFileLock(string path)
+    {
+        lock (_locksGuard)
+        {
+            object fileLock;
+            if (!_fileLocks.TryGetValue(path, out fileLock))
+            {
+                // 修复: 防止无界字典增长 - 超过上限时清空所有锁
+                if (_fileLocks.Count >= MAX_FILE_LOCKS)
+                {
+                    _fileLocks.Clear();
+                }
+                fileLock = new object();
+                _fileLocks[path] = fileLock;
+            }
+            return fileLock;
+        }
+    }
 
     /// <summary>
     /// 初始化基础路径。
@@ -122,15 +144,19 @@ public static class MemoryManager
             FileHelper.EnsureDir(dir);
         }
 
-        string rootJson = LoadOrCreateRootJson(deviceId, appName, memoryFilePath);
-        List<string> interactions = ParseJsonArray(JsonHelper.GetArray(rootJson, "interactions"));
+        object fileLock = GetFileLock(memoryFilePath);
+        lock (fileLock)
+        {
+            string rootJson = LoadOrCreateRootJson(deviceId, appName, memoryFilePath);
+            List<string> interactions = ParseJsonArray(JsonHelper.GetArray(rootJson, "interactions"));
 
-        string nowIso = CoreHelper.GetNowISO();
-        string entry = BuildInteractionEntry(postId, actionType, nowIso, score);
-        interactions.Add(entry);
+            string nowIso = CoreHelper.GetNowISO();
+            string entry = BuildInteractionEntry(postId, actionType, nowIso, score);
+            interactions.Add(entry);
 
-        string outJson = BuildRootJson(deviceId, appName, nowIso, interactions);
-        FileHelper.WriteAtomic(memoryFilePath, outJson);
+            string outJson = BuildRootJson(deviceId, appName, nowIso, interactions);
+            FileHelper.WriteAtomic(memoryFilePath, outJson);
+        }
     }
 
     /// <summary>

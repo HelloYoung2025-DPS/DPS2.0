@@ -1,0 +1,33 @@
+{
+  "project": "DPS v4.5",
+  "version": "2.1.0",
+  "lock_ttl_minutes": 120,
+  "heartbeat_stale_minutes": 30,
+  "heartbeat_interval_minutes": 10,
+  "confirm_delay_seconds": 5,
+  "module_granularity": "file-class",
+  "contract_format_version": "1.0",
+  "paths": {
+    "sessions": ".omo/sessions/",
+    "locks": ".omo/locks/",
+    "contracts": ".omo/contracts/",
+    "modules": ".omo/modules/",
+    "changes": ".omo/changes/",
+    "validations": ".omo/validations/"
+  },
+  "breaking_change_rules": {
+    "breaking": [
+      "removed_method",
+      "renamed_method",
+      "changed_param_type",
+      "removed_zd_variable",
+      "changed_return_type"
+    ],
+    "non_breaking": [
+      "added_method",
+      "added_optional_param",
+      "added_zd_variable",
+      "added_type_property"
+    ]
+  }
+}

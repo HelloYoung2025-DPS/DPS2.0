@@ -49,16 +49,20 @@ public class Maintenance
             {
                 string configJson = CoreHelper.ReadFile(maintenanceConfigPath);
                 
-                // 读取保留期限配置
-                int val;
-                val = JsonHelper.GetInt(configJson, "log_retention_days", LOG_RETENTION_DAYS);
-                if (val > 0) LOG_RETENTION_DAYS = val;
-                
-                val = JsonHelper.GetInt(configJson, "memory_retention_days", MEMORY_RETENTION_DAYS);
-                if (val > 0) MEMORY_RETENTION_DAYS = val;
-                
-                val = JsonHelper.GetInt(configJson, "backup_retention_days", BACKUP_RETENTION_DAYS);
-                if (val > 0) BACKUP_RETENTION_DAYS = val;
+                // 读取保留期限配置（嵌套在 retention 对象下）
+                string retentionJson = JsonHelper.ExtractObject(configJson, "retention");
+                if (!string.IsNullOrEmpty(retentionJson))
+                {
+                    int val;
+                    val = JsonHelper.GetInt(retentionJson, "log_retention_days", LOG_RETENTION_DAYS);
+                    if (val > 0) LOG_RETENTION_DAYS = val;
+                    
+                    val = JsonHelper.GetInt(retentionJson, "memory_retention_days", MEMORY_RETENTION_DAYS);
+                    if (val > 0) MEMORY_RETENTION_DAYS = val;
+                    
+                    val = JsonHelper.GetInt(retentionJson, "backup_retention_days", BACKUP_RETENTION_DAYS);
+                    if (val > 0) BACKUP_RETENTION_DAYS = val;
+                }
                 
                 CoreHelper.Log(TAG, "已加载维护配置");
             }

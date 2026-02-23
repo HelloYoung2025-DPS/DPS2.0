@@ -108,10 +108,10 @@ public class WeeklyEvolve
             CoreHelper.Log(TAG, "收集了 7 天的记忆数据，共 " + totalActions + " 个动作");
             
             // 2. 构建进化分析 Prompt
-            string stageCode = JsonHelper.Get(personaJson, "stage_code");
+            string stageCode = JsonHelper.GetNested(personaJson, "maternal_stage.stage_code");
             if (string.IsNullOrEmpty(stageCode)) stageCode = "T2";
             
-            string currentAge = JsonHelper.Get(personaJson, "current_age");
+            string currentAge = JsonHelper.GetNested(personaJson, "basic_info.current_age");
             if (string.IsNullOrEmpty(currentAge)) currentAge = "30";
             
             string prompt = "你是一个用户画像进化专家。根据以下信息分析画像应该如何自然进化。\n\n"

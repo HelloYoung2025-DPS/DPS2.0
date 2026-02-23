@@ -1,0 +1,491 @@
+{
+  "module": "AIService",
+  "version": "1.0.0",
+  "file": "Modules/Core/AIService.cs",
+  "updated_at": "2026-02-23",
+  "contract_format": "1.0",
+  "callable": [
+    {
+      "name": "CallPrimary",
+      "params": [
+        {
+          "name": "prompt",
+          "type": "string"
+        },
+        {
+          "name": "aiConfigJson",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "CallFallback",
+      "params": [
+        {
+          "name": "prompt",
+          "type": "string"
+        },
+        {
+          "name": "aiConfigJson",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "CallBackup",
+      "params": [
+        {
+          "name": "prompt",
+          "type": "string"
+        },
+        {
+          "name": "aiConfigJson",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "CallModel",
+      "params": [
+        {
+          "name": "prompt",
+          "type": "string"
+        },
+        {
+          "name": "aiConfigJson",
+          "type": "string"
+        },
+        {
+          "name": "modelKey",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "CallWithRetry",
+      "params": [
+        {
+          "name": "prompt",
+          "type": "string"
+        },
+        {
+          "name": "aiConfigJson",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "CallGeminiWithConfig",
+      "params": [
+        {
+          "name": "prompt",
+          "type": "string"
+        },
+        {
+          "name": "apiKey",
+          "type": "string"
+        },
+        {
+          "name": "model",
+          "type": "string"
+        },
+        {
+          "name": "baseUrl",
+          "type": "string"
+        },
+        {
+          "name": "timeoutMs",
+          "type": "int"
+        },
+        {
+          "name": "maxTokens",
+          "type": "int"
+        },
+        {
+          "name": "temperature",
+          "type": "double"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "CallGemini",
+      "params": [
+        {
+          "name": "prompt",
+          "type": "string"
+        },
+        {
+          "name": "apiKey",
+          "type": "string"
+        },
+        {
+          "name": "model",
+          "type": "string"
+        },
+        {
+          "name": "timeoutMs",
+          "type": "int"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "CallGemini",
+      "params": [
+        {
+          "name": "prompt",
+          "type": "string"
+        },
+        {
+          "name": "apiKey",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "CallOpenAICompatible",
+      "params": [
+        {
+          "name": "prompt",
+          "type": "string"
+        },
+        {
+          "name": "apiKey",
+          "type": "string"
+        },
+        {
+          "name": "model",
+          "type": "string"
+        },
+        {
+          "name": "baseUrl",
+          "type": "string"
+        },
+        {
+          "name": "timeoutMs",
+          "type": "int"
+        },
+        {
+          "name": "maxTokens",
+          "type": "int"
+        },
+        {
+          "name": "temperature",
+          "type": "double"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "CallOpenAI",
+      "params": [
+        {
+          "name": "prompt",
+          "type": "string"
+        },
+        {
+          "name": "apiKey",
+          "type": "string"
+        },
+        {
+          "name": "model",
+          "type": "string"
+        },
+        {
+          "name": "timeoutMs",
+          "type": "int"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "CallOpenAI",
+      "params": [
+        {
+          "name": "prompt",
+          "type": "string"
+        },
+        {
+          "name": "apiKey",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "ExtractText",
+      "params": [
+        {
+          "name": "response",
+          "type": "string"
+        },
+        {
+          "name": "provider",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "ExtractGeminiText",
+      "params": [
+        {
+          "name": "response",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "ExtractOpenAIText",
+      "params": [
+        {
+          "name": "response",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "ExtractJson",
+      "params": [
+        {
+          "name": "text",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "ReadFileAsBase64",
+      "params": [
+        {
+          "name": "filePath",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "GetMimeType",
+      "params": [
+        {
+          "name": "filePath",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "CallPrimaryWithImage",
+      "params": [
+        {
+          "name": "prompt",
+          "type": "string"
+        },
+        {
+          "name": "imagePath",
+          "type": "string"
+        },
+        {
+          "name": "aiConfigJson",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "CallModelWithImage",
+      "params": [
+        {
+          "name": "prompt",
+          "type": "string"
+        },
+        {
+          "name": "imagePath",
+          "type": "string"
+        },
+        {
+          "name": "aiConfigJson",
+          "type": "string"
+        },
+        {
+          "name": "modelKey",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "CallGeminiWithImage",
+      "params": [
+        {
+          "name": "prompt",
+          "type": "string"
+        },
+        {
+          "name": "base64Data",
+          "type": "string"
+        },
+        {
+          "name": "mimeType",
+          "type": "string"
+        },
+        {
+          "name": "apiKey",
+          "type": "string"
+        },
+        {
+          "name": "model",
+          "type": "string"
+        },
+        {
+          "name": "baseUrl",
+          "type": "string"
+        },
+        {
+          "name": "timeoutMs",
+          "type": "int"
+        },
+        {
+          "name": "maxTokens",
+          "type": "int"
+        },
+        {
+          "name": "temperature",
+          "type": "double"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "CallOpenAIWithImage",
+      "params": [
+        {
+          "name": "prompt",
+          "type": "string"
+        },
+        {
+          "name": "base64Data",
+          "type": "string"
+        },
+        {
+          "name": "mimeType",
+          "type": "string"
+        },
+        {
+          "name": "apiKey",
+          "type": "string"
+        },
+        {
+          "name": "model",
+          "type": "string"
+        },
+        {
+          "name": "baseUrl",
+          "type": "string"
+        },
+        {
+          "name": "timeoutMs",
+          "type": "int"
+        },
+        {
+          "name": "maxTokens",
+          "type": "int"
+        },
+        {
+          "name": "temperature",
+          "type": "double"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "CallWithRetryAndImage",
+      "params": [
+        {
+          "name": "prompt",
+          "type": "string"
+        },
+        {
+          "name": "imagePath",
+          "type": "string"
+        },
+        {
+          "name": "aiConfigJson",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "DoHttpGet",
+      "params": [
+        {
+          "name": "url",
+          "type": "string"
+        },
+        {
+          "name": "timeoutMs",
+          "type": "int"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    }
+  ],
+  "shared_state": {
+    "reads": [],
+    "writes": []
+  },
+  "types_defined": [],
+  "depends_on": [
+    "CoreHelper",
+    "Headers",
+    "JsonHelper",
+    "Response",
+    "UTF8",
+    "WebRequest"
+  ],
+  "depended_by": [
+    "PersonaCreate",
+    "WeeklyEvolve",
+    "Main"
+  ],
+  "side_effects": [
+    "AI API call",
+    "HTTP request",
+    "Thread.Sleep",
+    "file read"
+  ],
+  "stability": "stable"
+}

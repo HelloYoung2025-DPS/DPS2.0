@@ -26,9 +26,20 @@ session_*_full.md
 session_*_transcript.md
 nul
 
+# Tool artifacts / temporary files
+_tool_part_sample.json
+DPS_V4-opencode/
+-p/
+
 # Build / temp
 bin/
 obj/
 *.tmp
 *.bak
 
+# .omo 2.0 runtime (not for git)
+.omo/sessions/
+.omo/locks/
+.omo/changes/
+.omo/validations/
+.omo/current-task/

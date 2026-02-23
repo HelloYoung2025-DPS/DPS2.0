@@ -1,0 +1,99 @@
+{
+  "module": "Main",
+  "version": "1.0.0",
+  "file": "Modules/Main.cs",
+  "updated_at": "2026-02-23",
+  "contract_format": "1.0",
+  "callable": [
+    {
+      "name": "Run",
+      "params": [
+        {
+          "name": "projectObj",
+          "type": "object"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    }
+  ],
+  "shared_state": {
+    "reads": [
+      {
+        "name": "project_root",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "device_id",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "force_regenerate",
+        "type": "ZD variable",
+        "description": ""
+      }
+    ],
+    "writes": [
+      {
+        "name": "main_result",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "ai_config_json",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "stage_config_json",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "behavior_config_json",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "persona_json",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "session_plan_json",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "effective_date",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "force_regenerate",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "last_error",
+        "type": "ZD变量",
+        "description": ""
+      }
+    ]
+  },
+  "types_defined": [],
+  "depends_on": [
+    "CoreHelper",
+    "JsonHelper"
+  ],
+  "depended_by": [],
+  "side_effects": [
+    "ZD variable write",
+    "directory create",
+    "file read",
+    "logging"
+  ],
+  "stability": "stable"
+}

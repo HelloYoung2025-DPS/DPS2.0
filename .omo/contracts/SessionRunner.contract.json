@@ -1,0 +1,346 @@
+{
+  "module": "SessionRunner",
+  "version": "1.0.0",
+  "file": "Modules/SessionRunner.cs",
+  "updated_at": "2026-02-23",
+  "contract_format": "1.0",
+  "callable": [
+    {
+      "name": "Run",
+      "params": [
+        {
+          "name": "projectObj",
+          "type": "object"
+        },
+        {
+          "name": "instanceObj",
+          "type": "object"
+        }
+      ],
+      "returns": "string",
+      "description": "模块入口点，执行完整会话循环。加载配置→确定平台→初始化 MemoryManager→循环执行动作（疲劳调权→RuleEngine评估→统一引擎执行）→保存记忆→清理。返回 SUCCESS 或 ERROR:..."
+    }
+  ],
+  "shared_state": {
+    "reads": [
+      {
+        "name": "project_root",
+        "type": "ZD变量",
+        "description": "项目根目录路径"
+      },
+      {
+        "name": "device_id",
+        "type": "ZD变量",
+        "description": "当前设备标识符"
+      },
+      {
+        "name": "persona_json",
+        "type": "ZD变量",
+        "description": "当前设备的 Persona JSON 数据"
+      },
+      {
+        "name": "session_plan_json",
+        "type": "ZD变量",
+        "description": "会话计划 JSON（含 session_duration_minutes）"
+      },
+      {
+        "name": "behavior_config_json",
+        "type": "ZD变量",
+        "description": "行为配置 JSON（缓存，避免重复读文件）"
+      },
+      {
+        "name": "current_post_json",
+        "type": "ZD变量",
+        "description": "当前帖子 JSON 数据（供 RuleEngine 评估）"
+      },
+      {
+        "name": "current_post_id",
+        "type": "ZD变量",
+        "description": "当前帖子稳定标识符（用于去重）"
+      },
+      {
+        "name": "current_platform",
+        "type": "ZD变量",
+        "description": "当前平台名称（reddit/instagram 等）"
+      },
+      {
+        "name": "action_result",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "current_app",
+        "type": "ZD变量",
+        "description": "当前运行的 APP 包名"
+      },
+      {
+        "name": "screen_width",
+        "type": "ZD变量",
+        "description": "屏幕宽度（像素）"
+      },
+      {
+        "name": "screen_height",
+        "type": "ZD变量",
+        "description": "屏幕高度（像素）"
+      },
+      {
+        "name": "BehaviorConfig.json",
+        "type": "文件",
+        "description": "行为配置：动作权重、会话时长、打字速度等"
+      },
+      {
+        "name": "DecisionConfig.json",
+        "type": "文件",
+        "description": "决策配置：疲劳模型参数、交互阈值"
+      },
+      {
+        "name": "PlatformsConfig.json",
+        "type": "文件",
+        "description": "平台配置：各平台启用状态、页面签名"
+      },
+      {
+        "name": "device_app_mapping.json",
+        "type": "文件",
+        "description": "设备→平台映射表"
+      },
+      {
+        "name": "UserStrategy.json",
+        "type": "文件",
+        "description": "全局用户策略：AI 控制模式、决策权重"
+      },
+      {
+        "name": "IntentMappings/{platform}_intents.json",
+        "type": "文件",
+        "description": "平台意图映射：动作→意图→操作序列"
+      },
+      {
+        "name": "Operations/{platform}_operations.json",
+        "type": "文件",
+        "description": "平台操作定义 JSON"
+      },
+      {
+        "name": "Data/Keywords/{platform}/interests.json",
+        "type": "文件",
+        "description": "平台兴趣关键词"
+      },
+      {
+        "name": "Data/Keywords/{platform}/triggers.json",
+        "type": "文件",
+        "description": "平台触发/避免关键词"
+      }
+    ],
+    "writes": [
+      {
+        "name": "session_result",
+        "type": "ZD变量",
+        "description": "整体会话结果（SUCCESS/ERROR）"
+      },
+      {
+        "name": "behavior_config_json",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "current_platform",
+        "type": "ZD变量",
+        "description": "当前平台名称"
+      },
+      {
+        "name": "platforms_config_json",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "current_action",
+        "type": "ZD变量",
+        "description": "当前正在执行的动作名"
+      },
+      {
+        "name": "current_intent",
+        "type": "ZD变量",
+        "description": "当前动作对应的统一意图"
+      },
+      {
+        "name": "pending_action",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "pending_action_type",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "pending_platform",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "current_post_json",
+        "type": "ZD变量",
+        "description": "当前帖子 JSON（交互完成后清空）"
+      },
+      {
+        "name": "current_post_id",
+        "type": "ZD变量",
+        "description": "当前帖子 ID（交互完成后清空）"
+      },
+      {
+        "name": "run_result",
+        "type": "ZD变量",
+        "description": "模块运行结果（SUCCESS/ERROR）"
+      },
+      {
+        "name": "action_count",
+        "type": "ZD变量",
+        "description": "成功执行的动作数"
+      },
+      {
+        "name": "last_error",
+        "type": "ZD变量",
+        "description": "最近一次异常信息"
+      },
+      {
+        "name": "current_page",
+        "type": "ZD变量",
+        "description": "当前页面状态（feed/post_detail/unknown）"
+      },
+      {
+        "name": "effective_intent",
+        "type": "ZD变量",
+        "description": "经回退链解析后的实际执行意图"
+      },
+      {
+        "name": "action_result",
+        "type": "ZD变量",
+        "description": "最近一次动作执行结果（SUCCESS/SKIP/ERROR）"
+      },
+      {
+        "name": "strategy_success_weight",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "strategy_humanization_weight",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "ai_direct_execution",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "ai_notify_human",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "intent_mapping_loaded",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "intent_fallback_from",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "intent_fallback_to",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "human_prompt_text",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "human_prompt_platform",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "human_prompt_action",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "human_prompt_intent",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "module_operation",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "module_path",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "session_action_count",
+        "type": "ZD变量",
+        "description": "本次会话执行的动作总数"
+      },
+      {
+        "name": "session_energy",
+        "type": "ZD变量",
+        "description": "当前能量值（疲劳模型）"
+      },
+      {
+        "name": "session_platform",
+        "type": "ZD变量",
+        "description": "本次会话使用的平台"
+      },
+      {
+        "name": "Memory/{device_id}/{date}.json",
+        "type": "文件",
+        "description": "每日记忆文件，记录本次会话的动作序列"
+      }
+    ]
+  },
+  "types_defined": [
+    {
+      "name": "SessionState",
+      "kind": "class",
+      "properties": [
+        "FatigueEnabled: bool",
+        "Energy: double",
+        "DecayBrowse: double",
+        "DecayRead: double",
+        "DecayLike: double",
+        "DecayComment: double",
+        "RecoveryPerPauseSec: double",
+        "MinEnergyToComment: double",
+        "MinEnergyToLike: double"
+      ]
+    }
+  ],
+  "depends_on": [
+    "ActionExecutor",
+    "CoreHelper",
+    "JsonHelper",
+    "MemoryManager",
+    "ModuleLoader",
+    "Now",
+    "PageDetector",
+    "RuleEngine",
+    "SessionState"
+  ],
+  "depended_by": [
+    "Main"
+  ],
+  "side_effects": [
+    "DroidInstance device operation",
+    "Thread.Sleep",
+    "ZD variable write",
+    "directory create",
+    "file read",
+    "file write",
+    "logging"
+  ],
+  "stability": "stable"
+}

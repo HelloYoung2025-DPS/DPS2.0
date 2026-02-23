@@ -1,0 +1,242 @@
+{
+  "module": "MemoryManager",
+  "version": "1.0.0",
+  "file": "Modules/MemoryManager.cs",
+  "updated_at": "2026-02-23",
+  "contract_format": "1.0",
+  "callable": [
+    {
+      "name": "Init",
+      "params": [
+        {
+          "name": "basePath",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": ""
+    },
+    {
+      "name": "HasInteracted",
+      "params": [
+        {
+          "name": "deviceId",
+          "type": "string"
+        },
+        {
+          "name": "appName",
+          "type": "string"
+        },
+        {
+          "name": "postId",
+          "type": "string"
+        }
+      ],
+      "returns": "bool",
+      "description": ""
+    },
+    {
+      "name": "RecordInteraction",
+      "params": [
+        {
+          "name": "deviceId",
+          "type": "string"
+        },
+        {
+          "name": "appName",
+          "type": "string"
+        },
+        {
+          "name": "postId",
+          "type": "string"
+        },
+        {
+          "name": "actionType",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": ""
+    },
+    {
+      "name": "RecordInteractionWithScore",
+      "params": [
+        {
+          "name": "deviceId",
+          "type": "string"
+        },
+        {
+          "name": "appName",
+          "type": "string"
+        },
+        {
+          "name": "postId",
+          "type": "string"
+        },
+        {
+          "name": "actionType",
+          "type": "string"
+        },
+        {
+          "name": "score",
+          "type": "double"
+        }
+      ],
+      "returns": "void",
+      "description": ""
+    },
+    {
+      "name": "GetInteractionHistory",
+      "params": [
+        {
+          "name": "deviceId",
+          "type": "string"
+        },
+        {
+          "name": "appName",
+          "type": "string"
+        },
+        {
+          "name": "limit",
+          "type": "int"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "GetInteractionCount",
+      "params": [
+        {
+          "name": "deviceId",
+          "type": "string"
+        },
+        {
+          "name": "appName",
+          "type": "string"
+        },
+        {
+          "name": "actionType",
+          "type": "string"
+        }
+      ],
+      "returns": "int",
+      "description": ""
+    },
+    {
+      "name": "GetTodayInteractionCount",
+      "params": [
+        {
+          "name": "deviceId",
+          "type": "string"
+        },
+        {
+          "name": "appName",
+          "type": "string"
+        },
+        {
+          "name": "actionType",
+          "type": "string"
+        }
+      ],
+      "returns": "int",
+      "description": ""
+    },
+    {
+      "name": "CleanupOldInteractions",
+      "params": [
+        {
+          "name": "deviceId",
+          "type": "string"
+        },
+        {
+          "name": "appName",
+          "type": "string"
+        },
+        {
+          "name": "maxAgeDays",
+          "type": "int"
+        }
+      ],
+      "returns": "void",
+      "description": ""
+    },
+    {
+      "name": "EnforceMemoryLimits",
+      "params": [
+        {
+          "name": "deviceId",
+          "type": "string"
+        },
+        {
+          "name": "appName",
+          "type": "string"
+        },
+        {
+          "name": "configJson",
+          "type": "string"
+        }
+      ],
+      "returns": "int",
+      "description": ""
+    },
+    {
+      "name": "IsDuplicate",
+      "params": [
+        {
+          "name": "deviceId",
+          "type": "string"
+        },
+        {
+          "name": "appName",
+          "type": "string"
+        },
+        {
+          "name": "postId",
+          "type": "string"
+        },
+        {
+          "name": "windowHours",
+          "type": "int"
+        }
+      ],
+      "returns": "bool",
+      "description": ""
+    }
+  ],
+  "shared_state": {
+    "reads": [],
+    "writes": [
+      {
+        "name": "文件写入",
+        "type": "文件",
+        "description": ""
+      },
+      {
+        "name": "文件写入",
+        "type": "文件",
+        "description": ""
+      },
+      {
+        "name": "文件写入",
+        "type": "文件",
+        "description": ""
+      }
+    ]
+  },
+  "types_defined": [],
+  "depends_on": [
+    "CoreHelper",
+    "FileHelper",
+    "JsonHelper",
+    "Value"
+  ],
+  "depended_by": [
+    "SessionRunner"
+  ],
+  "side_effects": [
+    "directory create",
+    "logging"
+  ],
+  "stability": "stable"
+}

@@ -20,18 +20,31 @@ public class SessionRunner
 {
     private static dynamic _project;
     private const string TAG = "SessionRunner";
-    private static Random _random = new Random();
     
-    // 疲劳模型状态
-    private static bool _fatigueEnabled = false;
-    private static double _energy = 1.0;
-    private static double _decayBrowse = 0.02;
-    private static double _decayRead = 0.05;
-    private static double _decayLike = 0.03;
-    private static double _decayComment = 0.10;
-    private static double _recoveryPerPauseSec = 0.01;
-    private static double _minEnergyToComment = 0.3;
-    private static double _minEnergyToLike = 0.15;
+    [System.ThreadStatic]
+    private static Random _threadRandom;
+    
+    private static Random GetRandom()
+    {
+        if (_threadRandom == null)
+        {
+            _threadRandom = new Random(unchecked(Environment.TickCount * 31 + System.Threading.Thread.CurrentThread.ManagedThreadId));
+        }
+        return _threadRandom;
+    }
+    
+    private class SessionState
+    {
+        public bool FatigueEnabled;
+        public double Energy;
+        public double DecayBrowse;
+        public double DecayRead;
+        public double DecayLike;
+        public double DecayComment;
+        public double RecoveryPerPauseSec;
+        public double MinEnergyToComment;
+        public double MinEnergyToLike;
+    }
     
     // 规则引擎数据
     private static string _interestsJson = "";
@@ -54,13 +67,13 @@ public class SessionRunner
     /// <summary>
     /// 模块入口点
     /// </summary>
-    public static string Run(object projectObj)
+    public static string Run(object projectObj, object instanceObj)
     {
         _project = projectObj;
         
         try
         {
-            CoreHelper.Init(projectObj);
+            CoreHelper.Init(projectObj, instanceObj);
             
             string projectRoot = CoreHelper.GetVar("project_root", "");
             string deviceId = CoreHelper.GetVar("device_id", "");
@@ -106,27 +119,40 @@ public class SessionRunner
             
             // interests/triggers 在平台确定后加载（见下方）
             
-            // ========== 初始化疲劳模型 ==========
+            SessionState sessionState = new SessionState();
+            
             string fatigueSection = JsonHelper.ExtractObject(_decisionConfigJson, "fatigue_model");
             if (!string.IsNullOrEmpty(fatigueSection))
             {
                 string enabledFatigue = JsonHelper.Get(fatigueSection, "enabled");
-                _fatigueEnabled = (enabledFatigue == "true");
-                _energy = JsonHelper.GetDouble(fatigueSection, "initial_energy", 1.0);
-                _recoveryPerPauseSec = JsonHelper.GetDouble(fatigueSection, "recovery_per_pause_sec", 0.01);
-                _minEnergyToComment = JsonHelper.GetDouble(fatigueSection, "min_energy_to_comment", 0.3);
-                _minEnergyToLike = JsonHelper.GetDouble(fatigueSection, "min_energy_to_like", 0.15);
+                sessionState.FatigueEnabled = (enabledFatigue == "true");
+                sessionState.Energy = JsonHelper.GetDouble(fatigueSection, "initial_energy", 1.0);
+                sessionState.RecoveryPerPauseSec = JsonHelper.GetDouble(fatigueSection, "recovery_per_pause_sec", 0.01);
+                sessionState.MinEnergyToComment = JsonHelper.GetDouble(fatigueSection, "min_energy_to_comment", 0.3);
+                sessionState.MinEnergyToLike = JsonHelper.GetDouble(fatigueSection, "min_energy_to_like", 0.15);
                 
                 string decaySection = JsonHelper.ExtractObject(fatigueSection, "decay_per_action");
                 if (!string.IsNullOrEmpty(decaySection))
                 {
-                    _decayBrowse = JsonHelper.GetDouble(decaySection, "browse", 0.02);
-                    _decayRead = JsonHelper.GetDouble(decaySection, "read", 0.05);
-                    _decayLike = JsonHelper.GetDouble(decaySection, "like", 0.03);
-                    _decayComment = JsonHelper.GetDouble(decaySection, "comment", 0.10);
+                    sessionState.DecayBrowse = JsonHelper.GetDouble(decaySection, "browse", 0.02);
+                    sessionState.DecayRead = JsonHelper.GetDouble(decaySection, "read", 0.05);
+                    sessionState.DecayLike = JsonHelper.GetDouble(decaySection, "like", 0.03);
+                    sessionState.DecayComment = JsonHelper.GetDouble(decaySection, "comment", 0.10);
                 }
                 
-                CoreHelper.Log(TAG, string.Format("疲劳模型: enabled={0}, energy={1:F2}", _fatigueEnabled, _energy));
+                CoreHelper.Log(TAG, string.Format("疲劳模型: enabled={0}, energy={1:F2}", sessionState.FatigueEnabled, sessionState.Energy));
+            }
+            else
+            {
+                sessionState.FatigueEnabled = false;
+                sessionState.Energy = 1.0;
+                sessionState.DecayBrowse = 0.02;
+                sessionState.DecayRead = 0.05;
+                sessionState.DecayLike = 0.03;
+                sessionState.DecayComment = 0.10;
+                sessionState.RecoveryPerPauseSec = 0.01;
+                sessionState.MinEnergyToComment = 0.3;
+                sessionState.MinEnergyToLike = 0.15;
             }
             
             // ========== Multi-Platform Support ==========
@@ -283,12 +309,8 @@ public class SessionRunner
             
             while (DateTime.Now < sessionEnd)
             {
-                // BUG-02 fix: 每轮迭代开始前清空上一轮的帖子数据，避免残留
-                CoreHelper.SetVar("current_post_json", "");
-                CoreHelper.SetVar("current_post_id", "");
-                
                 // Step 1: 疲劳调权 — 能量不足时自动禁用高消耗动作
-                double[] adjustedWeights = AdjustWeightsForFatigue(actionTypes, weights);
+                double[] adjustedWeights = AdjustWeightsForFatigue(actionTypes, weights, sessionState);
                 
                 // 加权随机选择动作
                 string selectedAction = WeightedChoice(actionTypes, adjustedWeights);
@@ -303,7 +325,8 @@ public class SessionRunner
                 }
                 
                 // Step 2: RuleEngine 帖子评估门控
-                // 读取当前帖子数据（由平台模块 Browse 操作或 unified engine 写入）
+                // BUG-02 fix v2: 使用上一轮遗留的帖子数据进行评估（browse 会填充数据）
+                // 不在循环开头清空，让 browse → like/comment 的跨迭代数据流成立
                 string currentPostJson = CoreHelper.GetVar("current_post_json", "");
                 string currentPostId = CoreHelper.GetVar("current_post_id", "");
                 
@@ -316,18 +339,23 @@ public class SessionRunner
                     {
                         CoreHelper.Log(TAG, string.Format("MemoryManager 去重: 帖子 {0} 已交互过，降级为 browse", currentPostId));
                         selectedAction = "browse";
+                        selectedIntent = ResolveIntentForAction(selectedAction);
                     }
                 }
                 
                 // Step 2b: RuleEngine 评估
                 if (!EvaluatePostForAction(selectedAction, currentPostJson))
                 {
-                    // RuleEngine 拒绝 → 降级为 browse
                     CoreHelper.Log(TAG, string.Format("RuleEngine 拒绝 {0}，降级为 browse", selectedAction));
                     selectedAction = "browse";
+                    selectedIntent = ResolveIntentForAction(selectedAction);
                 }
                 
-                CoreHelper.Log(TAG, string.Format("执行动作: {0} (energy={1:F2})", selectedAction, _energy));
+                // 降级后同步变量
+                CoreHelper.SetVar("current_action", selectedAction);
+                CoreHelper.SetVar("current_intent", selectedIntent);
+                
+                CoreHelper.Log(TAG, string.Format("执行动作: {0} (energy={1:F2})", selectedAction, sessionState.Energy));
                 
                 // 执行实际动作
                 string actionResult = "PENDING";
@@ -374,6 +402,10 @@ public class SessionRunner
                     string currentPlatformForRecord = CoreHelper.GetVar("current_platform", "reddit");
                     MemoryManager.RecordInteraction(deviceId, currentPlatformForRecord, currentPostId, selectedAction);
                     CoreHelper.Log(TAG, string.Format("MemoryManager 已记录: {0} on {1}", selectedAction, currentPostId));
+                    
+                    // BUG-02 fix v2: 交互完成后清空帖子数据，防止下一轮重复评估同一帖子
+                    CoreHelper.SetVar("current_post_json", "");
+                    CoreHelper.SetVar("current_post_id", "");
                 }
                 
                 // 记录到日记忆文件（兼容 WeeklyEvolve 的文件读取）
@@ -395,7 +427,7 @@ public class SessionRunner
                 System.Threading.Thread.Sleep(sleepMs);
                 
                 // Step 3: 更新能量 — 用完整配置延迟计算恢复（非截断后的 sleepMs）
-                UpdateEnergy(selectedAction, delayMs);
+                UpdateEnergy(selectedAction, delayMs / 1000, sessionState);
                 
                 // 防止无限循环：设置最大动作数
                 if (actionCount >= 50)
@@ -468,7 +500,7 @@ public class SessionRunner
             return items[items.Length - 1];
         }
         
-        double r = _random.NextDouble() * total;
+        double r = GetRandom().NextDouble() * total;
         double sum = 0;
         for (int i = 0; i < weights.Length; i++)
         {
@@ -491,18 +523,32 @@ public class SessionRunner
         int minSec = JsonHelper.GetInt(actionSection, "duration_sec_min", 5);
         int maxSec = JsonHelper.GetInt(actionSection, "duration_sec_max", 30);
         
-        // 转换为毫秒并加入随机变化
-        int delayMs = _random.Next(minSec * 1000, maxSec * 1000);
-        return delayMs;
+        if (minSec < 0) minSec = 0;
+        if (maxSec < 0) maxSec = 0;
+        if (maxSec < minSec)
+        {
+            int temp = minSec;
+            minSec = maxSec;
+            maxSec = temp;
+        }
+        if (maxSec == minSec) maxSec = minSec + 1;
+        
+        if (minSec > 3600) minSec = 3600;
+        if (maxSec > 3600) maxSec = 3600;
+        
+        int minMs = minSec * 1000;
+        int maxMs = maxSec * 1000;
+        
+        return GetRandom().Next(minMs, maxMs);
     }
     
     /// <summary>
     /// 根据疲劳模型调整动作权重
     /// 能量不足时，高消耗动作（comment、like）权重降为 0
     /// </summary>
-    private static double[] AdjustWeightsForFatigue(string[] actionTypes, double[] baseWeights)
+    private static double[] AdjustWeightsForFatigue(string[] actionTypes, double[] baseWeights, SessionState state)
     {
-        if (!_fatigueEnabled)
+        if (!state.FatigueEnabled)
         {
             return baseWeights;
         }
@@ -516,12 +562,11 @@ public class SessionRunner
             string action = actionTypes[i];
             bool blocked = false;
             
-            // 能量不足时禁用高消耗动作
-            if (action == "comment" && _energy < _minEnergyToComment)
+            if (action == "comment" && state.Energy < state.MinEnergyToComment)
             {
                 blocked = true;
             }
-            else if (action == "like" && _energy < _minEnergyToLike)
+            else if (action == "like" && state.Energy < state.MinEnergyToLike)
             {
                 blocked = true;
             }
@@ -530,7 +575,7 @@ public class SessionRunner
             {
                 adjusted[i] = 0.0;
                 removedWeight += baseWeights[i];
-                CoreHelper.Log(TAG, string.Format("疲劳禁用动作: {0} (energy={1:F2})", action, _energy));
+                CoreHelper.Log(TAG, string.Format("疲劳禁用动作: {0} (energy={1:F2})", action, state.Energy));
             }
             else
             {
@@ -635,34 +680,35 @@ public class SessionRunner
     
     /// <summary>
     /// 更新能量值（执行动作后消耗，等待时恢复）
+    /// 修复: 重写方法签名匹配调用点 line 430: UpdateEnergy(selectedAction, delayMs / 1000, sessionState)
     /// </summary>
-    private static void UpdateEnergy(string action, int pauseMs)
+    private static void UpdateEnergy(string action, int pauseSec, SessionState state)
     {
-        if (!_fatigueEnabled)
+        if (!state.FatigueEnabled)
         {
             return;
         }
         
         // 消耗能量
         double decay = 0.0;
-        if (action == "browse") decay = _decayBrowse;
-        else if (action == "read_post") decay = _decayRead;
-        else if (action == "like") decay = _decayLike;
-        else if (action == "comment") decay = _decayComment;
-        else decay = _decayBrowse; // post 等其他动作用 browse 的消耗
+        if (action == "browse") decay = state.DecayBrowse;
+        else if (action == "read_post") decay = state.DecayRead;
+        else if (action == "like") decay = state.DecayLike;
+        else if (action == "comment") decay = state.DecayComment;
+        else decay = state.DecayBrowse; // post 等其他动作用 browse 的消耗
         
-        _energy -= decay;
+        state.Energy -= decay;
         
         // 等待期间恢复能量
-        double pauseSec = pauseMs / 1000.0;
-        _energy += pauseSec * _recoveryPerPauseSec;
+        double pauseSecD = (double)pauseSec;
+        state.Energy += pauseSecD * state.RecoveryPerPauseSec;
         
         // 钳制到 [0, 1]
-        if (_energy < 0.0) _energy = 0.0;
-        if (_energy > 1.0) _energy = 1.0;
+        if (state.Energy < 0.0) state.Energy = 0.0;
+        if (state.Energy > 1.0) state.Energy = 1.0;
         
         CoreHelper.Log(TAG, string.Format("能量更新: action={0}, decay={1:F3}, recovery={2:F3}, energy={3:F2}",
-            action, decay, pauseSec * _recoveryPerPauseSec, _energy));
+            action, decay, pauseSecD * state.RecoveryPerPauseSec, state.Energy));
     }
     
     /// <summary>

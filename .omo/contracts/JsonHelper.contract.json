@@ -1,0 +1,253 @@
+{
+  "module": "JsonHelper",
+  "version": "1.0.0",
+  "file": "Modules/Core/JsonHelper.cs",
+  "updated_at": "2026-02-23",
+  "contract_format": "1.0",
+  "callable": [
+    {
+      "name": "Get",
+      "params": [
+        {
+          "name": "json",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": "获取顶层字段值（depth-aware，仅匹配根对象直接子字段）。字符串值返回反转义内容，对象/数组返回原始 JSON，数字/布尔/null 返回原始文本"
+    },
+    {
+      "name": "GetNested",
+      "params": [
+        {
+          "name": "json",
+          "type": "string"
+        },
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": "获取嵌套字段值，使用点号路径（如 \"user.profile.name\"）"
+    },
+    {
+      "name": "ExtractObject",
+      "params": [
+        {
+          "name": "json",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": "提取嵌套对象（Get 的语义别名，用于明确表达提取对象意图）"
+    },
+    {
+      "name": "ExtractArray",
+      "params": [
+        {
+          "name": "json",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": "提取数组 JSON 字符串（Get 的语义别名，用于明确表达提取数组意图）"
+    },
+    {
+      "name": "GetArray",
+      "params": [
+        {
+          "name": "json",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        }
+      ],
+      "returns": "string[]",
+      "description": "提取数组为字符串数组，字符串元素自动反转义，对象/数字元素返回原始文本"
+    },
+    {
+      "name": "GetArrayElement",
+      "params": [
+        {
+          "name": "arrayJson",
+          "type": "string"
+        },
+        {
+          "name": "index",
+          "type": "int"
+        }
+      ],
+      "returns": "string",
+      "description": "按索引获取 JSON 数组中的单个元素（返回原始 JSON 文本）"
+    },
+    {
+      "name": "GetInt",
+      "params": [
+        {
+          "name": "json",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "defaultValue",
+          "type": "int"
+        }
+      ],
+      "returns": "int",
+      "description": "获取整数值，解析失败时返回 defaultValue"
+    },
+    {
+      "name": "GetDouble",
+      "params": [
+        {
+          "name": "json",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "defaultValue",
+          "type": "double"
+        }
+      ],
+      "returns": "double",
+      "description": "获取浮点值（使用 InvariantCulture 解析，确保跨 locale 正确），解析失败时返回 defaultValue"
+    },
+    {
+      "name": "GetBool",
+      "params": [
+        {
+          "name": "json",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "defaultValue",
+          "type": "bool"
+        }
+      ],
+      "returns": "bool",
+      "description": "获取布尔值（识别 \"true\"/\"false\" 字符串），解析失败时返回 defaultValue"
+    },
+    {
+      "name": "Set",
+      "params": [
+        {
+          "name": "json",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "newValue",
+          "type": "string"
+        },
+        {
+          "name": "isString",
+          "type": "bool"
+        }
+      ],
+      "returns": "string",
+      "description": "设置/修改顶层字段值。isString=true 时对 newValue 加引号并转义；字段不存在时追加到对象末尾"
+    },
+    {
+      "name": "Escape",
+      "params": [
+        {
+          "name": "s",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": "JSON 字符串转义（处理 \\、\"、\\n、\\r、\\t、\\b、\\f 及控制字符 \\uXXXX）"
+    },
+    {
+      "name": "Unescape",
+      "params": [
+        {
+          "name": "s",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": "JSON 字符串反转义，支持 \\uXXXX Unicode 转义序列"
+    },
+    {
+      "name": "IsValidJson",
+      "params": [
+        {
+          "name": "json",
+          "type": "string"
+        }
+      ],
+      "returns": "bool",
+      "description": "验证字符串是否为合法 JSON（必须以 { 或 [ 开头，且能完整解析）"
+    },
+    {
+      "name": "CreateObject",
+      "params": [
+        {
+          "name": "pairs",
+          "type": "params KeyValuePair<string, object>[]"
+        }
+      ],
+      "returns": "string",
+      "description": "从键值对构造 JSON 对象字符串。支持 string/bool/int/long/float/double/decimal/null 类型自动序列化"
+    },
+    {
+      "name": "CreateArray",
+      "params": [
+        {
+          "name": "values",
+          "type": "params string[]"
+        }
+      ],
+      "returns": "string",
+      "description": "从字符串数组构造 JSON 数组字符串，null 元素序列化为 JSON null"
+    }
+  ],
+  "shared_state": {
+    "reads": [],
+    "writes": []
+  },
+  "types_defined": [],
+  "depends_on": [],
+  "depended_by": [
+    "Main",
+    "SessionRunner",
+    "PersonaCreate",
+    "DailyUpdate",
+    "WeeklyEvolve",
+    "MemoryManager",
+    "RuleEngine",
+    "StateSaver",
+    "ReportGen"
+  ],
+  "side_effects": [],
+  "stability": "stable"
+}

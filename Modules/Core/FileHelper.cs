@@ -17,9 +17,16 @@ public class FileHelper
     /// </summary>
     public static void EnsureDir(string dirPath)
     {
-        if (!Directory.Exists(dirPath))
+        try
         {
-            Directory.CreateDirectory(dirPath);
+            if (!Directory.Exists(dirPath))
+            {
+                Directory.CreateDirectory(dirPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            CoreHelper.LogErr("FileHelper", "EnsureDir 失败 [" + dirPath + "]: " + ex.Message);
         }
     }
     
@@ -28,11 +35,19 @@ public class FileHelper
     /// </summary>
     public static string Read(string path)
     {
-        if (!File.Exists(path))
+        try
         {
+            if (!File.Exists(path))
+            {
+                return "";
+            }
+            return File.ReadAllText(path, Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            CoreHelper.LogErr("FileHelper", "Read 失败 [" + path + "]: " + ex.Message);
             return "";
         }
-        return File.ReadAllText(path, Encoding.UTF8);
     }
     
     /// <summary>
@@ -40,11 +55,19 @@ public class FileHelper
     /// </summary>
     public static string[] ReadLines(string path)
     {
-        if (!File.Exists(path))
+        try
         {
+            if (!File.Exists(path))
+            {
+                return new string[0];
+            }
+            return File.ReadAllLines(path, Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            CoreHelper.LogErr("FileHelper", "ReadLines 失败 [" + path + "]: " + ex.Message);
             return new string[0];
         }
-        return File.ReadAllLines(path, Encoding.UTF8);
     }
     
     /// <summary>
@@ -52,9 +75,16 @@ public class FileHelper
     /// </summary>
     public static void Write(string path, string content)
     {
-        string dir = Path.GetDirectoryName(path);
-        EnsureDir(dir);
-        File.WriteAllText(path, content, Encoding.UTF8);
+        try
+        {
+            string dir = Path.GetDirectoryName(path);
+            EnsureDir(dir);
+            File.WriteAllText(path, content, Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            CoreHelper.LogErr("FileHelper", "Write 失败 [" + path + "]: " + ex.Message);
+        }
     }
     
     /// <summary>
@@ -62,9 +92,16 @@ public class FileHelper
     /// </summary>
     public static void WriteLines(string path, string[] lines)
     {
-        string dir = Path.GetDirectoryName(path);
-        EnsureDir(dir);
-        File.WriteAllLines(path, lines, Encoding.UTF8);
+        try
+        {
+            string dir = Path.GetDirectoryName(path);
+            EnsureDir(dir);
+            File.WriteAllLines(path, lines, Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            CoreHelper.LogErr("FileHelper", "WriteLines 失败 [" + path + "]: " + ex.Message);
+        }
     }
     
     /// <summary>
@@ -72,9 +109,16 @@ public class FileHelper
     /// </summary>
     public static void Append(string path, string content)
     {
-        string dir = Path.GetDirectoryName(path);
-        EnsureDir(dir);
-        File.AppendAllText(path, content, Encoding.UTF8);
+        try
+        {
+            string dir = Path.GetDirectoryName(path);
+            EnsureDir(dir);
+            File.AppendAllText(path, content, Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            CoreHelper.LogErr("FileHelper", "Append 失败 [" + path + "]: " + ex.Message);
+        }
     }
     
     /// <summary>
@@ -90,19 +134,26 @@ public class FileHelper
     /// </summary>
     public static void WriteAtomic(string path, string content)
     {
-        string dir = Path.GetDirectoryName(path);
-        EnsureDir(dir);
-        
-        string tmp = path + ".tmp";
-        File.WriteAllText(tmp, content, Encoding.UTF8);
-        
-        if (File.Exists(path))
+        try
         {
-            File.Replace(tmp, path, path + ".bak", true);
+            string dir = Path.GetDirectoryName(path);
+            EnsureDir(dir);
+            
+            string tmp = path + ".tmp";
+            File.WriteAllText(tmp, content, Encoding.UTF8);
+            
+            if (File.Exists(path))
+            {
+                File.Replace(tmp, path, path + ".bak", true);
+            }
+            else
+            {
+                File.Move(tmp, path);
+            }
         }
-        else
+        catch (Exception ex)
         {
-            File.Move(tmp, path);
+            CoreHelper.LogErr("FileHelper", "WriteAtomic 失败 [" + path + "]: " + ex.Message);
         }
     }
     
@@ -127,9 +178,16 @@ public class FileHelper
     /// </summary>
     public static void Delete(string path)
     {
-        if (File.Exists(path))
+        try
         {
-            File.Delete(path);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (Exception ex)
+        {
+            CoreHelper.LogErr("FileHelper", "Delete 失败 [" + path + "]: " + ex.Message);
         }
     }
     
@@ -138,9 +196,16 @@ public class FileHelper
     /// </summary>
     public static void Copy(string source, string dest, bool overwrite)
     {
-        string dir = Path.GetDirectoryName(dest);
-        EnsureDir(dir);
-        File.Copy(source, dest, overwrite);
+        try
+        {
+            string dir = Path.GetDirectoryName(dest);
+            EnsureDir(dir);
+            File.Copy(source, dest, overwrite);
+        }
+        catch (Exception ex)
+        {
+            CoreHelper.LogErr("FileHelper", "Copy 失败 [" + source + " -> " + dest + "]: " + ex.Message);
+        }
     }
     
     /// <summary>
@@ -148,14 +213,21 @@ public class FileHelper
     /// </summary>
     public static void Move(string source, string dest)
     {
-        string dir = Path.GetDirectoryName(dest);
-        EnsureDir(dir);
-        
-        if (File.Exists(dest))
+        try
         {
-            File.Delete(dest);
+            string dir = Path.GetDirectoryName(dest);
+            EnsureDir(dir);
+            
+            if (File.Exists(dest))
+            {
+                File.Delete(dest);
+            }
+            File.Move(source, dest);
         }
-        File.Move(source, dest);
+        catch (Exception ex)
+        {
+            CoreHelper.LogErr("FileHelper", "Move 失败 [" + source + " -> " + dest + "]: " + ex.Message);
+        }
     }
     
     /// <summary>
@@ -163,11 +235,19 @@ public class FileHelper
     /// </summary>
     public static string[] GetFiles(string dirPath, string pattern)
     {
-        if (!Directory.Exists(dirPath))
+        try
         {
+            if (!Directory.Exists(dirPath))
+            {
+                return new string[0];
+            }
+            return Directory.GetFiles(dirPath, pattern);
+        }
+        catch (Exception ex)
+        {
+            CoreHelper.LogErr("FileHelper", "GetFiles 失败 [" + dirPath + "]: " + ex.Message);
             return new string[0];
         }
-        return Directory.GetFiles(dirPath, pattern);
     }
     
     /// <summary>

@@ -1,0 +1,78 @@
+{
+  "module": "IExtension",
+  "version": "1.0.0",
+  "file": "Modules/Core/IExtension.cs",
+  "updated_at": "2026-02-23",
+  "contract_format": "1.0",
+  "callable": [
+    {
+      "name": "Initialize",
+      "params": [
+        {
+          "name": "projectObj",
+          "type": "object"
+        },
+        {
+          "name": "configJson",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": "",
+      "kind": "interface_method"
+    },
+    {
+      "name": "Run",
+      "params": [
+        {
+          "name": "projectObj",
+          "type": "object"
+        }
+      ],
+      "returns": "string",
+      "description": "",
+      "kind": "interface_method"
+    },
+    {
+      "name": "Name",
+      "params": [],
+      "returns": "string",
+      "description": "",
+      "kind": "property"
+    },
+    {
+      "name": "Category",
+      "params": [],
+      "returns": "string",
+      "description": "",
+      "kind": "property"
+    },
+    {
+      "name": "Version",
+      "params": [],
+      "returns": "string",
+      "description": "",
+      "kind": "property"
+    },
+    {
+      "name": "Enabled",
+      "params": [],
+      "returns": "bool",
+      "description": "",
+      "kind": "property"
+    }
+  ],
+  "shared_state": {
+    "reads": [],
+    "writes": []
+  },
+  "types_defined": [],
+  "depends_on": [],
+  "depended_by": [
+    "ExtensionManager",
+    "IPLocationExtension",
+    "WeatherExtension"
+  ],
+  "side_effects": [],
+  "stability": "stable"
+}

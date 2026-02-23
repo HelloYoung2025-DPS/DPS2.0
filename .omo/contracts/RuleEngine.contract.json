@@ -1,0 +1,211 @@
+{
+  "module": "RuleEngine",
+  "version": "1.0.0",
+  "file": "Modules/RuleEngine.cs",
+  "updated_at": "2026-02-23",
+  "contract_format": "1.0",
+  "callable": [
+    {
+      "name": "LoadConfig",
+      "params": [
+        {
+          "name": "configJson",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": "加载决策配置 JSON（DecisionConfig.json 内容），初始化内部阈值和规则参数"
+    },
+    {
+      "name": "CalculateHotScore",
+      "params": [
+        {
+          "name": "postJson",
+          "type": "string"
+        }
+      ],
+      "returns": "double",
+      "description": "计算帖子热度分数（基于 upvotes、comment_count 等字段），返回 [0, 1] 归一化分数"
+    },
+    {
+      "name": "CalculateActivityScore",
+      "params": [
+        {
+          "name": "postJson",
+          "type": "string"
+        },
+        {
+          "name": "commentsJson",
+          "type": "string"
+        }
+      ],
+      "returns": "double",
+      "description": "计算帖子活跃度分数（基于时间戳新鲜度、评论活跃度等），返回 [0, 1] 归一化分数"
+    },
+    {
+      "name": "CalculateRelevanceScore",
+      "params": [
+        {
+          "name": "postJson",
+          "type": "string"
+        },
+        {
+          "name": "interestsJson",
+          "type": "string"
+        },
+        {
+          "name": "triggersJson",
+          "type": "string"
+        }
+      ],
+      "returns": "double",
+      "description": "计算帖子与 Persona 兴趣的相关度分数（关键词匹配），返回 [0, 1] 归一化分数"
+    },
+    {
+      "name": "CalculateCompositeScore",
+      "params": [
+        {
+          "name": "hotScore",
+          "type": "double"
+        },
+        {
+          "name": "activityScore",
+          "type": "double"
+        },
+        {
+          "name": "relevanceScore",
+          "type": "double"
+        }
+      ],
+      "returns": "double",
+      "description": "加权合并三个子分数为综合评分，权重来自 DecisionConfig.json scoring_weights 配置"
+    },
+    {
+      "name": "ShouldInteract",
+      "params": [
+        {
+          "name": "compositeScore",
+          "type": "double"
+        },
+        {
+          "name": "actionType",
+          "type": "string"
+        },
+        {
+          "name": "configJson",
+          "type": "string"
+        }
+      ],
+      "returns": "bool",
+      "description": "动作门控决策：将综合评分与 DecisionConfig.json 中对应 actionType 的阈值比较，返回是否执行该动作"
+    },
+    {
+      "name": "CheckAvoidTopics",
+      "params": [
+        {
+          "name": "postJson",
+          "type": "string"
+        },
+        {
+          "name": "triggersJson",
+          "type": "string"
+        }
+      ],
+      "returns": "bool",
+      "description": "检查帖子是否命中避免话题关键词列表，返回 true 表示应跳过该帖子"
+    },
+    {
+      "name": "CheckSensitiveTopics",
+      "params": [
+        {
+          "name": "postJson",
+          "type": "string"
+        },
+        {
+          "name": "triggersJson",
+          "type": "string"
+        }
+      ],
+      "returns": "bool",
+      "description": ""
+    },
+    {
+      "name": "ParseTimestampToMinutes",
+      "params": [
+        {
+          "name": "timestamp",
+          "type": "string"
+        }
+      ],
+      "returns": "double",
+      "description": ""
+    },
+    {
+      "name": "NormalizeScore",
+      "params": [
+        {
+          "name": "value",
+          "type": "double"
+        },
+        {
+          "name": "maxValue",
+          "type": "double"
+        }
+      ],
+      "returns": "double",
+      "description": ""
+    },
+    {
+      "name": "ContainsKeyword",
+      "params": [
+        {
+          "name": "text",
+          "type": "string"
+        },
+        {
+          "name": "keyword",
+          "type": "string"
+        }
+      ],
+      "returns": "bool",
+      "description": ""
+    }
+  ],
+  "shared_state": {
+    "reads": [
+      {
+        "name": "persona_json",
+        "type": "ZD变量",
+        "description": "当前设备的 Persona JSON（含兴趣、行为偏好）"
+      },
+      {
+        "name": "current_stage",
+        "type": "ZD变量",
+        "description": "当前账号成长阶段（影响阶段特定规则）"
+      },
+      {
+        "name": "DecisionConfig.json",
+        "type": "配置",
+        "description": "决策配置：各动作交互阈值、评分权重、疲劳模型参数"
+      },
+      {
+        "name": "ValidationRules.json",
+        "type": "配置",
+        "description": "验证规则集（可选，扩展规则定义）"
+      }
+    ],
+    "writes": []
+  },
+  "types_defined": [],
+  "depends_on": [
+    "CoreHelper",
+    "JsonHelper"
+  ],
+  "depended_by": [
+    "SessionRunner"
+  ],
+  "side_effects": [
+    "logging"
+  ],
+  "stability": "stable"
+}

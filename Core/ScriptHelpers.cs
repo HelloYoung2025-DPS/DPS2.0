@@ -26,7 +26,9 @@ Func<string, string, string> GetVar = (name, def) => {
 Action<string, string> SetVar = (name, val) => {
     try {
         project.Variables[name].Value = val ?? "";
-    } catch { }
+    } catch (System.Exception ex) {
+        try { project.SendWarningToLog("[ScriptHelpers] SetVar 失败 (" + name + "): " + ex.Message); } catch { }
+    }
 };
 
 // ========== Humanization Helpers ==========

@@ -1,0 +1,489 @@
+{
+  "module": "CoreHelper",
+  "version": "1.0.0",
+  "file": "Modules/Core/CoreHelper.cs",
+  "updated_at": "2026-02-23",
+  "contract_format": "1.0",
+  "callable": [
+    {
+      "name": "Init",
+      "params": [
+        {
+          "name": "projectObj",
+          "type": "object"
+        }
+      ],
+      "returns": "void",
+      "description": "初始化 CoreHelper，绑定 ZD project/instance 对象"
+    },
+    {
+      "name": "Init",
+      "params": [
+        {
+          "name": "projectObj",
+          "type": "object"
+        },
+        {
+          "name": "instanceObj",
+          "type": "object"
+        }
+      ],
+      "returns": "void",
+      "description": "初始化 CoreHelper，绑定 ZD project/instance 对象"
+    },
+    {
+      "name": "InitInstance",
+      "params": [
+        {
+          "name": "instanceObj",
+          "type": "object"
+        }
+      ],
+      "returns": "void",
+      "description": ""
+    },
+    {
+      "name": "GetDroid",
+      "params": [],
+      "returns": "dynamic",
+      "description": ""
+    },
+    {
+      "name": "GetInput",
+      "params": [],
+      "returns": "dynamic",
+      "description": ""
+    },
+    {
+      "name": "GetHierarchy",
+      "params": [],
+      "returns": "dynamic",
+      "description": ""
+    },
+    {
+      "name": "GetApp",
+      "params": [],
+      "returns": "dynamic",
+      "description": ""
+    },
+    {
+      "name": "GetLayout",
+      "params": [],
+      "returns": "string",
+      "description": "获取当前 Android 屏幕 UI 层级 XML（通过 ZD DroidInstance）"
+    },
+    {
+      "name": "HasInstance",
+      "params": [],
+      "returns": "bool",
+      "description": ""
+    },
+    {
+      "name": "Log",
+      "params": [
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": "输出 INFO 级别日志到 ZD 控制台"
+    },
+    {
+      "name": "Log",
+      "params": [
+        {
+          "name": "tag",
+          "type": "string"
+        },
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": "输出 INFO 级别日志到 ZD 控制台"
+    },
+    {
+      "name": "LogWarn",
+      "params": [
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": "输出 WARN 级别日志"
+    },
+    {
+      "name": "LogWarn",
+      "params": [
+        {
+          "name": "tag",
+          "type": "string"
+        },
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": "输出 WARN 级别日志"
+    },
+    {
+      "name": "LogErr",
+      "params": [
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": "输出 ERROR 级别日志"
+    },
+    {
+      "name": "LogErr",
+      "params": [
+        {
+          "name": "tag",
+          "type": "string"
+        },
+        {
+          "name": "message",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": "输出 ERROR 级别日志"
+    },
+    {
+      "name": "GetVar",
+      "params": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "defaultValue",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": "读取 ZD 全局变量，不存在时返回 defaultValue"
+    },
+    {
+      "name": "SetVar",
+      "params": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "value",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": "写入 ZD 全局变量"
+    },
+    {
+      "name": "GetVarInt",
+      "params": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "defaultValue",
+          "type": "int"
+        }
+      ],
+      "returns": "int",
+      "description": ""
+    },
+    {
+      "name": "GetVarBool",
+      "params": [
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "defaultValue",
+          "type": "bool"
+        }
+      ],
+      "returns": "bool",
+      "description": ""
+    },
+    {
+      "name": "EnsureDir",
+      "params": [
+        {
+          "name": "dirPath",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": "确保目录存在，不存在则创建"
+    },
+    {
+      "name": "ReadFile",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": "读取文件内容（UTF-8），失败抛出异常"
+    },
+    {
+      "name": "WriteFile",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        },
+        {
+          "name": "content",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": ""
+    },
+    {
+      "name": "AppendFile",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        },
+        {
+          "name": "content",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": ""
+    },
+    {
+      "name": "WriteFileAtomic",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        },
+        {
+          "name": "content",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": "原子写入文件（先写临时文件再重命名，防止写入中断导致数据损坏）"
+    },
+    {
+      "name": "JGet",
+      "params": [
+        {
+          "name": "json",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "JGetNested",
+      "params": [
+        {
+          "name": "json",
+          "type": "string"
+        },
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "JSet",
+      "params": [
+        {
+          "name": "json",
+          "type": "string"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "newValue",
+          "type": "string"
+        },
+        {
+          "name": "isString",
+          "type": "bool"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "GetToday",
+      "params": [],
+      "returns": "string",
+      "description": "返回今日日期字符串 yyyy-MM-dd"
+    },
+    {
+      "name": "GetNow",
+      "params": [],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "GetNowISO",
+      "params": [],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "SafeParseInt",
+      "params": [
+        {
+          "name": "s",
+          "type": "string"
+        },
+        {
+          "name": "defaultValue",
+          "type": "int"
+        }
+      ],
+      "returns": "int",
+      "description": ""
+    },
+    {
+      "name": "SafeParseDouble",
+      "params": [
+        {
+          "name": "s",
+          "type": "string"
+        },
+        {
+          "name": "defaultValue",
+          "type": "double"
+        }
+      ],
+      "returns": "double",
+      "description": ""
+    },
+    {
+      "name": "NormalizePath",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": "规范化路径（统一分隔符，确保末尾有反斜杠）"
+    },
+    {
+      "name": "CountOccurrences",
+      "params": [
+        {
+          "name": "text",
+          "type": "string"
+        },
+        {
+          "name": "pattern",
+          "type": "string"
+        }
+      ],
+      "returns": "int",
+      "description": ""
+    },
+    {
+      "name": "ValidateDeviceId",
+      "params": [
+        {
+          "name": "deviceId",
+          "type": "string"
+        }
+      ],
+      "returns": "bool",
+      "description": ""
+    },
+    {
+      "name": "GetSafeDeviceId",
+      "params": [
+        {
+          "name": "deviceId",
+          "type": "string"
+        },
+        {
+          "name": "defaultValue",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    }
+  ],
+  "shared_state": {
+    "reads": [
+      {
+        "name": "project_root",
+        "type": "ZD变量",
+        "description": "项目根目录路径"
+      },
+      {
+        "name": "device_id",
+        "type": "ZD变量",
+        "description": "当前设备标识符"
+      }
+    ],
+    "writes": [
+      {
+        "name": "(console/log)",
+        "type": "ZD控制台",
+        "description": "日志输出到 ZD 控制台"
+      }
+    ]
+  },
+  "types_defined": [],
+  "depends_on": [
+    "JsonHelper",
+    "Now"
+  ],
+  "depended_by": [
+    "Main",
+    "Initializer",
+    "SessionRunner",
+    "PersonaCreate",
+    "DailyUpdate",
+    "WeeklyEvolve",
+    "MemoryManager",
+    "RuleEngine",
+    "StateSaver",
+    "ReportGen",
+    "Maintenance",
+    "UIHelper"
+  ],
+  "side_effects": [
+    "DroidInstance device operation",
+    "ZD variable write",
+    "directory create",
+    "file read",
+    "file write",
+    "logging"
+  ],
+  "stability": "stable"
+}

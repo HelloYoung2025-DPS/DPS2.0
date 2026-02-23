@@ -1,0 +1,125 @@
+{
+  "module": "IPLocationExtension",
+  "version": "1.0.0",
+  "file": "Extensions/DataSources/IPLocationExtension.cs",
+  "updated_at": "2026-02-23",
+  "contract_format": "1.0",
+  "callable": [
+    {
+      "name": "Initialize",
+      "params": [
+        {
+          "name": "projectObj",
+          "type": "object"
+        },
+        {
+          "name": "configJson",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": "初始化扩展，解析配置 JSON 获取启用状态"
+    },
+    {
+      "name": "Run",
+      "params": [
+        {
+          "name": "projectObj",
+          "type": "object"
+        }
+      ],
+      "returns": "string",
+      "description": "执行 IP 地理位置查询：通过 HTTP 请求获取当前设备公网 IP 的地理位置信息，设置 ip_country/ip_city/ip_timezone 等 ZD 变量。返回 SUCCESS 或 ERROR:..."
+    },
+    {
+      "name": "Name",
+      "params": [],
+      "returns": "string",
+      "description": "返回扩展名称 \"IPLocation\"",
+      "kind": "property"
+    },
+    {
+      "name": "Category",
+      "params": [],
+      "returns": "string",
+      "description": "返回扩展类别 \"DataSource\"",
+      "kind": "property"
+    },
+    {
+      "name": "Version",
+      "params": [],
+      "returns": "string",
+      "description": "返回版本号 \"1.0.0\"",
+      "kind": "property"
+    },
+    {
+      "name": "Enabled",
+      "params": [],
+      "returns": "bool",
+      "description": "返回扩展是否启用",
+      "kind": "property"
+    }
+  ],
+  "shared_state": {
+    "reads": [
+      {
+        "name": "current_ip",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "ip_cache_time",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "ExtensionsConfig.json",
+        "type": "文件",
+        "description": "扩展配置，含启用状态"
+      }
+    ],
+    "writes": [
+      {
+        "name": "current_ip",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "ip_cache_time",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "ip_country",
+        "type": "ZD变量",
+        "description": "IP 所在国家"
+      },
+      {
+        "name": "ip_city",
+        "type": "ZD变量",
+        "description": "IP 所在城市"
+      },
+      {
+        "name": "ip_timezone",
+        "type": "ZD变量",
+        "description": "IP 所在时区"
+      }
+    ]
+  },
+  "types_defined": [],
+  "depends_on": [
+    "CoreHelper",
+    "IExtension",
+    "JsonHelper",
+    "Now"
+  ],
+  "depended_by": [
+    "Extension"
+  ],
+  "side_effects": [
+    "HTTP request",
+    "ZD variable write",
+    "logging"
+  ],
+  "stability": "stable"
+}

@@ -1,0 +1,326 @@
+{
+  "module": "FileHelper",
+  "version": "1.0.0",
+  "file": "Modules/Core/FileHelper.cs",
+  "updated_at": "2026-02-23",
+  "contract_format": "1.0",
+  "callable": [
+    {
+      "name": "EnsureDir",
+      "params": [
+        {
+          "name": "dirPath",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": ""
+    },
+    {
+      "name": "Read",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "ReadLines",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "string[]",
+      "description": ""
+    },
+    {
+      "name": "Write",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        },
+        {
+          "name": "content",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": ""
+    },
+    {
+      "name": "WriteLines",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        },
+        {
+          "name": "lines",
+          "type": "string[]"
+        }
+      ],
+      "returns": "void",
+      "description": ""
+    },
+    {
+      "name": "Append",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        },
+        {
+          "name": "content",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": ""
+    },
+    {
+      "name": "AppendLine",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        },
+        {
+          "name": "line",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": ""
+    },
+    {
+      "name": "WriteAtomic",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        },
+        {
+          "name": "content",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": ""
+    },
+    {
+      "name": "Exists",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "bool",
+      "description": ""
+    },
+    {
+      "name": "DirExists",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "bool",
+      "description": ""
+    },
+    {
+      "name": "Delete",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": ""
+    },
+    {
+      "name": "Copy",
+      "params": [
+        {
+          "name": "source",
+          "type": "string"
+        },
+        {
+          "name": "dest",
+          "type": "string"
+        },
+        {
+          "name": "overwrite",
+          "type": "bool"
+        }
+      ],
+      "returns": "void",
+      "description": ""
+    },
+    {
+      "name": "Move",
+      "params": [
+        {
+          "name": "source",
+          "type": "string"
+        },
+        {
+          "name": "dest",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": ""
+    },
+    {
+      "name": "GetFiles",
+      "params": [
+        {
+          "name": "dirPath",
+          "type": "string"
+        },
+        {
+          "name": "pattern",
+          "type": "string"
+        }
+      ],
+      "returns": "string[]",
+      "description": ""
+    },
+    {
+      "name": "GetInfo",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "FileInfo",
+      "description": ""
+    },
+    {
+      "name": "GetSize",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "long",
+      "description": ""
+    },
+    {
+      "name": "GetLastWriteTime",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "DateTime",
+      "description": ""
+    },
+    {
+      "name": "NormalizePath",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "Combine",
+      "params": [
+        {
+          "name": "path1",
+          "type": "string"
+        },
+        {
+          "name": "path2",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "GetFileName",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "GetFileNameWithoutExtension",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "GetDirectory",
+      "params": [
+        {
+          "name": "path",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    }
+  ],
+  "shared_state": {
+    "reads": [],
+    "writes": [
+      {
+        "name": "文件写入",
+        "type": "文件",
+        "description": ""
+      },
+      {
+        "name": "文件写入",
+        "type": "文件",
+        "description": ""
+      }
+    ]
+  },
+  "types_defined": [],
+  "depends_on": [
+    "CoreHelper",
+    "FileInfo"
+  ],
+  "depended_by": [
+    "MemoryManager",
+    "StateSaver",
+    "ReportGen",
+    "Maintenance",
+    "DailyUpdate",
+    "WeeklyEvolve"
+  ],
+  "side_effects": [
+    "directory create",
+    "file read",
+    "file write",
+    "logging"
+  ],
+  "stability": "stable"
+}

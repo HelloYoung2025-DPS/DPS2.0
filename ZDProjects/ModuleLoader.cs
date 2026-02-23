@@ -16,12 +16,22 @@
 // =====================================================
 
 // ========== 静态缓存（跨调用持久化） ==========
-// 缓存编译后的 MethodInfo，避免重复编译
-static System.Collections.Generic.Dictionary<string, System.Reflection.MethodInfo> _methodCache;
-// 缓存文件时间戳，用于检测变更
-static System.Collections.Generic.Dictionary<string, long> _timestampCache;
+// 缓存条目结构（包含方法和依赖快照）
+class CacheEntry
+{
+    public System.Reflection.MethodInfo Method;
+    public System.Collections.Generic.Dictionary<string, long> DependencyTimestamps;
+    public System.DateTime LastAccess;
+}
+
+// 缓存编译后的方法和依赖信息
+static System.Collections.Generic.Dictionary<string, CacheEntry> _moduleCache;
+// 缓存访问顺序（用于 LRU 淘汰）
+static System.Collections.Generic.Queue<string> _cacheAccessOrder;
 // 缓存锁对象
 static object _cacheLock = new object();
+// 缓存上限
+const int MAX_CACHE_ENTRIES = 32;
 
 // ========== 缓存辅助函数 ==========
 // 获取所有相关文件的时间戳列表
@@ -73,31 +83,60 @@ Func<string, string> BuildCacheKey = (filePath) => {
     return System.IO.Path.GetFullPath(filePath).ToLowerInvariant();
 };
 
-// 检查是否有任何文件发生变更
+// 规范化依赖路径（避免大小写/分隔符导致重复键）
+Func<string, string> NormalizeDependencyPath = (path) => {
+    return System.IO.Path.GetFullPath(path).ToLowerInvariant();
+};
+
+// 检查是否有任何文件发生变更（包括检测删除）
 Func<string, System.Collections.Generic.Dictionary<string, long>, bool> HasAnyFileChanged = null;
 HasAnyFileChanged = (cacheKey, currentTimestamps) => {
-    if (_timestampCache == null) return true;
+    if (_moduleCache == null) return true;
     
-    // 检查缓存中是否有此模块的时间戳记录
+    CacheEntry cached;
+    if (!_moduleCache.TryGetValue(cacheKey, out cached) || cached == null || cached.DependencyTimestamps == null) {
+        return true;
+    }
+    
+    // 检查新增或修改的文件
     foreach (var kvp in currentTimestamps) {
-        string fileKey = cacheKey + "|" + kvp.Key;
+        string normPath = NormalizeDependencyPath(kvp.Key);
         long cachedTicks;
-        if (!_timestampCache.TryGetValue(fileKey, out cachedTicks)) {
-            return true; // 新文件，需要重新编译
+        if (!cached.DependencyTimestamps.TryGetValue(normPath, out cachedTicks)) {
+            return true;
         }
         if (cachedTicks != kvp.Value) {
-            return true; // 文件已修改
+            return true;
+        }
+    }
+    
+    // 检查删除的文件：缓存里有但当前不存在
+    if (cached.DependencyTimestamps.Count != currentTimestamps.Count) {
+        foreach (var kvp in cached.DependencyTimestamps) {
+            bool found = false;
+            foreach (var curr in currentTimestamps) {
+                if (NormalizeDependencyPath(curr.Key) == kvp.Key) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) return true;
         }
     }
     
     return false;
 };
 
-// 更新时间戳缓存
-Action<string, System.Collections.Generic.Dictionary<string, long>> UpdateTimestampCache = (cacheKey, timestamps) => {
-    foreach (var kvp in timestamps) {
-        string fileKey = cacheKey + "|" + kvp.Key;
-        _timestampCache[fileKey] = kvp.Value;
+// 淘汰最旧的缓存条目（LRU）
+Action EvictOldestCacheEntry = () => {
+    if (_cacheAccessOrder == null || _cacheAccessOrder.Count == 0) return;
+    
+    while (_cacheAccessOrder.Count > 0 && _moduleCache.Count >= MAX_CACHE_ENTRIES) {
+        string oldKey = _cacheAccessOrder.Dequeue();
+        if (_moduleCache.ContainsKey(oldKey)) {
+            _moduleCache.Remove(oldKey);
+            project.SendInfoToLog("[ModuleLoader] 缓存淘汰: " + oldKey);
+        }
     }
 };
 
@@ -109,9 +148,9 @@ Func<string, string, object[], object> RunModule = (filePath, methodName, args) 
     }
     
     lock (_cacheLock) {
-        if (_methodCache == null) {
-            _methodCache = new System.Collections.Generic.Dictionary<string, System.Reflection.MethodInfo>();
-            _timestampCache = new System.Collections.Generic.Dictionary<string, long>();
+        if (_moduleCache == null) {
+            _moduleCache = new System.Collections.Generic.Dictionary<string, CacheEntry>();
+            _cacheAccessOrder = new System.Collections.Generic.Queue<string>();
         }
     }
     
@@ -119,9 +158,12 @@ Func<string, string, object[], object> RunModule = (filePath, methodName, args) 
     var currentTimestamps = GetFileTimestamps(filePath);
     
     lock (_cacheLock) {
-        if (_methodCache.ContainsKey(cacheKey) && !HasAnyFileChanged(cacheKey, currentTimestamps)) {
+        CacheEntry entry;
+        if (_moduleCache.TryGetValue(cacheKey, out entry) && !HasAnyFileChanged(cacheKey, currentTimestamps)) {
             project.SendInfoToLog("[ModuleLoader] 缓存命中: " + filePath);
-            return _methodCache[cacheKey].Invoke(null, args);
+            entry.LastAccess = System.DateTime.UtcNow;
+            // 修复: 移除重复入队 - 缓存命中时不应再次入队，避免无界队列增长
+            return entry.Method.Invoke(null, args);
         }
     }
     
@@ -228,8 +270,20 @@ Func<string, string, object[], object> RunModule = (filePath, methodName, args) 
     }
     
     lock (_cacheLock) {
-        _methodCache[cacheKey] = method;
-        UpdateTimestampCache(cacheKey, currentTimestamps);
+        EvictOldestCacheEntry();
+        
+        var normalizedTimestamps = new System.Collections.Generic.Dictionary<string, long>();
+        foreach (var kvp in currentTimestamps) {
+            normalizedTimestamps[NormalizeDependencyPath(kvp.Key)] = kvp.Value;
+        }
+        
+        var newEntry = new CacheEntry();
+        newEntry.Method = method;
+        newEntry.DependencyTimestamps = normalizedTimestamps;
+        newEntry.LastAccess = System.DateTime.UtcNow;
+        
+        _moduleCache[cacheKey] = newEntry;
+        _cacheAccessOrder.Enqueue(cacheKey);
     }
     
     project.SendInfoToLog("[ModuleLoader] 编译完成并已缓存: " + filePath);
