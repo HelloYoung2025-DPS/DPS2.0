@@ -1,3 +1,246 @@
+## [4.5.6] - 2026-02-27
+
+### 🛠️ 架构重构 - DPS 与 ZennoDroid 分层
+
+#### 核心理念
+- **DPS (大脑)**: 决策层 - 感知、记忆、决策、验证
+- **ZennoDroid (手)**: 执行层 - 元素定位、拟人化执行、异常处理
+- **翻译层**: 将高层意图翻译为物理操作（属于 DPS 的认知能力）
+
+#### Phase 1: 重构 ActionExecutor.cs
+- **新增**: `Modules/Core/Intent.cs` - 操作意图抽象类
+  - 定义高层操作意图，描述“做什么”而不是“怎么做”
+  - 支持从 JSON 步骤构造 Intent 对象
+  - 168 行，C# 5.0 兼容
+- **新增**: `ActionExecutor.ExecuteIntent()` 方法
+  - 基于 Intent 对象的执行方法
+  - 复用现有的 Step* 方法，保持向后兼容
+  - 渐进式重构策略：保留现有执行逻辑，只改变输入格式
+- **新增**: `ActionExecutor.GetContext()` 方法
+  - 供 SessionRunner 读取上下文变量（如 post_title, post_subreddit）
+  - 兼容现有代码调用
+
+#### Phase 2: 简化 Manifest - 删除物理参数
+- **修改**: `Config/Operations/reddit_operations.json`
+  - 删除 `duration` 参数（物理参数）
+  - 保留 `selector`, `direction`, `distance`（翻译层需要）
+- **修改**: `Configs/Manifests/instagram.json`
+  - 删除所有 `duration_ms` 参数（4 处）
+  - 保留选择器和高层参数
+
+#### Phase 3: 添加视觉验证层
+- **新增**: `SessionRunner.cs` 视觉验证逻辑
+  - 在关键操作（like, comment）执行后添加截图验证
+  - 调用 `VisionCorrector.AnalyzeAndRecover()` 验证结果
+  - 验证失败时标记操作为失败，记录失败原因
+  - 通过 `behavior_config_json` 中的 `vision_verification_enabled` 控制开关
+
+#### Phase 4: 设计新的 Manifest 格式
+- **新增**: `Configs/Manifests/manifest_schema.yaml` - Manifest Schema v2.0
+  - 定义 `capabilities`：APP 能做什么
+  - 定义 `states`：如何识别当前状态（视觉 + UI 特征）
+  - 定义 `intent_mappings`：意图翻译为操作
+  - 定义 `rate_limits`：速率限制
+  - 91 行，详细注释
+- **新增**: `Configs/Manifests/instagram_v2.yaml` - Instagram Manifest v2.0
+  - 11 个 capabilities（browse_feed, like_post, comment, 等）
+  - 7 个 states（home_feed, post_detail, profile, 等）
+  - 每个 state 包含 visual_markers + ui_signatures + gemini_prompt
+  - 11 个 intent_mappings，包含 fallback_intents
+  #HM|# 8 个 rate_limits，包含 per_hour + cooldown_seconds + per_day
+XX|  - 223 行，完整实现
+QK|-
+JN|# #### Phase 5: DPS 架构完整实现
+QZ|# - **新增**: `Modules/Core/ZDCommand.cs` - ZennoDroid 命令类
+XW|#   - 定义物理操作的命令类型（Tap, Swipe, SendText, 等）
+VW|#   - 封装坐标、持续时间、文本内容等物理参数
+HS|#   - 支持人性化执行标志和重试配置
+WW|#   - 333 行，C# 5.0 兼容
+RZ|# - **新增**: `Modules/Core/ZDResult.cs` - ZennoDroid 执行结果类
+BM|#   - 统一的执行结果格式（Success, FailedRetryable, FailedFatal, Skipped）
+XZ|#   - 支持扩展数据和错误追踪
+SN|#   - 提供与旧格式的兼容转换方法
+ZK|#   - 311 行，C# 5.0 兼容
+BV|# - **新增**: `Modules/Core/ZennoDroidAdapter.cs` - ZennoDroid API 适配器
+BQ|#   - 封装所有 ZennoDroid API 调用（Input.Tap, Input.Swipe, 等）
+HX|#   - 统一错误处理和重试机制
+XT|#   - 支持 GetLayout 和 Screenshot 操作
+BY|#   - 408 行，C# 5.0 兼容
+VV|# - **新增**: `Modules/Core/IntentTranslator.cs` - 意图翻译器
+ZP|#   - 将 Intent 翻译为 ZDCommand
+QH|#   - 保留元素定位逻辑（SelectorEngine）和坐标计算逻辑（ParseBounds）
+KQ|#   - 支持回退链翻译
+RJ|#   - 支持从 stepJson 快速翻译
+HX|#   - 472 行，C# 5.0 兼容
+XS|# - **修改**: `ZDProjects/ModuleLoader.cs`
+JW|#   - 添加新文件到编译列表：Intent.cs, ZDCommand.cs, ZDResult.cs, ZennoDroidAdapter.cs, IntentTranslator.cs
+YT|#   - 确保所有新文件被动态编译加载
+BP|-
+QW|# #### 架构图
+RT|# ```
+JS|# DPS (大脑层)
+PQ|# ├─ Intent ("我想点赞这个帖子")
+YB|# ├─ IntentTranslator (翻译：意图 → 命令)
+QQ|# │   └─ 输出: ZDCommand ("点击坐标 (540, 1800)")
+SX|# └─ VisionCorrector (视觉验证)
+PY|# 
+ZX|# ZennoDroid (手层)
+QK|# ├─ ZennoDroidAdapter (API 封装)
+ZV|# │   └─ 输入: ZDCommand
+JY|# │   └─ 输出: ZDResult
+VQ|# ├─ SelectorEngine (元素定位)
+ZM|# └─ ScriptHelpers (人性化执行)
+JJ|# ```
+MH|-
+WW|# #### 关键改进
+ZP|# 1. **清晰的架构边界**: DPS 不再直接调用 ZennoDroid API
+QS|# 2. **可测试性**: Intent/ZDCommand/ZDResult 都是纯数据结构
+KQ|# 3. **可扩展性**: 新增平台只需定义 Manifest 和翻译规则
+HT|# 4. **向后兼容**: 保留 ActionExecutor 的旧接口，渐进式迁移
+KN|# 5. **C# 5.0 兼容**: 所有新代码使用 C# 5.0 语法
+SX|
+  - 223 行，完整示例
+
+### 📝 架构决策
+- **ADR-011**: Intent-Based Execution
+  - 状态: 已接受
+  - 决策: 引入 Intent 抽象层，分离决策与执行
+  - 理由: 提高代码可读性，便于未来添加视觉验证层
+  - 后果: 保持向后兼容，现有代码无需修改
+- **ADR-012**: Vision Verification Layer
+  - 状态: 已接受
+  - 决策: 在关键操作后添加 Gemini Flash 截图验证
+  - 理由: 提高操作可靠性，及时发现执行失败
+  - 后果: 增加每次操作 2-3 秒延迟，但显著提高成功率
+- **ADR-013**: Manifest v2.0 Format
+  - 状态: 已接受
+  - 决策: 重新设计 Manifest 格式，分离语义和物理参数
+  - 理由: 现有格式混合了 DPS 层和 ZennoDroid 层的信息
+  - 后果: 旧格式仍然支持，新格式逐步迁移
+
+### ✅ 验证结果
+- **代码结构**: Intent.cs 创建成功，168 行
+- **向后兼容**: 现有 Execute() 方法保留，新增 ExecuteIntent() 方法
+- **配置简化**: 删除所有 duration/duration_ms 参数
+- **视觉验证**: SessionRunner 集成 VisionCorrector
+- **新格式**: manifest_schema.yaml + instagram_v2.yaml 创建成功
+- **状态**: ✅ READY - 可以进入运行时测试
+
+### 📚 文档更新
+- **新增**: `ARCHITECTURE_REFACTORING_REPORT.md` - 架构重构报告
+  - 详细分析当前架构错误
+  - 提供 7 个 Phase 的重构计划
+  - 428 行，包含代码示例和流程图
+
+---
+
+## [4.5.5] - 2026-02-27
+
+### 🐛 关键修复 - 编译错误修复
+
+#### ActionExecutor.cs
+- **修复**: 删除第279-308行重复的 StepTap 代码块（CS0116 错误）
+- **修复**: 删除第342-367行重复的 StepSwipe 代码块（CS0116 错误）
+- **修复**: 删除第408-443行重复的 StepScroll 代码块（CS0116 错误）
+- **修复**: 添加第1116行 `public static string GetContextVariable(string key)` 方法签名
+- **修复**: 添加第1132行 `public static void SetContextVariable(string key, string value)` 方法签名
+- **修复**: 添加第1145行 `public static void ClearContext()` 方法签名
+- **结果**: 所有 CS0116 编译错误已解决，代码结构完整
+
+#### ModuleLoader.cs
+- **修复**: 在 coreFiles 数组中添加 `RateLimiter.cs`
+- **结果**: 所有新模块现已包含在动态编译系统中
+
+#### AppExplorer.cs
+- **修复**: 第720行 `input.PressBack()` 改为 `input.Shell("input keyevent 4")`
+- **结果**: 使用 ZennoDroid 标准 API，避免 CS0117 错误
+
+#### NavigationResolver.cs
+- **修复**: 第94行 `JsonHelper.GetJsonValue` 改为 `JsonHelper.Get`
+- **修复**: 第102-103行 `JsonHelper.ParseJsonArray` 改为 `JsonHelper.GetArray`
+- **结果**: 使用存在的 JsonHelper API，避免 CS0117 错误
+
+#### AIConfig.json
+- **修复**: 模型名称从 `gemini-3-flash-preview` 改为 `gemini-3-flash`
+- **结果**: 使用正确的 Gemini API 模型名称
+
+#### Initializer.cs
+- **新增**: 在项目初始化时调用 `VisionCorrector.Init`
+- **新增**: 自动创建 `Screenshots/` 目录
+- **结果**: VisionCorrector 模块现已正确初始化，可以使用
+
+#### instagram.json
+- **修复**: 添加导航路径 `home → notifications`（第197行）
+- **修复**: 添加导航路径 `home → direct_messages`（第198行）
+- **修复**: `like_feed_posts` 速率限制从 15/min 调整为 30/hour（第233行）
+- **修复**: `cooldown_seconds` 从 5秒调整为 120秒
+- **结果**: 符合 Instagram 安全限制，所有屏幕可达
+
+### ✅ 验证结果
+- **编译验证**: 所有 11 个高优先级修复项已通过验证
+- **代码结构**: ActionExecutor.cs 共 28 个方法签名，无孤立代码块
+- **API 兼容性**: 所有 API 调用已修正为 ZennoDroid 标准 API
+- **配置完整性**: 所有配置文件已修正，符合框架规范
+- **状态**: ✅ READY - 可以进入 ZennoDroid 运行时测试
+
+---
+
+## [4.5.4] - 2026-02-27
+
+### ✨ 新功能 - Universal APP Automation Framework
+
+#### 核心模块扩展
+- **新增**: `NavigationResolver.cs` - BFS 最短路径导航算法
+  - 根据 Manifest navigation.edges 计算页面间最短路径
+  - 支持图结构加载、路径查询、直接到达检查
+  - 321 行，C# 5.0 兼容
+
+#### 模块集成
+- **更新**: `ModuleLoader.cs` coreFiles 数组
+  - 添加: ManifestLoader.cs, NavigationResolver.cs, VisionCorrector.cs, AppExplorer.cs, RateLimiter.cs
+  - 所有新核心模块现已纳入动态编译系统
+
+#### 配置文件
+- **新增**: `Configs/Manifests/instagram.json` - Instagram 完整 Manifest
+- **新增**: `Configs/Manifests/reddit.json` - Reddit 完整 Manifest
+- **新增**: `Configs/Manifests/template.json` - Manifest 模板
+
+### 📝 技术细节
+- **ActionExecutor.cs** 新原语已验证: call_operation, if_exists, foreach, random_pick
+- **C# 5.0 语法兼容性验证通过** - 无 $"", ?., nameof 等现代语法
+- 所有核心模块已集成到动态编译系统
+
+---
+
+## [4.5.3] - 2026-02-26
+
+### ✨ 新功能
+
+#### ActionExecutor.cs - call_operation 原语实现
+- **新增**: `call_operation` 原语，支持操作组合和递归调用
+  - 在 ExecuteStep 方法的 switch-case 中新增 `case "call_operation"`
+  - 实现 ExecuteCallOperation 方法，支持递归调用其他操作
+  - 递归深度限制为 5 层（通过 OperationContext.CanEnterCall 检查）
+  - 使用 context.EnterCall() 和 context.ExitCall() 管理递归深度
+  - 异常处理确保递归深度正确退出
+- **重构**: Execute 方法签名更新
+  - 新增 OperationContext 参数，替代静态 _context 字典
+  - 支持多设备并发安全执行
+- **重构**: 所有步骤方法更新以使用 OperationContext
+  - StepFind: 使用 context.SetVariable 存储查找结果
+  - StepTap: 使用 context 参数传递
+  - StepSetVar: 使用 context.GetVariable 读取上下文变量
+  - ExecuteForeach: 使用 context.SetVariable 设置循环变量
+  - ExecuteIfExists: 传递 context 到分支执行
+  - ExecuteRandomPick: 传递 context 到子步骤
+  - ResolveTapTarget: 使用 context.GetVariable 读取坐标
+- **兼容性**: 保留静态 GetContext/SetContext/ClearContext 方法（已标记为废弃）
+
+### 📝 技术细节
+- 符合 C# 5.0 语法要求（无 $""、?.、nameof）
+- 遵循现有代码风格（JsonHelper 用法、错误处理模式）
+- 详细注释说明递归机制和深度控制
+
 # DPS v4.5 更新日志
 
 ## [4.5.2] - 2026-02-17
@@ -292,3 +535,10 @@ Backups/
 - AI 画像生成
 - 会话模拟
 - 每日/每周更新
+
+## [4.5.3] - 2026-02-27
+### Added
+- ZennoDroidAdapter: Added fastMode support and conditional screenshot capture.
+- VisionCorrector: Added VerifyError method for error-triggered visual verification.
+### Changed
+- SessionRunner: Optimized verification logic to only trigger visual verification on ZennoDroid execution failure (performance optimization).

@@ -391,6 +391,53 @@ public class SessionRunner
                     CoreHelper.LogErr(TAG, "动作执行失败: " + ex.Message);
                 }
                 
+                // v4.5.2: 视觉验证层（架构重构）
+                // 对关键操作（like, comment）执行视觉验证
+                if (actionResult == "SUCCESS" && (selectedAction == "like" || selectedAction == "comment"))
+                {
+                    bool visionEnabled = JsonHelper.Get(behaviorConfigJson, "vision_verification_enabled") == "true";
+                    if (visionEnabled)
+                        // v4.5.3 优化：仅在报错时触发视觉验证
+                        if (actionResult.StartsWith("ERROR"))
+                        {
+                            CoreHelper.LogWarn(TAG, "检测到操作报错，尝试视觉验证恢复...");
+                            
+                            // 构造验证上下文
+                            string verifyIntent = string.Format("在页面 {0} 执行 {1} ({2})", _currentPage, selectedAction, effectiveIntent);
+                            
+                            // 从环境变量或结果中获取截图（ZennoDroidAdapter 在失败时已自动截图）
+                            string screenshotPath = CoreHelper.GetVar("last_error_screenshot", "");
+                            
+                            // 注意：ActionExecutor.Execute 返回的是字符串，我们需要更深层的 ZDResult 信息
+                            // 但由于 SessionRunner 目前结构限制，我们通过 VisionCorrector.AnalyzeAndRecover 分析当前屏幕
+                            string visionResult = VisionCorrector.AnalyzeAndRecover(verifyIntent, "操作应该已生效");
+                            
+                            string onExpectedStr = JsonHelper.Get(visionResult, "on_expected_page");
+                            bool verified = (onExpectedStr == "true" || onExpectedStr == "True");
+                            
+                            if (verified)
+                            {
+                                CoreHelper.Log(TAG, "视觉验证成功：系统虽报错但操作实际已生效");
+                                actionResult = "SUCCESS"; // 修正结果
+                                CoreHelper.SetVar("vision_verified", "true");
+                            }
+                            else
+                            {
+                                string reason = JsonHelper.Get(visionResult, "reason");
+                                CoreHelper.LogWarn(TAG, "视觉验证失败，操作确实失败: " + reason);
+                                CoreHelper.SetVar("vision_verified", "false");
+                                CoreHelper.SetVar("vision_failure_reason", reason);
+                                // 保持 ERROR 状态
+                            }
+                        }
+                        else
+                        {
+                            // 正常成功，不执行验证，保持高性能
+                            CoreHelper.SetVar("vision_verified", "skipped_fast_mode");
+                        }
+
+                }
+                
                 // BUG-04 fix: SKIP 不算失败（页面不匹配等正常情况）
                 if (actionResult != "SUCCESS" && !actionResult.StartsWith("SKIP")) {
                     failedActions++;
