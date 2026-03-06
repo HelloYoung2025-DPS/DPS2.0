@@ -22,7 +22,7 @@
         "babycenter": {
             "name": "BabyCenter",
             "full_name": "BabyCenter Community",
-            "enabled": false,
+            "enabled": true,
             "data_path": "Data/BabyCenter",
             "primary_communities": [
                 "Pregnancy",

@@ -16,6 +16,11 @@
             "platform": "reddit",
             "device_name": "OnePlus 9",
             "notes": "Secondary Reddit device"
+        },
+        "device_004": {
+            "platform": "babycenter",
+            "device_name": "BabyCenter Test Device",
+            "notes": "BabyCenter pilot device"
         }
     },
     "default_platform": "reddit"

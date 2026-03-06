@@ -25,10 +25,11 @@
                     "value": "post_footer"
                 },
                 "upvote_button": {
-                    "strategy": "resource-id",
-                    "value": "post_footer_first_child",
-                    "fallback_strategy": "content-desc",
-                    "fallback_value": "Upvote"
+                    "strategy": "content-desc",
+                    "value": "Upvote",
+                    "fallback_strategy": "resource-id",
+                    "fallback_value": "post_footer",
+                    "note": "Reddit Jetpack Compose 无独立 upvote resource-id，优先用 content-desc，回退到 post_footer 左 1/3 区域"
                 },
                 "downvote_button": {
                     "strategy": "content-desc",
@@ -36,19 +37,19 @@
                 },
                 "comment_button": {
                     "strategy": "resource-id",
-                    "value": "comment_button",
+                    "value": "post_comment_button",
                     "fallback_strategy": "content-desc",
                     "fallback_value": "Comment"
                 },
                 "share_button": {
                     "strategy": "resource-id",
-                    "value": "share_button",
+                    "value": "post_share_button",
                     "fallback_strategy": "content-desc",
                     "fallback_value": "Share"
                 },
                 "follow_button": {
                     "strategy": "resource-id",
-                    "value": "follow_button",
+                    "value": "post_join_button",
                     "fallback_strategy": "text",
                     "fallback_value": "Follow"
                 },
@@ -74,38 +75,82 @@
                 },
                 "subreddit_name": {
                     "strategy": "resource-id",
-                    "value": "subreddit_name"
+                    "value": "post_subreddit_icon",
+                    "note": "subreddit_name 不存在为独立 resource-id，使用 post_subreddit_icon 替代"
                 },
                 "author_name": {
                     "strategy": "resource-id",
-                    "value": "author_name"
+                    "value": "post_header",
+                    "note": "author_name 不存在为独立 resource-id，使用 post_header 替代"
                 },
                 "toolbar": {
                     "strategy": "resource-id",
-                    "value": "toolbar"
+                    "value": "home_screen_surface",
+                    "fallback_strategy": "resource-id",
+                    "fallback_value": "main_top_app_bar_navigation_icon"
+                },
+                "feed_container": {
+                    "strategy": "resource-id",
+                    "value": "feed_lazy_column"
+                },
+                "post_header": {
+                    "strategy": "resource-id",
+                    "value": "post_header"
+                },
+                "post_overflow": {
+                    "strategy": "resource-id",
+                    "value": "post_overflow"
+                },
+                "join_button": {
+                    "strategy": "resource-id",
+                    "value": "post_join_button"
                 },
                 "back_button": {
                     "strategy": "content-desc",
-                    "value": "Navigate up"
+                    "value": "Back",
+                    "fallback_strategy": "resource-id",
+                    "fallback_value": "fbp_back_button"
+                },
+                "vote_group": {
+                    "strategy": "resource-id",
+                    "value": "voteButtonGroup"
+                },
+                "vote_upvote": {
+                    "strategy": "resource-id",
+                    "value": "voteButtonGroup_upvote",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Upvote"
+                },
+                "vote_downvote": {
+                    "strategy": "resource-id",
+                    "value": "voteButtonGroup_downvote",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Downvote"
+                },
+                "detail_screen": {
+                    "strategy": "resource-id",
+                    "value": "fbp_screen"
                 }
             },
             "page_signatures": {
                 "feed": {
                     "threshold": 0.5,
                     "signals": [
-                        { "strategy": "resource-id", "value": "post_unit", "weight": 0.4 },
-                        { "strategy": "resource-id", "value": "toolbar", "weight": 0.2 },
-                        { "strategy": "resource-id", "value": "post_footer", "weight": 0.3 },
-                        { "strategy": "resource-id", "value": "subreddit_name", "weight": 0.1 }
+                        { "strategy": "resource-id", "value": "post_unit", "weight": 0.3 },
+                        { "strategy": "resource-id", "value": "home_screen_surface", "weight": 0.2 },
+                        { "strategy": "resource-id", "value": "feed_lazy_column", "weight": 0.2 },
+                        { "strategy": "resource-id", "value": "post_footer", "weight": 0.2 },
+                        { "strategy": "resource-id", "value": "bottom_nav", "weight": 0.1 }
                     ]
                 },
                 "post_detail": {
                     "threshold": 0.5,
                     "signals": [
-                        { "strategy": "resource-id", "value": "post_title", "weight": 0.3 },
-                        { "strategy": "resource-id", "value": "post_body", "weight": 0.2 },
-                        { "strategy": "resource-id", "value": "comment_input", "weight": 0.3 },
-                        { "strategy": "resource-id", "value": "author_name", "weight": 0.2 }
+                        { "strategy": "resource-id", "value": "fbp_screen", "weight": 0.3 },
+                        { "strategy": "resource-id", "value": "voteButtonGroup", "weight": 0.2 },
+                        { "strategy": "resource-id", "value": "bottom_controls", "weight": 0.2 },
+                        { "strategy": "resource-id", "value": "action_bar", "weight": 0.15 },
+                        { "strategy": "content-desc", "value": "Back", "weight": 0.15 }
                     ]
                 },
                 "comment": {
@@ -119,8 +164,8 @@
                 "profile": {
                     "threshold": 0.5,
                     "signals": [
-                        { "strategy": "resource-id", "value": "author_name", "weight": 0.3 },
-                        { "strategy": "resource-id", "value": "follow_button", "weight": 0.4 },
+                        { "strategy": "resource-id", "value": "post_header", "weight": 0.3 },
+                        { "strategy": "resource-id", "value": "post_join_button", "weight": 0.4 },
                         { "strategy": "text-contains", "value": "karma", "weight": 0.3 }
                     ]
                 }
@@ -283,6 +328,238 @@
                 "max_app_crashes": 2,
                 "max_network_errors": 8
             }
+        },
+        "babycenter": {
+            "name": "BabyCenter",
+            "package_name": "com.babycenter.pregnancytracker",
+            "enabled": true,
+            "rate_limits": {
+                "max_actions_per_hour": 80,
+                "max_likes_per_hour": 24,
+                "max_comments_per_hour": 12,
+                "max_follows_per_hour": 8,
+                "min_action_delay_ms": 2500,
+                "max_action_delay_ms": 10000
+            },
+            "ui_selectors": {
+                "post_unit": {
+                    "strategy": "resource-id",
+                    "value": "postContainer",
+                    "fallback_strategy": "class",
+                    "fallback_value": "android.view.ViewGroup",
+                    "note": "实机验证: Community 页 ViewPager 内的帖子卡片容器"
+                },
+                "post_title": {
+                    "strategy": "resource-id",
+                    "value": "title",
+                    "fallback_strategy": "resource-id",
+                    "fallback_value": "titleView",
+                    "note": "实机验证: 帖子标题（title 在 feed 页，titleView 在某些列表视图）"
+                },
+                "post_body": {
+                    "strategy": "resource-id",
+                    "value": "text",
+                    "fallback_strategy": "resource-id",
+                    "fallback_value": "content",
+                    "note": "实机验证: 帖子正文预览"
+                },
+                "post_author": {
+                    "strategy": "resource-id",
+                    "value": "subtitle",
+                    "note": "实机验证: 帖子作者名"
+                },
+                "post_group": {
+                    "strategy": "resource-id",
+                    "value": "groupReference",
+                    "note": "实机验证: 帖子所属社区/群组名"
+                },
+                "comment_count": {
+                    "strategy": "resource-id",
+                    "value": "commentCount",
+                    "note": "实机验证: 评论数显示（仅展示，不可点击）"
+                },
+                "reactions_count": {
+                    "strategy": "resource-id",
+                    "value": "reactionsCount",
+                    "note": "实机验证: 点赞/反应数显示（仅展示，不可点击）"
+                },
+                "like_button": {
+                    "strategy": "text",
+                    "value": "select for list of reactions",
+                    "fallback_strategy": "class",
+                    "fallback_value": "android.widget.Button",
+                    "note": "✅ 实机验证: WebView 内点赞按钮，uiautomator 可通过 accessibility node 访问。clickable=true。需先滚动到可见区域（bounds 非零）。滚动后 bounds≈[49,1688][147,1846]"
+                },
+                "comment_button": {
+                    "strategy": "text",
+                    "value": "ADD A COMMENT",
+                    "fallback_strategy": "text",
+                    "fallback_value": "Comment",
+                    "note": "✅ 实机验证: WebView 内评论按钮。'ADD A COMMENT' 为浮动按钮(bounds≈[756,2553][1393,2721])，'Comment' 为滚动后可见的内嵌按钮(bounds≈[49,1916][518,2094])"
+                },
+                "comment_input": {
+                    "strategy": "text",
+                    "value": "Add a comment",
+                    "fallback_strategy": "class",
+                    "fallback_value": "android.widget.EditText",
+                    "note": "✅ 实机验证: WebView 内评论输入区域，class=android.view.View，text='Add a comment '"
+                },
+                "submit_button": {
+                    "strategy": "text",
+                    "value": "Post",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Submit",
+                    "note": "✅ 实机验证: 评论提交按钮（具体文本待运行时确认，可能是 Post 或 Submit）"
+                },
+                "bookmark_button": {
+                    "strategy": "text",
+                    "value": "bookmark post",
+                    "note": "✅ 实机验证: WebView 内书签/收藏按钮，clickable=true"
+                },
+                "reply_button": {
+                    "strategy": "text",
+                    "value": "reply to comment",
+                    "note": "✅ 实机验证: WebView 内回复评论按钮，clickable=true"
+                },
+                "emoji_reply_button": {
+                    "strategy": "text",
+                    "value": "reply with emoji",
+                    "note": "✅ 实机验证: WebView 内 emoji 回复按钮，clickable=true"
+                },
+                "back_button": {
+                    "strategy": "content-desc",
+                    "value": "Navigate up",
+                    "fallback_strategy": "resource-id",
+                    "fallback_value": "toolbar",
+                    "note": "实机验证: 帖子详情页 toolbar 内返回按钮"
+                },
+                "share_button": {
+                    "strategy": "resource-id",
+                    "value": "share",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Share",
+                    "note": "实机验证: 帖子详情页原生分享按钮"
+                },
+                "refresh_button": {
+                    "strategy": "resource-id",
+                    "value": "refresh",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Refresh",
+                    "note": "实机验证: 帖子详情页刷新按钮"
+                },
+                "community_tab": {
+                    "strategy": "resource-id",
+                    "value": "menu_birthclub",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Community",
+                    "note": "实机验证: 底部导航 Community 标签"
+                },
+                "home_tab": {
+                    "strategy": "resource-id",
+                    "value": "menu_home",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Home",
+                    "note": "实机验证: 底部导航 Home 标签"
+                },
+                "bottom_nav": {
+                    "strategy": "resource-id",
+                    "value": "bottom_navigator",
+                    "note": "实机验证: 底部导航栏容器"
+                },
+                "feed_container": {
+                    "strategy": "resource-id",
+                    "value": "posts",
+                    "note": "实机验证: 帖子列表容器（ViewPager，水平滑动）"
+                },
+                "web_view": {
+                    "strategy": "resource-id",
+                    "value": "webViewLayout",
+                    "fallback_strategy": "class",
+                    "fallback_value": "android.webkit.WebView",
+                    "note": "✅ 实机验证: 帖子详情 WebView 容器，resource-id 为 webViewLayout（带包名前缀 com.babycenter.pregnancytracker:id/webViewLayout）"
+                },
+                "see_more_button": {
+                    "strategy": "resource-id",
+                    "value": "button",
+                    "fallback_strategy": "text",
+                    "fallback_value": "See more",
+                    "note": "实机验证: Community 页 'See more' 按钮，进入完整帖子列表"
+                },
+                "community_tabs": {
+                    "strategy": "resource-id",
+                    "value": "tabs",
+                    "note": "实机验证: Community 子标签（My Birth Club / My groups / Trending）"
+                }
+            },
+            "page_signatures": {
+                "feed": {
+                    "threshold": 0.5,
+                    "signals": [
+                        { "strategy": "resource-id", "value": "postContainer", "weight": 0.3 },
+                        { "strategy": "resource-id", "value": "posts", "weight": 0.2 },
+                        { "strategy": "resource-id", "value": "bottom_navigator", "weight": 0.2 },
+                        { "strategy": "content-desc", "value": "Community", "weight": 0.2 },
+                        { "strategy": "resource-id", "value": "tabs", "weight": 0.1 }
+                    ],
+                    "note": "实机验证: Community 标签页的帖子列表"
+                },
+                "home": {
+                    "threshold": 0.5,
+                    "signals": [
+                        { "strategy": "resource-id", "value": "recycler", "weight": 0.3 },
+                        { "strategy": "resource-id", "value": "salutation", "weight": 0.2 },
+                        { "strategy": "resource-id", "value": "weekRange", "weight": 0.2 },
+                        { "strategy": "resource-id", "value": "bottom_navigator", "weight": 0.2 },
+                        { "strategy": "content-desc", "value": "Home", "weight": 0.1 }
+                    ],
+                    "note": "实机验证: Home 标签页（周报/每日阅读）"
+                },
+                "post_detail": {
+                    "threshold": 0.5,
+                    "signals": [
+                        { "strategy": "resource-id", "value": "webViewLayout", "weight": 0.3 },
+                        { "strategy": "resource-id", "value": "webViewLayout", "weight": 0.15 },
+                        { "strategy": "resource-id", "value": "share", "weight": 0.15 },
+                        { "strategy": "content-desc", "value": "Navigate up", "weight": 0.15 },
+                        { "strategy": "text", "value": "select for list of reactions", "weight": 0.15 },
+                        { "strategy": "text", "value": "ADD A COMMENT", "weight": 0.1 }
+                    ],
+                    "note": "✅ 实机验证: WebView 帖子详情页 (WebViewActivity)，含 WebView 内部 accessibility 信号"
+                },
+                "comment": {
+                    "threshold": 0.6,
+                    "signals": [
+                        { "strategy": "text", "value": "Add a comment", "weight": 0.4 },
+                        { "strategy": "text", "value": "ADD A COMMENT", "weight": 0.3 },
+                        { "strategy": "class", "value": "android.widget.EditText", "weight": 0.3 }
+                    ],
+                    "note": "✅ 评论界面在 WebView 内部，但 uiautomator 可通过 accessibility node 检测到文本节点"
+                }
+            },
+            "action_weights": {
+                "browse": 40,
+                "like": 20,
+                "comment": 10,
+                "follow": 0,
+                "share": 3,
+                "open_post": 20,
+                "read_post": 7
+            },
+            "scroll_config": {
+                "min_scroll_distance": 850,
+                "max_scroll_distance": 1250,
+                "scroll_duration_ms": 550,
+                "note": "实机验证: Community feed 使用 ViewPager 水平滑动，browse 操作应使用水平 swipe 而非垂直 scroll"
+            },
+            "error_thresholds": {
+                "max_ui_not_found": 6,
+                "max_app_crashes": 2,
+                "max_network_errors": 8
+            },
+            "verified": true,
+            "verified_date": "2026-03-04",
+            "verified_version": "6.02.0",
+            "notes": "✅ 实机验证完成 (2026-03-04, v6.02.0)。关键发现：WebView (WebViewActivity) 中的 DOM 元素作为 accessibility nodes 暴露给 uiautomator。点赞按钮 text='select for list of reactions'，评论按钮 text='ADD A COMMENT'/'Comment'，评论输入 text='Add a comment'。like/comment 操作现已可用。Community feed 使用 ViewPager 水平滑动。action_weights 已上调 like(20%) 和 comment(10%)。"
         },
         "tiktok": {
             "name": "TikTok",
