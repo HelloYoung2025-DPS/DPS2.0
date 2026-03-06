@@ -22,9 +22,21 @@
             "steps": [
                 { "action": "log", "message": "执行 Instagram 点赞" },
                 { "action": "find", "selector": "post_unit", "save_as": "target_post", "on_fail": "skip" },
-                { "action": "find", "selector": "like_button", "save_as": "like_btn", "on_fail": "skip" },
-                { "action": "delay", "min_ms": 800, "max_ms": 2000 },
-                { "action": "tap", "context_ref": "like_btn", "on_fail": "skip" },
+                { "action": "find", "selector": "caption_text", "save_as": "post_title", "on_fail": "skip" },
+                {
+                    "action": "if_exists",
+                    "condition": {
+                        "selector": "like_button",
+                        "then": [
+                            { "action": "find", "selector": "like_button", "save_as": "like_btn", "on_fail": "skip" },
+                            { "action": "delay", "min_ms": 800, "max_ms": 2000 },
+                            { "action": "tap", "context_ref": "like_btn", "on_fail": "skip" }
+                        ],
+                        "else": [
+                            { "action": "call_operation", "operation": "double_tap_like", "on_fail": "skip" }
+                        ]
+                    }
+                },
                 { "action": "delay", "min_ms": 1000, "max_ms": 2500 },
                 { "action": "set_var", "name": "last_action", "value": "like" }
             ]
@@ -61,7 +73,7 @@
             "require_page": "post_detail",
             "steps": [
                 { "action": "log", "message": "查看帖子内容" },
-                { "action": "find", "selector": "caption_text", "save_as": "caption", "on_fail": "skip" },
+                { "action": "find", "selector": "caption_text", "save_as": "post_title", "on_fail": "skip" },
                 { "action": "delay", "min_ms": 4000, "max_ms": 12000 },
                 { "action": "scroll", "direction": "down", "distance": 300, "duration": 500 },
                 { "action": "delay", "min_ms": 2000, "max_ms": 6000 },

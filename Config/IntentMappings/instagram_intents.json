@@ -60,6 +60,30 @@
                 "browse_feed"
             ]
         },
+        "like_content": {
+            "operations": [
+                "like"
+            ],
+            "fallback_intents": [
+                "browse_feed"
+            ]
+        },
+        "follow_entity": {
+            "operations": [
+                "follow"
+            ],
+            "fallback_intents": [
+                "browse_feed"
+            ]
+        },
+        "share_content": {
+            "operations": [
+                "share"
+            ],
+            "fallback_intents": [
+                "browse_feed"
+            ]
+        },
         "check_dm": {
             "operations": [],
             "fallback_intents": [
@@ -76,7 +100,7 @@
     "action_to_intent": {
         "browse": "browse_feed",
         "read_post": "read_post",
-        "like": "open_post",
+        "like": "like_content",
         "comment": "reply_post",
         "post": "reply_post",
         "follow": "follow_entity",

@@ -1,5 +1,5 @@
 {
-    "platform": "reddit",
+    "platform": "babycenter",
     "version": "1.0",
     "intents": {
         "browse_feed": {
@@ -26,14 +26,11 @@
                 "browse_feed"
             ]
         },
-        "read_comments": {
+        "like_content": {
             "operations": [
-                "open_post",
-                "read_post",
-                "back_to_feed"
+                "like"
             ],
             "fallback_intents": [
-                "read_post",
                 "browse_feed"
             ]
         },
@@ -48,38 +45,14 @@
                 "browse_feed"
             ]
         },
-        "reply_comment": {
-            "operations": [
-                "open_post",
-                "comment",
-                "back_to_feed"
-            ],
-            "fallback_intents": [
-                "reply_post",
-                "read_post",
-                "browse_feed"
-            ]
-        },
-        "like_content": {
-            "operations": [
-                "like"
-            ],
-            "fallback_intents": [
-                "browse_feed"
-            ]
-        },
         "follow_entity": {
-            "operations": [
-                "follow"
-            ],
+            "operations": [],
             "fallback_intents": [
                 "browse_feed"
             ]
         },
         "share_content": {
-            "operations": [
-                "share"
-            ],
+            "operations": [],
             "fallback_intents": [
                 "browse_feed"
             ]
@@ -102,7 +75,7 @@
         "read_post": "read_post",
         "like": "like_content",
         "comment": "reply_post",
-        "post": "reply_post",
+        "post": "browse_feed",
         "follow": "follow_entity",
         "share": "share_content"
     }
