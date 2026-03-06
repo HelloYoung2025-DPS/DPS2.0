@@ -1,0 +1,222 @@
+# Instagram Manifest v2.0
+# DPS v4.5.2 架构重构 - 新格式
+# 2026-02-27
+
+---
+
+# APP 基本信息
+app:
+  id: "instagram"
+  name: "Instagram"
+  package: "com.instagram.android"
+  version: "2.0"
+
+# DPS 用于决策：Instagram 能做什么
+capabilities:
+  - browse_feed          # 浏览首页 Feed
+  - like_post            # 点赞帖子
+  - comment              # 评论帖子
+  - view_profile         # 查看个人资料
+  - follow               # 关注用户
+  - unfollow             # 取消关注
+  - search               # 搜索用户/标签
+  - view_story           # 查看 Story
+  - view_reels           # 查看 Reels
+  - send_dm              # 发送私信
+  - view_notifications   # 查看通知
+
+# DPS 用于感知：如何识别当前状态
+states:
+  - name: "home_feed"
+    visual_markers:
+      - "底部导航栏"
+      - "首页 Tab 高亮"
+      - "Feed 流式布局"
+    ui_signatures:
+      primary: "com.instagram.android:id/home_tab"
+      fallback:
+        - "android.widget.TextView@text='Home'"
+        - "com.instagram.android:id/tab_bar"
+    gemini_prompt: "这是 Instagram 首页吗？底部导航栏的首页图标是否高亮？"
+
+  - name: "post_detail"
+    visual_markers:
+      - "评论区"
+      - "点赞按钮"
+      - "返回按钮"
+      - "帖子内容占据主要区域"
+    ui_signatures:
+      primary: "com.instagram.android:id/feed_view_root_layout"
+      fallback:
+        - "com.instagram.android:id/container_view"
+    gemini_prompt: "这是帖子详情页吗？是否显示完整的帖子内容和评论区？"
+
+  - name: "profile"
+    visual_markers:
+      - "个人资料头像"
+      - "关注/粉丝数"
+      - "照片网格"
+    ui_signatures:
+      primary: "com.instagram.android:id/profile_tab"
+      fallback:
+        - "android.widget.TextView@text='Profile'"
+        - "com.instagram.android:id/action_bar_title"
+    gemini_prompt: "这是个人资料页吗？是否显示用户头像和照片网格？"
+
+  - name: "search"
+    visual_markers:
+      - "搜索框"
+      - "搜索 Tab 高亮"
+    ui_signatures:
+      primary: "com.instagram.android:id/search_tab"
+      fallback:
+        - "android.widget.TextView@text='Search'"
+    gemini_prompt: "这是搜索页吗？是否显示搜索框？"
+
+  - name: "reels"
+    visual_markers:
+      - "全屏短视频"
+      - "Reels Tab 高亮"
+      - "点赞/评论按钮在右侧"
+    ui_signatures:
+      primary: "com.instagram.android:id/clips_tab"
+      fallback:
+        - "android.widget.TextView@text='Reels'"
+    gemini_prompt: "这是 Reels 短视频页吗？是否显示全屏短视频？"
+
+  - name: "notifications"
+    visual_markers:
+      - "通知列表"
+      - "通知 Tab 高亮"
+    ui_signatures:
+      primary: "com.instagram.android:id/notification_tab"
+      fallback:
+        - "android.widget.TextView@text='Activity'"
+    gemini_prompt: "这是通知页吗？是否显示通知列表？"
+
+  - name: "direct_messages"
+    visual_markers:
+      - "对话列表"
+      - "私信图标"
+    ui_signatures:
+      primary: "com.instagram.android:id/tab_bar_gallery_direct"
+      fallback:
+        - "android.widget.ImageView@content-desc='Messenger'"
+    gemini_prompt: "这是私信页吗？是否显示对话列表？"
+
+# DPS → ZennoDroid 的翻译层
+intent_mappings:
+  browse_feed:
+    zd_action: "scroll_feed"
+    required_state: "home_feed"
+    params:
+      direction: "down"
+      count: 5
+    fallback_intents: []
+
+  like_post:
+    zd_action: "tap_like_button"
+    required_state: "home_feed"
+    params: {}
+    fallback_intents: ["browse_feed"]
+
+  comment:
+    zd_action: "input_comment"
+    required_state: "post_detail"
+    params:
+      text: "${comment_text}"  # 从 DPS 决策中获取
+    fallback_intents: ["open_post", "browse_feed"]
+
+  view_profile:
+    zd_action: "tap_profile_tab"
+    required_state: "home_feed"
+    params: {}
+    fallback_intents: []
+
+  follow:
+    zd_action: "tap_follow_button"
+    required_state: "profile"
+    params: {}
+    fallback_intents: ["view_profile"]
+
+  unfollow:
+    zd_action: "tap_unfollow_button"
+    required_state: "profile"
+    params: {}
+    fallback_intents: ["view_profile"]
+
+  search:
+    zd_action: "input_search"
+    required_state: "search"
+    params:
+      query: "${search_query}"
+    fallback_intents: []
+
+  view_story:
+    zd_action: "tap_story"
+    required_state: "home_feed"
+    params: {}
+    fallback_intents: ["browse_feed"]
+
+  view_reels:
+    zd_action: "tap_reels_tab"
+    required_state: "home_feed"
+    params: {}
+    fallback_intents: []
+
+  send_dm:
+    zd_action: "send_message"
+    required_state: "direct_messages"
+    params:
+      text: "${message_text}"
+    fallback_intents: []
+
+  view_notifications:
+    zd_action: "tap_notifications_tab"
+    required_state: "home_feed"
+    params: {}
+    fallback_intents: []
+
+# DPS 用于决策：速率限制
+rate_limits:
+  like_post:
+    per_hour: 30
+    cooldown_seconds: 120
+    per_day: 200
+
+  comment:
+    per_hour: 15
+    cooldown_seconds: 240
+    per_day: 50
+
+  follow:
+    per_hour: 20
+    cooldown_seconds: 180
+    per_day: 100
+
+  unfollow:
+    per_hour: 20
+    cooldown_seconds: 180
+    per_day: 100
+
+  send_dm:
+    per_hour: 10
+    cooldown_seconds: 300
+    per_day: 30
+
+  browse_feed:
+    per_hour: 100
+    cooldown_seconds: 30
+    per_day: 500
+
+  search:
+    per_hour: 30
+    cooldown_seconds: 60
+    per_day: 150
+
+# 注释：
+# - capabilities 定义了 DPS 可以执行的高层操作
+# - states 定义了 DPS 如何识别当前页面（视觉 + UI 特征）
+# - intent_mappings 将高层意图翻译为 ZennoDroid 操作
+# - rate_limits 防止被平台风控检测
+# - 物理参数（坐标、duration）不在此文件中，由翻译层处理

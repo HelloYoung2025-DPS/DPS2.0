@@ -1,0 +1,161 @@
+{
+  "_comment": "APP Manifest 模板 - 复制此文件并重命名为 {app_id}.json，然后填充内容",
+  
+  "_schema_version": "1.0",
+  "_generated_by": "DPS v4.5 AppExplorer",
+  "_generated_at": "YYYY-MM-DD HH:mm:ss",
+  
+  "app_id": "example_app",
+  "package": "com.example.app",
+  "version_range": ">=1.0.0",
+  "display_name": "Example App",
+  
+  "screens": {
+    "home_feed": {
+      "name": "首页信息流",
+      "signatures": [
+        {"type": "resource_id", "value": "com.example.app:id/home_feed", "required": true},
+        {"type": "resource_id", "value": "com.example.app:id/bottom_nav", "required": false}
+      ],
+      "navigable_to": ["post_detail", "profile", "search"],
+      "available_operations": ["browse_feed", "open_post", "navigate_to_profile"]
+    },
+    "post_detail": {
+      "name": "帖子详情页",
+      "signatures": [
+        {"type": "resource_id", "value": "com.example.app:id/post_detail", "required": true}
+      ],
+      "navigable_to": ["home_feed", "comment_reply"],
+      "available_operations": ["read_post", "like_post", "comment", "share"]
+    }
+  },
+  
+  "selectors": {
+    "post_unit": {
+      "type": "resource_id",
+      "value": "com.example.app:id/post_unit",
+      "description": "信息流中的单个帖子"
+    },
+    "like_button": {
+      "type": "resource_id",
+      "value": "com.example.app:id/like_button",
+      "description": "点赞按钮"
+    },
+    "comment_button": {
+      "type": "resource_id",
+      "value": "com.example.app:id/comment_button",
+      "description": "评论按钮"
+    },
+    "share_button": {
+      "type": "resource_id",
+      "value": "com.example.app:id/share_button",
+      "description": "分享按钮"
+    }
+  },
+  
+  "operations": {
+    "browse_feed": {
+      "name": "浏览信息流",
+      "description": "向下滚动信息流，随机点赞",
+      "require_page": "home_feed",
+      "humanized": true,
+      "vision_verify": false,
+      "steps": [
+        {
+          "action": "random_pick",
+          "choices": [
+            {
+              "weight": 0.7,
+              "steps": [
+                {"action": "scroll", "direction": "down", "distance": 500},
+                {"action": "delay", "min_ms": 1500, "max_ms": 3000}
+              ]
+            },
+            {
+              "weight": 0.3,
+              "steps": [
+                {"action": "call_operation", "operation": "like_random_post"}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    
+    "like_random_post": {
+      "name": "随机点赞帖子",
+      "description": "查找帖子并点赞",
+      "rate_limit": {
+        "max_per_hour": 30,
+        "cooldown_seconds": 60
+      },
+      "steps": [
+        {
+          "action": "foreach",
+          "loop": {
+            "selector": "post_unit",
+            "max_items": 3,
+            "body": [
+              {
+                "action": "if_exists",
+                "condition": {
+                  "selector": "like_button",
+                  "then": [
+                    {"action": "tap", "selector": "like_button", "humanized": true},
+                    {"action": "delay", "min_ms": 500, "max_ms": 1000},
+                    {"action": "log", "message": "Liked post"}
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    
+    "read_post": {
+      "name": "阅读帖子",
+      "description": "打开帖子详情并阅读评论",
+      "require_page": "post_detail",
+      "humanized": true,
+      "steps": [
+        {"action": "delay", "min_ms": 2000, "max_ms": 5000},
+        {"action": "scroll", "direction": "down", "distance": 300},
+        {"action": "delay", "min_ms": 1000, "max_ms": 2000}
+      ]
+    }
+  },
+  
+  "navigation": {
+    "home_to_post": {
+      "from": "home_feed",
+      "to": "post_detail",
+      "steps": [
+        {"action": "find", "selector": "post_unit", "save_as": "posts"},
+        {"action": "tap", "selector": "posts[0]"}
+      ]
+    },
+    "post_to_home": {
+      "from": "post_detail",
+      "to": "home_feed",
+      "steps": [
+        {"action": "back"}
+      ]
+    }
+  },
+  
+  "humanization": {
+    "typing_speed_ms": {"min": 80, "max": 200},
+    "action_delay_ms": {"min": 500, "max": 2000},
+    "scroll_duration_ms": {"min": 600, "max": 1200}
+  },
+  
+  "_notes": [
+    "1. 填充 screens: 根据实际 APP UI 结构添加屏幕定义",
+    "2. 填充 selectors: 添加所有 UI 元素的选择器",
+    "3. 填充 operations: 根据实际操作流程编写步骤",
+    "4. 填充 navigation: 添加屏幕间导航路径",
+    "5. 调整 rate_limit: 根据实际限制设置速率",
+    "6. 测试验证: 使用 AppExplorer 自动探索验证"
+  ]
+}

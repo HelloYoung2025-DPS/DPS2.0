@@ -1,0 +1,432 @@
+{
+  "_comment": "Reddit APP Manifest - 自动生成",
+  "_schema_version": "1.0",
+  "_generated_by": "DPS v4.5 Auto-Generation",
+  "_generated_at": "2026-02-27",
+  
+  "app_id": "reddit",
+  "package": "com.reddit.frontpage",
+  "version_range": ">=2024.1.0",
+  "display_name": "Reddit",
+  
+  "screens": {
+    "feed": {
+      "name": "首页信息流",
+      "signatures": [
+        {"type": "resource_id", "value": "post_unit", "weight": 0.3, "required": false},
+        {"type": "resource_id", "value": "home_screen_surface", "weight": 0.2, "required": false},
+        {"type": "resource_id", "value": "feed_lazy_column", "weight": 0.2, "required": false},
+        {"type": "resource_id", "value": "post_footer", "weight": 0.2, "required": false},
+        {"type": "resource_id", "value": "bottom_nav", "weight": 0.1, "required": false}
+      ],
+      "threshold": 0.5,
+      "navigable_to": ["post_detail", "profile"],
+      "available_operations": ["browse", "like", "open_post", "read_post"]
+    },
+    "post_detail": {
+      "name": "帖子详情页",
+      "signatures": [
+        {"type": "resource_id", "value": "fbp_screen", "weight": 0.3, "required": false},
+        {"type": "resource_id", "value": "voteButtonGroup", "weight": 0.2, "required": false},
+        {"type": "resource_id", "value": "bottom_controls", "weight": 0.2, "required": false},
+        {"type": "resource_id", "value": "action_bar", "weight": 0.15, "required": false},
+        {"type": "content_desc", "value": "Back", "weight": 0.15, "required": false}
+      ],
+      "threshold": 0.5,
+      "navigable_to": ["feed", "comment"],
+      "available_operations": ["read_post", "comment"]
+    },
+    "comment": {
+      "name": "评论页面",
+      "signatures": [
+        {"type": "resource_id", "value": "comment_input", "weight": 0.5, "required": false},
+        {"type": "class", "value": "android.widget.EditText", "weight": 0.3, "required": false},
+        {"type": "resource_id", "value": "submit_comment", "weight": 0.2, "required": false}
+      ],
+      "threshold": 0.6,
+      "navigable_to": ["post_detail", "feed"],
+      "available_operations": ["comment"]
+    },
+    "profile": {
+      "name": "用户资料页",
+      "signatures": [
+        {"type": "resource_id", "value": "post_header", "weight": 0.3, "required": false},
+        {"type": "resource_id", "value": "post_join_button", "weight": 0.4, "required": false},
+        {"type": "text", "value": "karma", "weight": 0.3, "required": false}
+      ],
+      "threshold": 0.5,
+      "navigable_to": ["feed"],
+      "available_operations": ["follow"]
+    }
+  },
+  
+  "selectors": {
+    "post_unit": {
+      "type": "resource_id",
+      "value": "post_unit",
+      "fallback_strategy": "class",
+      "fallback_value": "android.widget.FrameLayout",
+      "description": "信息流中的单个帖子"
+    },
+    "post_footer": {
+      "type": "resource_id",
+      "value": "post_footer",
+      "description": "帖子底部容器（包含点赞/评论按钮）"
+    },
+    "upvote_button": {
+      "type": "content_desc",
+      "value": "Upvote",
+      "fallback_strategy": "resource_id",
+      "fallback_value": "post_footer",
+      "description": "点赞按钮（Reddit Jetpack Compose 无独立 resource-id，使用 content-desc 定位，回退到 post_footer 左 1/3 区域）"
+    },
+    "downvote_button": {
+      "type": "content_desc",
+      "value": "Downvote",
+      "description": "踩帖按钮"
+    },
+    "comment_button": {
+      "type": "resource_id",
+      "value": "post_comment_button",
+      "fallback_strategy": "content_desc",
+      "fallback_value": "Comment",
+      "description": "评论按钮"
+    },
+    "share_button": {
+      "type": "resource_id",
+      "value": "post_share_button",
+      "fallback_strategy": "content_desc",
+      "fallback_value": "Share",
+      "description": "分享按钮"
+    },
+    "follow_button": {
+      "type": "resource_id",
+      "value": "post_join_button",
+      "fallback_strategy": "text",
+      "fallback_value": "Follow",
+      "description": "关注/加入按钮"
+    },
+    "post_title": {
+      "type": "resource_id",
+      "value": "post_unit",
+      "description": "帖子标题（post_title resource-id 不存在，使用 post_unit 整体点击）",
+      "note": "Reddit Jetpack Compose 中标题嵌入 post_unit，无独立 resource-id"
+    },
+    "post_body": {
+      "type": "resource_id",
+      "value": "post_unit",
+      "description": "帖子正文（post_body resource-id 不存在，回退到 post_unit）",
+      "note": "Reddit Jetpack Compose 中正文嵌入 post_unit，无独立 resource-id"
+    },
+    "comment_input": {
+      "type": "resource_id",
+      "value": "comment_input",
+      "fallback_strategy": "class",
+      "fallback_value": "android.widget.EditText",
+      "description": "评论输入框"
+    },
+    "submit_button": {
+      "type": "resource_id",
+      "value": "submit_comment",
+      "fallback_strategy": "text",
+      "fallback_value": "Post",
+      "description": "提交评论按钮"
+    },
+    "subreddit_name": {
+      "type": "resource_id",
+      "value": "post_subreddit_icon",
+      "description": "子版块标识（subreddit_name resource-id 不存在，使用 post_subreddit_icon）"
+    },
+    "author_name": {
+      "type": "resource_id",
+      "value": "post_header",
+      "description": "作者信息（author_name resource-id 不存在，使用 post_header 区域）"
+    },
+    "toolbar": {
+      "type": "resource_id",
+      "value": "home_screen_surface",
+      "fallback_strategy": "resource_id",
+      "fallback_value": "main_top_app_bar_navigation_icon",
+      "description": "顶部工具栏（toolbar resource-id 不存在，使用 home_screen_surface）"
+    },
+    "feed_container": {
+      "type": "resource_id",
+      "value": "feed_lazy_column",
+      "description": "信息流滚动容器"
+    },
+    "post_header": {
+      "type": "resource_id",
+      "value": "post_header",
+      "description": "帖子头部区域（包含子版块和作者信息）"
+    },
+    "post_overflow": {
+      "type": "resource_id",
+      "value": "post_overflow",
+      "description": "帖子菜单按钮（...）"
+    },
+    "join_button": {
+      "type": "resource_id",
+      "value": "post_join_button",
+      "description": "加入/关注按钮（信息流中）"
+    },
+    "back_button": {
+      "type": "content_desc",
+      "value": "Back",
+      "fallback_strategy": "resource_id",
+      "fallback_value": "fbp_back_button",
+      "description": "返回按钮（详情页 content-desc='Back'，resource-id='fbp_back_button'）"
+    },
+    "vote_group": {
+      "type": "resource_id",
+      "value": "voteButtonGroup",
+      "description": "投票按钮组（详情页）"
+    },
+    "vote_upvote": {
+      "type": "resource_id",
+      "value": "voteButtonGroup_upvote",
+      "fallback_strategy": "content_desc",
+      "fallback_value": "Upvote",
+      "description": "详情页点赞按钮"
+    },
+    "vote_downvote": {
+      "type": "resource_id",
+      "value": "voteButtonGroup_downvote",
+      "fallback_strategy": "content_desc",
+      "fallback_value": "Downvote",
+      "description": "详情页踩帖按钮"
+    },
+    "detail_screen": {
+      "type": "resource_id",
+      "value": "fbp_screen",
+      "description": "帖子详情全屏页面容器"
+    }
+  },
+  
+  "operations": {
+    "initialize": {
+      "name": "初始化 Reddit APP",
+      "description": "打开 Reddit APP 并验证",
+      "steps": [
+        {"action": "log", "message": "初始化 Reddit APP"},
+        {"action": "log", "message": "调用 app.Open(com.reddit.frontpage)"}
+      ]
+    },
+    
+    "browse": {
+      "name": "浏览信息流",
+      "description": "向下滚动信息流，随机点赞",
+      "require_page": "feed",
+      "humanized": true,
+      "vision_verify": false,
+      "steps": [
+        {"action": "log", "message": "开始浏览 Reddit feed"},
+        {"action": "find", "selector": "post_unit", "save_as": "posts", "on_fail": "abort"},
+        {"action": "delay", "min_ms": 3000, "max_ms": 8000, "humanized": true},
+        {"action": "scroll", "direction": "down", "distance": 900, "duration": 500, "humanized": true},
+        {"action": "delay", "min_ms": 1500, "max_ms": 4000, "humanized": true},
+        {"action": "refresh_layout"},
+        {"action": "verify", "selector": "post_unit", "on_fail": "retry", "max_retries": 3, "retry_delay_ms": 1500},
+        {"action": "set_var", "name": "last_action", "value": "browse"}
+      ]
+    },
+    
+    "like": {
+      "name": "点赞帖子",
+      "description": "对当前可见帖子点赞（upvote）",
+      "require_page": "feed",
+      "rate_limit": {
+        "max_per_hour": 40,
+        "cooldown_seconds": 60
+      },
+      "humanized": true,
+      "steps": [
+        {"action": "log", "message": "执行 Reddit upvote"},
+        {"action": "find", "selector": "post_unit", "save_as": "target_post", "on_fail": "skip"},
+        {"action": "find", "selector": "upvote_button", "save_as": "upvote_btn", "on_fail": "skip"},
+        {"action": "delay", "min_ms": 500, "max_ms": 1500, "humanized": true},
+        {"action": "tap", "selector": "upvote_btn", "context_ref": "upvote_btn", "on_fail": "skip", "humanized": true},
+        {"action": "delay", "min_ms": 800, "max_ms": 2000, "humanized": true},
+        {"action": "set_var", "name": "last_action", "value": "like"}
+      ]
+    },
+    
+    "open_post": {
+      "name": "打开帖子详情",
+      "description": "点击帖子进入详情页",
+      "require_page": "feed",
+      "humanized": true,
+      "steps": [
+        {"action": "log", "message": "打开帖子详情"},
+        {"action": "find", "selector": "post_unit", "save_as": "target_post", "on_fail": "skip"},
+        {"action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": true},
+        {"action": "tap", "selector": "target_post", "context_ref": "target_post", "on_fail": "abort", "humanized": true},
+        {"action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": true},
+        {"action": "refresh_layout"},
+        {"action": "require", "page": "post_detail", "on_fail": "abort"},
+        {"action": "set_var", "name": "last_action", "value": "open_post"}
+      ]
+    },
+    
+    "read_post": {
+      "name": "阅读帖子",
+      "description": "在详情页阅读帖子内容（模拟阅读时间）",
+      "require_page": "post_detail",
+      "humanized": true,
+      "steps": [
+        {"action": "log", "message": "阅读帖子内容"},
+        {"action": "find", "selector": "post_body", "save_as": "body", "on_fail": "skip"},
+        {"action": "delay", "min_ms": 5000, "max_ms": 15000, "humanized": true},
+        {"action": "scroll", "direction": "down", "distance": 400, "duration": 600, "humanized": true},
+        {"action": "delay", "min_ms": 3000, "max_ms": 8000, "humanized": true},
+        {"action": "set_var", "name": "last_action", "value": "read_post"}
+      ]
+    },
+    
+    "comment": {
+      "name": "发表评论",
+      "description": "在帖子详情页发表评论",
+      "require_page": "post_detail",
+      "rate_limit": {
+        "max_per_hour": 20,
+        "cooldown_seconds": 120
+      },
+      "humanized": true,
+      "steps": [
+        {"action": "log", "message": "执行 Reddit 评论"},
+        {"action": "find", "selector": "comment_input", "save_as": "input_box", "on_fail": "abort"},
+        {"action": "delay", "min_ms": 800, "max_ms": 2000, "humanized": true},
+        {"action": "tap", "selector": "input_box", "on_fail": "abort", "humanized": true},
+        {"action": "delay", "min_ms": 1000, "max_ms": 2500, "humanized": true},
+        {"action": "type", "var": "ai_comment_text", "on_fail": "abort"},
+        {"action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": true},
+        {"action": "find", "selector": "submit_button", "save_as": "submit_btn", "on_fail": "abort"},
+        {"action": "tap", "selector": "submit_btn", "on_fail": "abort", "humanized": true},
+        {"action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": true},
+        {"action": "set_var", "name": "last_action", "value": "comment"}
+      ]
+    },
+    
+    "follow": {
+      "name": "关注用户",
+      "description": "关注帖子作者",
+      "rate_limit": {
+        "max_per_hour": 15,
+        "cooldown_seconds": 300
+      },
+      "humanized": true,
+      "steps": [
+        {"action": "log", "message": "执行 Reddit 关注"},
+        {"action": "find", "selector": "post_header", "save_as": "header", "on_fail": "skip"},
+        {"action": "tap", "selector": "header", "context_ref": "header", "on_fail": "skip", "humanized": true},
+        {"action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": true},
+        {"action": "refresh_layout"},
+        {"action": "find", "selector": "follow_button", "save_as": "follow_btn", "on_fail": "skip"},
+        {"action": "delay", "min_ms": 500, "max_ms": 1500, "humanized": true},
+        {"action": "tap", "selector": "follow_btn", "context_ref": "follow_btn", "on_fail": "skip", "humanized": true},
+        {"action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": true},
+        {"action": "back"},
+        {"action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": true},
+        {"action": "set_var", "name": "last_action", "value": "follow"}
+      ]
+    },
+    
+    "share": {
+      "name": "分享帖子",
+      "description": "分享当前帖子",
+      "require_page": "feed",
+      "humanized": true,
+      "steps": [
+        {"action": "log", "message": "执行 Reddit 分享"},
+        {"action": "find", "selector": "share_button", "save_as": "share_btn", "on_fail": "skip"},
+        {"action": "delay", "min_ms": 500, "max_ms": 1500, "humanized": true},
+        {"action": "tap", "selector": "share_btn", "context_ref": "share_btn", "on_fail": "skip", "humanized": true},
+        {"action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": true},
+        {"action": "back"},
+        {"action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": true},
+        {"action": "set_var", "name": "last_action", "value": "share"}
+      ]
+    },
+    
+    "back_to_feed": {
+      "name": "返回首页",
+      "description": "从详情页返回 feed",
+      "steps": [
+        {"action": "log", "message": "返回 feed"},
+        {"action": "back"},
+        {"action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": true},
+        {"action": "refresh_layout"},
+        {"action": "verify", "selector": "post_unit", "on_fail": "retry", "max_retries": 3, "retry_delay_ms": 2000},
+        {"action": "set_var", "name": "last_action", "value": "back_to_feed"}
+      ]
+    }
+  },
+  
+  "navigation": {
+    "feed_to_post_detail": {
+      "from": "feed",
+      "to": "post_detail",
+      "steps": [
+        {"action": "log", "message": "导航: feed → post_detail"},
+        {"action": "find", "selector": "post_unit", "save_as": "target_post"},
+        {"action": "tap", "selector": "target_post"}
+      ]
+    },
+    "post_detail_to_feed": {
+      "from": "post_detail",
+      "to": "feed",
+      "steps": [
+        {"action": "log", "message": "导航: post_detail → feed"},
+        {"action": "back"}
+      ]
+    },
+    "feed_to_profile": {
+      "from": "feed",
+      "to": "profile",
+      "steps": [
+        {"action": "log", "message": "导航: feed → profile"},
+        {"action": "find", "selector": "post_header"},
+        {"action": "tap"},
+        {"action": "delay", "min_ms": 2500, "max_ms": 5000},
+        {"action": "refresh_layout"},
+        {"action": "require", "page": "profile"}
+      ]
+    },
+    "profile_to_feed": {
+      "from": "profile",
+      "to": "feed",
+      "steps": [
+        {"action": "log", "message": "导航: profile → feed"},
+        {"action": "back"}
+      ]
+    }
+  },
+  
+  "humanization": {
+    "typing_speed_ms": {"min": 80, "max": 200},
+    "action_delay_ms": {"min": 500, "max": 2000},
+    "scroll_duration_ms": {"min": 600, "max": 1200}
+  },
+  
+  "rate_limits": {
+    "max_actions_per_hour": 120,
+    "max_likes_per_hour": 40,
+    "max_comments_per_hour": 20,
+    "max_follows_per_hour": 15,
+    "min_action_delay_ms": 2000,
+    "max_action_delay_ms": 8000
+  },
+  
+  "error_thresholds": {
+    "max_ui_not_found": 5,
+    "max_app_crashes": 3,
+    "max_network_errors": 10
+  },
+  
+  "action_weights": {
+    "browse": 40,
+    "like": 30,
+    "comment": 15,
+    "follow": 10,
+    "share": 5
+  }
+}

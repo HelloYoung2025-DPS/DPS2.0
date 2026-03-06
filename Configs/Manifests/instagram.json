@@ -1,0 +1,388 @@
+{
+  "$schema": "manifest-schema.json",
+  "app": {
+    "id": "instagram",
+    "name": "Instagram",
+    "package": "com.instagram.android",
+    "version": "1.0"
+  },
+  "screens": {
+    "home": {
+      "name": "首页",
+      "selectors": {
+        "primary": "com.instagram.android:id/home_tab",
+        "fallback": ["android.widget.TextView@text='Home'", "com.instagram.android:id/tab_bar"]
+      },
+      "actions": {
+        "scroll_feed": {
+          "type": "swipe",
+          "direction": "up",
+          "description": "向下滚动Feed"
+          "description": "向下滚动Feed"
+        },
+        "double_tap_photo": {
+          "type": "gesture",
+          "action": "double_tap",
+          "selector": "com.instagram.android:id/feed_photo",
+          "description": "双击点赞照片"
+        },
+        "tap_like_button": {
+          "type": "tap",
+          "selector": "com.instagram.android:id/row_feed_button_like",
+          "description": "点击点赞按钮"
+        },
+        "tap_comment_button": {
+          "type": "tap",
+          "selector": "com.instagram.android:id/row_feed_button_comment",
+          "description": "点击评论按钮"
+        },
+        "open_story": {
+          "type": "tap",
+          "selector": "com.instagram.android:id/story_container",
+          "description": "打开Story"
+        }
+      }
+    },
+    "search": {
+      "name": "搜索页",
+      "selectors": {
+        "primary": "com.instagram.android:id/search_tab",
+        "fallback": ["android.widget.TextView@text='Search'"]
+      },
+      "actions": {
+        "search_users": {
+          "type": "input",
+          "selector": "com.instagram.android:id/action_bar_search_edit_text",
+          "description": "搜索用户/标签"
+        },
+        "tap_user_result": {
+          "type": "tap",
+          "selector": "com.instagram.android:id/search_user_row_container",
+          "description": "点击搜索结果中的用户"
+        }
+      }
+    },
+    "profile": {
+      "name": "个人资料页",
+      "selectors": {
+        "primary": "com.instagram.android:id/profile_tab",
+        "fallback": ["android.widget.TextView@text='Profile'", "com.instagram.android:id/action_bar_title"]
+      },
+      "actions": {
+        "follow_user": {
+          "type": "tap",
+          "selector": "com.instagram.android:id/profile_header_follow_button",
+          "description": "关注用户"
+        },
+        "unfollow_user": {
+          "type": "tap",
+          "selector": "com.instagram.android:id/profile_header_follow_button",
+          "description": "取消关注"
+        },
+        "scroll_grid": {
+          "type": "swipe",
+          "direction": "up",
+          "description": "滚动照片网格"
+          "description": "滚动照片网格"
+        },
+        "tap_post": {
+          "type": "tap",
+          "selector": "com.instagram.android:id/row_feed_button_comment",
+          "description": "点击打开帖子"
+        }
+      }
+    },
+    "post_detail": {
+      "name": "帖子详情页",
+      "selectors": {
+        "primary": "com.instagram.android:id/feed_view_root_layout",
+        "fallback": ["com.instagram.android:id/container_view"]
+      },
+      "actions": {
+        "like": {
+          "type": "tap",
+          "selector": "com.instagram.android:id/row_feed_button_like",
+          "description": "点赞"
+        },
+        "comment": {
+          "type": "input",
+          "selector": "com.instagram.android:id/layout_comment_thread_edittext",
+          "description": "输入评论"
+        },
+        "submit_comment": {
+          "type": "tap",
+          "selector": "com.instagram.android:id/layout_comment_thread_post_button",
+          "description": "发送评论"
+        },
+        "back": {
+          "type": "tap",
+          "selector": "android:id/up",
+          "description": "返回"
+        }
+      }
+    },
+    "reels": {
+      "name": "Reels短视频",
+      "selectors": {
+        "primary": "com.instagram.android:id/clips_tab",
+        "fallback": ["android.widget.TextView@text='Reels'"]
+      },
+      "actions": {
+        "like": {
+          "type": "tap",
+          "selector": "com.instagram.android:id/row_feed_button_like",
+          "description": "点赞Reel"
+        },
+        "swipe_next": {
+          "type": "swipe",
+          "direction": "up",
+          "description": "下一个Reel"
+          "description": "下一个Reel"
+        },
+        "comment": {
+          "type": "tap",
+          "selector": "com.instagram.android:id/row_feed_button_comment",
+          "description": "评论Reel"
+        }
+      }
+    },
+    "notifications": {
+      "name": "通知页",
+      "selectors": {
+        "primary": "com.instagram.android:id/notification_tab",
+        "fallback": ["android.widget.TextView@text='Activity'"]
+      },
+      "actions": {
+        "scroll": {
+          "type": "swipe",
+          "direction": "up",
+          "description": "滚动通知列表"
+          "description": "滚动通知列表"
+        },
+        "tap_notification": {
+          "type": "tap",
+          "selector": "com.instagram.android:id/notification_row_container",
+          "description": "点击通知"
+        }
+      }
+    },
+    "direct_messages": {
+      "name": "私信页",
+      "selectors": {
+        "primary": "com.instagram.android:id/tab_bar_gallery_direct",
+        "fallback": ["android.widget.ImageView@content-desc='Messenger'"]
+      },
+      "actions": {
+        "open_conversation": {
+          "type": "tap",
+          "selector": "com.instagram.android:id/thread_row_item_layout",
+          "description": "打开对话"
+        },
+        "send_message": {
+          "type": "input",
+          "selector": "com.instagram.android:id/direct_thread_message_edittext",
+          "description": "输入消息"
+        },
+        "submit_message": {
+          "type": "tap",
+          "selector": "com.instagram.android:id/direct_thread_send_button",
+          "description": "发送消息"
+        }
+      }
+    }
+  },
+  "navigation": {
+    "edges": [
+      { "from": "home", "to": "search", "action": "tap_search_tab" },
+      { "from": "home", "to": "notifications", "action": "tap_notifications_tab" },
+      { "from": "home", "to": "direct_messages", "action": "tap_dm_tab" },
+      { "from": "home", "to": "reels", "action": "tap_reels_tab" },
+      { "from": "home", "to": "profile", "action": "tap_profile_tab" },
+      { "from": "search", "to": "profile", "action": "tap_profile_result" },
+      { "from": "profile", "to": "post_detail", "action": "tap_post" },
+      { "from": "post_detail", "to": "profile", "action": "back" },
+      { "from": "profile", "to": "home", "action": "tap_home_tab" },
+      { "from": "notifications", "to": "profile", "action": "tap_profile_tab" },
+      { "from": "direct_messages", "to": "home", "action": "tap_home_tab" },
+      { "from": "reels", "to": "home", "action": "tap_home_tab" }
+    ]
+  },
+  "operations": {
+    "like_feed_posts": {
+      "description": "浏览首页并点赞多个帖子",
+      "start_screen": "home",
+      "humanized": true,
+      "steps": [
+        {
+          "action": "scroll_feed",
+          "repeat": {
+            "count": 10,
+            "break_if": "com.instagram.android:id/end_of_feed_marker"
+          }
+        },
+        {
+          "action": "random_pick",
+          "options": [
+            { "action": "double_tap_photo", "weight": 0.6 },
+            { "action": "tap_like_button", "weight": 0.3 },
+            { "action": "scroll_feed", "weight": 0.1 }
+          ]
+        }
+      ],
+      "rate_limit": {
+        "per_hour": 30,
+        "cooldown_seconds": 120
+      }
+    },
+    "explore_hashtag": {
+      "description": "探索特定标签的内容",
+      "start_screen": "search",
+      "parameters": {
+        "hashtag": { "type": "string", "required": true }
+      },
+      "steps": [
+        {
+          "action": "search_users",
+          "input": "#${hashtag}"
+        },
+        {
+          "action": "tap_user_result",
+          "selector": "com.instagram.android:id/search_tag_row_container"
+        },
+        {
+          "action": "scroll_grid",
+          "repeat": { "count": 5 }
+        }
+      ]
+    },
+    "follow_users_by_keyword": {
+      "description": "通过关键词搜索并关注用户",
+      "start_screen": "search",
+      "parameters": {
+        "keyword": { "type": "string", "required": true },
+        "max_follows": { "type": "int", "default": 10 }
+      },
+      "steps": [
+        {
+          "action": "search_users",
+          "input": "${keyword}"
+        },
+        {
+          "action": "call_operation",
+          "operation": "follow_single_user",
+          "repeat": {
+            "count": "${max_follows}",
+            "break_if": "no_results"
+          }
+        }
+      ],
+      "rate_limit": {
+        "max_per_hour": 20,
+        "cooldown_seconds": 180
+      }
+    },
+    "follow_single_user": {
+      "description": "关注单个用户",
+      "steps": [
+        {
+          "action": "tap_user_result"
+        },
+        {
+          "action": "if_exists",
+          "selector": "com.instagram.android:id/profile_header_follow_button",
+          "then": [
+            { "action": "follow_user" }
+          ]
+        }
+      ]
+    },
+    "interact_with_reels": {
+      "description": "浏览Reels并互动",
+      "start_screen": "reels",
+      "humanized": true,
+      "steps": [
+        {
+          "action": "swipe_next",
+          "repeat": { "count": 15 },
+          "between": [
+            {
+              "action": "random_pick",
+              "options": [
+                { "action": "like", "weight": 0.4 },
+                { "action": "comment", "weight": 0.1 },
+                { "action": "none", "weight": 0.5 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "daily_engagement": {
+      "description": "每日综合互动",
+      "start_screen": "home",
+      "humanized": true,
+      "steps": [
+        {
+          "action": "call_operation",
+          "operation": "like_feed_posts"
+        },
+        {
+          "action": "call_operation",
+          "operation": "interact_with_reels"
+        },
+        {
+          "action": "navigate",
+          "to": "notifications"
+        },
+        {
+          "action": "scroll",
+          "repeat": { "count": 3 }
+        }
+      ]
+    }
+  },
+  "recovery_actions": {
+    "popup_dismiss": {
+      "trigger": "popup_detected",
+      "actions": [
+        {
+          "selector": "android:id/button2",
+          "action": "tap"
+        },
+        {
+          "selector": "com.instagram.android:id/floating_close_button",
+          "action": "tap"
+        }
+      ]
+    },
+    "login_required": {
+      "trigger": "login_screen_detected",
+      "actions": [
+        {
+          "selector": "com.instagram.android:id/login_button",
+          "action": "tap"
+        }
+      ],
+      "critical": true
+    }
+  },
+  "rate_limits": {
+    "default": {
+      "actions_per_minute": 10,
+      "actions_per_hour": 100,
+      "cooldown_range": [2, 8]
+    },
+    "follow": {
+      "actions_per_hour": 20,
+      "cooldown_range": [60, 300]
+    },
+    "comment": {
+      "actions_per_minute": 2,
+      "cooldown_range": [30, 120]
+    },
+    "like": {
+      "actions_per_minute": 15,
+      "cooldown_range": [3, 10]
+    }
+  }
+}

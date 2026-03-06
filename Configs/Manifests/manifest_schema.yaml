@@ -1,0 +1,90 @@
+# Manifest Schema v2.0
+# DPS v4.5.2 架构重构 - 新的 APP 认知地图格式
+# 2026-02-27
+
+# 核心理念：
+# - DPS（大脑）需要知道 APP 能做什么（capabilities）
+# - DPS 需要知道如何识别当前状态（states）
+# - DPS 需要知道如何将意图翻译为操作（intent_mappings）
+# - 物理执行细节（坐标、duration）由翻译层处理，不在 Manifest 中
+
+---
+
+# APP 基本信息
+app:
+  id: string                    # APP 标识符（如 "instagram"）
+  name: string                  # APP 名称（如 "Instagram"）
+  package: string               # Android 包名（如 "com.instagram.android"）
+  version: string               # Manifest 版本（如 "2.0"）
+
+# DPS 用于决策：这个 APP 能做什么
+capabilities:
+  - browse_feed                 # 可以浏览首页
+  - like_post                   # 可以点赞
+  - comment                     # 可以评论
+  - view_profile                # 可以查看个人资料
+  - search                      # 可以搜索
+  - follow                      # 可以关注
+  - share                       # 可以分享
+
+# DPS 用于感知：如何识别当前状态
+states:
+  - name: string                # 状态名称（如 "home_feed"）
+    visual_markers:             # 视觉标记（供 Gemini Flash 识别）
+      - string                  # 描述性标记（如 "底部导航栏"）
+    ui_signatures:              # UI 特征（供 PageDetector 识别）
+      primary: string           # 主选择器（resource-id）
+      fallback: [string]        # 备用选择器
+    gemini_prompt: string       # Gemini Flash 验证提示词
+
+# DPS → ZennoDroid 的翻译层
+intent_mappings:
+  capability_name:              # 对应 capabilities 中的能力
+    zd_action: string           # ZennoDroid 操作名（对应 operations.json）
+    required_state: string      # 需要的前置状态
+    params:                     # 高层参数（语义参数，非物理参数）
+      key: value
+    fallback_intents: [string]  # 回退意图链
+
+# DPS 用于决策：速率限制
+rate_limits:
+  capability_name:
+    per_hour: int               # 每小时最大次数
+    cooldown_seconds: int       # 冷却时间（秒）
+    per_day: int                # 每天最大次数（可选）
+
+# 示例：
+# capabilities:
+#   - browse_feed
+#   - like_post
+#   - comment
+#
+# states:
+#   - name: "home_feed"
+#     visual_markers:
+#       - "底部导航栏"
+#       - "首页 Tab 高亮"
+#     ui_signatures:
+#       primary: "com.instagram.android:id/home_tab"
+#       fallback: ["android.widget.TextView@text='Home'"]
+#     gemini_prompt: "这是 Instagram 首页吗？"
+#
+# intent_mappings:
+#   browse_feed:
+#     zd_action: "scroll_feed"
+#     required_state: "home_feed"
+#     params:
+#       direction: "down"
+#       count: 5
+#   like_post:
+#     zd_action: "tap_like_button"
+#     required_state: "home_feed"
+#     fallback_intents: ["browse_feed"]
+#
+# rate_limits:
+#   like_post:
+#     per_hour: 30
+#     cooldown_seconds: 120
+#   comment:
+#     per_hour: 15
+#     cooldown_seconds: 240
