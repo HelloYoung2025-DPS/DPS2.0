@@ -13,7 +13,7 @@ Func<string, string, object[], object> RunModule = (filePath, methodName, args) 
         string efPath = engineDir + ef; if (System.IO.File.Exists(efPath)) { allCodes.Add(System.IO.File.ReadAllText(efPath, System.Text.Encoding.UTF8)); }
     }
     string coreDir = System.IO.Path.GetDirectoryName(filePath) + "\\Core\\";
-    foreach (string cf in new string[] { "CoreHelper.cs", "JsonHelper.cs", "AIService.cs", "FileHelper.cs", "IExtension.cs", "ExtensionManager.cs", "SelectorEngine.cs", "PageDetector.cs", "ActionExecutor.cs" }) {
+    foreach (string cf in new string[] { "CoreHelper.cs", "JsonHelper.cs", "AIService.cs", "FileHelper.cs", "IExtension.cs", "ExtensionManager.cs", "SelectorEngine.cs", "PageDetector.cs", "ActionExecutor.cs", "OperationContext.cs" }) {
         string cfPath = coreDir + cf; if (System.IO.File.Exists(cfPath)) { allCodes.Add(System.IO.File.ReadAllText(cfPath, System.Text.Encoding.UTF8)); }
     }
     string extBaseDir = System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(filePath)) + "\\Extensions\\";
