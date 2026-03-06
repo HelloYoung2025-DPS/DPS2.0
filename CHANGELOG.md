@@ -1,15 +1,276 @@
+# DPS v4.5 更新日志
+
+## [4.5.10] - 2026-03-04
+
+### 🆕 App Onboarder — 新平台自动接入工具
+
+新增独立 Python CLI 工具 `Tools/app_onboarder/`，用于自动化新 APP 平台接入流程。
+
+#### 1) 工具架构（6 个模块）
+- `adb_controller.py` (300 行) — ADB 命令封装：设备连接、UI dump、截图、点击、滑动、拟人化延迟
+- `ui_analyzer.py` (483 行) — UI Dump XML 解析引擎：元素查找、底部导航检测、Feed 类型判断、WebView 检测、帖子容器识别、页面分类
+- `app_explorer.py` (699 行) — 5 阶段自主探索引擎：首页扫描 → 导航探索 → Feed 分析 → 帖子详情分析 → 交互按钮发现。支持 WebView accessibility nodes 深度分析，启发式失败时截图向用户提问
+- `config_generator.py` (1812 行) — 配置生成器：基于探索结果自动生成 PlatformsConfig.json 平台条目、{platform}_operations.json 操作定义、{platform}_e2e_test.ps1 端到端测试脚本
+- `test_runner.py` — 测试运行器：执行 E2E 测试 → 解析结果 → 分析失败 → 自动修复 → 重试。支持 5 种修复策略（延迟增加、选择器切换、滚动调整、坐标校准、WebView 等待增加）
+- `main.py` — CLI 入口：支持交互模式和命令行参数模式（`--package`/`--key`/`--skip-test`）
+
+#### 2) 核心特性
+- **全自动探索**: 无需手动查看 XML dump，工具自主导航 APP 发现 UI 结构
+- **WebView 感知**: 自动检测 WebView 页面并分析 accessibility nodes（如 BabyCenter 的点赞/评论按钮）
+- **双 Feed 类型**: 支持 ViewPager 水平滑动和 RecyclerView 垂直滚动两种 feed 模式
+- **自动修复循环**: E2E 测试失败后自动分析原因并尝试修复配置，最多 3 轮
+- **零第三方依赖**: 仅使用 Python 标准库
+
+#### 3) 使用方式
+```bash
+# 交互模式
+python Tools/app_onboarder/main.py
+
+# 命令行模式
+python Tools/app_onboarder/main.py --package com.example.app --key example
+
+# 跳过测试
+python Tools/app_onboarder/main.py --package com.example.app --key example --skip-test
+```
+
+#### 4) 验证
+- 使用 BabyCenter 模拟数据通过集成测试
+- 生成的 PlatformsConfig.json 条目包含 12 个字段、17 个 UI 选择器
+- 生成的 operations.json（示例）可覆盖 WebView 场景，含 `scroll_to_reactions` 等关键步骤
+- 生成的 E2E 测试脚本可直接由 PowerShell 执行并进入自动修复循环
+
+#### 5) 实现计划文档
+- 新增 `Docs/plans/2026-03-04-app-onboarder.md` — 完整实现计划
+
+### 📚 Docs 一致性审核（2026-03-05）
+
+- 审核并更新 `Docs/` 目录核心说明书，统一到 v4.5.10 基线
+- 修复文档索引失效链接与不存在路径引用（如 `子项目调用架构.md`、历史错误文件名链接）
+- 校正文档与代码不一致项：BabyCenter 为配置驱动模式、行为档案命名（`speed_demon/casual/deep_reader/distracted`）、`Config/IntentMappings` 路径
+- 补充历史文档说明：`FIX_REPORT_2026-02-27.md` 中旧绝对路径属于历史快照，不代表当前仓库路径约定
+
+---
+
+## [4.5.9] - 2026-02-28
+
+### 🔧 代码重构优化
+
+#### 1) SessionRunner 帖子 JSON 构建逻辑封装
+- `Modules/SessionRunner.cs`
+  - 新增方法 `BuildAndSetPostJsonFromContext()` - 封装原本在 `ExecuteWithUnifiedEngine()` 中的 24 行复杂逻辑
+  - `ExecuteWithUnifiedEngine()` 方法简化，调用新方法替代内联代码
+  - 提高代码可维护性和可读性
+  - 行数变化: 1492 → 1501 (+9 行)
+
+#### 2) .omo 2.0 模块追踪系统
+- 新增 `.omo/modules/SessionRunner.md` - SessionRunner 模块追踪文件
+- 新增 `.omo/modules/TEMPLATE.md` - 模块追踪模板
+- 新增 `.omo/modules/index.md` - 活跃模块索引
+- 新增 `.omo/PLANS.md` - 优化计划文档
+- 完善 L3/L4 层级操作映射
+#### 3) 文件 I/O 错误处理增强
+- `Modules/SessionRunner.cs`
+  - 为 `LoadUserStrategy()` 方法添加 try-catch 错误处理
+  - 为 `LoadIntentMapping()` 方法添加 try-catch 错误处理
+  - 确保文件读取失败时使用默认值，不中断流程
+  - 符合 .omo 规范：所有 I/O 操作必须包含 try-catch
+
+#### 4) 编译错误修复
+- `Modules/SessionRunner.cs`
+  - 修复 `LoadUserStrategy()` 方法结构损坏：恢复 `File.Exists()` 条件检查，补全 `balanceJson`/`aiControl` 变量声明
+  - 修复 `LoadIntentMapping()` 方法结构损坏：恢复 `File.Exists()` 条件检查，使 try-catch 可达
+  - 修复视觉验证块中 `effectiveIntent` 变量未定义的编译错误（CS0103），简化为快速模式逻辑
+  - 修复 `ResolveIntentForAction()` 默认映射：`like` 从错误的 `open_post` 修正为 `like_content`
+
+#### 5) L3/L4 映射文档完善
+- `.omo/layers/l3-operation.yaml`
+  - 新增 op-sr-008 (build-post-json) 操作定义
+- `.omo/modules/SessionRunner.md`
+  - 更新模块追踪状态为 stable，进度 100%
+
+---
+
+
+## [4.5.8] - 2026-02-27
+
+### 🔧 CODEX 复扫修复（逻辑与流程）
+
+#### 1) 会话成功判定升级（目标对齐 >95%）
+- `Modules/SessionRunner.cs`
+  - 新增 `successfulActions` / `skippedActions` 计数
+  - 成功判定改为：`success_rate >= 0.95` 且 `successfulActions >= min_successful_actions(默认6)`
+  - 新增输出变量：`session_success_rate`, `session_successful_actions`, `session_failed_actions`, `session_skipped_actions`, `action_attempt_count`
+  - `action_count` 改为记录成功动作数（不再混入 SKIP）
+
+#### 2) 帖子语义链路修复（ActionExecutor -> SessionRunner -> RuleEngine）
+- `Modules/Core/ActionExecutor.cs`
+  - `find` 步骤新增节点语义提取（`*_text`, `*_desc`）
+  - 新增语义别名同步：`title/caption/body/...` -> `post_title/post_body/post_subreddit/post_upvotes/post_comment_count/post_timestamp`
+  - 新增数字标准化（支持 `1.2k`, `3,421`）
+- `Modules/SessionRunner.cs`
+  - 构建 `current_post_json` 时增加多级兜底字段读取（`post_title`, `*_text` 等）
+  - 新增 `body` 字段写入
+  - 对 `upvotes/comment_count` 做标准化后再写入 JSON，避免无效数字污染
+- `Config/Operations/reddit_operations.json`
+  - `like` 增加 `post_title` 采集
+  - `open_post` 统一使用 `post_title`
+  - `read_post` 统一使用 `post_body`
+- `Config/Operations/instagram_operations.json`
+  - `like` 增加 `post_title`（来自 `caption_text`）采集
+  - `view_post` 语义字段改为 `post_title`
+- `Config/Operations/babycenter_operations.json`
+  - `open_post` 统一使用 `post_title`
+  - `read_post` 统一使用 `post_body`
+  - `like` 增加 `post_title` 采集
+
+#### 3) 安全与配置完整性修复
+- `Modules/Main.cs`
+  - 新增 `device_id` 安全校验（`ValidateDeviceId`）
+  - 配置检查从单文件扩展为 `AIConfig + StageConfig + BehaviorConfig`
+  - 增加配置读取为空时的错误返回
+
+#### 4) I/O 错误处理与维护鲁棒性
+- `Modules/Core/CoreHelper.cs`
+  - `EnsureDir/ReadFile/WriteFile/AppendFile` 增加 try-catch 与日志
+- `Modules/Main.cs`
+  - `ClearRuntimeData` 中的备份/删除改为单文件异常隔离，避免一处失败中断全流程
+- `Modules/Maintenance.cs`
+  - 日志/记忆/备份清理循环增加单文件 try-catch
+  - 磁盘空间检查失败不再静默吞掉，改为告警日志
+  - `DriveInfo` 路径获取增强（优先 `Path.GetPathRoot`）
+
+#### 5) 返回码与意图映射一致性
+- `Modules/ReportGen.cs`
+  - `SKIPPED` 统一为 `SKIP`
+- `Modules/SessionRunner.cs`
+  - 默认意图映射修复：`like -> like_content`（原为错误的 `open_post`）
+
+#### 6) 源文件可编译性修复
+- `Modules/Core/AppExplorer_v2.cs`
+  - 清理行前缀噪声（`#XX|`），恢复为可读源码文本
+
+#### 7) 文档与上下文同步（v4.5.8）
+- 同步更新 `README.md`、`UPGRADE.md`、`Docs/README.md`、`Docs/CopyPaste_Setup.md`、`Docs/DPS_v4.5_完整配置手册.md`、`Docs/FIX_REPORT_2026-02-27.md`、`Docs/QuickSetup_Flowchart.md`、`Docs/BabyCenterModule.md`、`FINAL_DELIVERY_REPORT.md`
+- 修正文档口径：`action_count` 为成功动作数，新增 `action_attempt_count/session_success_*` 统计变量说明
+- `SKIPPED` 相关文档表述统一为 `SKIP`
+- `.omo/decisions.md` 清理前缀噪声，`.omo/context.md` / `.omo/PROJECT.md` 同步到 v4.5.8 状态
+
+
+
+## [4.5.7] - 2026-02-27
+
+### 🔧 CODEX 修复 - 运行时稳定性与平台接入
+
+#### 修复内容（由 CODEX 完成）
+
+#### 修复点 1: ActionExecutor 运行稳定性修复
+- **新增**: `refresh_layout` 步骤已添加到 `ExecuteStep` 分发（第186行）
+  - 修复浏览/返回流程中的布局刷新步骤未执行的问题
+- **修复**: `call_operation` 递归时上下文仅在顶层（CallDepth==0）清空
+  - 解决递归调用链丢失步骤上下文的问题
+- **新增**: `SyncLegacyContext` 方法（第1123行）
+  - 将 `OperationContext.Variables` 同步回静态 `_context`
+  - 修复 `SessionRunner` 无法稳定读取 `ActionExecutor` 上下文的问题
+- **清理**: 移除非当前运行链的 Intent 执行段
+  - 降低动态编译失败概率，保持现有流程稳定
+
+#### 修复点 2: SessionRunner 评估门控修复
+- **修复**: 空语义帖子处理（第898-931行）
+  - 仅在存在语义字段（title/subreddit/upvotes/comments/timestamp）时写入 `current_post_json`
+  - 避免无内容帖子被 `RuleEngine` 误判为低分并持续拒绝互动
+
+#### 修复点 3: Reddit / Instagram 意图映射修复
+- **新增**: `like_content` 意图定义
+  - 修复 `like` 映射到 `like_content`（之前错误映射到 `open_post`）
+  - 行为现在符合"值得点赞再点赞"的目标
+- **新增**: `follow_entity` 意图定义
+  - 补充缺失的 `follow_entity` 映射到 `follow` 操作
+- **新增**: `share_content` 意图定义
+  - 补充缺失的 `share_content` 映射到 `share` 操作
+
+#### 修复点 4: Instagram 点赞回退链增强
+- **修改**: `instagram_operations.json` 中 `like` 操作配置
+  - 使用 `if_exists(like_button)` 检查点赞按钮是否存在
+  - `else` 分支调用 `call_operation(double_tap_like)` 作为回退
+  - UI 变化时容错能力提升
+- **验证**: `double_tap_like` 操作存在且配置正确
+  - 支持双击图片点赞（Instagram 特有功能）
+
+#### 修复点 5: BabyCenter 三件套接入
+- **新增**: `PlatformsConfig.json` 中 `babycenter` 平台配置（第287行）
+  - package: `com.babycenter.pregnancytracker`
+  - ui_selectors: post_unit, post_title, post_body, like_button, comment_button, etc.
+  - rate_limits: 80/hour, 24 likes/hour, 12 comments/hour
+  - page_signatures: feed, post_detail, comment
+- **新增**: `Config/Operations/babycenter_operations.json`
+  - 6 个操作: browse, open_post, read_post, like, comment, back_to_feed
+  - 所有操作包含 refresh_layout 步骤和 humanized 参数
+- **新增**: `Config/IntentMappings/babycenter_intents.json`
+  - 意图映射: browse_feed, open_post, read_post, like_content, reply_post
+  - action_to_intent: browse, read_post, like, comment, post, follow, share
+- **修改**: `Apps.json` 中 `babycenter.enabled = true`
+  - data_path: `Data/BabyCenter`
+  - primary_communities: Pregnancy, Baby, Toddler
+- **新增**: `device_app_mapping.json` 中 `device_004 -> babycenter` 映射
+
+#### 修复点 6: ZDProjects 兼容性修复
+- **修复**: 所有 `*_OwnCode.cs` 文件添加 `OperationContext.cs` 依赖
+  - DailyUpdate_OwnCode.cs
+  - Extension_OwnCode.cs
+  - Initializer_OwnCode.cs
+  - Main_OwnCode.cs
+  - Maintenance_OwnCode.cs
+  - PersonaCreate_OwnCode.cs
+  - ReportGen_OwnCode.cs
+  - SessionRunner_OwnCode.cs
+  - StateSaver_OwnCode.cs
+  - WeeklyEvolve_OwnCode.cs
+  - 减少动态编译时"类型找不到"的风险
+
+### 📝 新增测试脚本
+- **新增**: `ZDProjects/Tests/Reddit_E2E_Test.cs` - Reddit E2E 测试脚本
+  - 验证 refresh_layout 步骤
+  - 验证 like_content/follow_entity/share_content 意图
+  - 完整工作流模拟
+- **新增**: `ZDProjects/Tests/Instagram_E2E_Test.cs` - Instagram E2E 测试脚本
+  - 验证 if_exists(like_button) 配置
+  - 验证 call_operation(double_tap_like) 回退链
+  - 验证 double_tap_like 操作
+- **新增**: `ZDProjects/Tests/BabyCenter_E2E_Test.cs` - BabyCenter E2E 测试脚本
+  - 验证平台配置、操作配置、意图映射
+  - 验证应用开关和设备映射
+
+### ⏳ 待用户验证（运行时测试）
+- ZennoDroid 实机/模拟器 E2E 测试
+  - Reddit: 首页 → 选帖 → 阅读 → 判断点赞 → 点赞 → 返回
+  - Instagram: 同上 + like 回退链测试
+  - BabyCenter: selectors 与页面签名需要按实际 UI 微调
+
+### ✅ 验证结果
+- 所有 JSON 文件通过语法校验
+- 关键映射一致性检查通过
+- 代码验证通过（C# 5.0 兼容）
+- 状态: ⏳ READY - 等待 ZennoDroid 运行时测试
+
+---
+
+
+
+
 ## [4.5.6] - 2026-02-27
 
-### 🛠️ 架构重构 - DPS 与 ZennoDroid 分层
+### 🚀 Universal Framework - 架构完整重构
 
 #### 核心理念
 - **DPS (大脑)**: 决策层 - 感知、记忆、决策、验证
 - **ZennoDroid (手)**: 执行层 - 元素定位、拟人化执行、异常处理
-- **翻译层**: 将高层意图翻译为物理操作（属于 DPS 的认知能力）
+- **翻译层**: IntentTranslator 将高层意图翻译为物理命令
+
+### 🛠️ 架构重构 - DPS 与 ZennoDroid 分层
 
 #### Phase 1: 重构 ActionExecutor.cs
 - **新增**: `Modules/Core/Intent.cs` - 操作意图抽象类
-  - 定义高层操作意图，描述“做什么”而不是“怎么做”
+  - 定义高层操作意图，描述"做什么"而不是"怎么做"
   - 支持从 JSON 步骤构造 Intent 对象
   - 168 行，C# 5.0 兼容
 - **新增**: `ActionExecutor.ExecuteIntent()` 方法
@@ -47,59 +308,57 @@
   - 7 个 states（home_feed, post_detail, profile, 等）
   - 每个 state 包含 visual_markers + ui_signatures + gemini_prompt
   - 11 个 intent_mappings，包含 fallback_intents
-  #HM|# 8 个 rate_limits，包含 per_hour + cooldown_seconds + per_day
-XX|  - 223 行，完整实现
-QK|-
-JN|# #### Phase 5: DPS 架构完整实现
-QZ|# - **新增**: `Modules/Core/ZDCommand.cs` - ZennoDroid 命令类
-XW|#   - 定义物理操作的命令类型（Tap, Swipe, SendText, 等）
-VW|#   - 封装坐标、持续时间、文本内容等物理参数
-HS|#   - 支持人性化执行标志和重试配置
-WW|#   - 333 行，C# 5.0 兼容
-RZ|# - **新增**: `Modules/Core/ZDResult.cs` - ZennoDroid 执行结果类
-BM|#   - 统一的执行结果格式（Success, FailedRetryable, FailedFatal, Skipped）
-XZ|#   - 支持扩展数据和错误追踪
-SN|#   - 提供与旧格式的兼容转换方法
-ZK|#   - 311 行，C# 5.0 兼容
-BV|# - **新增**: `Modules/Core/ZennoDroidAdapter.cs` - ZennoDroid API 适配器
-BQ|#   - 封装所有 ZennoDroid API 调用（Input.Tap, Input.Swipe, 等）
-HX|#   - 统一错误处理和重试机制
-XT|#   - 支持 GetLayout 和 Screenshot 操作
-BY|#   - 408 行，C# 5.0 兼容
-VV|# - **新增**: `Modules/Core/IntentTranslator.cs` - 意图翻译器
-ZP|#   - 将 Intent 翻译为 ZDCommand
-QH|#   - 保留元素定位逻辑（SelectorEngine）和坐标计算逻辑（ParseBounds）
-KQ|#   - 支持回退链翻译
-RJ|#   - 支持从 stepJson 快速翻译
-HX|#   - 472 行，C# 5.0 兼容
-XS|# - **修改**: `ZDProjects/ModuleLoader.cs`
-JW|#   - 添加新文件到编译列表：Intent.cs, ZDCommand.cs, ZDResult.cs, ZennoDroidAdapter.cs, IntentTranslator.cs
-YT|#   - 确保所有新文件被动态编译加载
-BP|-
-QW|# #### 架构图
-RT|# ```
-JS|# DPS (大脑层)
-PQ|# ├─ Intent ("我想点赞这个帖子")
-YB|# ├─ IntentTranslator (翻译：意图 → 命令)
-QQ|# │   └─ 输出: ZDCommand ("点击坐标 (540, 1800)")
-SX|# └─ VisionCorrector (视觉验证)
-PY|# 
-ZX|# ZennoDroid (手层)
-QK|# ├─ ZennoDroidAdapter (API 封装)
-ZV|# │   └─ 输入: ZDCommand
-JY|# │   └─ 输出: ZDResult
-VQ|# ├─ SelectorEngine (元素定位)
-ZM|# └─ ScriptHelpers (人性化执行)
-JJ|# ```
-MH|-
-WW|# #### 关键改进
-ZP|# 1. **清晰的架构边界**: DPS 不再直接调用 ZennoDroid API
-QS|# 2. **可测试性**: Intent/ZDCommand/ZDResult 都是纯数据结构
-KQ|# 3. **可扩展性**: 新增平台只需定义 Manifest 和翻译规则
-HT|# 4. **向后兼容**: 保留 ActionExecutor 的旧接口，渐进式迁移
-KN|# 5. **C# 5.0 兼容**: 所有新代码使用 C# 5.0 语法
-SX|
-  - 223 行，完整示例
+  - 8 个 rate_limits，包含 per_hour + cooldown_seconds + per_day
+  - 223 行，完整实现
+
+#### Phase 5: DPS 架构完整实现
+- **新增**: `Modules/Core/ZDCommand.cs` - ZennoDroid 命令类
+  - 定义物理操作的命令类型（Tap, Swipe, SendText, 等）
+  - 封装坐标、持续时间、文本内容等物理参数
+  - 支持人性化执行标志和重试配置
+  - 333 行，C# 5.0 兼容
+- **新增**: `Modules/Core/ZDResult.cs` - ZennoDroid 执行结果类
+  - 统一的执行结果格式（Success, FailedRetryable, FailedFatal, Skipped）
+  - 支持扩展数据和错误追踪
+  - 提供与旧格式的兼容转换方法
+  - 311 行，C# 5.0 兼容
+- **新增**: `Modules/Core/ZennoDroidAdapter.cs` - ZennoDroid API 适配器
+  - 封装所有 ZennoDroid API 调用（Input.Tap, Input.Swipe, 等）
+  - 统一错误处理和重试机制
+  - 支持 GetLayout 和 Screenshot 操作
+  - 408 行，C# 5.0 兼容
+- **新增**: `Modules/Core/IntentTranslator.cs` - 意图翻译器
+  - 将 Intent 翻译为 ZDCommand
+  - 保留元素定位逻辑（SelectorEngine）和坐标计算逻辑（ParseBounds）
+  - 支持回退链翻译
+  - 支持从 stepJson 快速翻译
+  - 472 行，C# 5.0 兼容
+- **修改**: `ZDProjects/ModuleLoader.cs`
+  - 添加新文件到编译列表：Intent.cs, ZDCommand.cs, ZDResult.cs, ZennoDroidAdapter.cs, IntentTranslator.cs
+  - 确保所有新文件被动态编译加载
+
+#### 架构图
+```
+DPS (大脑层)
+├─ Intent ("我想点赞这个帖子")
+├─ IntentTranslator (翻译：意图 → 命令)
+│   └─ 输出: ZDCommand ("点击坐标 (540, 1800)")
+└─ VisionCorrector (视觉验证)
+
+ZennoDroid (手层)
+├─ ZennoDroidAdapter (API 封装)
+│   ├─ 输入: ZDCommand
+│   └─ 输出: ZDResult
+├─ SelectorEngine (元素定位)
+└─ ScriptHelpers (人性化执行)
+```
+
+#### 关键改进
+1. **清晰的架构边界**: DPS 不再直接调用 ZennoDroid API
+2. **可测试性**: Intent/ZDCommand/ZDResult 都是纯数据结构
+3. **可扩展性**: 新增平台只需定义 Manifest 和翻译规则
+4. **向后兼容**: 保留 ActionExecutor 的旧接口，渐进式迁移
+5. **C# 5.0 兼容**: 所有新代码使用 C# 5.0 语法
 
 ### 📝 架构决策
 - **ADR-011**: Intent-Based Execution
@@ -212,6 +471,38 @@ SX|
 
 ---
 
+## [4.5.4] - 2026-02-27
+
+### 🔧 稳定性修复
+
+#### ActionExecutor.cs
+- **修复** `refresh_layout` 步骤未分发问题（operations 中该步骤此前会被当作未知动作跳过）
+- **修复** 递归 `call_operation` 时上下文被误清空的问题（仅顶层执行清理 context）
+- **修复** 旧接口兼容：执行后同步 `OperationContext` 到静态上下文，恢复 `SessionRunner` 的 `ActionExecutor.GetContext()` 读取能力
+- **清理** 移除不在当前编译链中的 Intent 相关执行段，避免运行时动态编译缺失依赖
+
+#### SessionRunner.cs
+- **修复** 当 ActionExecutor 未提供语义字段时，`current_post_json` 不再写入空内容对象，避免 RuleEngine 将“空帖子”误判并持续拒绝互动
+
+### 🌐 多平台配置完善
+
+#### IntentMappings
+- **修复** `reddit_intents.json` / `instagram_intents.json` 中 `follow_entity` 与 `share_content` 未定义导致的意图回退问题
+- **调整** `like` 动作映射到 `like_content`（直接执行 like 操作，不再错误映射为 open_post）
+- **新增** `babycenter_intents.json`（支持 browse/read/like/comment 主链路）
+
+#### Operations
+- **增强** `instagram_operations.json` 的 like 操作：新增 `if_exists + call_operation(double_tap_like)` 回退链
+- **新增** `babycenter_operations.json`（browse/open_post/read_post/like/comment/back_to_feed）
+
+#### Platforms / Apps / Device Mapping
+- **新增** `PlatformsConfig.json` 的 `babycenter` 平台配置（selectors/page_signatures/rate_limits）
+- **更新** `Apps.json` 中 babycenter `enabled: true`
+- **新增** `device_app_mapping.json` 示例映射 `device_004 -> babycenter`
+
+### 🧩 ZDProjects 兼容性
+- **更新** 各 `*_OwnCode.cs` 核心依赖列表，补充 `OperationContext.cs`，避免 `ActionExecutor` 新签名在不同入口编译失败
+
 ## [4.5.3] - 2026-02-26
 
 ### ✨ 新功能
@@ -241,7 +532,7 @@ SX|
 - 遵循现有代码风格（JsonHelper 用法、错误处理模式）
 - 详细注释说明递归机制和深度控制
 
-# DPS v4.5 更新日志
+---
 
 ## [4.5.2] - 2026-02-17
 
@@ -349,7 +640,7 @@ SX|
 #### JsonHelper.cs (完全重写)
 - **重写** 使用栈式状态机实现健壮的 JSON 解析器
 - **修复** 嵌套对象中同名键的正确匹配（深度感知）
-- **修复** 转义字符处理（包括 `\\\"` 和 `\\\\`）
+- **修复** 转义字符处理（包括 `\"` 和 `\\`）
 - **修复** Unicode 转义序列 `\uXXXX` 完整支持
 - **新增** `GetArrayElement(arrayJson, index)` - 按索引获取数组元素
 - **新增** `IsValidJson(json)` - JSON 格式验证
@@ -536,9 +827,4 @@ Backups/
 - 会话模拟
 - 每日/每周更新
 
-## [4.5.3] - 2026-02-27
-### Added
-- ZennoDroidAdapter: Added fastMode support and conditional screenshot capture.
-- VisionCorrector: Added VerifyError method for error-triggered visual verification.
-### Changed
-- SessionRunner: Optimized verification logic to only trigger visual verification on ZennoDroid execution failure (performance optimization).
+---
