@@ -1,0 +1,582 @@
+# L3: 操作层定义
+# DPS v4.5 模块内的操作单元层级
+
+level:
+  id: l3
+  name: 操作层
+  priority: 3
+  description: 模块内的独立操作单元，完成特定功能
+
+scope:
+  type: operation
+  includes:
+    - 单个操作的实现
+    - 操作逻辑优化
+    - 操作接口变更
+    - 操作错误处理
+
+# 操作清单（按模块分组）
+operations:
+
+  # === SessionRunner 操作 ===
+  - id: op-sr-001
+    name: initialize-session
+    module: SessionRunner
+    description: 初始化 ZennoDroid 会话实例
+    complexity: medium
+    risk: low
+    entry_point: "SessionRunner.Initialize()"
+    steps: [op-sr-001-01, op-sr-001-02, op-sr-001-03]
+    last_modified: 2026-02-27
+
+  - id: op-sr-002
+    name: load-behavior-config
+    module: SessionRunner
+    description: 加载行为配置文件
+    complexity: low
+    risk: low
+    entry_point: "SessionRunner.LoadBehaviorConfig()"
+    steps: [op-sr-002-01, op-sr-002-02]
+    last_modified: 2026-02-27
+
+  - id: op-sr-003
+    name: execute-action-sequence
+    module: SessionRunner
+    description: 执行动作序列
+    complexity: high
+    risk: medium
+    entry_point: "SessionRunner.ExecuteSequence()"
+    steps: [op-sr-003-01, op-sr-003-02, op-sr-003-03, op-sr-003-04]
+    last_modified: 2026-02-27
+
+  - id: op-sr-004
+    name: apply-fatigue-model
+    module: SessionRunner
+    description: 应用疲劳模型降低权重
+    complexity: medium
+    risk: low
+    entry_point: "SessionRunner.ApplyFatigue()"
+    steps: [op-sr-004-01]
+    last_modified: 2026-02-27
+
+  - id: op-sr-005
+    name: handle-session-error
+    module: SessionRunner
+    description: 处理会话级错误
+    complexity: medium
+    risk: medium
+    entry_point: "SessionRunner.HandleError()"
+    steps: [op-sr-005-01, op-sr-005-02]
+    last_modified: 2026-02-27
+
+  - id: op-sr-006
+    name: calculate-session-duration
+    module: SessionRunner
+    description: 计算随机会话时长
+    complexity: low
+    risk: low
+    entry_point: "SessionRunner.CalculateDuration()"
+    steps: [op-sr-006-01]
+    last_modified: 2026-02-27
+
+  - id: op-sr-007
+    name: validate-session-success
+    module: SessionRunner
+    description: 验证会话成功率（门控 >=95%）
+    complexity: medium
+    risk: medium
+    entry_point: "SessionRunner.ValidateSuccessRate()"
+    steps: [op-sr-007-01, op-sr-007-02]
+    last_modified: 2026-02-27
+
+  - id: op-sr-008
+    name: build-post-json
+    module: SessionRunner
+    description: 从 ActionExecutor 上下文构建帖子 JSON 供 RuleEngine 评估
+    complexity: medium
+    risk: low
+    entry_point: "SessionRunner.BuildAndSetPostJsonFromContext()"
+    steps: [op-sr-008-01]
+    last_modified: 2026-03-03
+
+  # === RuleEngine 操作 ===
+  - id: op-re-001
+    name: parse-rule
+    module: RuleEngine
+    description: 解析规则 JSON
+    complexity: medium
+    risk: low
+    entry_point: "RuleEngine.ParseRule()"
+    steps: [op-re-001-01, op-re-001-02]
+    last_modified: 2026-02-27
+
+  - id: op-re-002
+    name: validate-rule
+    module: RuleEngine
+    description: 验证规则语法和完整性
+    complexity: medium
+    risk: low
+    entry_point: "RuleEngine.ValidateRule()"
+    steps: [op-re-002-01, op-re-002-02]
+    last_modified: 2026-02-27
+
+  - id: op-re-003
+    name: evaluate-post
+    module: RuleEngine
+    description: 评估帖子是否符合规则
+    complexity: high
+    risk: medium
+    entry_point: "RuleEngine.Evaluate()"
+    steps: [op-re-003-01, op-re-003-02, op-re-003-03]
+    last_modified: 2026-02-27
+
+  - id: op-re-004
+    name: decide-action
+    module: RuleEngine
+    description: 决定执行什么动作
+    complexity: medium
+    risk: medium
+    entry_point: "RuleEngine.Decide()"
+    steps: [op-re-004-01]
+    last_modified: 2026-02-27
+
+  - id: op-re-005
+    name: calculate-hot-score
+    module: RuleEngine
+    description: 计算热度分（时间衰减）
+    complexity: medium
+    risk: low
+    entry_point: "RuleEngine.CalculateHotScore()"
+    steps: [op-re-005-01, op-re-005-02, op-re-005-03]
+    last_modified: 2026-02-27
+
+  - id: op-re-006
+    name: calculate-relevance-score
+    module: RuleEngine
+    description: 计算相关性分
+    complexity: medium
+    risk: low
+    entry_point: "RuleEngine.CalculateRelevanceScore()"
+    steps: [op-re-006-01]
+    last_modified: 2026-02-27
+
+  # === JsonHelper 操作 ===
+  - id: op-jh-001
+    name: get-json-value
+    module: JsonHelper
+    description: 获取 JSON 顶层字段值
+    complexity: low
+    risk: low
+    entry_point: "JsonHelper.GetJsonValue()"
+    steps: [op-jh-001-01]
+    last_modified: 2026-02-27
+
+  - id: op-jh-002
+    name: get-nested-value
+    module: JsonHelper
+    description: 获取嵌套路径值
+    complexity: medium
+    risk: low
+    entry_point: "JsonHelper.GetNestedValue()"
+    steps: [op-jh-002-01, op-jh-002-02]
+    last_modified: 2026-02-27
+
+  - id: op-jh-003
+    name: set-json-value
+    module: JsonHelper
+    description: 设置字段值并返回新 JSON
+    complexity: medium
+    risk: low
+    entry_point: "JsonHelper.SetJsonValue()"
+    steps: [op-jh-003-01]
+    last_modified: 2026-02-27
+
+  - id: op-jh-004
+    name: parse-json-array
+    module: JsonHelper
+    description: 解析 JSON 数组
+    complexity: medium
+    risk: low
+    entry_point: "JsonHelper.ParseJsonArray()"
+    steps: [op-jh-004-01]
+    last_modified: 2026-02-27
+
+  # === IntentTranslator 操作 ===
+  - id: op-it-001
+    name: translate-intent
+    module: IntentTranslator
+    description: 翻译高层意图为物理命令
+    complexity: high
+    risk: high
+    entry_point: "IntentTranslator.Translate()"
+    steps: [op-it-001-01, op-it-001-02, op-it-001-03]
+    last_modified: 2026-02-27
+
+  - id: op-it-002
+    name: resolve-selector
+    module: IntentTranslator
+    description: 解析 UI 选择器
+    complexity: medium
+    risk: medium
+    entry_point: "IntentTranslator.ResolveSelector()"
+    steps: [op-it-002-01, op-it-002-02]
+    last_modified: 2026-02-27
+
+  - id: op-it-003
+    name: calculate-coordinates
+    module: IntentTranslator
+    description: 计算点击坐标
+    complexity: medium
+    risk: low
+    entry_point: "IntentTranslator.CalculateCoords()"
+    steps: [op-it-003-01]
+    last_modified: 2026-02-27
+
+  - id: op-it-004
+    name: build-fallback-chain
+    module: IntentTranslator
+    description: 构建回退执行链
+    complexity: high
+    risk: medium
+    entry_point: "IntentTranslator.BuildFallback()"
+    steps: [op-it-004-01, op-it-004-02]
+    last_modified: 2026-02-27
+
+  # === MemoryManager 操作 ===
+  - id: op-mm-001
+    name: record-interaction
+    module: MemoryManager
+    description: 记录交互到记忆
+    complexity: low
+    risk: low
+    entry_point: "MemoryManager.Record()"
+    steps: [op-mm-001-01, op-mm-001-02]
+    last_modified: 2026-02-27
+
+  - id: op-mm-002
+    name: check-duplicate
+    module: MemoryManager
+    description: 检查重复交互
+    complexity: low
+    risk: low
+    entry_point: "MemoryManager.IsDuplicate()"
+    steps: [op-mm-002-01]
+    last_modified: 2026-02-27
+
+  - id: op-mm-003
+    name: query-memory
+    module: MemoryManager
+    description: 查询历史记忆
+    complexity: medium
+    risk: low
+    entry_point: "MemoryManager.Query()"
+    steps: [op-mm-003-01]
+    last_modified: 2026-02-27
+
+  - id: op-mm-004
+    name: cleanup-old-memory
+    module: MemoryManager
+    description: 清理过期记忆
+    complexity: low
+    risk: low
+    entry_point: "MemoryManager.Cleanup()"
+    steps: [op-mm-004-01]
+    last_modified: 2026-02-27
+
+  - id: op-mm-005
+    name: apply-decay
+    module: MemoryManager
+    description: 应用记忆衰减
+    complexity: medium
+    risk: low
+    entry_point: "MemoryManager.ApplyDecay()"
+    steps: [op-mm-005-01]
+    last_modified: 2026-02-27
+
+  # === ActionExecutor 操作 ===
+  - id: op-ae-001
+    name: execute-operation
+    module: ActionExecutor
+    description: 执行操作（来自 operations.json）
+    complexity: high
+    risk: high
+    entry_point: "ActionExecutor.Execute()"
+    steps: [op-ae-001-01, op-ae-001-02, op-ae-001-03]
+    last_modified: 2026-02-27
+
+  - id: op-ae-002
+    name: process-step
+    module: ActionExecutor
+    description: 处理单个步骤指令
+    complexity: medium
+    risk: medium
+    entry_point: "ActionExecutor.ProcessStep()"
+    steps: [op-ae-002-01, op-ae-002-02]
+    last_modified: 2026-02-27
+
+  - id: op-ae-003
+    name: handle-find-command
+    module: ActionExecutor
+    description: 处理 find 指令
+    complexity: medium
+    risk: low
+    entry_point: "ActionExecutor.HandleFind()"
+    steps: [op-ae-003-01]
+    last_modified: 2026-02-27
+
+  - id: op-ae-004
+    name: handle-tap-command
+    module: ActionExecutor
+    description: 处理 tap 指令
+    complexity: low
+    risk: low
+    entry_point: "ActionExecutor.HandleTap()"
+    steps: [op-ae-004-01]
+    last_modified: 2026-02-27
+
+  - id: op-ae-005
+    name: handle-swipe-command
+    module: ActionExecutor
+    description: 处理 swipe 指令
+    complexity: low
+    risk: low
+    entry_point: "ActionExecutor.HandleSwipe()"
+    steps: [op-ae-005-01]
+    last_modified: 2026-02-27
+
+  - id: op-ae-006
+    name: handle-verify-command
+    module: ActionExecutor
+    description: 处理 verify 指令
+    complexity: medium
+    risk: medium
+    entry_point: "ActionExecutor.HandleVerify()"
+    steps: [op-ae-006-01, op-ae-006-02]
+    last_modified: 2026-02-27
+
+  - id: op-ae-007
+    name: handle-call-operation
+    module: ActionExecutor
+    description: 处理 call_operation 指令（递归）
+    complexity: high
+    risk: medium
+    entry_point: "ActionExecutor.HandleCallOperation()"
+    steps: [op-ae-007-01]
+    last_modified: 2026-02-27
+
+  # === PersonaCreate 操作 ===
+  - id: op-pc-001
+    name: generate-persona
+    module: PersonaCreate
+    description: 调用 AI 生成画像
+    complexity: medium
+    risk: medium
+    entry_point: "PersonaCreate.Generate()"
+    steps: [op-pc-001-01, op-pc-001-02, op-pc-001-03]
+    last_modified: 2026-02-27
+
+  - id: op-pc-002
+    name: validate-persona-json
+    module: PersonaCreate
+    description: 验证画像 JSON 完整性
+    complexity: low
+    risk: low
+    entry_point: "PersonaCreate.Validate()"
+    steps: [op-pc-002-01]
+    last_modified: 2026-02-27
+
+  # === DailyUpdate 操作 ===
+  - id: op-du-001
+    name: update-age
+    module: DailyUpdate
+    description: 更新年龄
+    complexity: low
+    risk: low
+    entry_point: "DailyUpdate.UpdateAge()"
+    steps: [op-du-001-01]
+    last_modified: 2026-02-27
+
+  - id: op-du-002
+    name: update-pregnancy-weeks
+    module: DailyUpdate
+    description: 更新孕周
+    complexity: low
+    risk: low
+    entry_point: "DailyUpdate.UpdatePregnancyWeeks()"
+    steps: [op-du-002-01]
+    last_modified: 2026-02-27
+
+  - id: op-du-003
+    name: detect-stage-transition
+    module: DailyUpdate
+    description: 检测阶段切换
+    complexity: medium
+    risk: low
+    entry_point: "DailyUpdate.DetectStage()"
+    steps: [op-du-003-01]
+    last_modified: 2026-02-27
+
+  # === WeeklyEvolve 操作 ===
+  - id: op-we-001
+    name: analyze-behavior
+    module: WeeklyEvolve
+    description: 分析 7 天行为数据
+    complexity: medium
+    risk: low
+    entry_point: "WeeklyEvolve.Analyze()"
+    steps: [op-we-001-01, op-we-001-02]
+    last_modified: 2026-02-27
+
+  - id: op-we-002
+    name: adjust-persona
+    module: WeeklyEvolve
+    description: 调整画像参数
+    complexity: medium
+    risk: medium
+    entry_point: "WeeklyEvolve.Adjust()"
+    steps: [op-we-002-01]
+    last_modified: 2026-02-27
+
+  # === AIService 操作 ===
+  - id: op-ai-001
+    name: call-gemini
+    module: AIService
+    description: 调用 Gemini API
+    complexity: medium
+    risk: medium
+    entry_point: "AIService.CallGemini()"
+    steps: [op-ai-001-01, op-ai-001-02]
+    last_modified: 2026-02-27
+
+  - id: op-ai-002
+    name: fallback-claude
+    module: AIService
+    description: 回退到 Claude API
+    complexity: medium
+    risk: medium
+    entry_point: "AIService.FallbackClaude()"
+    steps: [op-ai-002-01]
+    last_modified: 2026-02-27
+
+  - id: op-ai-003
+    name: fallback-gpt
+    module: AIService
+    description: 回退到 GPT API
+    complexity: medium
+    risk: medium
+    entry_point: "AIService.FallbackGPT()"
+    steps: [op-ai-003-01]
+    last_modified: 2026-02-27
+
+  # === 平台模块操作 ===
+  - id: op-pf-001
+    name: platform-initialize
+    module: PlatformModule
+    description: 平台初始化
+    complexity: low
+    risk: low
+    entry_point: "IPlatform.Initialize()"
+    steps: [op-pf-001-01]
+    last_modified: 2026-02-27
+
+  - id: op-pf-002
+    name: platform-browse
+    module: PlatformModule
+    description: 浏览内容
+    complexity: medium
+    risk: medium
+    entry_point: "IPlatform.Browse()"
+    steps: [op-pf-002-01, op-pf-002-02]
+    last_modified: 2026-02-27
+
+  - id: op-pf-003
+    name: platform-like
+    module: PlatformModule
+    description: 点赞内容
+    complexity: medium
+    risk: medium
+    entry_point: "IPlatform.Like()"
+    steps: [op-pf-003-01]
+    last_modified: 2026-02-27
+
+  - id: op-pf-004
+    name: platform-comment
+    module: PlatformModule
+    description: 评论内容
+    complexity: high
+    risk: high
+    entry_point: "IPlatform.Comment()"
+    steps: [op-pf-004-01, op-pf-004-02]
+    last_modified: 2026-02-27
+
+  - id: op-pf-005
+    name: platform-follow
+    module: PlatformModule
+    description: 关注用户
+    complexity: medium
+    risk: medium
+    entry_point: "IPlatform.Follow()"
+    steps: [op-pf-005-01]
+    last_modified: 2026-02-27
+
+  - id: op-pf-006
+    name: platform-share
+    module: PlatformModule
+    description: 分享内容
+    complexity: medium
+    risk: medium
+    entry_point: "IPlatform.Share()"
+    steps: [op-pf-006-01]
+    last_modified: 2026-02-27
+
+# 操作统计
+statistics:
+  total_operations: 52
+  by_module:
+    SessionRunner: 8
+    RuleEngine: 6
+    JsonHelper: 4
+    IntentTranslator: 4
+    MemoryManager: 5
+    ActionExecutor: 7
+    PersonaCreate: 2
+    DailyUpdate: 3
+    WeeklyEvolve: 2
+    AIService: 3
+    PlatformModule: 6
+    其他: 2
+  by_complexity:
+    high: 9
+    medium: 27
+    low: 15
+  by_risk:
+    high: 6
+    medium: 19
+    low: 26
+
+# 操作模板
+templates:
+  new_operation:
+    id_format: "op-{module_short}-{number:03d}"
+    required_fields:
+      - name
+      - module
+      - description
+      - entry_point
+    optional_fields:
+      - complexity
+      - risk
+      - steps
+      - last_modified
+
+# 成功标准
+success_criteria:
+  - 操作编译通过
+  - 操作逻辑正确
+  - 错误处理完整
+  - 不影响其他操作
+
+# 依赖关系
+dependencies:
+  parent_level: l2-module
+  child_levels: [l4-step]

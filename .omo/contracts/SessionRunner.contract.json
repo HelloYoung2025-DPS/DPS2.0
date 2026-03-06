@@ -2,7 +2,7 @@
   "module": "SessionRunner",
   "version": "1.0.0",
   "file": "Modules/SessionRunner.cs",
-  "updated_at": "2026-02-23",
+  "updated_at": "2026-03-03",
   "contract_format": "1.0",
   "callable": [
     {
@@ -319,6 +319,43 @@
       ]
     }
   ],
+  "method_dependencies": {
+    "LoadUserStrategy": {
+      "calls": [
+        "CoreHelper.ReadFile",
+        "CoreHelper.Log",
+        "CoreHelper.LogErr",
+        "CoreHelper.SetVar",
+        "JsonHelper.ExtractObject",
+        "JsonHelper.GetDouble",
+        "JsonHelper.Get"
+      ],
+      "error_handling": "try-catch with fallback to default values",
+      "added_in": "v4.5.9"
+    },
+    "LoadIntentMapping": {
+      "calls": [
+        "CoreHelper.ReadFile",
+        "CoreHelper.Log",
+        "CoreHelper.LogErr",
+        "CoreHelper.LogWarn",
+        "CoreHelper.SetVar"
+      ],
+      "error_handling": "try-catch with fallback to empty mapping",
+      "added_in": "v4.5.9"
+    },
+    "BuildAndSetPostJsonFromContext": {
+      "calls": [
+        "ActionExecutor.GetContext",
+        "CoreHelper.SetVar",
+        "JsonHelper.Escape",
+        "CoreHelper.NormalizeCountForPostJson",
+        "CoreHelper.FirstNonEmpty"
+      ],
+      "error_handling": "null checks with fallback to empty string",
+      "added_in": "v4.5.9"
+    }
+  },
   "depends_on": [
     "ActionExecutor",
     "CoreHelper",

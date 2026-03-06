@@ -1,0 +1,96 @@
+{
+  "module": "UILocator",
+  "version": "1.0.0",
+  "file": "Core/UILocator.cs",
+  "updated_at": "2026-02-23",
+  "contract_format": "1.0",
+  "callable": [
+    {
+      "name": "IsElementClickable",
+      "params": [
+        {
+          "name": "nodeStr",
+          "type": "string"
+        }
+      ],
+      "returns": "bool",
+      "description": "",
+      "kind": "lambda"
+    },
+    {
+      "name": "ExtractAttribute",
+      "params": [
+        {
+          "name": "nodeStr",
+          "type": "string"
+        },
+        {
+          "name": "attrName",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": "",
+      "kind": "lambda"
+    },
+    {
+      "name": "FindElement",
+      "params": [
+        {
+          "name": "xml",
+          "type": "string"
+        },
+        {
+          "name": "identifier",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": "",
+      "kind": "lambda"
+    },
+    {
+      "name": "FindChildBoundsInParent",
+      "params": [
+        {
+          "name": "xml",
+          "type": "string"
+        },
+        {
+          "name": "parentIndex",
+          "type": "int"
+        },
+        {
+          "name": "parentResourceId",
+          "type": "string"
+        },
+        {
+          "name": "childResourceId",
+          "type": "string"
+        }
+      ],
+      "returns": "string",
+      "description": "",
+      "kind": "lambda"
+    }
+  ],
+  "shared_state": {
+    "reads": [],
+    "writes": []
+  },
+  "types_defined": [],
+  "depends_on": [
+    "DroidInstance",
+    "Hierarchy",
+    "Item1",
+    "Item2"
+  ],
+  "depended_by": [
+    "SessionRunner"
+  ],
+  "side_effects": [
+    "DroidInstance device operation",
+    "ZD variable write"
+  ],
+  "stability": "stable"
+}

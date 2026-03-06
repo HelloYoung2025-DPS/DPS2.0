@@ -1,0 +1,81 @@
+{
+  "module": "Initializer",
+  "version": "1.0.0",
+  "file": "Modules/Initializer.cs",
+  "updated_at": "2026-02-23",
+  "contract_format": "1.0",
+  "callable": [
+    {
+      "name": "Run",
+      "params": [
+        {
+          "name": "projectObj",
+          "type": "object"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    }
+  ],
+  "shared_state": {
+    "reads": [
+      {
+        "name": "project_root",
+        "type": "ZD variable",
+        "description": ""
+      }
+    ],
+    "writes": [
+      {
+        "name": "initializer_result",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "_init_status",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "_config_ok",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "_config_missing",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "_module_ok",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "_module_missing",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "last_error",
+        "type": "ZD变量",
+        "description": ""
+      }
+    ]
+  },
+  "types_defined": [],
+  "depends_on": [
+    "CoreHelper"
+  ],
+  "depended_by": [
+    "Main"
+  ],
+  "side_effects": [
+    "AI API call",
+    "ZD variable write",
+    "directory create",
+    "file read",
+    "logging"
+  ],
+  "stability": "stable"
+}

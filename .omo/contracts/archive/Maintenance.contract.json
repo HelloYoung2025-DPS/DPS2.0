@@ -1,0 +1,58 @@
+{
+  "module": "Maintenance",
+  "version": "1.0.0",
+  "file": "Modules/Maintenance.cs",
+  "updated_at": "2026-02-23",
+  "contract_format": "1.0",
+  "callable": [
+    {
+      "name": "Run",
+      "params": [
+        {
+          "name": "projectObj",
+          "type": "object"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    }
+  ],
+  "shared_state": {
+    "reads": [
+      {
+        "name": "project_root",
+        "type": "ZD variable",
+        "description": ""
+      },
+      {
+        "name": "device_id",
+        "type": "ZD variable",
+        "description": ""
+      }
+    ],
+    "writes": [
+      {
+        "name": "last_error",
+        "type": "ZD变量",
+        "description": ""
+      }
+    ]
+  },
+  "types_defined": [],
+  "depends_on": [
+    "CoreHelper",
+    "DriveInfo",
+    "FileInfo",
+    "JsonHelper",
+    "Now"
+  ],
+  "depended_by": [
+    "Main"
+  ],
+  "side_effects": [
+    "ZD variable write",
+    "file read",
+    "logging"
+  ],
+  "stability": "stable"
+}

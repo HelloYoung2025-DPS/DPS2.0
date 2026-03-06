@@ -1,0 +1,152 @@
+{
+  "module": "ErrorRecovery",
+  "version": "1.0.0",
+  "file": "Core/ErrorRecovery.cs",
+  "updated_at": "2026-02-23",
+  "contract_format": "1.0",
+  "callable": [
+    {
+      "name": "IsRecoverable",
+      "params": [
+        {
+          "name": "ex",
+          "type": "System.Exception"
+        }
+      ],
+      "returns": "bool",
+      "description": "",
+      "kind": "lambda"
+    },
+    {
+      "name": "TryWithRetry",
+      "params": [
+        {
+          "name": "action",
+          "type": "System.Action"
+        },
+        {
+          "name": "maxRetries",
+          "type": "int"
+        },
+        {
+          "name": "delayMs",
+          "type": "int"
+        }
+      ],
+      "returns": "bool",
+      "description": "",
+      "kind": "lambda"
+    },
+    {
+      "name": "RecoverFromError",
+      "params": [
+        {
+          "name": "errorType",
+          "type": "string"
+        },
+        {
+          "name": "recoveryAction",
+          "type": "System.Action"
+        }
+      ],
+      "returns": "bool",
+      "description": "",
+      "kind": "lambda"
+    },
+    {
+      "name": "LogError",
+      "params": [
+        {
+          "name": "errorType",
+          "type": "string"
+        },
+        {
+          "name": "errorMessage",
+          "type": "string"
+        }
+      ],
+      "returns": "void",
+      "description": "",
+      "kind": "lambda"
+    },
+    {
+      "name": "IsErrorThresholdExceeded",
+      "params": [
+        {
+          "name": "errorType",
+          "type": "string"
+        },
+        {
+          "name": "threshold",
+          "type": "int"
+        }
+      ],
+      "returns": "bool",
+      "description": "",
+      "kind": "lambda"
+    },
+    {
+      "name": "ResetErrorCounters",
+      "params": [],
+      "returns": "void",
+      "description": "",
+      "kind": "lambda"
+    }
+  ],
+  "shared_state": {
+    "reads": [],
+    "writes": [
+      {
+        "name": "last_error_type",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "last_error_message",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "last_error_time",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "error_count_app_crash",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "error_count_ui_not_found",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "error_count_network_error",
+        "type": "ZD变量",
+        "description": ""
+      },
+      {
+        "name": "error_count_timeout",
+        "type": "ZD变量",
+        "description": ""
+      }
+    ]
+  },
+  "types_defined": [],
+  "depends_on": [
+    "App",
+    "Hierarchy",
+    "Input",
+    "Now"
+  ],
+  "depended_by": [
+    "SessionRunner"
+  ],
+  "side_effects": [
+    "DroidInstance device operation",
+    "Thread.Sleep",
+    "ZD variable write"
+  ],
+  "stability": "stable"
+}

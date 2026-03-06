@@ -1,0 +1,530 @@
+# L2: 模块层定义
+# DPS v4.5 独立功能模块层级
+
+level:
+  id: l2
+  name: 模块层
+  priority: 2
+  description: 独立的功能模块，可以单独开发、测试、优化
+
+scope:
+  type: module
+  includes:
+    - 单个模块的完整重构
+    - 新模块开发
+    - 模块级性能优化
+    - 模块接口变更
+
+# 模块清单
+modules:
+  # === 核心工具模块 ===
+  - id: m-core-001
+    name: JsonHelper
+    file: Modules/Core/JsonHelper.cs
+    lines: 993
+    methods: 23
+    status: stable
+    complexity: high
+    risk: high
+    description: 纯字符串 JSON 解析器，栈式解析，零依赖
+    depends_on: []
+    used_by:
+      - SessionRunner
+      - RuleEngine
+      - MemoryManager
+      - StateSaver
+      - AIService
+      - ActionExecutor
+    contract_file: .omo/contracts/JsonHelper.contract.json
+    last_modified: 2026-02-27
+
+  - id: m-core-002
+    name: CoreHelper
+    file: Modules/Core/CoreHelper.cs
+    lines: 470
+    status: stable
+    complexity: low
+    risk: low
+    description: 日志/变量/文件/时间/ZD API 封装工具
+    depends_on: []
+    used_by: [几乎所有模块]
+    contract_file: .omo/contracts/CoreHelper.contract.json
+    last_modified: 2026-02-27
+
+  - id: m-core-003
+    name: FileHelper
+    file: Modules/Core/FileHelper.cs
+    lines: ~300
+    status: stable
+    complexity: low
+    risk: low
+    description: 文件操作工具：原子写入、目录管理
+    depends_on: []
+    used_by: [MemoryManager, StateSaver, DailyUpdate]
+    last_modified: 2026-02-27
+
+  - id: m-core-004
+    name: AIService
+    file: Modules/Core/AIService.cs
+    lines: ~400
+    status: stable
+    complexity: medium
+    risk: medium
+    description: AI API 调用，3 级 fallback (Gemini→Claude→GPT)
+    depends_on: [CoreHelper, JsonHelper]
+    used_by: [PersonaCreate, WeeklyEvolve, RuleEngine]
+    last_modified: 2026-02-27
+
+  - id: m-core-005
+    name: ActionExecutor
+    file: Modules/Core/ActionExecutor.cs
+    lines: 1401
+    status: stable
+    complexity: high
+    risk: high
+    description: 统一操作执行器，JSON 步骤驱动，12 种指令
+    depends_on: [CoreHelper, JsonHelper, SelectorEngine]
+    used_by: [SessionRunner, PlatformModule]
+    contract_file: .omo/contracts/ActionExecutor.contract.json
+    last_modified: 2026-02-27
+
+  - id: m-core-006
+    name: SelectorEngine
+    file: Modules/Core/SelectorEngine.cs
+    lines: ~300
+    status: stable
+    complexity: medium
+    risk: medium
+    description: UI 选择器引擎，解析嵌套 ui_selectors
+    depends_on: [JsonHelper]
+    used_by: [ActionExecutor, IntentTranslator]
+    last_modified: 2026-02-27
+
+  - id: m-core-007
+    name: PageDetector
+    file: Modules/Core/PageDetector.cs
+    lines: ~250
+    status: stable
+    complexity: medium
+    risk: low
+    description: 页面状态检测，基于 page_signatures 识别
+    depends_on: [JsonHelper]
+    used_by: [SessionRunner, ActionExecutor]
+    last_modified: 2026-02-27
+
+  - id: m-core-008
+    name: RateLimiter
+    file: Modules/Core/RateLimiter.cs
+    lines: ~200
+    status: stable
+    complexity: low
+    risk: low
+    description: 速率限制：per_hour/cooldown/per_day 控制
+    depends_on: [CoreHelper]
+    used_by: [SessionRunner, PlatformModule]
+    last_modified: 2026-02-27
+
+  - id: m-core-009
+    name: ExtensionManager
+    file: Modules/Core/ExtensionManager.cs
+    lines: ~200
+    status: stable
+    complexity: low
+    risk: low
+    description: 扩展管理器，动态加载扩展
+    depends_on: [CoreHelper]
+    used_by: [Extension]
+    last_modified: 2026-02-27
+
+  # === Intent 系统模块 (v4.5.6+) ===
+  - id: m-intent-001
+    name: Intent
+    file: Modules/Core/Intent.cs
+    lines: 168
+    status: stable
+    complexity: medium
+    risk: low
+    description: 高层操作意图抽象类
+    depends_on: []
+    used_by: [IntentTranslator, PlatformModule]
+    last_modified: 2026-02-27
+
+  - id: m-intent-002
+    name: ZDCommand
+    file: Modules/Core/ZDCommand.cs
+    lines: 333
+    status: stable
+    complexity: medium
+    risk: low
+    description: ZennoDroid 物理命令类
+    depends_on: []
+    used_by: [ZennoDroidAdapter, IntentTranslator]
+    last_modified: 2026-02-27
+
+  - id: m-intent-003
+    name: ZDResult
+    file: Modules/Core/ZDResult.cs
+    lines: 311
+    status: stable
+    complexity: low
+    risk: low
+    description: 统一执行结果类
+    depends_on: []
+    used_by: [所有执行模块]
+    last_modified: 2026-02-27
+
+  - id: m-intent-004
+    name: ZennoDroidAdapter
+    file: Modules/Core/ZennoDroidAdapter.cs
+    lines: 408
+    status: stable
+    complexity: high
+    risk: medium
+    description: ZennoDroid API 适配器
+    depends_on: [ZDCommand, ZDResult]
+    used_by: [IntentTranslator]
+    last_modified: 2026-02-27
+
+  - id: m-intent-005
+    name: IntentTranslator
+    file: Modules/Core/IntentTranslator.cs
+    lines: 472
+    status: stable
+    complexity: high
+    risk: high
+    description: 意图翻译器，解析选择器、计算坐标、处理回退链
+    depends_on: [Intent, ZDCommand, ZDResult, ZennoDroidAdapter, SelectorEngine]
+    used_by: [ActionExecutor, PlatformModule]
+    last_modified: 2026-02-27
+
+  # === 业务逻辑模块 ===
+  - id: m-biz-001
+    name: SessionRunner
+    file: Modules/SessionRunner.cs
+    lines: 1492
+    status: stable
+    complexity: high
+    risk: high
+    description: 核心会话执行引擎，加权随机动作，疲劳模型，会话门控
+    depends_on: [CoreHelper, JsonHelper, ActionExecutor, RuleEngine, MemoryManager, PageDetector, HumanizationEngine]
+    used_by: [Main]
+    contract_file: .omo/contracts/SessionRunner.contract.json
+    last_modified: 2026-02-27
+
+  - id: m-biz-002
+    name: RuleEngine
+    file: Modules/RuleEngine.cs
+    lines: 663
+    status: stable
+    complexity: high
+    risk: medium
+    description: 规则引擎，帖子评估门控，动作决策
+    depends_on: [CoreHelper, JsonHelper]
+    used_by: [SessionRunner]
+    last_modified: 2026-02-27
+
+  - id: m-biz-003
+    name: MemoryManager
+    file: Modules/MemoryManager.cs
+    lines: 782
+    methods: 24
+    status: stable
+    complexity: high
+    risk: medium
+    description: 交互记忆管理，去重/查询/清理，文件锁
+    depends_on: [CoreHelper, JsonHelper, FileHelper]
+    used_by: [SessionRunner, WeeklyEvolve]
+    last_modified: 2026-02-27
+
+  - id: m-biz-004
+    name: PersonaCreate
+    file: Modules/PersonaCreate.cs
+    lines: 142
+    status: stable
+    complexity: medium
+    risk: low
+    description: AI 画像生成，JSON 解析验证
+    depends_on: [CoreHelper, AIService, JsonHelper]
+    used_by: [Main]
+    last_modified: 2026-02-27
+
+  - id: m-biz-005
+    name: DailyUpdate
+    file: Modules/DailyUpdate.cs
+    lines: 219
+    status: stable
+    complexity: low
+    risk: low
+    description: 每日更新年龄/孕周/季节/阶段码
+    depends_on: [CoreHelper, JsonHelper, FileHelper]
+    used_by: [Main]
+    last_modified: 2026-02-27
+
+  - id: m-biz-006
+    name: WeeklyEvolve
+    file: Modules/WeeklyEvolve.cs
+    lines: ~400
+    status: stable
+    complexity: medium
+    risk: medium
+    description: 每周 AI 进化，分析 7 天行为调整画像
+    depends_on: [CoreHelper, AIService, JsonHelper, FileHelper, MemoryManager]
+    used_by: [Main]
+    last_modified: 2026-02-27
+
+  - id: m-biz-007
+    name: StateSaver
+    file: Modules/StateSaver.cs
+    lines: ~200
+    status: stable
+    complexity: low
+    risk: low
+    description: 状态持久化
+    depends_on: [CoreHelper, JsonHelper, FileHelper]
+    used_by: [Main]
+    last_modified: 2026-02-27
+
+  - id: m-biz-008
+    name: ReportGen
+    file: Modules/ReportGen.cs
+    lines: ~300
+    status: stable
+    complexity: low
+    risk: low
+    description: 报告生成，17:00 后触发
+    depends_on: [CoreHelper, JsonHelper, FileHelper, MemoryManager]
+    used_by: [Main]
+    last_modified: 2026-02-27
+
+  - id: m-biz-009
+    name: Maintenance
+    file: Modules/Maintenance.cs
+    lines: ~250
+    status: stable
+    complexity: low
+    risk: low
+    description: 维护任务，清理日志/过期数据
+    depends_on: [CoreHelper, FileHelper, MemoryManager]
+    used_by: [Main]
+    last_modified: 2026-02-27
+
+  - id: m-biz-010
+    name: Main
+    file: Modules/Main.cs
+    lines: 307
+    status: stable
+    complexity: medium
+    risk: low
+    description: 主入口，检查画像状态，分发流程
+    depends_on: [CoreHelper, JsonHelper, PersonaCreate, DailyUpdate, SessionRunner, StateSaver, ReportGen, Maintenance, Extension]
+    used_by: [ZD Entry Point]
+    last_modified: 2026-02-27
+
+  - id: m-biz-011
+    name: Initializer
+    file: Modules/Initializer.cs
+    lines: 211
+    status: stable
+    complexity: low
+    risk: low
+    description: 初始化，创建目录结构，验证配置
+    depends_on: [CoreHelper, JsonHelper, FileHelper]
+    used_by: [Main]
+    last_modified: 2026-02-27
+
+  - id: m-biz-012
+    name: UIHelper
+    file: Modules/UIHelper.cs
+    lines: ~350
+    status: stable
+    complexity: medium
+    risk: low
+    description: UI 辅助，Android XML 解析，bounds 提取
+    depends_on: [CoreHelper]
+    used_by: [PlatformModule]
+    last_modified: 2026-02-27
+
+  - id: m-biz-013
+    name: Extension
+    file: Modules/Extension.cs
+    lines: ~150
+    status: stable
+    complexity: low
+    risk: low
+    description: 扩展入口，IPLocation、Weather 等
+    depends_on: [CoreHelper, ExtensionManager]
+    used_by: [Main]
+    last_modified: 2026-02-27
+
+  # === 平台模块 ===
+  - id: m-platform-001
+    name: RedditModule
+    file: Platforms/Reddit/RedditModule.cs
+    lines: 603
+    status: stable
+    complexity: medium
+    risk: medium
+    description: Reddit 平台实现
+    operations: 6
+    operations_list: [Initialize, Browse, Like, Comment, Follow, Share]
+    depends_on: [ActionExecutor, IntentTranslator]
+    used_by: [SessionRunner]
+    last_modified: 2026-02-27
+
+  - id: m-platform-002
+    name: InstagramModule
+    file: Platforms/Instagram/InstagramModule.cs
+    lines: ~600
+    status: stable
+    complexity: medium
+    risk: medium
+    description: Instagram 平台实现
+    operations: 6
+    operations_list: [Initialize, Browse, Like, Comment, Follow, Share]
+    depends_on: [ActionExecutor, IntentTranslator]
+    used_by: [SessionRunner]
+    last_modified: 2026-02-27
+
+  - id: m-platform-003
+    name: BabyCenterModule
+    file: Platforms/BabyCenter/BabyCenterModule.cs
+    lines: ~500
+    status: stable
+    complexity: medium
+    risk: medium
+    description: BabyCenter 平台实现 (v4.5.7 新增)
+    operations: 6
+    operations_list: [Initialize, Browse, Like, Comment, Follow, Share]
+    depends_on: [ActionExecutor, IntentTranslator]
+    used_by: [SessionRunner]
+    last_modified: 2026-02-27
+
+  # === ZD 脚本层引擎模块 ===
+  - id: m-zd-001
+    name: ScriptHelpers
+    file: Core/ScriptHelpers.cs
+    lines: ~400
+    status: stable
+    complexity: low
+    risk: low
+    description: ZD 公共函数库：GetVar/SetVar/Humanization
+    depends_on: []
+    used_by: [所有 ZD 脚本]
+    last_modified: 2026-02-27
+
+  - id: m-zd-002
+    name: HumanizationEngine
+    file: Core/HumanizationEngine.cs
+    lines: ~300
+    status: stable
+    complexity: medium
+    risk: low
+    description: 人性化行为引擎，4 种配置
+    depends_on: []
+    used_by: [SessionRunner, ActionExecutor]
+    last_modified: 2026-02-27
+
+  - id: m-zd-003
+    name: UILocator
+    file: Core/UILocator.cs
+    lines: ~350
+    status: stable
+    complexity: medium
+    risk: low
+    description: 多策略 UI 元素定位：resource-id/text/class
+    depends_on: []
+    used_by: [ActionExecutor, IntentTranslator]
+    last_modified: 2026-02-27
+
+  - id: m-zd-004
+    name: ErrorRecovery
+    file: Core/ErrorRecovery.cs
+    lines: ~300
+    status: stable
+    complexity: medium
+    risk: low
+    description: 错误恢复，指数退避重试
+    depends_on: []
+    used_by: [ActionExecutor, SessionRunner]
+    last_modified: 2026-02-27
+
+  - id: m-zd-005
+    name: PlatformBase
+    file: Core/PlatformBase.cs
+    lines: 182
+    status: stable
+    complexity: low
+    risk: low
+    description: 平台基类接口定义，6 种操作签名
+    depends_on: []
+    used_by: [所有 PlatformModule]
+    last_modified: 2026-02-27
+
+  # === ZD 项目入口模块 ===
+  - id: m-zd-006
+    name: ModuleLoader
+    file: ZDProjects/ModuleLoader.cs
+    lines: 273
+    status: stable
+    complexity: medium
+    risk: medium
+    description: 通用模块加载器，动态编译，LRU 缓存（32 条目）
+    depends_on: []
+    used_by: [所有模块]
+    last_modified: 2026-02-27
+
+# 模块操作
+operations:
+  - id: op-l2-001
+    name: 模块重构
+    template: "重构模块 {module_name}"
+    complexity: varies
+    risk: varies
+
+  - id: op-l2-002
+    name: 新模块开发
+    template: "开发新模块 {module_name}"
+    complexity: varies
+    risk: varies
+
+  - id: op-l2-003
+    name: 接入新平台
+    template: "接入 {platform_name} 平台"
+    complexity: medium
+    risk: medium
+    estimated_hours: 16
+
+# 模块分类统计
+statistics:
+  total_modules: 32
+  by_category:
+    core_tools: 9
+    intent_system: 5
+    business_logic: 13
+    platform: 3
+    zd_engine: 5
+    zd_entry: 1
+  by_status:
+    stable: 32
+    experimental: 0
+    deprecated: 0
+  by_complexity:
+    high: 8
+    medium: 13
+    low: 11
+  by_risk:
+    high: 5
+    medium: 13
+    low: 14
+
+# 成功标准
+success_criteria:
+  - 模块编译通过
+  - 单元测试通过
+  - 不影响其他模块
+  - 合约更新完成
+
+# 依赖关系
+dependencies:
+  parent_level: l1-project
+  child_levels: [l3-operation]

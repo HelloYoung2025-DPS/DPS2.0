@@ -1,0 +1,56 @@
+{
+  "module": "UIHelper",
+  "version": "1.0.0",
+  "file": "Modules/UIHelper.cs",
+  "updated_at": "2026-02-23",
+  "contract_format": "1.0",
+  "callable": [
+    {
+      "name": "ParseBounds",
+      "params": [
+        {
+          "name": "boundsStr",
+          "type": "string"
+        }
+      ],
+      "returns": "int[]",
+      "description": ""
+    },
+    {
+      "name": "GetBounds",
+      "params": [
+        {
+          "name": "element",
+          "type": "System.Xml.Linq.XElement"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    },
+    {
+      "name": "GetResourceId",
+      "params": [
+        {
+          "name": "element",
+          "type": "System.Xml.Linq.XElement"
+        }
+      ],
+      "returns": "string",
+      "description": ""
+    }
+  ],
+  "shared_state": {
+    "reads": [],
+    "writes": []
+  },
+  "types_defined": [],
+  "depends_on": [
+    "Value",
+    "XDocument"
+  ],
+  "depended_by": [
+    "SessionRunner"
+  ],
+  "side_effects": [],
+  "stability": "stable"
+}
