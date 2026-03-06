@@ -25,7 +25,7 @@ Func<string, string, object[], object> RunModule = (filePath, methodName, args) 
     
     // 2. 加载 Modules/Core 所有依赖文件
     string coreDir = System.IO.Path.GetDirectoryName(filePath) + "\\Core\\";
-    string[] coreFiles = new string[] { "CoreHelper.cs", "JsonHelper.cs", "AIService.cs", "FileHelper.cs", "IExtension.cs", "ExtensionManager.cs", "SelectorEngine.cs", "PageDetector.cs", "ActionExecutor.cs" };
+    string[] coreFiles = new string[] { "JsonHelper.cs", "CoreHelper.cs", "FileHelper.cs", "IExtension.cs", "Intent.cs", "ZDCommand.cs", "ZDResult.cs", "OperationContext.cs", "ZennoDroidAdapter.cs", "IntentTranslator.cs", "SelectorEngine.cs", "PageDetector.cs", "AIService.cs", "ExtensionManager.cs", "ActionExecutor.cs", "VisionCorrector.cs", "RateLimiter.cs", "NavigationResolver.cs", "AppExplorer.cs", "ManifestLoader.cs" };
     foreach (string cf in coreFiles) {
         string cfPath = coreDir + cf;
         if (System.IO.File.Exists(cfPath)) {

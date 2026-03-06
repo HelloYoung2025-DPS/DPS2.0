@@ -45,7 +45,7 @@ Func<string, System.Collections.Generic.Dictionary<string, long>> GetFileTimesta
     
     // 添加 Modules/Core 依赖文件时间戳
     string coreDir = System.IO.Path.GetDirectoryName(filePath) + "\\Core\\";
-    string[] coreFiles = new string[] { "CoreHelper.cs", "JsonHelper.cs", "AIService.cs", "FileHelper.cs", "IExtension.cs", "ExtensionManager.cs", "SelectorEngine.cs", "PageDetector.cs", "ActionExecutor.cs" };
+    string[] coreFiles = new string[] { "CoreHelper.cs", "JsonHelper.cs", "AIService.cs", "FileHelper.cs", "IExtension.cs", "ExtensionManager.cs", "SelectorEngine.cs", "PageDetector.cs", "ActionExecutor.cs", "OperationContext.cs", "ManifestLoader.cs", "NavigationResolver.cs", "VisionCorrector.cs", "AppExplorer.cs", "RateLimiter.cs", "Intent.cs", "ZDCommand.cs", "ZDResult.cs", "ZennoDroidAdapter.cs", "IntentTranslator.cs" };
     foreach (string cf in coreFiles) {
         string cfPath = coreDir + cf;
         if (System.IO.File.Exists(cfPath)) {
@@ -179,7 +179,7 @@ Func<string, string, object[], object> RunModule = (filePath, methodName, args) 
     
     // 加载 Modules/Core 依赖文件
     string coreDir = System.IO.Path.GetDirectoryName(filePath) + "\\Core\\";
-    string[] coreFiles = new string[] { "CoreHelper.cs", "JsonHelper.cs", "AIService.cs", "FileHelper.cs", "IExtension.cs", "ExtensionManager.cs", "SelectorEngine.cs", "PageDetector.cs", "ActionExecutor.cs" };
+    string[] coreFiles = new string[] { "CoreHelper.cs", "JsonHelper.cs", "AIService.cs", "FileHelper.cs", "IExtension.cs", "ExtensionManager.cs", "SelectorEngine.cs", "PageDetector.cs", "ActionExecutor.cs", "OperationContext.cs", "ManifestLoader.cs", "NavigationResolver.cs", "VisionCorrector.cs", "AppExplorer.cs", "RateLimiter.cs", "Intent.cs", "ZDCommand.cs", "ZDResult.cs", "ZennoDroidAdapter.cs", "IntentTranslator.cs" };
     foreach (string cf in coreFiles) {
         string cfPath = coreDir + cf;
         if (System.IO.File.Exists(cfPath)) {
