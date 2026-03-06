@@ -42,6 +42,13 @@ public class Main
                 CoreHelper.SetVar("main_result", "ERROR");
                 return "ERROR: 变量未设置";
             }
+
+            if (!CoreHelper.ValidateDeviceId(deviceId))
+            {
+                CoreHelper.LogErr(TAG, "device_id 包含非法字符");
+                CoreHelper.SetVar("main_result", "ERROR");
+                return "ERROR: device_id 无效";
+            }
             
             projectRoot = CoreHelper.NormalizePath(projectRoot);
             
@@ -66,9 +73,11 @@ public class Main
             string stageConfigPath = projectRoot + "Config\\StageConfig.json";
             string behaviorConfigPath = projectRoot + "Config\\BehaviorConfig.json";
             
-            if (!File.Exists(aiConfigPath))
+            if (!File.Exists(aiConfigPath) || !File.Exists(stageConfigPath) || !File.Exists(behaviorConfigPath))
             {
-                CoreHelper.LogErr(TAG, "配置文件不存在: " + aiConfigPath);
+                if (!File.Exists(aiConfigPath)) CoreHelper.LogErr(TAG, "配置文件不存在: " + aiConfigPath);
+                if (!File.Exists(stageConfigPath)) CoreHelper.LogErr(TAG, "配置文件不存在: " + stageConfigPath);
+                if (!File.Exists(behaviorConfigPath)) CoreHelper.LogErr(TAG, "配置文件不存在: " + behaviorConfigPath);
                 CoreHelper.SetVar("main_result", "ERROR");
                 return "ERROR: 配置文件缺失";
             }
@@ -76,6 +85,12 @@ public class Main
             string aiConfigJson = CoreHelper.ReadFile(aiConfigPath);
             string stageConfigJson = CoreHelper.ReadFile(stageConfigPath);
             string behaviorConfigJson = CoreHelper.ReadFile(behaviorConfigPath);
+            if (string.IsNullOrEmpty(aiConfigJson) || string.IsNullOrEmpty(stageConfigJson) || string.IsNullOrEmpty(behaviorConfigJson))
+            {
+                CoreHelper.LogErr(TAG, "配置文件读取失败或为空");
+                CoreHelper.SetVar("main_result", "ERROR");
+                return "ERROR: 配置读取失败";
+            }
             
             CoreHelper.SetVar("ai_config_json", aiConfigJson);
             CoreHelper.SetVar("stage_config_json", stageConfigJson);
@@ -213,12 +228,19 @@ public class Main
         string personaPath = projectRoot + "Persons\\" + deviceId + ".json";
         if (File.Exists(personaPath))
         {
-            string backupPath = upgradeBackupDir + "\\persona_" + deviceId + ".json";
-            File.Copy(personaPath, backupPath, true);
-            File.Delete(personaPath);
-            backupCount++;
-            deleteCount++;
-            CoreHelper.Log(TAG, "[升级] 画像已备份并删除");
+            try
+            {
+                string backupPath = upgradeBackupDir + "\\persona_" + deviceId + ".json";
+                File.Copy(personaPath, backupPath, true);
+                File.Delete(personaPath);
+                backupCount++;
+                deleteCount++;
+                CoreHelper.Log(TAG, "[升级] 画像已备份并删除");
+            }
+            catch (Exception ex)
+            {
+                CoreHelper.LogWarn(TAG, "[升级] 画像备份/删除失败: " + ex.Message);
+            }
         }
         
         // 2. 备份并清空记忆目录
@@ -233,11 +255,18 @@ public class Main
                 
                 foreach (string file in memoryFiles)
                 {
-                    string fileName = Path.GetFileName(file);
-                    File.Copy(file, memoryBackupDir + "\\" + fileName, true);
-                    File.Delete(file);
-                    backupCount++;
-                    deleteCount++;
+                    try
+                    {
+                        string fileName = Path.GetFileName(file);
+                        File.Copy(file, memoryBackupDir + "\\" + fileName, true);
+                        File.Delete(file);
+                        backupCount++;
+                        deleteCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        CoreHelper.LogWarn(TAG, "[升级] 记忆文件处理失败: " + file + " - " + ex.Message);
+                    }
                 }
                 CoreHelper.Log(TAG, "[升级] 记忆文件已备份并删除: " + memoryFiles.Length + " 个");
             }
@@ -255,11 +284,18 @@ public class Main
                 
                 foreach (string file in reportFiles)
                 {
-                    string fileName = Path.GetFileName(file);
-                    File.Copy(file, reportsBackupDir + "\\" + fileName, true);
-                    File.Delete(file);
-                    backupCount++;
-                    deleteCount++;
+                    try
+                    {
+                        string fileName = Path.GetFileName(file);
+                        File.Copy(file, reportsBackupDir + "\\" + fileName, true);
+                        File.Delete(file);
+                        backupCount++;
+                        deleteCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        CoreHelper.LogWarn(TAG, "[升级] 报告文件处理失败: " + file + " - " + ex.Message);
+                    }
                 }
                 CoreHelper.Log(TAG, "[升级] 报告文件已备份并删除: " + reportFiles.Length + " 个");
             }

@@ -83,11 +83,18 @@ public class Maintenance
                 
                 foreach (string file in logFiles)
                 {
-                    FileInfo fileInfo = new FileInfo(file);
-                    if (fileInfo.LastWriteTime < cutoff)
+                    try
                     {
-                        File.Delete(file);
-                        cleanedFiles++;
+                        FileInfo fileInfo = new FileInfo(file);
+                        if (fileInfo.LastWriteTime < cutoff)
+                        {
+                            File.Delete(file);
+                            cleanedFiles++;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        CoreHelper.LogWarn(TAG, "清理日志失败: " + file + " - " + ex.Message);
                     }
                 }
             }
@@ -105,25 +112,32 @@ public class Maintenance
                     
                     foreach (string file in memoryFiles)
                     {
-                        string fileName = Path.GetFileNameWithoutExtension(file);
-                        DateTime fileDate;
-                        
-                        if (DateTime.TryParse(fileName, out fileDate))
+                        try
                         {
-                            if (fileDate < retentionCutoff)
+                            string fileName = Path.GetFileNameWithoutExtension(file);
+                            DateTime fileDate;
+                            
+                            if (DateTime.TryParse(fileName, out fileDate))
                             {
-                            string content = CoreHelper.ReadFile(file);
-                                int actionCount = CoreHelper.CountOccurrences(content, "\"action_type\"");
-                                
-                                // 追加到长期记忆
-                                string longTermFile = memoryDir + "\\_long_term.txt";
-                                string summary = fileName + ": " + actionCount + " actions\n";
-                                File.AppendAllText(longTermFile, summary, Encoding.UTF8);
-                                
-                                // 删除原文件
-                                File.Delete(file);
-                                compressedFiles++;
+                                if (fileDate < retentionCutoff)
+                                {
+                                    string content = CoreHelper.ReadFile(file);
+                                    int actionCount = CoreHelper.CountOccurrences(content, "\"action_type\"");
+                                    
+                                    // 追加到长期记忆
+                                    string longTermFile = memoryDir + "\\_long_term.txt";
+                                    string summary = fileName + ": " + actionCount + " actions\n";
+                                    File.AppendAllText(longTermFile, summary, Encoding.UTF8);
+                                    
+                                    // 删除原文件
+                                    File.Delete(file);
+                                    compressedFiles++;
+                                }
                             }
+                        }
+                        catch (Exception ex)
+                        {
+                            CoreHelper.LogWarn(TAG, "压缩记忆失败: " + file + " - " + ex.Message);
                         }
                     }
                 }
@@ -140,11 +154,18 @@ public class Maintenance
                     
                     foreach (string file in backupFiles)
                     {
-                        FileInfo fileInfo = new FileInfo(file);
-                        if (fileInfo.LastWriteTime < backupCutoff)
+                        try
                         {
-                            File.Delete(file);
-                            deletedBackups++;
+                            FileInfo fileInfo = new FileInfo(file);
+                            if (fileInfo.LastWriteTime < backupCutoff)
+                            {
+                                File.Delete(file);
+                                deletedBackups++;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            CoreHelper.LogWarn(TAG, "清理备份失败: " + file + " - " + ex.Message);
                         }
                     }
                     
@@ -182,7 +203,12 @@ public class Maintenance
             // 5. 检查磁盘空间
             try
             {
-                DriveInfo driveInfo = new DriveInfo(projectRoot.Substring(0, 1));
+                string driveName = Path.GetPathRoot(projectRoot);
+                if (string.IsNullOrEmpty(driveName))
+                {
+                    driveName = projectRoot.Substring(0, 1);
+                }
+                DriveInfo driveInfo = new DriveInfo(driveName);
                 long freeGB = driveInfo.AvailableFreeSpace / (1024 * 1024 * 1024);
                 
                 if (freeGB < 1)
@@ -194,7 +220,10 @@ public class Maintenance
                     CoreHelper.Log(TAG, "磁盘空间: " + freeGB + " GB 可用");
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                CoreHelper.LogWarn(TAG, "磁盘空间检查失败: " + ex.Message);
+            }
             
             CoreHelper.Log(TAG, "系统维护完成");
             

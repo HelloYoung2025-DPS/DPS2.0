@@ -397,45 +397,12 @@ public class SessionRunner
                 {
                     bool visionEnabled = JsonHelper.Get(behaviorConfigJson, "vision_verification_enabled") == "true";
                     if (visionEnabled)
+                    {
                         // v4.5.3 优化：仅在报错时触发视觉验证
-                        if (actionResult.StartsWith("ERROR"))
-                        {
-                            CoreHelper.LogWarn(TAG, "检测到操作报错，尝试视觉验证恢复...");
-                            
-                            // 构造验证上下文
-                            string verifyIntent = string.Format("在页面 {0} 执行 {1} ({2})", _currentPage, selectedAction, effectiveIntent);
-                            
-                            // 从环境变量或结果中获取截图（ZennoDroidAdapter 在失败时已自动截图）
-                            string screenshotPath = CoreHelper.GetVar("last_error_screenshot", "");
-                            
-                            // 注意：ActionExecutor.Execute 返回的是字符串，我们需要更深层的 ZDResult 信息
-                            // 但由于 SessionRunner 目前结构限制，我们通过 VisionCorrector.AnalyzeAndRecover 分析当前屏幕
-                            string visionResult = VisionCorrector.AnalyzeAndRecover(verifyIntent, "操作应该已生效");
-                            
-                            string onExpectedStr = JsonHelper.Get(visionResult, "on_expected_page");
-                            bool verified = (onExpectedStr == "true" || onExpectedStr == "True");
-                            
-                            if (verified)
-                            {
-                                CoreHelper.Log(TAG, "视觉验证成功：系统虽报错但操作实际已生效");
-                                actionResult = "SUCCESS"; // 修正结果
-                                CoreHelper.SetVar("vision_verified", "true");
-                            }
-                            else
-                            {
-                                string reason = JsonHelper.Get(visionResult, "reason");
-                                CoreHelper.LogWarn(TAG, "视觉验证失败，操作确实失败: " + reason);
-                                CoreHelper.SetVar("vision_verified", "false");
-                                CoreHelper.SetVar("vision_failure_reason", reason);
-                                // 保持 ERROR 状态
-                            }
-                        }
-                        else
-                        {
-                            // 正常成功，不执行验证，保持高性能
-                            CoreHelper.SetVar("vision_verified", "skipped_fast_mode");
-                        }
-
+                        // 注意：此处 actionResult == "SUCCESS"，所以视觉验证跳过（快速模式）
+                        // 未来可在操作结果可疑时（如 UI 变化不符合预期）启用验证
+                        CoreHelper.SetVar("vision_verified", "skipped_fast_mode");
+                    }
                 }
                 
                 // BUG-04 fix: SKIP 不算失败（页面不匹配等正常情况）
@@ -941,27 +908,33 @@ public class SessionRunner
             return;
         }
         
-        _userStrategyJson = CoreHelper.ReadFile(strategyPath);
-        
-        string balanceJson = JsonHelper.ExtractObject(_userStrategyJson, "decision_balance");
-        double successWeight = JsonHelper.GetDouble(balanceJson, "success_weight", 1.0);
-        double humanizationWeight = JsonHelper.GetDouble(balanceJson, "humanization_weight", 1.0);
-        
-        CoreHelper.SetVar("strategy_success_weight", successWeight.ToString("F2"));
-        CoreHelper.SetVar("strategy_humanization_weight", humanizationWeight.ToString("F2"));
-        
-        string aiControl = JsonHelper.ExtractObject(_userStrategyJson, "ai_control");
-        string directExecution = JsonHelper.Get(aiControl, "direct_execution");
-        string notifyHuman = JsonHelper.Get(aiControl, "notify_human");
-        
-        _aiDirectExecution = (directExecution != "false");
-        _notifyHumanOnAiControl = (notifyHuman == "true");
-        
-        CoreHelper.SetVar("ai_direct_execution", _aiDirectExecution ? "true" : "false");
-        CoreHelper.SetVar("ai_notify_human", _notifyHumanOnAiControl ? "true" : "false");
-        
-        CoreHelper.Log(TAG, string.Format("用户策略: success={0:F2}, humanization={1:F2}, ai_direct={2}, notify_human={3}",
-            successWeight, humanizationWeight, _aiDirectExecution, _notifyHumanOnAiControl));
+        try
+        {
+            _userStrategyJson = CoreHelper.ReadFile(strategyPath);
+            
+            string balanceJson = JsonHelper.ExtractObject(_userStrategyJson, "balance");
+            double successWeight = JsonHelper.GetDouble(balanceJson, "success_weight", 1.0);
+            double humanizationWeight = JsonHelper.GetDouble(balanceJson, "humanization_weight", 1.0);
+            CoreHelper.SetVar("strategy_success_weight", successWeight.ToString("F2"));
+            CoreHelper.SetVar("strategy_humanization_weight", humanizationWeight.ToString("F2"));
+            
+            string aiControl = JsonHelper.ExtractObject(_userStrategyJson, "ai_control");
+            string directExecution = JsonHelper.Get(aiControl, "direct_execution");
+            _aiDirectExecution = (directExecution != "false");
+            string notifyHuman = JsonHelper.Get(aiControl, "notify_human");
+            _notifyHumanOnAiControl = (notifyHuman == "true");
+            CoreHelper.SetVar("ai_direct_execution", _aiDirectExecution ? "true" : "false");
+            CoreHelper.SetVar("ai_notify_human", _notifyHumanOnAiControl ? "true" : "false");
+            
+            CoreHelper.Log(TAG, string.Format("用户策略: success={0:F2}, humanization={1:F2}, aiDirect={2}, notifyHuman={3}",
+                successWeight, humanizationWeight, _aiDirectExecution, _notifyHumanOnAiControl));
+        }
+        catch (Exception ex)
+        {
+            CoreHelper.LogErr(TAG, "加载用户策略失败: " + ex.Message);
+            CoreHelper.SetVar("strategy_success_weight", "1.0");
+            CoreHelper.SetVar("strategy_humanization_weight", "1.0");
+        }
     }
     
     /// <summary>
@@ -978,9 +951,17 @@ public class SessionRunner
             return;
         }
         
-        _intentMappingJson = CoreHelper.ReadFile(mappingPath);
-        CoreHelper.SetVar("intent_mapping_loaded", "true");
-        CoreHelper.Log(TAG, "已加载意图映射: " + platformName);
+        try
+        {
+            _intentMappingJson = CoreHelper.ReadFile(mappingPath);
+            CoreHelper.SetVar("intent_mapping_loaded", "true");
+            CoreHelper.Log(TAG, "已加载意图映射: " + platformName);
+        }
+        catch (Exception ex)
+        {
+            CoreHelper.LogErr(TAG, "加载意图映射失败: " + ex.Message);
+            _intentMappingJson = "";
+        }
     }
     
     /// <summary>
@@ -1002,9 +983,10 @@ public class SessionRunner
         }
         
         // 默认映射，兼容旧配置
+        // v4.5.9 修复: like 映射到 like_content（之前错误映射到 open_post）
         if (action == "browse") return "browse_feed";
         if (action == "read_post") return "read_post";
-        if (action == "like") return "open_post";
+        if (action == "like") return "like_content";
         if (action == "comment") return "reply_post";
         if (action == "post") return "reply_post";
         return "browse_feed";

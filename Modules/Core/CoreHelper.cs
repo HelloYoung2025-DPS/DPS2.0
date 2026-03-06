@@ -221,9 +221,21 @@ public class CoreHelper
     /// </summary>
     public static void EnsureDir(string dirPath)
     {
-        if (!Directory.Exists(dirPath))
+        if (string.IsNullOrEmpty(dirPath))
         {
-            Directory.CreateDirectory(dirPath);
+            return;
+        }
+        
+        try
+        {
+            if (!Directory.Exists(dirPath))
+            {
+                Directory.CreateDirectory(dirPath);
+            }
+        }
+        catch (Exception ex)
+        {
+            LogErr("CoreHelper", "EnsureDir 失败 [" + dirPath + "]: " + ex.Message);
         }
     }
     
@@ -232,11 +244,19 @@ public class CoreHelper
     /// </summary>
     public static string ReadFile(string path)
     {
-        if (!File.Exists(path))
+        try
         {
+            if (!File.Exists(path))
+            {
+                return "";
+            }
+            return File.ReadAllText(path, Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            LogErr("CoreHelper", "ReadFile 失败 [" + path + "]: " + ex.Message);
             return "";
         }
-        return File.ReadAllText(path, Encoding.UTF8);
     }
     
     /// <summary>
@@ -244,9 +264,16 @@ public class CoreHelper
     /// </summary>
     public static void WriteFile(string path, string content)
     {
-        string dir = Path.GetDirectoryName(path);
-        EnsureDir(dir);
-        File.WriteAllText(path, content, Encoding.UTF8);
+        try
+        {
+            string dir = Path.GetDirectoryName(path);
+            EnsureDir(dir);
+            File.WriteAllText(path, content, Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            LogErr("CoreHelper", "WriteFile 失败 [" + path + "]: " + ex.Message);
+        }
     }
     
     /// <summary>
@@ -254,9 +281,16 @@ public class CoreHelper
     /// </summary>
     public static void AppendFile(string path, string content)
     {
-        string dir = Path.GetDirectoryName(path);
-        EnsureDir(dir);
-        File.AppendAllText(path, content, Encoding.UTF8);
+        try
+        {
+            string dir = Path.GetDirectoryName(path);
+            EnsureDir(dir);
+            File.AppendAllText(path, content, Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            LogErr("CoreHelper", "AppendFile 失败 [" + path + "]: " + ex.Message);
+        }
     }
     
     /// <summary>
@@ -400,6 +434,72 @@ public class CoreHelper
             idx++;
         }
         return count;
+    }
+    
+    /// <summary>
+    /// 返回第一个非空字符串（按顺序兜底）
+    /// </summary>
+    public static string FirstNonEmpty(params string[] values)
+    {
+        if (values == null) return "";
+        for (int i = 0; i < values.Length; i++)
+        {
+            if (!string.IsNullOrEmpty(values[i]))
+            {
+                return values[i];
+            }
+        }
+        return "";
+    }
+    
+    /// <summary>
+    /// 将 "1.2k"/"3,421" 等数字文本标准化为 JSON 数字字符串
+    /// </summary>
+    public static string NormalizeCountForPostJson(string raw)
+    {
+        if (string.IsNullOrEmpty(raw))
+        {
+            return "";
+        }
+
+        string s = raw.Trim().ToLowerInvariant().Replace(",", "");
+        double multiplier = 1.0;
+        if (s.EndsWith("k"))
+        {
+            multiplier = 1000.0;
+            s = s.Substring(0, s.Length - 1);
+        }
+        else if (s.EndsWith("m"))
+        {
+            multiplier = 1000000.0;
+            s = s.Substring(0, s.Length - 1);
+        }
+
+        StringBuilder numeric = new StringBuilder();
+        for (int i = 0; i < s.Length; i++)
+        {
+            char c = s[i];
+            if ((c >= '0' && c <= '9') || c == '.')
+            {
+                numeric.Append(c);
+            }
+        }
+
+        if (numeric.Length == 0)
+        {
+            return "";
+        }
+
+        double val;
+        if (double.TryParse(numeric.ToString(), System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out val))
+        {
+            long n = (long)Math.Round(val * multiplier);
+            if (n < 0) n = 0;
+            return n.ToString();
+        }
+
+        return "";
     }
     
     /// <summary>

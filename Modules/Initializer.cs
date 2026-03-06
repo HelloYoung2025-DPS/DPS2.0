@@ -39,6 +39,23 @@ public class Initializer
             
             projectRoot = CoreHelper.NormalizePath(projectRoot);
             
+            // 初始化 VisionCorrector
+            try
+            {
+                string screenshotDir = projectRoot + "Screenshots\\";
+                string aiConfigPath = projectRoot + "Config\\AIConfig.json";
+                if (!Directory.Exists(screenshotDir))
+                {
+                    Directory.CreateDirectory(screenshotDir);
+                }
+                VisionCorrector.Init(projectObj, null, screenshotDir, aiConfigPath);
+                CoreHelper.Log(TAG, "[VisionCorrector] 初始化成功");
+            }
+            catch (Exception visionEx)
+            {
+                CoreHelper.LogWarn(TAG, "[VisionCorrector] 初始化失败: " + visionEx.Message);
+            }
+            
             CoreHelper.Log(TAG, "========================================");
 CoreHelper.Log(TAG, "  DPS v4.5 Persona - 初始化程序");
             CoreHelper.Log(TAG, "  版本: 4.5.0-Modular");

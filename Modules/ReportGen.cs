@@ -49,8 +49,8 @@ public class ReportGen
             if (currentHour < 17)
             {
                 CoreHelper.Log(TAG, "当前时间 " + currentHour + ":00，未到报告生成时间（17:00后）");
-                CoreHelper.SetVar("report_result", "SKIPPED");
-                return "SKIPPED: 未到报告生成时间";
+                CoreHelper.SetVar("report_result", "SKIP");
+                return "SKIP: 未到报告生成时间";
             }
             
             string reportDir = projectRoot + "Reports\\" + deviceId;
@@ -60,8 +60,8 @@ public class ReportGen
             if (File.Exists(todayReportPath))
             {
                 CoreHelper.Log(TAG, "今日报告已存在，跳过生成");
-                CoreHelper.SetVar("report_result", "SKIPPED");
-                return "SKIPPED: 今日报告已存在";
+                CoreHelper.SetVar("report_result", "SKIP");
+                return "SKIP: 今日报告已存在";
             }
             
             CoreHelper.Log(TAG, "生成报告 - " + today);
