@@ -1,7 +1,7 @@
 # DPS v4.5 TechManual_技术手册
 
-> 更新: 2026-03-05 (v4.5.10)
-> 来源: MultiPlatformFramework.md + SessionRunner使用说明.md + UnifiedIntentArchitecture.md + PersonaSchema_MultiPlatform.md + GLOSSARY.md + if_exists_usage.md + PLAYWRIGHT_ANDROID_ANALYSIS.md
+> 更新: 2026-03-07 (v4.5.16)
+> 来源: Docs 目录历史技术文档合并稿（已统一并入当前 `ConfigGuide_配置指南.md` / `TechManual_技术手册.md` / 平台指南）
 
 ---
 
@@ -24,7 +24,7 @@ Multi-Platform Social Media Automation Framework 将 DPS v4.5 扩展为支持 **
 
 #### v4.5.8 稳定性更新
 
-- Session success gate 升级: 有效动作成功率 `>= 95%` + 最低成功动作数阈值
+- 当前仓库现行代码的 Session success gate：`action_count > 0 && failedActions <= action_count / 2`
 - ActionExecutor `find` 现在回填语义字段（`post_title/post_body/...`）供 RuleEngine 评分
 - 状态一致性: 跳过状态统一为 `SKIP`，核心 I/O 增强 per-file 错误处理
 
@@ -38,7 +38,7 @@ Multi-Platform Social Media Automation Framework 将 DPS v4.5 扩展为支持 **
 │  • HumanizationEngine.cs  - Behavior profiles & timing       │
 │  • UILocator.cs           - Multi-strategy element finding   │
 │  • ErrorRecovery.cs       - Retry logic & error tracking     │
-│  • PlatformBase.cs        - Standard operation interface     │
+│  • RateLimiter.cs         - Rate limiting (ready, not wired) │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -154,7 +154,7 @@ DPS_v4.5/
 │   ├── HumanizationEngine.cs      ✅ Shared humanization
 │   ├── UILocator.cs               ✅ Multi-strategy UI location
 │   ├── ErrorRecovery.cs           ✅ Automatic error recovery
-│   └── PlatformBase.cs            ✅ Platform interface
+│   └── RateLimiter.cs             ✅ Rate limiting (ready, not wired)
 ├── Modules/
 │   ├── Core/                      ✅ Core libraries (Intent, ZDCommand, etc.)
 │   ├── SessionRunner.cs           ✅ Multi-platform session runner
@@ -182,10 +182,11 @@ DPS_v4.5/
     ├── README.md
     ├── ConfigGuide_配置指南.md
     ├── TechManual_技术手册.md      ✅ 本文档
-    ├── PLATFORM_MODULE_TEMPLATE.md
-    ├── GIT_WORKFLOW.md
+    ├── PlatformTemplate_平台模块模板.md
+    ├── GitWorkflow_Git工作流.md
     └── Platforms/
-        └── BabyCenter_APP_Guide.md
+        ├── BabyCenter_APP_Guide_平台指南.md
+        └── Reddit_TestGuide_Reddit测试指南.md
 ```
 
 ---
@@ -382,7 +383,6 @@ SessionRunner.Run()
 │   │   │   ├── ResolveIntentWithFallback() — 意图回退链解析
 │   │   │   ├── GetOperationsByIntent() — 意图→操作序列
 │   │   │   └── ActionExecutor.Execute() — 逐步执行操作
-│   │   └── LoadPlatformModule() — 旧模块模式（回退）
 │   │
 │   ├── Step 4: 结果处理
 │   │   ├── 视觉验证（仅 like/comment 且启用时）
@@ -396,7 +396,7 @@ SessionRunner.Run()
 └── [5] 会话结束
     ├── 保存记忆文件到 Memory/{device_id}/{date}.json
     ├── MemoryManager 清理过期记忆
-    ├── 计算成功率，设置 session_result
+    ├── 统计失败动作数，设置 session_result / run_result / action_count
     └── 返回 "SUCCESS" 或 "ERROR"
 ```
 
@@ -649,24 +649,21 @@ SessionRunner 执行完毕后设置的 ZD 变量：
 |--------|------|------|
 | `session_result` | SUCCESS / ERROR | 会话总体结果 |
 | `run_result` | SUCCESS / ERROR | 同上（兼容旧版） |
-| `action_count` | 数字 | 成功执行的动作总数（仅成功动作） |
-| `action_attempt_count` | 数字 | 总动作尝试数（含成功+失败+跳过） |
-| `session_success_rate` | 数字 | 有效动作成功率（百分比） |
-| `session_successful_actions` | 数字 | 成功动作数 |
-| `session_failed_actions` | 数字 | 失败动作数 |
-| `session_skipped_actions` | 数字 | 跳过动作数（SKIP 状态） |
+| `action_count` | 数字 | 动作循环次数（SUCCESS / ERROR / SKIP 都计入） |
 | `current_platform` | 平台名 | 本次使用的平台 |
-| `current_page` | 页面名 | 会话结束时的页面状态 |
+| `current_page` | 页面名 | 最近一次检测到的页面状态 |
+| `current_action` | 动作名 | 最近一次选择的动作 |
+| `current_intent` | 意图名 | 最近一次解析出的意图 |
 | `last_error` | 错误信息 | 仅异常时设置 |
 
-#### 成功判定（v4.5.8+）
+#### 成功判定（按当前仓库代码）
 
 ```
-成功条件: session_success_rate >= 95% && session_successful_actions >= 6
-即：有效动作成功率不低于 95%，且至少有 6 个成功动作
+成功条件: action_count > 0 && failedActions <= action_count / 2
+即：至少执行过 1 次动作，且失败动作数不超过动作循环次数的一半
 ```
 
-> **注**: v4.5.8 之前的旧条件为 `failedActions <= actionCount / 2`（50% 容错）。v4.5.8 起升级为更严格的成功门控，`action_count` 语义也调整为仅统计成功动作。
+> **注**: 如果你看到其他历史文档写的是 `>=95%` 成功率门槛，请以当前仓库 `Modules/SessionRunner.cs` 的实现为准。
 
 ---
 
@@ -708,9 +705,9 @@ string result = SessionRunner.Run(project, instance);
 **原因**: `device_app_mapping.json` 中的设备映射指向了 `PlatformsConfig.json` 中不存在的平台。
 **解决**: 检查两个文件的平台名是否一致（大小写敏感）。
 
-#### 问题 3: "操作配置不存在，将回退到旧模块模式"
-**原因**: `Config/Operations/{platform}_operations.json` 文件不存在。
-**解决**: 创建对应的 operations JSON 文件。回退到旧模块模式意味着使用 `Platforms/{Platform}/{Platform}Module.cs`。
+#### 问题 3: "操作配置不存在"
+**原因**: `Config/Operations/{platform}_operations.json` 文件不存在或路径错误。
+**解决**: 创建对应的 operations JSON 文件。当前主链不会再把“旧模块模式”当作成功回退路径，缺少 operations 配置会直接导致 SessionRunner 报错。
 
 #### 问题 4: 动作全部变成 browse
 **可能原因**:
@@ -733,7 +730,478 @@ string result = SessionRunner.Run(project, instance);
 | 会话时长 | 3~30 分钟 | 由 BehaviorConfig 钳制 |
 | 实际等待 | 1~5 秒 | Thread.Sleep 截断范围 |
 | 页面检测 | 每次操作后 | 通过 XML layout + page_signatures |
-| 旧模块回退 | 自动 | 无 operations.json 时回退到 C# 平台模块 |
+| 旧模块回退 | 非标准路径 | 当前 `SessionRunner` 主链依赖 `Operations + IntentMappings`；缺少 operations 配置时应视为配置错误，而不是新人施工入口 |
+
+### 3.14 ZD 微流程已知坑点与防错规则 (Anti-Errors)
+
+> 本节汇总 SessionRunner 四入口 + ZD 原生块微流程编排过程中已踩过的坑和必须遵守的防错规则。
+> 来源：真机验证日志 + 官方文档 + 内部契约审查。
+
+#### AE-1: Touch 是矩形区域，不是单点
+
+ZennoDroid 的 Touch Emulation 使用 `X from / X to / Y from / Y to` 四个字段定义点击区域。
+不要把它当成单点 `(x, y)` 来用。Locate 输出的变量必须是四坐标矩形（`zd_tap_x1/x2/y1/y2`）。
+
+**错误做法**: 只填一个 X 和一个 Y。
+**正确做法**: 填写完整的 `X from / X to / Y from / Y to` 四字段。
+
+#### AE-2: T:long 必须是独立块，不能运行时切换
+
+ZennoDroid 的 Long Tap 由 Touch 块上的 design-time 复选框控制，不支持运行时变量切换。
+因此 `T`（普通点击）和 `T:long`（长按）必须拆成两个独立的 ZD 动作块，对应 Switch 的两个不同 case。
+
+**错误做法**: 用一个 Touch 块 + 运行时参数来区分普通/长按。
+**正确做法**: Switch 中 `T` 和 `T:long` 分别路由到各自独立的 Touch Emulation 块。
+
+#### AE-3: Keyboard Back 必须保持 Delay 启用
+
+`{AndroidKeys.BACK}` 宏只有在 Keyboard Emulation 块的 Delay 选项启用时才生效。
+关闭 Delay 会导致宏被当作纯文本处理，返回键失效。
+
+**错误做法**: 关闭 Keyboard Delay 以"加速"执行。
+**正确做法**: Keyboard Emulation 块的 Delay 必须保持启用状态。
+
+#### AE-4: Pause 单位是秒, Swipe Duration 单位是毫秒
+
+两个时间参数的单位不同，混淆会导致等待 3 毫秒或滑动 800 秒的荒谬行为。
+
+| 参数 | 单位 | 示例 |
+|------|------|------|
+| Pause (W) | 秒 | `W:3` = 等待 3 秒 |
+| Swipe Duration | 毫秒 | `zd_swipe_duration=800` = 滑动耗时 800ms |
+
+**错误做法**: Pause 填毫秒值，或 Swipe Duration 填秒值。
+**正确做法**: Pause 填秒（整数），Swipe Duration 填毫秒（整数）。
+
+#### AE-5: Swipe Curved 启用后必须配置 Bending
+
+如果 Swipe Emulation 块勾选了 Curved，则 Bending 数值字段不可留空。
+遗漏 Bending 会导致不可预测的滑动轨迹或运行错误。
+
+#### AE-6: Switch Default 分支不可悬空
+
+ZennoDroid 的 Switch 逻辑块必须有 Default 分支，且 Default 必须连接到有效目标（当前契约为 BadEnd / 错误记录路径）。
+悬空的 Default 会导致未知步骤类型静默丢失。
+
+#### AE-7: 所有红色箭头必须定义去向
+
+ZD 流程中每个动作块的红色箭头（异常/失败出口）都必须连接到有效目标。
+当前契约：Locate/Touch/Swipe/Keyboard/Pause/Verify 的红色箭头统一连到 Advancer；StepRunner 和 Advancer 的红色箭头连 BadEnd。
+
+**错误做法**: 红色箭头留空（未连线）。
+**正确做法**: 按 Arrow Routing Contract 逐块确认红色箭头连线。
+
+#### AE-8: DSL 分隔符必须是 ASCII `|`，禁止 Unicode 箭头
+
+旧版方案使用 Unicode `→` 作为步骤分隔符，但 StepRunner 的解析器只认 ASCII `|`。
+使用 `→` 会导致整条 plan 被当作 1 个步骤，后续步骤全部丢失。
+
+**真机证据**: `"L:post_unit → W:3 → S:down_900 → W:2"` 解析为 `1/1` 步，仅执行了第一步。
+**修复后**: `"L:post_unit|W:3|S:down_900|W:2"` 正确解析为 `4/4` 步。
+
+#### AE-9: 空 plan 必须走错误路径，禁止映射为 DONE
+
+当 `zd_step_plan` 为空或全空白时，StepRunner 必须设置 `zd_step_type=ERROR_EMPTY_PLAN`，由 Switch 的 Default 分支路由到 BadEnd。
+
+**错误做法**: 空 plan 时 `zd_step_index(0) >= zd_step_count(0)` 成立，直接输出 DONE。
+**正确做法**: 空 plan 判定为配置错误，走 `ERROR_EMPTY_PLAN -> Default -> BadEnd`，并记录错误日志。
+
+### 3.15 ZD 微流程实施自检清单
+
+> 在搭建或修改 ZD 微流程项目时，逐项核对以下清单。全部通过方可交付。
+
+| 序号 | 检查项 | 是/否 |
+|------|--------|-------|
+| 1 | Touch Emulation 块填写了完整的四坐标字段（X from / X to / Y from / Y to）? | [ ] |
+| 2 | `T`（普通点击）和 `T:long`（长按）使用了两个独立的 Touch Emulation 块? | [ ] |
+| 3 | Switch 中 `T` 和 `T:long` 分别路由到各自独立的块? | [ ] |
+| 4 | Keyboard Emulation 块的 Delay 选项处于启用状态? | [ ] |
+| 5 | Keyboard Back 使用的是 `{AndroidKeys.BACK}` 宏（非纯文本）? | [ ] |
+| 6 | Pause 块的参数单位为秒（非毫秒）? | [ ] |
+| 7 | Swipe Duration 参数单位为毫秒（非秒）? | [ ] |
+| 8 | 若 Swipe 启用了 Curved，Bending 值已填写? | [ ] |
+| 9 | Switch 块存在 Default 分支，且 Default 已连接到 BadEnd / 错误路径? | [ ] |
+| 10 | 所有动作块的红色箭头均已连线（无悬空红色出口）? | [ ] |
+| 11 | StepRunner 和 Advancer 的红色箭头连接到 BadEnd? | [ ] |
+| 12 | Locate/Touch/Swipe/Keyboard/Pause/Verify 的红色箭头连接到 Advancer? | [ ] |
+| 13 | DSL 步骤分隔符使用的是 ASCII `\|`（非 Unicode 箭头 `→`）? | [ ] |
+| 14 | 空 plan（`zd_step_plan` 为空/空白）会触发 `ERROR_EMPTY_PLAN` 而非 DONE? | [ ] |
+| 15 | 变量 `zd_tap_x1/x2/y1/y2` 由 Locate 输出并传入 Touch 块? | [ ] |
+| 16 | 变量 `zd_swipe_x1/y1/x2/y2` 和 `zd_swipe_duration` 由 StepRunner 写入并传入 Swipe 块? | [ ] |
+| 17 | 变量 `zd_wait_sec` 由 StepRunner 写入并传入 Pause 块? | [ ] |
+
+### 3.16 ZD 微流程防回归检查方法
+
+> 本节是 3.14 Anti-Errors 和 3.15 自检清单的配套"可执行验证"。
+> 每项给出具体输入、观察点和通过判据，用于在修改 ZD 项目后做防回归验收。
+
+#### RC-1: 单位检查 (Pause 秒 / Swipe 毫秒)
+
+**目标**: 确认 Pause 和 Swipe Duration 没有单位混淆（对应 AE-4）。
+
+**检查步骤**:
+
+1. 准备测试 plan: `W:3|S:down_900|W:2`
+2. 在 ZD 中运行该 plan，观察执行日志
+
+**观察点 A (Pause)**:
+- 找到 `Step 1/3: W:3` 对应的 Pause 块执行日志
+- 用秒表或日志时间戳测量实际等待时长
+
+**通过判据**:
+- Pause 实际等待约 3 秒（容差 +/- 1 秒），而非 3 毫秒或 3000 秒
+- `Step 3/3: W:2` 同理，实际等待约 2 秒
+
+**观察点 B (Swipe Duration)**:
+- 找到 `Step 2/3: S:down_900` 对应的 Swipe Emulation 块
+- 在 ZD 项目属性中确认 Duration 字段值
+
+**通过判据**:
+- Duration 字段的值为毫秒级整数（默认 800），而非秒级（如 0.8）
+- 滑动动作可见且耗时亚秒级，不会出现"卡住 800 秒"的现象
+
+**回归红线**: 若 Pause 3 秒变成了闪过（毫秒级）或卡死（分钟级），说明单位被篡改，必须回退。
+
+#### RC-2: 宏检查 ({AndroidKeys.BACK} + Delay)
+
+**目标**: 确认 Keyboard Back 宏在 Delay 启用时正常生效（对应 AE-3）。
+
+**检查步骤**:
+
+1. 准备测试 plan: `B|W:2|B|W:2`
+2. 在运行前确认 Keyboard Emulation 块属性中 Delay 选项为启用状态
+3. 将模拟器置于非主屏页面（例如打开设置 > 关于手机），运行 plan
+
+**观察点**:
+- 第一个 `B` 执行后，模拟器是否从"关于手机"返回到"设置"主页
+- 第二个 `B` 执行后，模拟器是否从"设置"主页返回到主屏
+
+**通过判据**:
+- 两次 `B` 动作均触发了 Android 系统返回行为（页面有变化）
+- 执行日志中无 "text input" 相关警告（宏被正确识别为按键而非文本）
+
+**负例验证（可选）**:
+- 临时关闭 Keyboard Emulation 块的 Delay 选项
+- 再次运行相同 plan
+- 预期: `{AndroidKeys.BACK}` 被当作文本处理，返回键不生效，页面不变化
+- 验证完毕后务必把 Delay 改回启用状态
+
+**回归红线**: 若 `B` 动作执行后页面纹丝不动且日志无异常，说明 Delay 被误关或宏语法被改坏。
+
+#### RC-3: Checkbox 检查 (T:long 独立块 / Curved+Bending)
+
+**目标**: 确认 design-time checkbox 配置没有被破坏（对应 AE-2 和 AE-5）。
+
+**检查步骤 (T:long)**:
+
+1. 在 ZD 项目中打开 Switch 逻辑块，确认存在两个独立的 Touch Emulation 块:
+   - 一个用于 `T`（普通点击），Long Tap 复选框**未勾选**
+   - 一个用于 `T:long`（长按），Long Tap 复选框**已勾选**
+2. 准备测试 plan A: `L:post_unit|T|W:2`
+3. 准备测试 plan B: `L:post_unit|T:long|W:2`
+4. 分别运行两个 plan
+
+**观察点**:
+- Plan A 的 Switch 日志中，case 命中值为 `T`，路由到普通 Touch 块
+- Plan B 的 Switch 日志中，case 命中值为 `T:long`，路由到长按 Touch 块
+- Plan A 执行的点击时长为短促触碰（约 100ms 以内）
+- Plan B 执行的点击时长为长按（约 500ms 以上，具体取决于系统设定）
+
+**通过判据**:
+- 两个 plan 路由到的 Touch Emulation 块不同（通过日志中块名称或 ID 确认）
+- Long Tap 复选框状态正确: `T` 块未勾选、`T:long` 块已勾选
+- 行为可区分: 普通点击和长按的执行时长明显不同
+
+**检查步骤 (Curved + Bending)**:
+
+1. 在 ZD 项目中打开 Swipe Emulation 块的属性面板
+2. 检查 Curved 复选框状态
+
+**通过判据**:
+- 若 Curved **已勾选**: Bending 字段必须有非空数值（例如 `50`），不得留空
+- 若 Curved **未勾选**: Bending 字段状态无要求（留空或有值均可）
+- 运行含 `S` 步骤的 plan 时，Swipe 动作无异常报错
+
+**回归红线**: 若 `T` 和 `T:long` 路由到同一个块，说明 Switch case 被合并或 checkbox 被改动。若 Curved 已勾选但 Bending 为空，Swipe 执行将不可预测。
+
+#### RC-4: 分隔符负例检查 (Unicode 分隔符识别与拒绝)
+
+**目标**: 确认 StepRunner 只接受 ASCII `|` 作为步骤分隔符，Unicode 箭头等非法分隔符不会被静默吞掉（对应 AE-8）。
+
+**负例 A: Unicode `→` 分隔符**
+
+1. 准备测试 plan: `L:post_unit → W:3 → S:down_900 → W:2`（使用 Unicode 右箭头 U+2192）
+2. 将该 plan 写入 `zd_step_plan` 变量，运行 ZD 流程
+
+**观察点**:
+- 查看 StepRunner 的执行日志中 `Step X/Y` 的 Y 值（总步数）
+- 查看 Switch 路由命中了几轮
+
+**通过判据**:
+- StepRunner 解析结果表现为以下任一行为:
+  - (a) 显式报错/走 Default 错误路径，日志中包含 `ERROR` 或 `unknown` 相关字样
+  - (b) 解析为 `1/1` 步（因为 `→` 不是合法分隔符），整条 plan 被当成单个 token，Switch 路由到 Default -> BadEnd
+- 绝对不能出现: 解析为 `4/4` 步且全部正常执行（那说明解析器错误地接受了 `→`）
+
+**失败判据**:
+- 若日志显示 `Step 1/4` 或类似正常 4 步解析，说明解析器接受了非法分隔符，必须修复
+- 若日志无任何异常且静默完成 DONE，说明错误被吞掉了，同样必须修复
+
+**负例 B: 混合分隔符**
+
+1. 准备测试 plan: `L:post_unit|W:3 → S:down_900|W:2`（混合 ASCII `|` 和 Unicode `→`）
+2. 运行并检查 StepRunner 日志
+
+**通过判据**:
+- 解析为 3 步（按 `|` 分割得到 `L:post_unit`、`W:3 → S:down_900`、`W:2`）
+- 第 2 步 `W:3 → S:down_900` 因包含非法字符而触发 Switch Default 路径或产生可见的解析异常
+- 不能出现静默跳过第 2 步后正常完成的行为
+
+**回归红线**: 若 Unicode `→` 被当作合法分隔符接受（解析出 4 步），说明解析器的分隔逻辑被改坏，DSL 分隔符唯一合法值 ASCII `|` 的约束失效。
+
+#### RC-5: 安全计数器与空 plan 检查 (防无限循环与错误路径触发)
+
+**目标**: 确认两条安全防线正常工作: (1) 空/全空白 plan 触发 `ERROR_EMPTY_PLAN` 错误路径而非静默 DONE; (2) 安全计数器 `zd_safety` 在异常场景下能终止无限循环（对应 AE-9 及 Variable Contract 中的 `zd_safety` 定义）。
+
+**负例 A: 空 plan 触发错误路径**
+
+1. 将 `zd_step_plan` 设为空字符串 `""`
+2. 运行 ZD 流程
+
+**观察点**:
+- StepRunner 的第一条日志输出
+- Switch 路由命中的 case 值
+- 最终退出路径（GoodEnd 还是 BadEnd）
+
+**通过判据**:
+- StepRunner 输出 `zd_step_type=ERROR_EMPTY_PLAN`
+- Switch 未命中任何具名 case（L/T/S/B/W/V/DONE），走 Default 分支
+- 最终走 BadEnd 路径退出，日志中有明确的空 plan 错误记录
+- 绝对不能出现: `zd_step_type=DONE` 且走 GoodEnd（这是已知的旧 bug 行为）
+
+**失败判据**:
+- 若日志显示 `[StepRunner] 全部完成` + Switch 结果 `DONE`，说明空 plan 被错误映射为正常完成，旧 bug 回归
+- 若无任何日志输出直接退出，说明空 plan 的检测逻辑缺失
+
+**负例 B: 全空白 plan**
+
+1. 将 `zd_step_plan` 设为纯空白字符串 `"   "`（3 个空格）
+2. 运行 ZD 流程
+
+**通过判据**: 行为应与负例 A 完全一致（`ERROR_EMPTY_PLAN -> Default -> BadEnd`）。空白字符串不能被当作有效 plan。
+
+**负例 C: 安全计数器触发路径**
+
+1. 准备一条会导致循环的异常场景: 例如 plan 中只有 `L:nonexistent`（一个永远找不到的元素），Locate 失败后 Advancer 递增 `zd_step_index`，但假设 index 被外部干扰重置为 0
+2. 或直接在运行前手动将 `zd_safety` 设为接近上限的值（如上限为 100 则设为 99），然后运行任意正常 plan
+
+**观察点**:
+- `zd_safety` 变量在每轮循环中是否递增
+- 达到安全上限时的行为
+
+**通过判据**:
+- `zd_safety` 每经过一轮 Loop 递增 1
+- 当 `zd_safety` 达到预设安全上限时（查看 ZD Loop 条件中的阈值），循环强制退出
+- 退出时日志中包含安全计数器相关的警告或错误信息
+- 不能出现: 循环无限运行且 `zd_safety` 不递增或无上限检查
+
+**回归红线**: 若空 plan 能走到 `DONE -> GoodEnd`，说明 `ERROR_EMPTY_PLAN` 防护被移除。若 `zd_safety` 计数器未递增或无上限检查，系统将在异常场景下无限循环，耗尽资源。
+
+### 3.17 v4.7 ZD 微流程施工路径说明
+
+> 本节面向开发者，描述从零搭建 ZD 微流程编排项目的完整施工路径。
+> 施工结果应同时符合 3.14 Anti-Errors 规则、3.15 自检清单和 3.16 防回归检查。
+
+#### 3.17.1 四入口与 ZD 外层编排的关系
+
+v4.7 将 SessionRunner 拆为四个独立入口方法，由 ZD 外层流程（Loop + Switch + 原生动作块）串联:
+
+```
+Initializer_OwnCode
+  -> Main_OwnCode
+    -> DPS_Init_OwnCode          ← SessionRunner.InitSession()
+      -> [循环] (选中 DPS_DecideAction 到 DPS_CheckResult 所有块 → 右键 → Repeat in loop → Repeat while condition is true) {
+           条件: {-Variable.zd_safety-} < 100 && {-Variable.zd_step_type-} != "DONE"
+
+           DPS_DecideAction_OwnCode   ← SessionRunner.DecideNextAction()
+             -> [Switch] (Add action → Logic → Switch, Variable: {-Variable.zd_step_type-}) {
+                  L      -> [Locate 占位] (Add action → Custom code → C# code, 注释: Locate)
+                  T      -> Touch Emulation (ZD 原生, Long Tap OFF)
+                  T:long -> Touch Emulation (ZD 原生, Long Tap ON)
+                  S      -> Swipe Emulation (ZD 原生)
+                  B      -> Keyboard Emulation (ZD 原生)
+                  W      -> Pause (ZD 原生)
+                  V      -> [Verify 占位] (Add action → Custom code → C# code, 注释: Verify)
+                  DONE   -> [GoodEnd 标记] (C# code 块, 输出成功日志)
+                  Default-> [BadEnd 标记] (C# code 块, 输出错误日志)
+                }
+             -> Advancer (两个 Variables processing 块, 模式 Increase\Decrease counter, 属性选 Increase counter, 分别递增 zd_step_index 和 zd_safety)
+             -> DPS_CheckResult_OwnCode  ← SessionRunner.EvaluateActionResult()
+           }
+      -> DPS_Finalize_OwnCode    ← SessionRunner.FinalizeSession()
+```
+
+四入口方法各自的职责:
+
+| 入口 | OwnCode 文件 | 方法 | 核心职责 |
+|------|-------------|------|---------|
+| Init | `DPS_Init_OwnCode.cs` | `InitSession()` | 初始化 ZD 变量、屏幕尺寸、安全计数器、Step Plan |
+| Decide | `DPS_DecideAction_OwnCode.cs` | `DecideNextAction()` | 解析当前步骤, 设置 `zd_step_type` / 参数变量 |
+| Check | `DPS_CheckResult_OwnCode.cs` | `EvaluateActionResult()` | 回收原生块执行结果, 递增 `zd_step_index` |
+| Finalize | `DPS_Finalize_OwnCode.cs` | `FinalizeSession()` | 记忆写入, 统计输出, 会话终态判定 |
+
+#### 3.17.2 关键 DSL 与变量契约速查
+
+**Step DSL 语法**:
+
+```
+PLAN  := STEP ('|' STEP)*
+STEP  := TYPE [':' PARAM]
+TYPE  := L | T | T:long | S | B | W | V | DONE
+```
+
+唯一合法分隔符: ASCII `|`。严禁 Unicode 箭头 `→`（参见 AE-8）。
+
+**核心变量一览** (完整列表见计划文件 Variable Contract):
+
+| 变量 | 写入者 | 读取者 | 用途 |
+|------|--------|--------|------|
+| `zd_step_plan` | ZD/InitSession | DecideNextAction | 整条 DSL 字符串 |
+| `zd_step_index` | InitSession/Advancer | DecideNextAction | 当前步骤索引 (0-based) |
+| `zd_step_count` | DecideNextAction | Loop 条件 | 总步骤数 |
+| `zd_step_type` | DecideNextAction | Switch | 路由键 (L/T/S/B/W/V/DONE) |
+| `zd_step_param` | DecideNextAction | 各原生块 | 当前步骤参数 |
+| `zd_safety` | Advancer | Loop 条件 | 防无限循环计数器 |
+| `zd_screen_width` / `zd_screen_height` | InitSession | StepRunner | Swipe 参数展开依据 |
+
+**Switch 路由契约**: 见 3.14 AE-6 (Default 不可悬空) 和计划文件 Switch Routing Contract。
+
+**Arrow 路由契约**: 所有原生块绿色/红色箭头均连到 Advancer; StepRunner 和 Advancer 的红色箭头连 BadEnd (Fail-Advance 策略, 参见计划文件 Arrow Routing Contract)。
+
+#### 3.17.3 施工操作步骤 (从零搭建)
+
+以下步骤假设你已有一个 ZennoDroid 项目，且 `Modules/SessionRunner.cs` 已包含四入口方法。
+
+**Phase 1: 创建 ZD 变量**
+
+操作路径: Window → Variables → Custom 标签 → Add → 输入变量名 → 设置 Default value
+
+在 ZD 项目中创建以下变量 (全部 String 类型):
+
+```
+zd_step_plan          (初始值: 留空)
+zd_step_index         (初始值: 0)
+zd_step_count         (初始值: 0)
+zd_step_type          (初始值: 留空)
+zd_step_param         (初始值: 留空)
+zd_selector_key       (初始值: 留空)
+zd_tap_x1, zd_tap_x2, zd_tap_y1, zd_tap_y2  (初始值: 0)
+zd_swipe_x1, zd_swipe_y1, zd_swipe_x2, zd_swipe_y2  (初始值: 0)
+zd_swipe_duration     (初始值: 800)
+zd_wait_sec           (初始值: 0)
+zd_found              (初始值: false)
+zd_verify_rule        (初始值: 留空)
+zd_safety             (初始值: 0)
+zd_screen_width       (初始值: 0)
+zd_screen_height      (初始值: 0)
+zd_action_result      (初始值: 留空)
+zd_action_duration    (初始值: 0)
+zd_action_error_detail(初始值: 留空)
+sr_use_legacy_run     (初始值: 留空, 设为 "true" 走旧 Run 兼容路径)
+```
+
+**Phase 2: 摆放 OwnCode 动作块**
+
+添加 4 个 OwnCode 块, 每个块的操作步骤:
+
+1. 右键空白 → Add action → Custom code → C# code
+2. 双击块打开代码编辑器
+3. 打开对应 .cs 文件 → Ctrl+A 全选 → Ctrl+C 复制
+4. 回到 ZD 编辑器 → Ctrl+A → Ctrl+V 覆盖 → Save
+5. 右键块 → Comment → 输入名称（如 DPS_Init）
+6. 对以下 4 个文件分别重复以上步骤:
+   - `ZDProjects/DPS_Init_OwnCode.cs` → 命名 DPS_Init
+   - `ZDProjects/DPS_DecideAction_OwnCode.cs` → 命名 DPS_DecideAction
+   - `ZDProjects/DPS_CheckResult_OwnCode.cs` → 命名 DPS_CheckResult
+   - `ZDProjects/DPS_Finalize_OwnCode.cs` → 命名 DPS_Finalize
+
+7. 在 4 个 OwnCode 块之间, 还需要前面的 `Initializer_OwnCode` 和 `Main_OwnCode`。
+
+**Phase 3: 搭建 Loop + Switch 结构**
+
+> 重要: ZD 的 Loop 不能先放空循环再往里塞块。必须先摆好内部块, 再把它们"框"成循环。
+
+**步骤 1: 先摆放 Loop 内部所有块（步骤 2-6 的块），再框选成循环**
+
+1. 先按步骤 2-6 摆放好 Loop 内部的所有块（DPS_DecideAction → Switch → 各分支 → Advancer → DPS_CheckResult）
+2. 全部摆好后, 选中从 DPS_DecideAction 到 DPS_CheckResult 的所有块
+3. 右键 → Repeat in loop → Repeat while the condition is true
+4. 在弹出的输入框填: `{-Variable.zd_safety-} < 100 && {-Variable.zd_step_type-} != "DONE"`
+5. 点 OK, ZD 自动生成循环结构
+
+**步骤 2: Loop 内部第一个块**
+
+`DPS_DecideAction_OwnCode`（Phase 2 已创建）
+
+**步骤 3: Switch 块**
+
+1. 右键空白 → Add action → Logic → Switch
+2. 双击 Switch 块打开属性
+3. Variable 字段填: `{-Variable.zd_step_type-}`
+4. 在 Conditions list 逐个添加: `L`, `T`, `T:long`, `S`, `B`, `W`, `V`, `DONE`
+5. Default 分支自动存在, 必须连线（到 BadEnd 或错误处理块, 参见 AE-6）
+
+**步骤 4: 每个 Case 分支放置对应的原生块或 OwnCode 块**
+
+见 3.17.1 流程图中的块类型标注, Phase 4 配置具体属性。
+
+**步骤 5: Advancer（用两个 Variables processing 块实现）**
+
+Advancer 不是 OwnCode, 而是两个 ZD 原生的 "Variables processing" 块:
+
+1. 右键空白 → **Add action → Data → Variables processing**
+   - 模式: **Increase\Decrease counter**
+   - 方向属性: **Increase counter**
+   - Variable: `zd_step_index`, Value: `1`
+2. 再添加一个同类块: 右键空白 → **Add action → Data → Variables processing**
+   - 模式: **Increase\Decrease counter**
+   - 方向属性: **Increase counter**
+   - Variable: `zd_safety`, Value: `1`
+3. 右键第一个块 → Comment → 输入 "Advancer"
+4. 所有原生块的绿色箭头和红色箭头都连到第一个 Advancer 块
+
+**步骤 6: Advancer 之后连接 `DPS_CheckResult_OwnCode`**
+
+**步骤 7: Loop 退出后连接 `DPS_Finalize_OwnCode`**
+
+**Phase 4: 配置原生块属性**
+
+原生块菜单路径（在 Add action 菜单中搜索对应名称亦可）:
+- Touch emulation: 右键空白 → Add action → Android → Touch emulation
+- Swipe emulation: 右键空白 → Add action → Android → Swipe emulation
+- Keyboard emulation: 右键空白 → Add action → Android → Keyboard emulation
+- Pause: 右键空白 → Add action → Logic → Pause
+
+| 块 | 关键属性 | 注意事项 |
+|----|---------|---------|
+| Touch (普通) | X from: `{-Variable.zd_tap_x1-}`, X to: `{-Variable.zd_tap_x2-}`, Y from: `{-Variable.zd_tap_y1-}`, Y to: `{-Variable.zd_tap_y2-}` | Long Tap 复选框 **不勾选** |
+| Touch (长按) | 同上四坐标 | Long Tap 复选框 **勾选** (独立块, 参见 AE-2) |
+| Swipe | Xfrom/Yfrom/Xto/Yto 使用 `zd_swipe_*` 变量, Duration: `{-Variable.zd_swipe_duration-}` | Duration 单位毫秒 (AE-4); Curved 若启用必须设 Bending (AE-5) |
+| Keyboard Back | Text: `{AndroidKeys.BACK}` | Delay 必须启用 (AE-3) |
+| Pause | 秒数: `{-Variable.zd_wait_sec-}` | 单位是秒, 不是毫秒 (AE-4) |
+
+**Phase 5: 连线与验收**
+
+1. 确认所有红色箭头已连线（AE-7）
+2. 确认 Switch Default 已连线（AE-6）
+3. 使用 golden harness 测试: 设置 `zd_step_plan = "L:post_unit|W:3|S:down_900|W:2"`
+4. 预期日志: 4/4 步骤依次执行, 最终 `zd_step_type=DONE`
+5. 按 3.16 的 RC-1 到 RC-5 执行防回归验收
+
+> **交叉引用**:
+> - 变量创建指南: [ConfigGuide_配置指南.md 六、变量快速参考表](ConfigGuide_配置指南.md#六变量快速参考表)
+> - OwnCode 文件列表: [ZDProjects/README.md](../ZDProjects/README.md#文件列表)
+> - 完整契约定义: `.sisyphus/plans/sessionrunner-zd-microflow-plan.md`
 
 ---
 
@@ -1019,15 +1487,17 @@ string result = RunSession(project, instance);
 | v4.5.0 | 2026-02-07 | 初始版本，加权随机动作选择 |
 | v4.5.1 | 2026-02-26 | 接入 MemoryManager，交互去重 |
 | v4.5.2 | 2026-02-27 | 统一引擎 (ActionExecutor + operations.json)，视觉验证层 |
-| v4.5.8 | 2026-02-27 | 成功门控升级 (>=95%)，语义字段回填，SKIP 状态统一 |
+| v4.5.8 | 2026-02-27 | 会话门控与语义字段回填修复，SKIP 状态统一 |
 | v4.5.9 | 2026-02-28 | like 映射修复 (like_content 替代错误的 open_post) + I/O 容错增强 |
 | v4.5.10 | 2026-03-04 | App Onboarder 上线（不改 SessionRunner 主执行语义，文档同步） |
+| v4.6.0 | 2026-03-14 | 执行层向 ZD 原生动作迁移架构设计 (ADR-015)，四层分离: ZD 原子动作层 + ZD 组合动作层 + 智能编排层 + AI 视觉纠偏层 |
 
-### MultiPlatformFramework 版本历史
+### 框架版本历史
 
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.5 | 2026-03-05 | Added v4.5.10 App Onboarder, corrected BabyCenter status |
+| 1.6 | 2026-03-14 | Added v4.6.0 execution layer migration architecture (ADR-015) |
 | 1.4 | 2026-02-27 | Added v4.5.8 stability updates |
 | 1.3 | 2026-02-27 | Added BabyCenter platform support |
 | 1.2 | 2026-02-14 | Fixed file structure, added MemoryManager/RuleEngine |
@@ -1680,7 +2150,7 @@ testDPSConfiguration().catch(console.error);
 
 ---
 
-### 7.2 运行时测试计划
+### 7.3 运行时测试计划
 
 > 来源: TESTING_PLAN.md (v1.0, 2026-02-27)
 > 目标: 验证 DPS v4.5 所有核心模块在 ZennoDroid 环境中的运行时行为
@@ -1764,7 +2234,7 @@ testDPSConfiguration().catch(console.error);
 
 ---
 
-### 7.3 快速测试执行指南
+### 7.4 快速测试执行指南
 
 > 来源: QUICK_START_TESTING.md (2026-02-27)
 
@@ -2026,9 +2496,7 @@ project.SendInfoToLog("VisionCorrector 结果: " + result);
 
 **Platform (平台)** — v4.5 新增。当前已接入 Reddit、Instagram、BabyCenter（TikTok/Facebook 配置预留，默认未启用）。
 
-**Platform Base (平台基类)** — v4.5 新增。定义平台模块标准接口的抽象类。
-
-**Platform Module (平台模块)** — v4.5 新增。特定平台的操作实现，如 `RedditModule.cs`、`InstagramModule.cs`。
+**Platform (平台)** — 通过 `PlatformsConfig.json` + `Config/Operations/*.json` + `Config/IntentMappings/*.json` 定义的自动化目标。当前已接入 Reddit、Instagram、BabyCenter。
 
 **PP0 (Postpartum 0)** — 产后早期，孩子 0-3 个月的阶段。
 
@@ -2042,7 +2510,7 @@ project.SendInfoToLog("VisionCorrector 结果: " + result);
 
 **Rate Limit (速率限制)** — v4.5 新增。平台对操作频率的限制，如 Instagram 限制 60 actions/hour。
 
-**RateLimiter (速率限制器)** — v4.5.4 新增，位于 `Modules/Core/RateLimiter.cs`。统一的速率限制实现。
+**RateLimiter (速率限制器)** — v4.5.4 新增，位于 `Modules/Core/RateLimiter.cs`。统一的速率限制实现；当前主链文档不能把它画成 ZennoDroid 外层必经动作块。
 
 **ReportGen (报告生成)** — 生成每日/每周运行报告的模块，在 17:00 后自动触发。
 
@@ -2060,7 +2528,7 @@ project.SendInfoToLog("VisionCorrector 结果: " + result);
 
 **SelectorEngine (选择器引擎)** — 位于 `Modules/Core/SelectorEngine.cs`。负责解析 `PlatformsConfig.json` 中的嵌套 `ui_selectors` 对象。
 
-**SessionRunner (会话执行器)** — 执行会话计划的模块，负责选择动作、调用平台模块、记录行为。
+**SessionRunner (会话执行器)** — 执行会话计划的模块，负责选择动作、解析 `action -> intent -> operation`、调用 `ActionExecutor`、记录行为。
 
 **Short-term Memory (短期记忆)** — 保留 7-30 天的会话记录，存储在 `Memory/{device_id}/{date}.json`。
 
@@ -2133,4 +2601,3 @@ project.SendInfoToLog("VisionCorrector 结果: " + result);
 ---
 
 *文档版本: v1.0 | 最后更新: 2026-03-05 | 合并自 7 个源文档*
-
