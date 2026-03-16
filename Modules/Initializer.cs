@@ -1,6 +1,7 @@
 // =====================================================
 // Initializer.cs - 项目初始化模块
 // ⚠️ C# 5.0 语法 - 禁止使用 $""、?.、nameof() 等
+// v4.5.18 - 修复目录/配置/模块验证列表、初始化顺序、死代码
 // =====================================================
 using System;
 using System.IO;
@@ -12,7 +13,6 @@ using System.Text;
 /// </summary>
 public class Initializer
 {
-    private static dynamic _project;
     private const string TAG = "Initializer";
     
     /// <summary>
@@ -20,8 +20,6 @@ public class Initializer
     /// </summary>
     public static string Run(object projectObj)
     {
-        _project = projectObj;
-        
         try
         {
             CoreHelper.Init(projectObj);
@@ -39,26 +37,9 @@ public class Initializer
             
             projectRoot = CoreHelper.NormalizePath(projectRoot);
             
-            // 初始化 VisionCorrector
-            try
-            {
-                string screenshotDir = projectRoot + "Screenshots\\";
-                string aiConfigPath = projectRoot + "Config\\AIConfig.json";
-                if (!Directory.Exists(screenshotDir))
-                {
-                    Directory.CreateDirectory(screenshotDir);
-                }
-                VisionCorrector.Init(projectObj, null, screenshotDir, aiConfigPath);
-                CoreHelper.Log(TAG, "[VisionCorrector] 初始化成功");
-            }
-            catch (Exception visionEx)
-            {
-                CoreHelper.LogWarn(TAG, "[VisionCorrector] 初始化失败: " + visionEx.Message);
-            }
-            
             CoreHelper.Log(TAG, "========================================");
-CoreHelper.Log(TAG, "  DPS v4.5 Persona - 初始化程序");
-            CoreHelper.Log(TAG, "  版本: 4.5.0-Modular");
+            CoreHelper.Log(TAG, "  DPS v4.5 Persona - 初始化程序");
+            CoreHelper.Log(TAG, "  版本: 4.5");
             CoreHelper.Log(TAG, "  日期: " + CoreHelper.GetNow());
             CoreHelper.Log(TAG, "========================================");
             CoreHelper.Log(TAG, "");
@@ -70,7 +51,7 @@ CoreHelper.Log(TAG, "  DPS v4.5 Persona - 初始化程序");
             
             CreateDir(projectRoot + "Config");
             CreateDir(projectRoot + "Config\\Operations");
-            CreateDir(projectRoot + "Config\\Selectors");
+            CreateDir(projectRoot + "Config\\IntentMappings");
             CreateDir(projectRoot + "Modules");
             CreateDir(projectRoot + "Modules\\Core");
             CreateDir(projectRoot + "Core");
@@ -80,6 +61,7 @@ CoreHelper.Log(TAG, "  DPS v4.5 Persona - 初始化程序");
             CreateDir(projectRoot + "Data");
             CreateDir(projectRoot + "Logs");
             CreateDir(projectRoot + "Reports");
+            CreateDir(projectRoot + "Screenshots");
             CreateDir(projectRoot + "Extensions");
             CreateDir(projectRoot + "Extensions\\DataSources");
             CreateDir(projectRoot + "Extensions\\Hooks");
@@ -88,16 +70,36 @@ CoreHelper.Log(TAG, "  DPS v4.5 Persona - 初始化程序");
             CoreHelper.Log(TAG, "[目录] 完成!");
             CoreHelper.Log(TAG, "");
             
+            // 初始化 VisionCorrector（目录已就绪）
+            try
+            {
+                string screenshotDir = projectRoot + "Screenshots\\";
+                string aiConfigPath = projectRoot + "Config\\AIConfig.json";
+                VisionCorrector.Init(projectObj, null, screenshotDir, aiConfigPath);
+                CoreHelper.Log(TAG, "[VisionCorrector] 初始化成功");
+            }
+            catch (Exception visionEx)
+            {
+                CoreHelper.LogWarn(TAG, "[VisionCorrector] 初始化失败: " + visionEx.Message);
+            }
+            
             // 验证配置文件
             int configOk = 0;
             int configMissing = 0;
             
             string[] requiredConfigs = new string[] {
                 "AIConfig.json",
-                "StageConfig.json",
+                "Apps.json",
                 "BehaviorConfig.json",
                 "DecisionConfig.json",
+                "device_app_mapping.json",
+                "EvolutionRules.json",
+                "ExtensionsConfig.json",
+                "ExtensionsRegistry.json",
+                "MaintenanceConfig.json",
                 "PlatformsConfig.json",
+                "StageConfig.json",
+                "ValidationRules.json",
                 "PersonaPrompt.txt"
             };
             
@@ -131,6 +133,7 @@ CoreHelper.Log(TAG, "  DPS v4.5 Persona - 初始化程序");
             CoreHelper.Log(TAG, "[模块] 检查核心模块...");
             
             string[] requiredModules = new string[] {
+                // Core 工具模块
                 "Modules\\Core\\CoreHelper.cs",
                 "Modules\\Core\\JsonHelper.cs",
                 "Modules\\Core\\AIService.cs",
@@ -140,6 +143,15 @@ CoreHelper.Log(TAG, "  DPS v4.5 Persona - 初始化程序");
                 "Modules\\Core\\ActionExecutor.cs",
                 "Modules\\Core\\IExtension.cs",
                 "Modules\\Core\\ExtensionManager.cs",
+                // Intent 系统模块 (v4.5.6+)
+                "Modules\\Core\\Intent.cs",
+                "Modules\\Core\\ZDCommand.cs",
+                "Modules\\Core\\ZDResult.cs",
+                "Modules\\Core\\ZennoDroidAdapter.cs",
+                "Modules\\Core\\IntentTranslator.cs",
+                "Modules\\Core\\OperationContext.cs",
+                "Modules\\Core\\VisionCorrector.cs",
+                // 业务逻辑模块
                 "Modules\\Main.cs",
                 "Modules\\SessionRunner.cs",
                 "Modules\\MemoryManager.cs",
@@ -165,11 +177,11 @@ CoreHelper.Log(TAG, "  DPS v4.5 Persona - 初始化程序");
             }
             
             // 保存状态
-            CoreHelper.SetVar("_init_status", "SUCCESS");
-            CoreHelper.SetVar("_config_ok", configOk.ToString());
-            CoreHelper.SetVar("_config_missing", configMissing.ToString());
-            CoreHelper.SetVar("_module_ok", moduleOk.ToString());
-            CoreHelper.SetVar("_module_missing", moduleMissing.ToString());
+            CoreHelper.SetVar("init_status", "SUCCESS");
+            CoreHelper.SetVar("config_ok", configOk.ToString());
+            CoreHelper.SetVar("config_missing", configMissing.ToString());
+            CoreHelper.SetVar("module_ok", moduleOk.ToString());
+            CoreHelper.SetVar("module_missing", moduleMissing.ToString());
             
             CoreHelper.Log(TAG, "");
             CoreHelper.Log(TAG, "========================================");
