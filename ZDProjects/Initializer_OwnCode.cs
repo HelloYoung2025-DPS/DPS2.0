@@ -8,12 +8,12 @@
 Func<string, string, object[], object> RunModule = (filePath, methodName, args) => {
     if (!System.IO.File.Exists(filePath)) { project.SendErrorToLog("[Initializer] 模块不存在: " + filePath); return null; }
     var allCodes = new System.Collections.Generic.List<string>();
-    string engineDir = System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(filePath)) + "\\Core\\";
-    foreach (string ef in new string[] { "ScriptHelpers.cs", "HumanizationEngine.cs", "UILocator.cs", "ErrorRecovery.cs" }) {
-        string efPath = engineDir + ef; if (System.IO.File.Exists(efPath)) { allCodes.Add(System.IO.File.ReadAllText(efPath, System.Text.Encoding.UTF8)); }
-    }
+    // ⚠️ Core/ 引擎文件（ScriptHelpers, HumanizationEngine, UILocator, ErrorRecovery）
+    // 是 "Own Code" 风格的裸代码（Func/Action 委托），不能和 class 一起编译。
+    // 它们仅供 ZDProjects/*.cs Own Code 动作块直接使用。
+    // 编译模块已通过 CoreHelper/SelectorEngine/UIHelper 提供等效功能。
     string coreDir = System.IO.Path.GetDirectoryName(filePath) + "\\Core\\";
-    foreach (string cf in new string[] { "CoreHelper.cs", "JsonHelper.cs", "AIService.cs", "FileHelper.cs", "IExtension.cs", "ExtensionManager.cs", "SelectorEngine.cs", "PageDetector.cs", "ActionExecutor.cs", "OperationContext.cs" }) {
+    foreach (string cf in new string[] { "CoreHelper.cs", "JsonHelper.cs", "AIService.cs", "FileHelper.cs", "IExtension.cs", "ExtensionManager.cs", "SelectorEngine.cs", "PageDetector.cs", "ActionExecutor.cs", "OperationContext.cs", "ManifestLoader.cs", "NavigationResolver.cs", "VisionCorrector.cs", "AppExplorer.cs", "RateLimiter.cs", "Intent.cs", "ZDCommand.cs", "ZDResult.cs", "ZennoDroidAdapter.cs", "IntentTranslator.cs", "SmartOrchestrator.cs" }) {
         string cfPath = coreDir + cf; if (System.IO.File.Exists(cfPath)) { allCodes.Add(System.IO.File.ReadAllText(cfPath, System.Text.Encoding.UTF8)); }
     }
     string extBaseDir = System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(filePath)) + "\\Extensions\\";
@@ -25,7 +25,7 @@ Func<string, string, object[], object> RunModule = (filePath, methodName, args) 
     foreach (string fileCode in allCodes) { foreach (string line in fileCode.Split(new string[] { "\r\n", "\n" }, System.StringSplitOptions.None)) { string trimmed = line.Trim(); if (trimmed.StartsWith("using ") && trimmed.EndsWith(";") && !trimmed.Contains("(")) { usings.Add(trimmed); } else { codeBody.AppendLine(line); } } }
     var finalCode = new System.Text.StringBuilder(); foreach (string u in usings) { finalCode.AppendLine(u); } finalCode.AppendLine(); finalCode.Append(codeBody.ToString()); string code = finalCode.ToString();
     var provider = new Microsoft.CSharp.CSharpCodeProvider(); var param = new System.CodeDom.Compiler.CompilerParameters();
-    param.ReferencedAssemblies.Add("System.dll"); param.ReferencedAssemblies.Add("System.Core.dll"); param.ReferencedAssemblies.Add("System.Data.dll"); param.ReferencedAssemblies.Add("System.Xml.dll"); param.ReferencedAssemblies.Add("Microsoft.CSharp.dll"); param.GenerateInMemory = true;
+    param.ReferencedAssemblies.Add("System.dll"); param.ReferencedAssemblies.Add("System.Core.dll"); param.ReferencedAssemblies.Add("System.Data.dll"); param.ReferencedAssemblies.Add("System.Xml.dll"); param.ReferencedAssemblies.Add("System.Xml.Linq.dll"); param.ReferencedAssemblies.Add("Microsoft.CSharp.dll"); param.GenerateInMemory = true;
     var result = provider.CompileAssemblyFromSource(param, code);
     if (result.Errors.HasErrors) { foreach (System.CodeDom.Compiler.CompilerError e in result.Errors) { project.SendErrorToLog(string.Format("[Initializer] 编译错误 行{0}: {1}", e.Line, e.ErrorText)); } return null; }
     string className = System.IO.Path.GetFileNameWithoutExtension(filePath); System.Type t = result.CompiledAssembly.GetType(className);
