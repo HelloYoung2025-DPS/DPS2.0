@@ -38,33 +38,31 @@ ZD 的 Own Code 环境限制了外部 DLL 加载；动态编译允许热更新�
 ## ADR-002: 三管道执行回退
 
 - **日期**: 2026-02-07 (v4.5.0)
-- **状态**: 已接受
+- **状态**: ~~已接受~~ → **已取代**（v4.5.11，2026-03-08）
 
 ### 背景
 
 需要灵活的操作执行机制，同时保持对旧脚本的向后兼容。随着项目演进，出现了三种不同风格的代码组织方式，需要统一调度。
 
-### 决策
+### 原始决策（已废弃）
 
 三级回退执行链：
 
 1. `ActionExecutor`（JSON 步骤驱动）
-2. `PlatformModule`（动态编译加载）
-3. `Independent Scripts`（`ZDProjects/*.cs` 旧脚本）
+2. ~~`PlatformModule`（动态编译加载）~~
+3. ~~`Independent Scripts`（`ZDProjects/*.cs` 旧脚本）~~
 
-### 理由
+### 取代说明（v4.5.11）
 
-`ActionExecutor` 提供配置化操作定义，适合简单流程；`PlatformModule` 提供编程灵活性，适合复杂逻辑；独立脚本保持旧代码兼容，避免大规模重写。
+经验证，主执行链已完全切换到 `ActionExecutor + operations.json` 单一路径。第 2、3 管道的代码分支虽存在但永远返回 ERROR，属于死代码。v4.5.11 正式移除了 `LoadPlatformModule` 方法和 `Platforms/` 目录下的旧模块实现（`RedditModule.cs`、`InstagramModule.cs`），以及 `Core/PlatformBase.cs` 接口定义。
+
+当前唯一执行路径：`SessionRunner` → `ExecuteWithUnifiedEngine` → `ActionExecutor.Execute(_operationsJson, opName, _platformConfig)`
 
 ### 后果
 
-- 维护三套执行路径增加了系统复杂度
-- 提供了渐进式迁移路径，旧脚本可逐步迁移到新管道
-- 调试时需要确认当前走的是哪条执行路径
-
-### 备选方案
-
-- 只保留 `ActionExecutor`：会丢失旧脚本兼容性，需要大量重写工作，排除
+- 消除了三套执行路径的维护复杂度
+- 所有平台操作通过 `Config/Operations/*.json` + `Config/IntentMappings/*.json` 定义
+- `ResolveIntentForAction` 和 `MapActionToOperations` 保留硬编码默认映射作为安全网
 
 ---
 
@@ -230,29 +228,32 @@ AI 服务不稳定，单一 API 可能因限流、网络问题、服务中断而
 ## ADR-008: 平台抽象
 
 - **日期**: 2026-02-07 (v4.5.0)
-- **状态**: 已接受
+- **状态**: ~~已接受~~ → **已取代**（v4.5.11，2026-03-08）
 
 ### 背景
 
 需要支持多个社交媒体平台，每个平台的 UI 结构和操作逻辑差异显著。如果不做抽象，`SessionRunner` 会充斥大量平台判断分支。
 
-### 决策
+### 原始决策（已废弃）
 
-`PlatformBase` 定义标准接口（`Initialize` / `Browse` / `Like` / `Comment` / `Follow` / `Share`），每个平台实现独立模块。
+~~`PlatformBase` 定义标准接口（`Initialize` / `Browse` / `Like` / `Comment` / `Follow` / `Share`），每个平台实现独立模块。~~
 
-### 理由
+### 取代说明（v4.5.11）
 
-统一接口使 `SessionRunner` 不需要关心具体平台细节；新增平台只需实现接口，不改动核心调度逻辑。
+平台差异现在完全通过 JSON 配置解决，不再需要 `PlatformBase` 接口或独立模块：
+
+- **UI 差异** → `Config/PlatformsConfig.json` 中的 `ui_selectors`（每个平台定义选择器）
+- **操作流程差异** → `Config/Operations/{platform}_operations.json`（每个平台定义步骤序列）
+- **意图映射差异** → `Config/IntentMappings/{platform}_intents.json`（action → intent → operations）
+- **页面状态识别** → `PlatformsConfig.json` 中的 `page_signatures`
+
+`PlatformBase.cs` 和 `Platforms/` 目录在 v4.5.11 中被删除。
 
 ### 后果
 
-- Reddit 和 Instagram 已完整实现
-- TikTok / Facebook 配置已准备但未启用（待实现）
-- 接口方法粒度需要在通用性和平台特性之间权衡
-
-### 备选方案
-
-- 单一模块 + 条件分支：随平台增加代码膨胀，不可扩展，排除
+- 新增平台只需添加 JSON 配置文件，无需编写 C# 模块
+- `Tools/app_onboarder/` 可自动生成这些配置
+- 所有平台共享同一套 `ActionExecutor` 执行引擎
 
 ---
 
@@ -432,3 +433,98 @@ UI 操作后无法确认是否成功执行，"以为点到了但实际没点到"
 
 ---
 
+## ADR-014: 文档双层职责与新人施工图优先
+
+- **日期**: 2026-03-07 (v4.5.16)
+- **状态**: 已接受
+
+### 背景
+
+`Docs/` 在多轮合并后，同时承担了新人入门、架构说明、平台指南、测试说明等多种职责。现有文档出现了三个问题：
+
+1. `ConfigGuide` 中的流程图偏概念说明，无法直接指导新人在 ZennoDroid 中搭建动作块和条件分支
+2. `TechManual`、模板文档、平台指南存在历史文件名和已失效路径，容易把读者引到仓库中不存在的文件
+3. 部分文档沿用“理想设计”或历史行为口径，和当前仓库真实运行链不一致
+
+### 决策
+
+将 `Docs/` 的职责固定为两层：
+
+1. `Docs/ConfigGuide_配置指南.md` 作为**新人施工文档**
+   - 必须使用可执行的 ZennoDroid 搭建步骤
+   - 流程图必须能直接照着创建模块、条件块和变量
+   - 变量名、返回值、条件表达式必须与当前代码一致
+   - 每张流程图必须标明它是“ZennoDroid 施工图”还是“模块内部逻辑图”
+   - 只要存在分支，就必须写清分支依据变量、返回值和 ZennoDroid 条件表达式
+   - 必须明确区分“首次最小闭环”和“完整生产链”
+2. `Docs/TechManual_技术手册.md` 作为**架构与参考文档**
+   - 负责解释主执行链、模块边界、配置契约、测试方案
+   - 不再假定读者会根据它直接在 ZennoDroid 里施工
+
+同时要求 `Docs/README.md` 与 `Docs/DOCS_RULES.md` 始终反映真实文件清单，所有平台指南和模板文档必须引用当前仓库真实存在的路径。
+
+### 理由
+
+新人最常见的失败点不是“看不懂概念”，而是“照着图搭项目却搭错节点或变量”。把施工职责集中到 `ConfigGuide`，能减少路径错误、变量错误和错误分支。把架构说明集中到 `TechManual`，能避免同一内容在多个文档里出现不同说法。
+
+### 后果
+
+- 文档更新时必须先判断是“施工说明”还是“架构参考”，避免两类内容继续混写
+- `ConfigGuide` 的流程图需要维护到 ZennoDroid 可直接照做的粒度
+- `ConfigGuide` 中的每个分支都必须能回溯到具体变量与返回值，禁止只写“无画像 / 准备就绪”这类抽象分支名
+- `TechManual`、模板文档、平台指南中的历史死链需要持续清理
+
+### 备选方案
+
+- 保持现状：文档混用概念说明和施工说明，继续制造新人接线错误，排除
+- 继续拆分成多个新文件：违反当前 `Docs/` 根目录禁止新增文件的规则，排除
+
+---
+
+## ADR-015: SessionRunner 执行层向 ZennoDroid 原生动作迁移
+
+- **日期**: 2026-03-14
+- **状态**: 已接受
+
+### 背景
+
+当前 SessionRunner 中的 APP 具体执行动作（tap、swipe、input 等）全部由 C# 代码通过 ActionExecutor 驱动。这种方式的拟人化程度不足，无法充分利用 ZennoDroid 原生的拟人行为能力（如贝塞尔曲线滑动、随机偏移、分心模式等）。
+
+### 决策
+
+将执行层分为四层：
+
+1. **ZD 原子动作层**: tap、double_tap、swipe、long_press、input_text、wait、back、scroll_once 等最小执行单元，由 ZD 动作块或子工作流承载，通过编号 + Switch 动作块分发
+2. **ZD 组合动作层**: open_post、like_post、comment_post、browse_feed、back_to_feed 等业务子流程，由若干原子动作组合而成，对齐现有 `Config/Operations/*.json` 中的 operation 定义
+3. **SessionRunner 智能编排层**: 保留会话生命周期总控、意图编排、恢复编排、成功门控；新增智能编排器子模块负责判断上一步是否执行正确并决定恢复策略
+4. **AI 视觉纠偏层**: 在分级恢复失败后介入，允许识别当前页面状态、提供纠偏建议、临时修正功能块或小流程（仅限当前 session）
+
+Switch 编号路由采用混合组织方式：先平台、再页面、再动作。
+
+成功判定采用双层机制：
+- ZD 层判定执行成功（动作块或子工作流无运行时错误）
+- 编排器判定业务成功（页面状态符合预期、关键元素变化、变量更新）
+
+### 理由
+
+- ZennoDroid 原生动作具备更好的拟人化能力，C# 直接驱动的 tap/swipe 缺乏自然偏移和曲线
+- 分层设计使各层可独立演进，原子动作可跨平台复用
+- 智能编排器先内嵌后独立，降低一次性改造风险
+- 双层成功判定避免"假成功"（动作执行完但页面没变化）
+- Reddit 作为试点验证框架有效性，最终沉淀为通用框架
+
+### 后果
+
+- 需要在 ZennoDroid 项目中创建原子动作块和 Switch 路由
+- 现有 `Config/Operations/*.json` 中的 operation 定义保留复用，不重造
+- SessionRunner 保留编排、恢复、日志、会话控制职责，剥离物理执行细节
+- 迁移过程需要 feature-flag 实现新旧路径并存，支持安全回滚
+- AI 视觉修正仅限 session 级别，不自动持久化为长期规则
+
+### 备选方案
+
+- 保持纯 C# 执行：拟人化不足，无法利用 ZD 原生能力，排除
+- 全部重写为 ZD 项目流程：SessionRunner 失去会话控制能力，风险过高，排除
+- 一次性大爆炸迁移：无法安全回滚，排除
+
+---

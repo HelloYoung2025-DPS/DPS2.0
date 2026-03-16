@@ -52,12 +52,11 @@ DPS_v4.5/
 │   ├── StageConfig.json         # 7 阶段生命周期配置
 │   ├── ValidationRules.json     # 数据验证规则
 │   └── device_app_mapping.json  # 设备→平台映射
-├── Core/                        # ZD 脚本层引擎（5 个文件）
+├── Core/                        # ZD 脚本层引擎（4 个文件）
 │   ├── ScriptHelpers.cs         # ZD 公共函数库（GetVar/SetVar/Humanization）
 │   ├── HumanizationEngine.cs    # 人性化行为引擎 — 4 种配置
 │   ├── UILocator.cs             # 多策略 UI 元素定位
-│   ├── ErrorRecovery.cs         # 错误恢复 — 指数退避重试
-│   └── PlatformBase.cs          # 平台基类接口定义
+│   └── ErrorRecovery.cs         # 错误恢复 — 指数退避重试
 ├── Modules/                     # 业务逻辑模块（14 个 .cs）
 │   ├── Main.cs                  # 主入口 — 检查画像状态，分发流程
 │   ├── Initializer.cs           # 初始化 — 创建目录、验证配置
@@ -87,13 +86,6 @@ DPS_v4.5/
 │       ├── ZDResult.cs          # v4.5.6 新增：统一执行结果（311 行）
 │       ├── ZennoDroidAdapter.cs # v4.5.6 新增：API 适配器（408 行）
 │       └── IntentTranslator.cs  # v4.5.6 新增：意图翻译器（472 行）
-├── Platforms/                   # 平台实现
-│   ├── Reddit/
-│   │   └── RedditModule.cs      # Reddit 6 种操作
-│   ├── Instagram/
-│   │   └── InstagramModule.cs   # Instagram 6 种操作 + 速率限制
-│   └── BabyCenter/
-│       └── BabyCenterModule.cs  # BabyCenter 6 种操作 (v4.5.7 新增)
 ├── Extensions/                  # 可插拔扩展
 │   ├── DataSources/
 │   │   ├── IPLocationExtension.cs
@@ -205,9 +197,12 @@ ReportGen
 
 ## 6. 关键模块说明
 
-### SessionRunner.cs（853 行）
+### SessionRunner.cs（~1490 行）
 会话执行的核心。负责：
+- 通过 `device_app_mapping.json` 选择平台，加载 `PlatformsConfig.json` 和 `operations.json`
+- 加载 `IntentMappings` 意图映射（可选，缺失时回退到硬编码默认映射）
 - 从 BehaviorConfig 读取动作权重，加权随机选择下一个动作
+- 通过 `ExecuteWithUnifiedEngine` → `ActionExecutor.Execute` 执行具体 UI 操作
 - 疲劳模型：连续执行同类动作后，该动作权重临时降低
 - 时间感知：根据当前时间（早/午/晚）调整行为模式
 - 调用 HumanizationEngine 在每次操作前后插入随机延迟

@@ -24,7 +24,7 @@ metadata:
   full_name: Dynamic Persona Simulation
   version: 4.5.8
   created_date: 2026-01-01
-  last_updated: 2026-02-28
+  last_updated: 2026-03-07
   total_files: 77
   total_lines: ~24100
   language_version: C# 5.0 (Modules/), C# 7.0+ (ZDProjects/)
@@ -134,6 +134,15 @@ operations:
     status: completed
     completed_date: 2026-02-27
 
+  - id: op-l1-005
+    name: 文档体系治理
+    description: 清理 Docs 目录索引失真、施工流程图失真、分支依据缺失和历史死链
+    complexity: medium
+    risk: low
+    estimated_hours: 8+
+    status: completed
+    completed_date: 2026-03-07
+
 # 成功标准
 success_criteria:
   - 所有模块编译通过
@@ -172,6 +181,43 @@ dependencies:
       type: AI Service
   internal: []
 
+# L1 强制执行协议
+change_protocol:
+  gate_script: Tools/omo_guard/Invoke-OmoGate.ps1
+  gate_phases:
+    - Preflight: 开始实现前
+    - Advance: 每个计划文件完成后
+    - Postflight: 收尾与验证命令执行
+  primary_files:
+    - .omo/current-task/plan.md
+    - .omo/decisions_架构决策.md
+    - .omo/layers/l1-project.yaml
+  edit_order:
+    - 先更新计划并标注主层级/受影响层级
+    - 再更新架构决策与项目级约束
+    - 再同步受影响的 l2/l3/l4 登记
+    - 再修改 Config/Modules/Tools/Tests
+    - 若入口接口变化，最后再改 ZDProjects
+    - 最后更新 CHANGELOG.md
+  validation_order:
+    - 先做 L4 级局部验证
+    - 再做 L3 级契约与 operation 验证
+    - 再做 L2 级模块装载与回归
+    - 最后做 L1 级跨模块/跨平台一致性复核
+  stop_conditions:
+    - 未执行 Gate Preflight，不得开始实现
+    - 若未更新决策记录，不得开始实现
+    - 若无法明确影响模块，不得开始实现
+coding_rules:
+  - 先写架构决策，再动实现
+  - 不允许隐式改变主执行链
+  - 不允许新增绕过 SessionRunner/ActionExecutor 主链的旁路
+  - 必须保持向后兼容
+  - 新人施工文档必须优先保证可执行性与路径准确性
+  - 新人施工图必须标注分支依据变量、返回值、条件表达式，并区分施工图与模块内部图
+  - 执行层迁移必须通过 feature-flag 实现新旧路径并存，支持安全回滚 (ADR-015)
+  - ZD 原子动作层与组合动作层必须复用现有 Operations JSON 契约，不重造 (ADR-015)
+
 # 已知技术债
 technical_debt:
   - item: Extensions/Hooks/ 目录为空
@@ -186,6 +232,11 @@ technical_debt:
   - item: Modules/Persona/ 子目录占位
     priority: low
     estimated_cost: 待评估
+  - item: SessionRunner 执行层向 ZD 原生动作迁移 (ADR-015)
+    priority: high
+    estimated_cost: 分阶段推进，Reddit 试点为首批
+    status: in_progress
+    reference: .omo/decisions_架构决策.md#ADR-015
 
 # 7 阶段生命周期
 lifecycle_stages:

@@ -50,6 +50,36 @@ steps:
     risk: low
     last_modified: 2026-02-27
 
+  - id: op-sr-001-04
+    name: detect-initial-page
+    operation: initialize-session
+    module: SessionRunner
+    description: APP 打开后检测当前所处页面（首页/帖子/频道/其他）
+    code: "_currentPage = DetectInitialPage();"
+    complexity: medium
+    risk: low
+    last_modified: 2026-03-08
+
+  - id: op-sr-001-05
+    name: plan-pre-session-actions
+    operation: initialize-session
+    module: SessionRunner
+    description: 根据检测到的页面状态规划预设动作序列（剧本）
+    code: "List<string> preActions = PlanPreSessionActions(_currentPage);"
+    complexity: medium
+    risk: low
+    last_modified: 2026-03-08
+
+  - id: op-sr-001-06
+    name: execute-pre-session-actions
+    operation: initialize-session
+    module: SessionRunner
+    description: 在主循环前执行规划的预设动作序列
+    code: "ExecutePreSessionActions(preActions, platformName, projectRoot);"
+    complexity: medium
+    risk: low
+    last_modified: 2026-03-08
+
   # === SessionRunner.LoadBehaviorConfig() 步骤 ===
   - id: op-sr-002-01
     name: read-behavior-file
@@ -290,6 +320,109 @@ steps:
     risk: medium
     last_modified: 2026-02-27
 
+
+  # === Initializer.Run() 步骤 ===
+  - id: op-init-001-01
+    name: create-directories
+    operation: initialize-project
+    module: Initializer
+    description: 创建运行时目录结构（Persons/Memory/Logs/Reports/Screenshots/Config 子目录）
+    code: "CreateDir(projectRoot + dir);"
+    complexity: low
+    risk: low
+    last_modified: 2026-03-08
+
+  - id: op-init-001-02
+    name: validate-configs
+    operation: initialize-project
+    module: Initializer
+    description: 验证 13 个关键配置文件存在性
+    code: "foreach (string cfg in requiredConfigs) { File.Exists(cfgPath); }"
+    complexity: low
+    risk: low
+    last_modified: 2026-03-08
+
+  - id: op-init-001-03
+    name: validate-modules
+    operation: initialize-project
+    module: Initializer
+    description: 验证 20 个核心模块文件存在性
+    code: "foreach (string mod in requiredModules) { File.Exists(modPath); }"
+    complexity: low
+    risk: low
+    last_modified: 2026-03-08
+
+  - id: op-init-001-04
+    name: init-vision-corrector
+    operation: initialize-project
+    module: Initializer
+    description: 初始化 VisionCorrector 子系统
+    code: "VisionCorrector.Init(projectObj, null, screenshotDir, aiConfigPath);"
+    complexity: low
+    risk: low
+    last_modified: 2026-03-08
+
+  # === AppOnboarder 新增步骤 (v1.1) ===
+  - id: op-ao-001-01
+    name: detect-app-state
+    operation: app-onboarder-explore
+    module: AppOnboarder (UIAnalyzer)
+    description: 综合分析当前 APP 页面状态（home/feed/post_detail/profile/unknown）
+    code: "state = analyzer.detect_app_state()"
+    complexity: medium
+    risk: low
+    last_modified: 2026-03-08
+
+  - id: op-ao-001-02
+    name: plan-exploration
+    operation: app-onboarder-explore
+    module: AppOnboarder (AppExplorer)
+    description: 根据检测到的状态规划探索流程（跳过/调整 Phase）
+    code: "phases = self.plan_exploration(current_state)"
+    complexity: medium
+    risk: low
+    last_modified: 2026-03-08
+
+  - id: op-ao-001-03
+    name: navigate-to-home
+    operation: app-onboarder-explore
+    module: AppOnboarder (AppExplorer)
+    description: 从任意页面导航回首页
+    code: "self.navigate_to_home()"
+    complexity: medium
+    risk: low
+    last_modified: 2026-03-08
+
+  - id: op-ao-001-04
+    name: visual-checkpoint
+    operation: app-onboarder-explore
+    module: AppOnboarder (AppExplorer)
+    description: 每个 Phase 结束后截图保存视觉验证检查点
+    code: "self.visual_checkpoint(phase_name)"
+    complexity: low
+    risk: low
+    last_modified: 2026-03-08
+
+  - id: op-ao-001-05
+    name: get-device-info
+    operation: app-onboarder-device
+    module: AppOnboarder (ADBController)
+    description: 获取完整设备信息（型号、Android 版本、分辨率、DPI）
+    code: "info = adb.get_device_info()"
+    complexity: low
+    risk: low
+    last_modified: 2026-03-08
+
+  - id: op-ao-001-06
+    name: step-detect-state
+    operation: app-onboarder-main
+    module: AppOnboarder (main)
+    description: 主入口中的页面状态检测步骤
+    code: "state = step_detect_state(adb, package_name)"
+    complexity: low
+    risk: low
+    last_modified: 2026-03-08
+
 # 步骤类型分类
 types:
   - type: variable_assignment
@@ -383,3 +516,36 @@ success_criteria:
 dependencies:
   parent_level: l3-operation
   child_levels: []
+
+# L4 强制执行协议
+change_protocol:
+  gate_script: Tools/omo_guard/Invoke-OmoGate.ps1
+  gate_phases:
+    - Preflight: 开始实现前
+    - Advance: 每个计划文件完成后
+    - Postflight: 收尾与验证命令执行
+  primary_files:
+    - .omo/current-task/plan.md
+    - .omo/modules/{ModuleName}.md
+    - .omo/layers/l4-step.yaml
+  edit_order:
+    - 先更新计划与模块追踪文件
+    - 再更新 l4-step.yaml 中对应 step / primitive 记录
+    - 再修改 step 所属代码
+    - 若影响 operation 契约，再回写 l3-operation.yaml 与 Config/Operations/*
+    - 最后更新 CHANGELOG.md
+  validation_order:
+    - 先做局部逻辑/语法验证
+    - 再做受影响 operation 的针对性验证
+    - 若 step 被多个模块复用，再做模块级回归
+  stop_conditions:
+    - 未执行 Gate Preflight，不得修改 step / primitive
+    - 未记录 step 变化，不得改 primitive 语义
+    - 若会影响上层契约，未回写 L3 不得结束任务
+coding_rules:
+  - 最小改动，禁止顺手改 unrelated 逻辑
+  - 明确 success / retry / skip / abort 路径
+  - 不新增重复 primitive
+  - 若新增 I/O，必须补错误处理
+  - 原子动作下沉到 ZD 后必须保持与现有 step action 语义兼容 (ADR-015)
+  - 双层成功判定: ZD 判执行成功，编排器判业务成功 (ADR-015)

@@ -473,6 +473,18 @@ modules:
     used_by: [所有模块]
     last_modified: 2026-02-27
 
+  - id: m-tool-001
+    name: AppOnboarder
+    file: Tools/app_onboarder/ (6 files)
+    lines: ~4558
+    status: modifying
+    complexity: medium
+    risk: medium
+    description: 新平台自动接入工具 Python CLI（正在升级：智能页面检测+动态剧本+视觉验证）
+    depends_on: []
+    used_by: []
+    last_modified: 2026-03-08
+
 # 模块操作
 operations:
   - id: op-l2-001
@@ -528,3 +540,37 @@ success_criteria:
 dependencies:
   parent_level: l1-project
   child_levels: [l3-operation]
+
+# L2 强制执行协议
+change_protocol:
+  gate_script: Tools/omo_guard/Invoke-OmoGate.ps1
+  gate_phases:
+    - Preflight: 开始实现前
+    - Advance: 每个计划文件完成后
+    - Postflight: 收尾与验证命令执行
+  primary_files:
+    - .omo/current-task/plan.md
+    - .omo/modules/{ModuleName}.md
+    - .omo/layers/l2-module.yaml
+  edit_order:
+    - 先更新计划与模块追踪文件
+    - 再更新 l2-module.yaml 中对应模块状态与说明
+    - 若 operation/step 受影响，先更新 l3/l4 登记
+    - 再修改模块源码
+    - 若接口变化，再同步 Config/Platforms/Extensions/ZDProjects
+    - 最后更新 CHANGELOG.md
+  validation_order:
+    - 先做受影响 step/operation 的针对性验证
+    - 再做模块级编译/装载验证
+    - 最后做主模块回归
+  stop_conditions:
+    - 未执行 Gate Preflight，不得修改模块源码
+    - 未创建或更新模块追踪文件，不得修改模块源码
+    - 未明确模块输入输出，不得开始重构
+coding_rules:
+  - 模块保持单一职责
+  - 不把 ZennoDroid 物理执行细节直接散落到业务模块
+  - 优先复用 Modules/Core 中已有能力
+  - 所有 I/O 必须包含错误处理
+  - SessionRunner 迁移期间新增子模块(智能编排器等)必须先内嵌后独立 (ADR-015)
+  - 下沉职责时保留 SessionRunner 对会话结果契约的唯一所有权 (ADR-015)

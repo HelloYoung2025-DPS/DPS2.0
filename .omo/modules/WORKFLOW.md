@@ -1,202 +1,159 @@
-# .omo 2.0 模块修改工作流程
+# .omo 模块追踪与分层落地工作流
 
-## 🎯 概述
+## 概述
 
-当需要修改一个模块时，.omo 2.0 会创建一个**模块追踪文件**，记录从 L1 到 L4 的所有修改内容，确保下次会话无缝衔接。
+本文件不是“可选建议”，而是 `L2/L3/L4` 任务的强制执行流程。  
+任何涉及模块、操作、step 的任务，都必须同时遵守：
 
----
+1. `.omo/layers/EXECUTION_PROTOCOL.md`
+2. 本文件
+3. `.omo/modules/TEMPLATE.md`
+4. `Tools/omo_guard/Invoke-OmoGate.ps1`
 
-## 📁 文件结构
+## 文件结构
 
 ```
 .omo/
-├── modules/                    # 模块修改追踪目录
-│   ├── TEMPLATE.md             # 模块记录模板
-│   ├── {{ModuleName}}.md       # 模块修改记录（自动创建）
-│   └── index.md                # 模块修改索引
-│
-├── layers/                     # L1-L4 层级定义（动态更新）
-│   ├── l1-project.yaml         # 反映项目级变更
-│   ├── l2-module.yaml          # 反映模块状态变更
-│   ├── l3-operation.yaml       # 反映操作变更
-│   └── l4-step.yaml            # 反映步骤变更
-│
-└── current-task/               # 当前任务（指向模块）
-    └── plan.md                 # 包含模块修改计划
+├── modules/
+│   ├── TEMPLATE.md
+│   ├── {{ModuleName}}.md
+│   └── index.md
+├── layers/
+│   ├── l1-project.yaml
+│   ├── l2-module.yaml
+│   ├── l3-operation.yaml
+│   ├── l4-step.yaml
+│   └── EXECUTION_PROTOCOL.md
+└── current-task/
+    └── plan.md
 ```
 
----
+## 强制流程
 
-## 🔄 模块修改工作流
+### 第 1 步：先判层级
 
-### 第一步：开始模块修改
+先判断这次修改的：
 
-用户指令：
-```
-"修改 SessionRunner 模块，优化疲劳模型"
-```
+- **主层级**：`L1 / L2 / L3 / L4`
+- **受影响层级**：可能不止一个
+- **主模块**：如果主层级是 `L2/L3/L4`，必须明确主模块
 
-**AI 自动执行**：
-1. 在 `.omo/modules/` 创建 `SessionRunner.md`
-2. 复制 `TEMPLATE.md` 内容
-3. 填写模块基本信息
-4. 更新 `l2-module.yaml` 中 SessionRunner 的状态为 `modifying`
+若这三项有任何一项不清楚，先提问，不准直接编码。
 
-### 第二步：记录修改内容
+### 第 2 步：先写计划
 
-在修改过程中，AI 实时更新 `SessionRunner.md`：
+在 `.omo/current-task/plan.md` 中写清：
 
-```yaml
-# L2 模块状态
-module:
-  status: modifying
-  last_modified: 2026-02-28
-  modified_by: ai_session_abc123
+- 主层级
+- 受影响层级
+- 主模块
+- 文件修改顺序
+- 验证顺序
+- 强制运行命令（这里填验证/构建/测试命令，不填 `Postflight` 自身）
+- 预计要跑的检查
 
-changes:
-  - type: optimization
-    description: 优化疲劳模型算法
-    files_affected:
-      - Modules/SessionRunner.cs
-    methods_changed:
-      - ApplyFatigue()
-      - CalculateDecay()
-```
+未写完计划，不允许开始实现。
 
-### 第三步：会话结束保存
+### 第 3 步：创建或更新模块追踪文件
 
-AI 自动：
-1. 更新 `.omo/modules/SessionRunner.md` 的"下次会话继续点"
-2. 更新 `.omo/modules/index.md` 记录本次会话
-3. 保存当前状态到 `l2-module.yaml`
+只要任务涉及 `L2/L3/L4`，都必须创建或更新：
 
-### 第四步：下次会话恢复
+- `.omo/modules/{ModuleName}.md`
 
-用户指令：
-```
-"继续修改 SessionRunner 模块"
-```
+这个文件必须在任何实现文件之前更新，至少包含：
 
-**AI 自动执行**：
-1. 读取 `.omo/modules/SessionRunner.md`
-2. 定位"下次会话继续点"
-3. 读取相关源码文件
-4. 继续工作
+- 主层级 / 受影响层级
+- 本次任务目标
+- 强制文件顺序
+- 强制验证顺序
+- 强制运行命令
+- 当前进度与下次继续点
 
----
+### 第 4 步：执行 Gate 预检
 
-## 📝 模块记录文件格式
+在计划和模块追踪文件准备完成后，必须执行：
 
-每个模块的记录文件包含：
+- `pwsh -File Tools\omo_guard\Invoke-OmoGate.ps1 -Phase Preflight`
 
-| 部分 | 内容 |
-|------|------|
-| **模块信息** | 名称、文件、日期、会话ID |
-| **修改目标** | 目标描述、影响范围、预计时间 |
-| **L2 模块状态** | 修改前后的状态对比（YAML） |
-| **L3 操作变更** | 新增/修改/删除的操作 |
-| **L4 步骤变更** | 新增/修改/删除的步骤 |
-| **依赖影响** | 影响的模块、合约、测试 |
-| **进度跟踪** | 当前阶段、完成度、剩余工作 |
-| **继续点** | 下次会话从哪里开始 |
-| **变更日志** | 历史修改记录 |
+随后立刻对已经完成的文件按顺序执行：
 
----
+- `pwsh -File Tools\omo_guard\Invoke-OmoGate.ps1 -Phase Advance -FilePath ".omo/current-task/plan.md"`
+- 若存在模块追踪文件，再对 `.omo/modules/{ModuleName}.md` 执行 `Advance`
 
-## 🔍 自动更新机制
+### 第 5 步：先更新分层登记，再改实现
 
-### l2-module.yaml 自动更新
+顺序固定：
 
-当模块状态变化时，自动更新：
+1. `.omo/layers/l2-module.yaml`
+2. `.omo/layers/l3-operation.yaml`
+3. `.omo/layers/l4-step.yaml`
+4. `Config/` / `Modules/` / `Platforms/` / `Extensions/`
+5. `ZDProjects/`（仅接口变化时）
+6. 测试资产
+7. `CHANGELOG.md`
 
-```yaml
-- id: m-biz-001
-  name: SessionRunner
-  status: modifying  # ← 自动变更
-  last_modified: 2026-02-28  # ← 自动更新
-  current_task: "优化疲劳模型"  # ← 新增字段
-  session_id: "ses_abc123"  # ← 新增字段
-```
+若某层不受影响，可跳过；但不得跳过实际受影响的层。
 
-### l3-operation.yaml 自动更新
+每完成一个计划中的文件，必须执行：
 
-当操作变更时，自动添加/更新操作记录
+- `pwsh -File Tools\omo_guard\Invoke-OmoGate.ps1 -Phase Advance -FilePath "<刚完成的文件>"`
 
-### l4-step.yaml 自动更新
+## 模块追踪文件必须记录什么
 
-当步骤变更时，自动添加/更新步骤记录
+| 部分 | 必填内容 |
+|------|----------|
+| 任务头 | 任务名称、主层级、受影响层级、模块名 |
+| 目标 | 目标描述、风险、兼容性要求 |
+| 文件顺序 | 先改哪些文件、后改哪些文件 |
+| 验证顺序 | 先跑哪些检查、后跑哪些检查 |
+| 运行命令 | `Postflight` 将执行的验证命令（不含 Gate 本身） |
+| L2 状态 | 模块状态、版本、变更摘要 |
+| L3 变化 | operation / intent / contract 变化 |
+| L4 变化 | step / primitive / 局部代码变化 |
+| 依赖影响 | 影响的模块、配置、测试 |
+| 继续点 | 当前停留位置与下一步 |
 
----
+## 分层开发规则
 
-## 🎯 使用示例
+### `L2`
 
-### 示例 1：单次会话完成
+- 重点是模块边界、接口、职责
+- 先更新 `l2-module.yaml`，再改模块代码
+- 若涉及 operation / step，必须继续下钻到 `L3/L4`
 
-```
-用户: "修复 MemoryManager 的去重 bug"
-AI:
-  1. 创建 .omo/modules/MemoryManager.md
-  2. 修改源码
-  3. 更新记录文件
-  4. 更新 l2-module.yaml 状态为 "stable"
-  5. 归档记录文件到 .omo/history/
-```
+### `L3`
 
-### 示例 2：多次会话完成
+- 重点是 `action -> intent -> operation`
+- 先更新 `l3-operation.yaml`
+- 再改 `Config/ActionCatalog.json`、`Config/IntentMappings/*`、`Config/Operations/*`
+- 最后才改编排模块
 
-```
-# 会话 1
-用户: "开始重构 SessionRunner"
-AI:
-  1. 创建 .omo/modules/SessionRunner.md
-  2. 状态: "implementing" (20%)
-  3. 继续: "完成主循环重构"
+### `L4`
 
-# 会话 2
-用户: "继续 SessionRunner 重构"
-AI:
-  1. 读取 .omo/modules/SessionRunner.md
-  2. 定位继续点
-  3. 继续重构
-  4. 状态: "implementing" (60%)
-  5. 继续: "完成疲劳模型重构"
+- 重点是具体 step / primitive / 局部逻辑
+- 先更新 `l4-step.yaml`
+- 再改 step 所属代码
+- 若影响 operation 契约，必须回写 `L3`
 
-# 会话 3
-用户: "完成 SessionRunner 重构"
-AI:
-  1. 读取 .omo/modules/SessionRunner.md
-  2. 完成剩余工作
-  3. 状态: "testing"
-  4. 更新 l2-module.yaml 为 "stable"
-  5. 归档到 .omo/history/
-```
+## 会话结束前必须完成
 
----
+1. 更新 `.omo/modules/{ModuleName}.md`
+2. 更新 `.omo/modules/index.md`（若有活跃模块变化）
+3. 更新相关 `l2/l3/l4` yaml
+4. 记录已跑验证和未跑验证
+5. 最后更新 `CHANGELOG.md`
+6. 执行 `pwsh -File Tools\omo_guard\Invoke-OmoGate.ps1 -Phase Postflight -ExecuteCommands`
 
-## 📊 模块索引文件
+## 失败与中断规则
 
-`.omo/modules/index.md` 记录所有活跃的模块修改：
+若会话中断或任务未完成，模块追踪文件必须明确写出：
 
-```markdown
-# 活跃模块修改
+- 停在什么文件
+- 已完成到哪一层
+- 下一步先改什么
+- 还缺哪些验证
 
-| 模块 | 状态 | 进度 | 最后修改 | 会话 |
-|------|------|------|----------|------|
-| SessionRunner | modifying | 60% | 2026-02-28 | ses_abc123 |
-| MemoryManager | stable | 100% | 2026-02-27 | ses_xyz789 |
-```
+## 版本
 
----
-
-## ✅ 无缝衔接保证
-
-1. **状态持久化**：所有修改状态保存在 `.omo/modules/{{ModuleName}}.md`
-2. **继续点明确**：每次会话结束前记录"下次会话继续点"
-3. **上下文完整**：记录所有相关文件路径和修改内容
-4. **版本追踪**：记录修改前后的版本和哈希
-5. **依赖追踪**：记录影响的模块、合约、测试
-
----
-
-**最后更新**: 2026-02-28
-**版本**: 2.1.0
+- **最后更新**: 2026-03-06
+- **版本**: 3.1.0

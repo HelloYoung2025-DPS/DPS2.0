@@ -580,3 +580,38 @@ success_criteria:
 dependencies:
   parent_level: l2-module
   child_levels: [l4-step]
+
+# L3 强制执行协议
+change_protocol:
+  gate_script: Tools/omo_guard/Invoke-OmoGate.ps1
+  gate_phases:
+    - Preflight: 开始实现前
+    - Advance: 每个计划文件完成后
+    - Postflight: 收尾与验证命令执行
+  primary_files:
+    - .omo/current-task/plan.md
+    - .omo/modules/{ModuleName}.md
+    - .omo/layers/l3-operation.yaml
+  edit_order:
+    - 先更新计划与模块追踪文件
+    - 再更新 l3-operation.yaml 中对应 operation
+    - 若动作语义变化，先更新 Config/ActionCatalog.json
+    - 再更新 Config/IntentMappings/*
+    - 再更新 Config/Operations/*
+    - 最后才修改 SessionRunner / IntentTranslator / 相关编排代码
+    - 最后更新 CHANGELOG.md
+  validation_order:
+    - 先做 JSON 结构校验
+    - 再做 action -> intent -> operation 一致性检查
+    - 再做 operation 级验证
+    - 最后做模块级回归
+  stop_conditions:
+    - 未执行 Gate Preflight，不得修改 operation / mapping
+    - 映射与 operation 未同步前，不得宣称完成
+    - 不清楚该改配置还是改代码时，必须先提问
+coding_rules:
+  - 优先配置化表达
+  - 保持 action -> intent -> operation 契约一致
+  - operation 命名、失败路径、变量写入必须稳定
+  - selector / intent / operation 改动必须同步测试
+  - 迁移期间现有 Operations JSON 定义保留复用，组合动作层与其对齐而非替代 (ADR-015)
