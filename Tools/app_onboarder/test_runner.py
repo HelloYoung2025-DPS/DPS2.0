@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# pyright: reportGeneralTypeIssues=false, reportArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportOptionalSubscript=false, reportCallIssue=false, reportOperatorIssue=false, reportMissingTypeArgument=false
 """
 DPS v4.5 App Onboarder - 测试运行器
 执行 E2E PowerShell 测试脚本，分析失败原因，自动修复配置并重试。
@@ -67,6 +68,8 @@ class TestRunner(object):
         self.fix_history = []
         # 日志缓冲区
         self._log_buffer = []
+        # 记录各阶段截图路径
+        self._phase_screenshots = {}
 
     # ================================================================
     # 日志
@@ -94,6 +97,25 @@ class TestRunner(object):
 
     def _log_error(self, message):
         self._log("ERROR", message)
+
+    def _capture_phase_screenshot(self, phase):
+        """
+        在每个测试阶段后截图保存
+
+        Args:
+            phase (int): 阶段号
+
+        Returns:
+            str: 截图路径，失败返回空字符串
+        """
+        try:
+            screenshot_path = self.adb.screenshot("e2e_phase_{}".format(phase))
+            self._log_info("Phase {} 截图已保存: {}".format(phase, screenshot_path))
+            self._phase_screenshots[phase] = screenshot_path
+            return screenshot_path
+        except Exception as e:
+            self._log_warn("Phase {} 截图失败: {}".format(phase, str(e)))
+            return ""
 
     # ================================================================
     # 公共接口
@@ -146,6 +168,11 @@ class TestRunner(object):
             self._log_info("测试结果: {0}/{1} 通过".format(
                 results.get("pass_count", 0), results.get("total", 0)
             ))
+
+            # 对失败的 Phase 截图记录
+            for phase_num, phase_data in results.get("phases", {}).items():
+                if not phase_data.get("passed"):
+                    self._capture_phase_screenshot(phase_num)
 
             # 2. 检查是否全部通过
             if results["pass_count"] == results["total"] and results["total"] > 0:
@@ -312,11 +339,20 @@ class TestRunner(object):
             pass_count, total, len(phases)
         ))
 
+        # 截图保存当前状态用于测试报告
+        try:
+            screenshot_path = self.adb.screenshot("test_final_state")
+            self._log_info("测试结束截图: {}".format(screenshot_path))
+        except Exception as e:
+            self._log_warn("测试截图失败: {}".format(str(e)))
+            screenshot_path = ""
+
         return {
             "total": total,
             "pass_count": pass_count,
             "phases": phases,
             "raw_output": raw_output,
+            "screenshot": screenshot_path,
         }
 
     def analyze_failures(self, results):
@@ -883,7 +919,13 @@ class TestRunner(object):
             "summary": summary,
             "log": list(self._log_buffer),
             "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "phase_screenshots": getattr(self, '_phase_screenshots', {}),
         }
+        report["screenshots"] = []
+        # Collect any screenshots from fixes
+        for fix in fixes_applied:
+            if fix.get("screenshot"):
+                report["screenshots"].append(fix["screenshot"])
         return report
 
     def _replace_in_file(self, file_path, search, replace):

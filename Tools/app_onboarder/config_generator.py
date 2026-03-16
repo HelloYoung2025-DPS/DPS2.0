@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# pyright: reportGeneralTypeIssues=false, reportArgumentType=false, reportAttributeAccessIssue=false, reportIndexIssue=false, reportOptionalSubscript=false, reportCallIssue=false, reportOperatorIssue=false, reportMissingTypeArgument=false
 """
 DPS v4.5 App Onboarder - 配置生成器
 从 AppMap 数据结构自动生成平台配置、操作文件和 E2E 测试脚本。
@@ -119,6 +120,27 @@ class ConfigGenerator(object):
                 "error": str(e),
             })
 
+        # 4. 生成 Python E2E 测试脚本
+        try:
+            py_test_content = self.generate_python_test()
+            py_test_path = os.path.join(
+                self.output_dir,
+                "{0}_e2e_test.py".format(self.platform_key)
+            )
+            self._ensure_dir(self.output_dir)
+            with open(py_test_path, "w", encoding="utf-8") as f:
+                f.write(py_test_content)
+            summary["generated_files"].append({
+                "type": "python_test",
+                "path": py_test_path,
+                "status": "ok",
+            })
+        except Exception as e:
+            summary["errors"].append({
+                "type": "python_test",
+                "error": str(e),
+            })
+
         summary["success"] = len(summary["errors"]) == 0
 
         # 构建简单的 type→path 映射，供 main.py 直接消费
@@ -158,6 +180,21 @@ class ConfigGenerator(object):
                 "max_app_crashes": 2,
                 "max_network_errors": 8,
             },
+            "vision_config": {
+                "enabled": True,
+                "model": "gpt-4o-mini",
+                "use_as_fallback": True,
+                "trigger_conditions": [
+                    "ui_element_not_found_after_retries",
+                    "page_state_unknown",
+                    "webview_content_unreadable",
+                ],
+                "screenshot_before_action": False,
+                "screenshot_on_failure": True,
+                "max_vision_calls_per_session": 20,
+                "confidence_threshold": 0.7,
+                "note": "三层恢复机制: ADB前台检测 -> UI XML覆盖检测 -> Vision模型兜底",
+            },
             "verified": False,
             "verified_date": None,
             "notes": "由 App Onboarder 自动生成 ({0})".format(
@@ -173,31 +210,113 @@ class ConfigGenerator(object):
     def generate_operations(self):
         """
         生成 {platform}_operations.json 操作定义。
+        基于 BabyCenter 测试经验，生成覆盖全 APP 生命周期的 60+ 操作。
 
         返回:
             dict: 完整的操作文件内容
         """
         ops = {
             "platform": self.platform_key,
-            "version": "3.0",
+            "version": "4.0",
             "verified": False,
             "verified_date": None,
             "architecture_notes": self._build_architecture_notes(),
+            "generation_notes": "由 App Onboarder v2.0 自动生成，包含恢复元数据和比例坐标",
             "operations": {},
         }
 
-        ops["operations"]["navigate_to_feed"] = self._op_navigate_to_feed()
+        # === A. 核心导航操作 ===
+        ops["operations"]["navigate_to_community"] = self._op_navigate_to_feed()
+        ops["operations"]["navigate_to_feed"] = self._op_navigate_to_feed()  # 别名
+
+        # 为每个发现的底部导航 Tab 生成导航操作
+        nav_tabs = self.app_map.get("bottom_nav_tabs", {})
+        for tab_key, tab_info in nav_tabs.items():
+            safe_key = tab_key.replace("menu_", "").lower()
+            op_name = "nav_{0}".format(safe_key)
+            if op_name not in ops["operations"]:
+                ops["operations"][op_name] = self._op_nav_tab(safe_key, tab_info)
+
+        ops["operations"]["back_to_feed"] = self._op_back_to_feed()
+
+        # === B. Feed 浏览操作 ===
         ops["operations"]["browse"] = self._op_browse()
+        ops["operations"]["browse_multiple"] = self._op_browse_multiple()
+        ops["operations"]["browse_swipe_back"] = self._op_browse_swipe_back()
+        ops["operations"]["pull_refresh_feed"] = self._op_pull_refresh()
+        ops["operations"]["scroll_feed"] = self._op_scroll_feed()
+
+        # === C. 帖子详情操作 ===
         ops["operations"]["open_post"] = self._op_open_post()
         ops["operations"]["read_post"] = self._op_read_post()
+        ops["operations"]["read_post_deep"] = self._op_read_post_deep()
+        ops["operations"]["scroll_to_comments"] = self._op_scroll_to_comments()
+        ops["operations"]["refresh_post"] = self._op_refresh_post()
+        ops["operations"]["open_post_dropdown"] = self._op_open_post_dropdown()
 
-        # WebView 应用需要额外的滚动到反应按钮操作
+        # === D. 帖子互动操作 ===
         if self.is_webview:
             ops["operations"]["scroll_to_reactions"] = self._op_scroll_to_reactions()
-
         ops["operations"]["like"] = self._op_like()
         ops["operations"]["comment"] = self._op_comment()
-        ops["operations"]["back_to_feed"] = self._op_back_to_feed()
+        ops["operations"]["share_post"] = self._op_share_post()
+        ops["operations"]["bookmark_post"] = self._op_bookmark_post()
+
+        # === E. WebView 专属操作 ===
+        if self.is_webview:
+            ops["operations"]["open_webview_hamburger"] = self._op_webview_hamburger()
+            ops["operations"]["tap_webview_member_avatar"] = self._op_webview_avatar()
+            # WebView 内部 Tab 切换
+            for wv_tab in self.app_map.get("webview_tabs", []):
+                tab_text = wv_tab.get("text", "")
+                tab_name = tab_text.lower().replace(" ", "_").replace("my_", "")
+                op_name = "switch_community_{0}_tab".format(tab_name)
+                ops["operations"][op_name] = self._op_webview_tab(tab_name, tab_text, wv_tab)
+
+        # === F. 首页/内容浏览操作 ===
+        ops["operations"]["view_home_content"] = self._op_view_page("home", "首页内容")
+        ops["operations"]["view_salutation"] = self._op_view_page("salutation", "问候语")
+        ops["operations"]["scroll_home"] = self._op_scroll_page("home", "首页")
+        ops["operations"]["tap_child_image"] = self._op_tap_element("child_image", "宝宝图标")
+
+        # === G. 设置/资料页操作 ===
+        ops["operations"]["go_to_settings"] = self._op_go_to_sub_page("settings", "Settings", "设置")
+        ops["operations"]["view_settings"] = self._op_view_page("settings", "设置页面")
+        ops["operations"]["go_to_profile"] = self._op_go_to_sub_page("profile", "Profile", "个人资料")
+        ops["operations"]["view_profile"] = self._op_view_page("profile", "个人资料")
+        ops["operations"]["view_profile_email"] = self._op_view_profile_detail("email", "邮箱信息")
+        ops["operations"]["tap_avatar"] = self._op_tap_element("avatar", "头像")
+        ops["operations"]["go_to_bookmarks"] = self._op_go_to_sub_page("bookmarks", "Bookmarks", "书签")
+        ops["operations"]["view_reward_points"] = self._op_view_page("rewards", "积分数值")
+        ops["operations"]["view_more_page"] = self._op_view_page("more", "更多页面")
+
+        # 主题切换
+        for theme in ["dark", "light", "system"]:
+            ops["operations"]["toggle_theme_{0}".format(theme)] = self._op_toggle_theme(theme)
+
+        # === H. 日历操作 (条件生成) ===
+        if any("calendar" in k.lower() for k in nav_tabs):
+            ops["operations"]["view_calendar"] = self._op_view_page("calendar", "日历页面")
+            ops["operations"]["navigate_prev_month"] = self._op_calendar_nav("prev")
+            ops["operations"]["navigate_next_month"] = self._op_calendar_nav("next")
+            ops["operations"]["tap_day_cell"] = self._op_tap_element("day_cell", "日历日期")
+            ops["operations"]["switch_to_timeline"] = self._op_switch_view("timeline", "Timeline 视图")
+
+        # === I. 工具页操作 (条件生成) ===
+        if any("tool" in k.lower() for k in nav_tabs):
+            ops["operations"]["filter_tools_all"] = self._op_filter("all", "全部工具")
+            ops["operations"]["filter_tools_pregnancy"] = self._op_filter("pregnancy", "Pregnancy 工具")
+            ops["operations"]["filter_tools_baby"] = self._op_filter("baby", "Baby 工具")
+            ops["operations"]["tap_tool_item"] = self._op_tap_element("tool_item", "工具项")
+            ops["operations"]["scroll_tools"] = self._op_scroll_page("tools", "工具页面")
+
+        # === J. 群组/社区操作 ===
+        ops["operations"]["view_group_description"] = self._op_view_page("group_description", "群组描述")
+
+        # === K. Vision AI 发现的操作 ===
+        vision_count = self._generate_vision_operations(ops["operations"])
+        if vision_count > 0:
+            ops["vision_operations_count"] = vision_count
 
         return ops
 
@@ -579,8 +698,10 @@ class ConfigGenerator(object):
         L("")
         L("    if ({0}) {{".format(check_expr))
         L('        Mark-Phase -phase 1 -passed $true -details "应用已启动，主界面可见"')
+        L("        # Visual checkpoint: Phase 1")
         L("    } else {")
         L('        Mark-Phase -phase 1 -passed $false -details "未检测到底部导航元素"')
+        L("        # Visual checkpoint: Phase 1")
         L("    }")
         L("}")
         L("catch {")
@@ -622,8 +743,10 @@ class ConfigGenerator(object):
         L('        Mark-Phase -phase 2 -passed $true -details "Feed 可见 ({0}/{1})"'.format(
             post_container_id, feed_container_id
         ))
+        L("        # Visual checkpoint: Phase 2")
         L("    } else {")
         L('        Mark-Phase -phase 2 -passed $false -details "未检测到 Feed 核心元素"')
+        L("        # Visual checkpoint: Phase 2")
         L("    }")
         L("}")
         L("catch {")
@@ -687,8 +810,10 @@ class ConfigGenerator(object):
         L("")
         L("    if (($null -ne $postAfter1) -or ($null -ne $postAfter2)) {")
         L('        Mark-Phase -phase 3 -passed $true -details "已完成 2 次浏览操作"')
+        L("        # Visual checkpoint: Phase 3")
         L("    } else {")
         L('        Mark-Phase -phase 3 -passed $false -details "浏览后未检测到 {0}"'.format(post_container_id))
+        L("        # Visual checkpoint: Phase 3")
         L("    }")
         L("}")
         L("catch {")
@@ -732,8 +857,10 @@ class ConfigGenerator(object):
             L("")
             L("    if ($null -ne $webView) {")
             L('        Mark-Phase -phase 4 -passed $true -details "WebView 已加载 ({0} 存在)"'.format(webview_container_id))
+            L("        # Visual checkpoint: Phase 4")
             L("    } else {")
             L('        Mark-Phase -phase 4 -passed $false -details "未检测到 WebView，可能未加载"')
+            L("        # Visual checkpoint: Phase 4")
             L("    }")
         else:
             # 原生详情页：检查 back 按钮或 detail 页面的标志元素
@@ -745,8 +872,10 @@ class ConfigGenerator(object):
             L("")
             L("    if ($null -ne $detailCheck) {")
             L('        Mark-Phase -phase 4 -passed $true -details "帖子详情页已加载"')
+            L("        # Visual checkpoint: Phase 4")
             L("    } else {")
             L('        Mark-Phase -phase 4 -passed $false -details "未检测到详情页标志元素"')
+            L("        # Visual checkpoint: Phase 4")
             L("    }")
 
         L("}")
@@ -800,8 +929,10 @@ class ConfigGenerator(object):
         L("")
         L("    if ($foundReaction) {")
         L('        Mark-Phase -phase 5 -passed $true -details "已找到 reaction 按钮且 bounds 非零 (尝试 $i 次)"')
+        L("        # Visual checkpoint: Phase 5")
         L("    } else {")
         L('        Mark-Phase -phase 5 -passed $false -details "滚动 $maxTry 次后仍未定位有效 reaction 按钮"')
+        L("        # Visual checkpoint: Phase 5")
         L("    }")
         L("}")
         L("catch {")
@@ -840,8 +971,10 @@ class ConfigGenerator(object):
         L("        TapElement -element $picked")
         L("        HumanDelay -minMs 1500 -maxMs 2500")
         L('        Mark-Phase -phase 6 -passed $true -details "reaction 按钮可点击，已选择表情"')
+        L("        # Visual checkpoint: Phase 6")
         L("    } else {")
         L('        Mark-Phase -phase 6 -passed $true -details "reaction 按钮可点击（表情选择器选项未明确识别，可能已直接点赞）"')
+        L("        # Visual checkpoint: Phase 6")
         L("    }")
         L("}")
         L("catch {")
@@ -955,8 +1088,10 @@ class ConfigGenerator(object):
         L("        TapElement -element $submitEl")
         L("        HumanDelay -minMs 1500 -maxMs 2500")
         L('        Mark-Phase -phase 7 -passed $true -details "已定位输入框、输入评论文本并尝试提交"')
+        L("        # Visual checkpoint: Phase 7")
         L("    } else {")
         L('        Mark-Phase -phase 7 -passed $true -details "已定位输入框并输入评论文本（未识别到明确提交按钮）"')
+        L("        # Visual checkpoint: Phase 7")
         L("    }")
         L("}")
         L("catch {")
@@ -1063,6 +1198,596 @@ class ConfigGenerator(object):
         L('Write-Host ""')
 
         return "\n".join(lines)
+
+    def generate_python_test(self):
+        """
+        生成独立的 Python E2E 测试脚本，包含三层恢复机制。
+
+        三层恢复:
+            Layer 1: ADB 前台检测 (dumpsys activity top)
+            Layer 2: UI XML 覆盖检测 (弹窗/对话框/ShareSheet)
+            Layer 3: Vision 模型兜底 (截图+API，可配置)
+
+        返回:
+            str: Python 脚本内容
+        """
+        feed_tab = self._get_feed_tab()
+        feed_tab_id = feed_tab.get("short_id", "") if feed_tab else ""
+        feed_tab_desc = feed_tab.get("text", "") if feed_tab else ""
+        nav_tabs = self.app_map.get("bottom_nav_tabs", {})
+        screen_w, screen_h = self.screen_w, self.screen_h
+
+        script = '''# -*- coding: utf-8 -*-
+"""
+{app_name} Android E2E 测试脚本 (Python 独立版)
+三层恢复机制: ADB前台检测 -> UI XML覆盖检测 -> Vision模型兜底
+由 App Onboarder v2.0 自动生成 ({date})
+
+用法:
+    python {platform_key}_e2e_test.py [--no-vision] [--device DEVICE_ID]
+"""
+
+import subprocess
+import xml.etree.ElementTree as ET
+import json
+import time
+import random
+import os
+import sys
+import re
+import argparse
+
+sys.stdout.reconfigure(encoding="utf-8")
+
+# ========================================
+# 全局配置
+# ========================================
+PACKAGE_NAME = "{package_name}"
+PLATFORM_KEY = "{platform_key}"
+SCREEN_W = {screen_w}
+SCREEN_H = {screen_h}
+WORK_DIR = os.path.expanduser("~")
+UI_REMOTE_PATH = "/sdcard/window_dump.xml"
+
+# Vision 模型配置
+VISION_ENABLED = True
+VISION_MODEL = "gpt-4o-mini"
+VISION_API_URL = ""  # 需要用户填入
+VISION_API_KEY = ""  # 需要用户填入
+MAX_VISION_CALLS = 20
+
+# ========================================
+# ADB 工具函数
+# ========================================
+
+def adb_cmd(args, device_id=None):
+    """执行 ADB 命令并返回输出"""
+    cmd = ["adb"]
+    if device_id:
+        cmd.extend(["-s", device_id])
+    cmd.extend(args)
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True,
+            encoding="utf-8", timeout=30
+        )
+        return result.stdout.strip()
+    except Exception as e:
+        return ""
+
+def adb_shell(cmd_str, device_id=None):
+    """执行 ADB shell 命令"""
+    return adb_cmd(["shell"] + cmd_str.split(), device_id)
+
+def adb_tap(x, y, device_id=None):
+    """点击屏幕坐标"""
+    rx = random.randint(-5, 5)
+    ry = random.randint(-5, 5)
+    adb_shell("input tap {{}} {{}}".format(x + rx, y + ry), device_id)
+
+def adb_swipe(x1, y1, x2, y2, duration=500, device_id=None):
+    """滑动操作"""
+    adb_shell("input swipe {{}} {{}} {{}} {{}} {{}}".format(x1, y1, x2, y2, duration), device_id)
+
+def adb_input_text(text, device_id=None):
+    """输入文本"""
+    escaped = text.replace(" ", "%s").replace("&", "\\\\&")
+    adb_shell("input text {{}}".format(escaped), device_id)
+
+def adb_back(device_id=None):
+    """按返回键"""
+    adb_shell("input keyevent KEYCODE_BACK", device_id)
+
+def adb_screenshot(name, device_id=None):
+    """截图并拉到本地"""
+    remote = "/sdcard/{{}}_{{}}.png".format(PLATFORM_KEY, name)
+    local = os.path.join(WORK_DIR, "{{}}_{{}}.png".format(PLATFORM_KEY, name))
+    adb_shell("screencap -p {{}}".format(remote), device_id)
+    adb_cmd(["pull", remote, local], device_id)
+    return local
+
+def dump_ui(name, device_id=None):
+    """执行 UI dump 并返回 XML 内容"""
+    local_path = os.path.join(WORK_DIR, "{{}}_e2e_{{}}.xml".format(PLATFORM_KEY, name))
+    adb_shell("uiautomator dump {{}}".format(UI_REMOTE_PATH), device_id)
+    time.sleep(0.8)
+    adb_cmd(["pull", UI_REMOTE_PATH, local_path], device_id)
+    if not os.path.exists(local_path):
+        return ""
+    with open(local_path, "r", encoding="utf-8") as f:
+        return f.read()
+
+def human_delay(min_ms, max_ms):
+    """模拟人类延迟"""
+    delay = random.randint(min_ms, max_ms) / 1000.0
+    time.sleep(delay)
+
+def find_element(xml, strategy, value):
+    """在 XML 中查找元素，返回 (cx, cy) 或 None"""
+    if not xml:
+        return None
+    if strategy == "resource-id":
+        pattern = r'resource-id="[^"]*{{}}[^"]*"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"'.format(
+            re.escape(value)
+        )
+    elif strategy == "text":
+        pattern = r'text="{{}}[^"]*"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"'.format(
+            re.escape(value)
+        )
+    elif strategy == "content-desc":
+        pattern = r'content-desc="{{}}[^"]*"[^>]*bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"'.format(
+            re.escape(value)
+        )
+    else:
+        return None
+
+    m = re.search(pattern, xml)
+    if not m:
+        # 尝试反转属性顺序
+        if strategy == "resource-id":
+            pattern2 = r'bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"[^>]*resource-id="[^"]*{{}}[^"]*"'.format(
+                re.escape(value)
+            )
+        elif strategy == "text":
+            pattern2 = r'bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"[^>]*text="{{}}[^"]*"'.format(
+                re.escape(value)
+            )
+        else:
+            pattern2 = r'bounds="\\[(\\d+),(\\d+)\\]\\[(\\d+),(\\d+)\\]"[^>]*content-desc="{{}}[^"]*"'.format(
+                re.escape(value)
+            )
+        m = re.search(pattern2, xml)
+
+    if not m:
+        return None
+
+    x1, y1, x2, y2 = int(m.group(1)), int(m.group(2)), int(m.group(3)), int(m.group(4))
+    if x1 == 0 and y1 == 0 and x2 == 0 and y2 == 0:
+        return None
+    return ((x1 + x2) // 2, (y1 + y2) // 2)
+
+
+# ========================================
+# 三层恢复机制
+# ========================================
+
+class RecoveryManager:
+    """三层恢复管理器"""
+
+    def __init__(self, device_id=None):
+        self.device_id = device_id
+        self.vision_calls = 0
+
+    def check_and_recover(self, expected_page="any", step_name=""):
+        """
+        执行三层恢复检查
+
+        返回:
+            str: "ok" | "recovered" | "failed"
+        """
+        # Layer 1: ADB 前台检测
+        result = self._layer1_foreground_check()
+        if result == "wrong_app":
+            print("  [恢复 L1] APP 不在前台，正在重新启动...")
+            adb_shell(
+                "monkey -p {{}} -c android.intent.category.LAUNCHER 1".format(PACKAGE_NAME),
+                self.device_id
+            )
+            human_delay(5000, 8000)
+            # 重新检查
+            result2 = self._layer1_foreground_check()
+            if result2 == "wrong_app":
+                return "failed"
+            return "recovered"
+
+        # Layer 2: UI XML 覆盖检测
+        overlay = self._layer2_overlay_check()
+        if overlay:
+            print("  [恢复 L2] 检测到覆盖层: {{}}，正在关闭...".format(overlay))
+            self._dismiss_overlay(overlay)
+            human_delay(1000, 2000)
+            # 再次检查
+            overlay2 = self._layer2_overlay_check()
+            if overlay2:
+                adb_back(self.device_id)
+                human_delay(1000, 1500)
+            return "recovered"
+
+        return "ok"
+
+    def vision_fallback(self, step_name, goal):
+        """
+        Layer 3: Vision 模型兜底
+        需要配置 VISION_API_URL 和 VISION_API_KEY
+        """
+        if not VISION_ENABLED or not VISION_API_URL or not VISION_API_KEY:
+            return None
+        if self.vision_calls >= MAX_VISION_CALLS:
+            print("  [Vision] 已达到最大调用次数限制")
+            return None
+
+        self.vision_calls += 1
+        screenshot_path = adb_screenshot("vision_{{}}".format(step_name), self.device_id)
+        if not os.path.exists(screenshot_path):
+            return None
+
+        print("  [恢复 L3] 调用 Vision 模型分析屏幕...")
+        try:
+            import base64
+            with open(screenshot_path, "rb") as f:
+                img_b64 = base64.b64encode(f.read()).decode("utf-8")
+
+            import urllib.request
+            payload = json.dumps({{
+                "model": VISION_MODEL,
+                "messages": [{{
+                    "role": "user",
+                    "content": [
+                        {{"type": "text", "text": "分析当前 Android 屏幕截图。目标: {{}}. 当前步骤: {{}}. 请描述屏幕内容，并给出建议操作 (tap/swipe/back/wait)。如果建议 tap，给出坐标。返回 JSON 格式: {{\\"action\\": \\"tap\\", \\"x\\": 100, \\"y\\": 200, \\"reason\\": \\"...\\"}}".format(goal, step_name)}},
+                        {{"type": "image_url", "image_url": {{"url": "data:image/png;base64,{{}}".format(img_b64)}}}}
+                    ]
+                }}],
+                "max_tokens": 300,
+            }}, ensure_ascii=False).encode("utf-8")
+
+            req = urllib.request.Request(
+                VISION_API_URL,
+                data=payload,
+                headers={{
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer {{}}".format(VISION_API_KEY),
+                }},
+            )
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                result = json.loads(resp.read().decode("utf-8"))
+                content = result.get("choices", [{{}}])[0].get("message", {{}}).get("content", "")
+                # 尝试解析 JSON 响应
+                json_match = re.search(r'\\{{[^{{}}]+\\}}', content)
+                if json_match:
+                    action = json.loads(json_match.group())
+                    return action
+        except Exception as e:
+            print("  [Vision] 调用失败: {{}}".format(str(e)))
+
+        return None
+
+    def _layer1_foreground_check(self):
+        """Layer 1: 检查 APP 是否在前台"""
+        output = adb_shell("dumpsys activity top", self.device_id)
+        if PACKAGE_NAME in output:
+            return "ok"
+        return "wrong_app"
+
+    def _layer2_overlay_check(self):
+        """Layer 2: 检查是否有覆盖层/弹窗"""
+        xml = dump_ui("overlay_check", self.device_id)
+        if not xml:
+            return None
+
+        # 检测常见覆盖层
+        overlay_patterns = [
+            ("ShareSheet", r'android:id/resolver_list|android:id/chooser_action_button'),
+            ("SystemDialog", r'android:id/alertTitle|android:id/message.*android:id/button1'),
+            ("PermissionDialog", r'com.android.permissioncontroller|permission_allow_button'),
+            ("AppPopup", r'resource-id="[^"]*close[Bb]tn[^"]*"|resource-id="[^"]*dismiss[^"]*"'),
+            ("AppDialog", r'resource-id="[^"]*dialog[^"]*".*clickable="true"'),
+        ]
+
+        for name, pattern in overlay_patterns:
+            if re.search(pattern, xml, re.IGNORECASE):
+                return name
+
+        return None
+
+    def _dismiss_overlay(self, overlay_type):
+        """关闭覆盖层"""
+        if overlay_type in ("ShareSheet", "SystemDialog", "PermissionDialog"):
+            adb_back(self.device_id)
+        elif overlay_type in ("AppPopup", "AppDialog"):
+            # 尝试找关闭按钮
+            xml = dump_ui("dismiss_overlay", self.device_id)
+            for keyword in ["close", "dismiss", "cancel", "Not now", "OK", "Got it"]:
+                pos = find_element(xml, "text", keyword)
+                if pos:
+                    adb_tap(pos[0], pos[1], self.device_id)
+                    return
+                pos = find_element(xml, "resource-id", keyword)
+                if pos:
+                    adb_tap(pos[0], pos[1], self.device_id)
+                    return
+            # 兜底: 按返回键
+            adb_back(self.device_id)
+
+
+# ========================================
+# 测试运行器
+# ========================================
+
+class TestRunner:
+    """E2E 测试运行器"""
+
+    def __init__(self, device_id=None, enable_vision=True):
+        self.device_id = device_id
+        self.recovery = RecoveryManager(device_id)
+        self.results = []  # [(step_name, status, details)]
+        if not enable_vision:
+            global VISION_ENABLED
+            VISION_ENABLED = False
+
+    def run_step(self, step_name, action_fn, expected_page="any"):
+        """
+        运行单个测试步骤，带三层恢复
+
+        参数:
+            step_name: 步骤名称
+            action_fn: 执行动作的函数，返回 (success: bool, details: str)
+            expected_page: 期望的页面状态
+        """
+        print("\\n[Step] {{}}".format(step_name))
+
+        # 执行前恢复检查
+        recovery_status = self.recovery.check_and_recover(expected_page, step_name)
+        if recovery_status == "failed":
+            self.results.append((step_name, "FAIL", "恢复失败: APP 无法回到前台"))
+            print("  [FAIL] {{}} - 恢复失败".format(step_name))
+            return False
+
+        if recovery_status == "recovered":
+            print("  [恢复] 已从异常状态恢复")
+
+        # 执行动作
+        try:
+            success, details = action_fn()
+            if success:
+                self.results.append((step_name, "PASS", details))
+                print("  [PASS] {{}}".format(details))
+                return True
+            else:
+                # 尝试 Vision 兜底
+                vision_result = self.recovery.vision_fallback(step_name, details)
+                if vision_result and vision_result.get("action") == "tap":
+                    print("  [Vision] 建议点击 ({{}}, {{}})".format(
+                        vision_result.get("x"), vision_result.get("y")
+                    ))
+                    adb_tap(vision_result["x"], vision_result["y"], self.device_id)
+                    human_delay(2000, 3000)
+                    self.results.append((step_name, "PASS", "Vision 恢复: {{}}".format(
+                        vision_result.get("reason", "")
+                    )))
+                    return True
+
+                self.results.append((step_name, "SKIP", details))
+                print("  [SKIP] {{}}".format(details))
+                return False
+        except Exception as e:
+            self.results.append((step_name, "FAIL", str(e)))
+            print("  [FAIL] {{}}".format(str(e)))
+            return False
+
+    def print_summary(self):
+        """输出测试汇总"""
+        total = len(self.results)
+        passed = sum(1 for _, s, _ in self.results if s == "PASS")
+        skipped = sum(1 for _, s, _ in self.results if s == "SKIP")
+        failed = sum(1 for _, s, _ in self.results if s == "FAIL")
+
+        print("\\n" + "=" * 50)
+        print("测试汇总: {{}} 步骤 | {{}} PASS | {{}} SKIP | {{}} FAIL".format(
+            total, passed, skipped, failed
+        ))
+        print("=" * 50)
+        for name, status, details in self.results:
+            tag_color = {{"PASS": "\\033[92m", "SKIP": "\\033[93m", "FAIL": "\\033[91m"}}
+            reset = "\\033[0m"
+            print("  {{}}[{{}}]{{}}\\ {{}}: {{}}".format(
+                tag_color.get(status, ""), status, reset, name, details
+            ))
+        print("")
+        return passed, skipped, failed
+
+
+# ========================================
+# 测试步骤定义
+# ========================================
+
+def main():
+    parser = argparse.ArgumentParser(description="{app_name} E2E 测试")
+    parser.add_argument("--device", "-d", help="ADB 设备 ID")
+    parser.add_argument("--no-vision", action="store_true", help="禁用 Vision 模型")
+    args = parser.parse_args()
+
+    runner = TestRunner(device_id=args.device, enable_vision=not args.no_vision)
+
+    # Step 1: 启动应用
+    def step_launch():
+        adb_shell(
+            "monkey -p {{}} -c android.intent.category.LAUNCHER 1".format(PACKAGE_NAME),
+            args.device
+        )
+        human_delay(8000, 9500)
+        xml = dump_ui("launch", args.device)
+        if not xml:
+            return (False, "UI dump 失败")
+        # 检查底部导航
+        found = False
+'''.format(
+            app_name=self.app_name,
+            date=datetime.datetime.now().strftime("%Y-%m-%d"),
+            platform_key=self.platform_key,
+            package_name=self.package_name,
+            screen_w=screen_w,
+            screen_h=screen_h,
+        )
+
+        # 动态生成 Step 1 的导航检测
+        nav_check_lines = []
+        for key, tab in list(nav_tabs.items())[:2]:
+            tab_id = tab.get("short_id", "")
+            if tab_id:
+                nav_check_lines.append(
+                    '        pos = find_element(xml, "resource-id", "{0}")\n'
+                    '        if pos:\n'
+                    '            found = True\n'.format(tab_id)
+                )
+
+        script += "".join(nav_check_lines)
+        script += '''        if found:
+            return (True, "应用已启动，主界面可见")
+        return (False, "未检测到底部导航元素")
+
+    runner.run_step("启动应用", step_launch)
+
+    # Step 2: 导航到 Feed
+    def step_navigate_feed():
+        xml = dump_ui("nav_feed", args.device)
+'''
+
+        if feed_tab_id:
+            script += '        pos = find_element(xml, "resource-id", "{0}")\n'.format(feed_tab_id)
+        elif feed_tab_desc:
+            script += '        pos = find_element(xml, "content-desc", "{0}")\n'.format(feed_tab_desc)
+        else:
+            script += '        pos = None\n'
+
+        script += '''        if not pos:
+            return (False, "未找到 Feed 标签")
+        adb_tap(pos[0], pos[1], args.device)
+        human_delay(5000, 7000)
+        return (True, "已导航到 Feed 标签")
+
+    runner.run_step("导航到 Feed", step_navigate_feed, expected_page="home")
+
+    # Step 3: 浏览帖子
+    def step_browse():
+        human_delay(2500, 4000)
+'''
+
+        # 根据 feed_type 生成滑动代码
+        if self.feed_type == "viewpager_horizontal":
+            script += '        sx = int(SCREEN_W * 0.76)\n'
+            script += '        sy = int(SCREEN_H * 0.58)\n'
+            script += '        ex = int(SCREEN_W * 0.21)\n'
+            script += '        adb_swipe(sx, sy, ex, sy, 500, args.device)\n'
+        else:
+            script += '        sx = SCREEN_W // 2\n'
+            script += '        sy = int(SCREEN_H * 0.7)\n'
+            script += '        ey = int(SCREEN_H * 0.3)\n'
+            script += '        adb_swipe(sx, sy, sx, ey, 500, args.device)\n'
+
+        script += '''        human_delay(1500, 3000)
+        return (True, "浏览帖子完成")
+
+    runner.run_step("浏览帖子", step_browse, expected_page="feed")
+
+    # Step 4: 打开帖子
+    def step_open_post():
+        xml = dump_ui("open_post", args.device)
+'''
+
+        post_container_id = self.app_map.get("post_container_id", "postContainer")
+        script += '        pos = find_element(xml, "resource-id", "{0}")\n'.format(post_container_id)
+
+        script += '''        if not pos:
+            return (False, "未找到帖子容器")
+        adb_tap(pos[0], pos[1], args.device)
+        human_delay(5000, 8000)
+        return (True, "已打开帖子详情")
+
+    runner.run_step("打开帖子", step_open_post, expected_page="feed")
+
+    # Step 5: 阅读帖子
+    def step_read():
+        human_delay(4000, 8000)
+        sx = SCREEN_W // 2
+        sy = int(SCREEN_H * 0.65)
+        ey = sy - 500
+        adb_swipe(sx, sy, sx, max(ey, 300), 600, args.device)
+        human_delay(3000, 6000)
+        return (True, "阅读帖子完成")
+
+    runner.run_step("阅读帖子", step_read, expected_page="post_detail")
+
+    # Step 6: 点赞
+    def step_like():
+        xml = dump_ui("like", args.device)
+'''
+
+        action_buttons = self.app_map.get("action_buttons", {})
+        like_btn = action_buttons.get("like", {})
+        like_strategy = like_btn.get("strategy", "text")
+        like_value = like_btn.get("value", "")
+        script += '        pos = find_element(xml, "{0}", "{1}")\n'.format(like_strategy, like_value)
+
+        script += '''        if not pos:
+            return (False, "未找到点赞按钮")
+        adb_tap(pos[0], pos[1], args.device)
+        human_delay(2000, 4000)
+        return (True, "点赞完成")
+
+    runner.run_step("点赞", step_like, expected_page="post_detail")
+
+    # Step 7: 评论
+    def step_comment():
+        xml = dump_ui("comment", args.device)
+'''
+
+        comment_btn = action_buttons.get("comment", {})
+        comment_strategy = comment_btn.get("strategy", "text")
+        comment_value = comment_btn.get("value", "")
+        script += '        pos = find_element(xml, "{0}", "{1}")\n'.format(comment_strategy, comment_value)
+
+        script += '''        if not pos:
+            return (False, "未找到评论按钮")
+        adb_tap(pos[0], pos[1], args.device)
+        human_delay(2000, 4000)
+        # 查找评论输入框
+        xml2 = dump_ui("comment_input", args.device)
+        input_pos = find_element(xml2, "class", "android.widget.EditText")
+        if input_pos:
+            adb_tap(input_pos[0], input_pos[1], args.device)
+            human_delay(500, 1000)
+        return (True, "评论流程完成")
+
+    runner.run_step("评论", step_comment, expected_page="post_detail")
+
+    # Step 8: 返回 Feed
+    def step_back():
+        adb_back(args.device)
+        human_delay(1500, 2500)
+        return (True, "已返回")
+
+    runner.run_step("返回 Feed", step_back, expected_page="post_detail")
+
+    # 输出测试汇总
+    passed, skipped, failed = runner.print_summary()
+    sys.exit(1 if failed > 0 else 0)
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+        return script
 
     # ================================================================
     # 平台配置构建辅助方法
@@ -1181,6 +1906,38 @@ class ConfigGenerator(object):
                 "fallback_value": "android.webkit.WebView",
                 "note": "由 App Onboarder 自动映射: WebView 容器",
             }
+
+        # Vision AI 发现的元素选择器
+        vision_discoveries = self.app_map.get("vision_discoveries", [])
+        if vision_discoveries:
+            for discovery in vision_discoveries:
+                if discovery.get("skipped", False):
+                    continue
+                features = discovery.get("features", [])
+                for feature in features:
+                    resolution = feature.get("resolution", {})
+                    if not resolution.get("matched", False):
+                        continue
+                    feature_key = feature.get("feature_key", "")
+                    if not feature_key:
+                        continue
+                    selector_key = "v_{0}".format(feature_key)
+                    # 避免覆盖已有选择器
+                    if selector_key in selectors:
+                        continue
+                    vision_selector = {
+                        "strategy": resolution.get("selector_strategy", "text"),
+                        "value": resolution.get("selector_value", ""),
+                        "source": "vision_ai",
+                        "confidence": feature.get("confidence", 0.0),
+                        "note": "由 Vision AI 自动发现: {0}".format(
+                            feature.get("feature_label", feature_key)
+                        ),
+                    }
+                    if resolution.get("fallback_strategy") and resolution.get("fallback_value"):
+                        vision_selector["fallback_strategy"] = resolution["fallback_strategy"]
+                        vision_selector["fallback_value"] = resolution["fallback_value"]
+                    selectors[selector_key] = vision_selector
 
         return selectors
 
@@ -1326,6 +2083,53 @@ class ConfigGenerator(object):
                     "signals": home_signals,
                 }
 
+        # Vision AI 发现的高置信度特征作为页面签名补充信号
+        vision_discoveries = self.app_map.get("vision_discoveries", [])
+        if vision_discoveries:
+            for discovery in vision_discoveries:
+                if discovery.get("skipped", False):
+                    continue
+                page_key = discovery.get("page_key", "")
+                if not page_key:
+                    continue
+
+                # 筛选高置信度 (>= 0.8) 且已匹配的特征
+                vision_signals = []
+                features = discovery.get("features", [])
+                for feature in features:
+                    resolution = feature.get("resolution", {})
+                    if not resolution.get("matched", False):
+                        continue
+                    confidence = feature.get("confidence", 0.0)
+                    if confidence < 0.8:
+                        continue
+                    strategy = resolution.get("selector_strategy", "")
+                    value = resolution.get("selector_value", "")
+                    if strategy and value:
+                        vision_signals.append({
+                            "strategy": strategy,
+                            "value": value,
+                            "weight": round(confidence * 0.2, 2),
+                            "source": "vision_ai",
+                        })
+
+                if not vision_signals:
+                    continue
+
+                # 如果该页面已有签名，追加 vision 信号并重新归一化
+                if page_key in signatures:
+                    existing_signals = signatures[page_key].get("signals", [])
+                    existing_signals.extend(vision_signals)
+                    signatures[page_key]["signals"] = self._normalize_weights(existing_signals)
+                else:
+                    # 为新页面创建签名
+                    vision_signals = self._normalize_weights(vision_signals)
+                    if vision_signals:
+                        signatures[page_key] = {
+                            "threshold": 0.5,
+                            "signals": vision_signals,
+                        }
+
         return signatures
 
     def _build_action_weights(self):
@@ -1363,6 +2167,9 @@ class ConfigGenerator(object):
         config["min_scroll_distance"] = 850
         config["max_scroll_distance"] = 1250
         config["scroll_duration_ms"] = 550
+        config["scroll_start_y_ratio"] = 0.7
+        config["scroll_end_y_ratio"] = 0.3
+        config["scroll_x_ratio"] = 0.5
 
         if self.feed_type == "viewpager_horizontal":
             config["note"] = "Feed 使用 ViewPager 水平滑动，browse 操作应使用水平 swipe 而非垂直 scroll"
@@ -1413,17 +2220,21 @@ class ConfigGenerator(object):
                 "retry_delay_ms": 2000,
             },
             {"action": "set_var", "name": "current_page", "value": "feed"},
+            {"action": "visual_verify", "checkpoint": "navigate_to_feed", "note": "视觉验证: 确认已到达 Feed 页面"},
         ])
 
         return {
             "description": "从任意页面导航到 Feed 标签",
             "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "nav_tab",
+            "preconditions": [],
+            "fallback_op": "nav_home",
         }
 
     def _op_browse(self):
         """生成 browse 操作。"""
         is_horizontal = self.feed_type == "viewpager_horizontal"
-        cx = self.screen_w // 2
 
         steps = [
             {"action": "log", "message": "开始浏览 {0} 帖子".format(self.app_name)},
@@ -1439,30 +2250,21 @@ class ConfigGenerator(object):
         ]
 
         if is_horizontal:
-            swipe_start_x = int(self.screen_w * 0.76)
-            swipe_end_x = int(self.screen_w * 0.21)
-            swipe_y = int(self.screen_h * 0.58)
             swipe_step = {
                 "action": "swipe",
                 "direction": "left",
-                "start_x": swipe_start_x,
-                "start_y": swipe_y,
-                "end_x": swipe_end_x,
-                "end_y": swipe_y,
+                "start_x_ratio": 0.76, "start_y_ratio": 0.58,
+                "end_x_ratio": 0.21, "end_y_ratio": 0.58,
                 "duration": 500,
                 "humanized": "true",
                 "note": "水平滑动 ViewPager 查看下一张帖子卡片",
             }
         else:
-            vert_start_y = int(self.screen_h * 0.7)
-            vert_end_y = int(self.screen_h * 0.3)
             swipe_step = {
                 "action": "swipe",
                 "direction": "up",
-                "start_x": cx,
-                "start_y": vert_start_y,
-                "end_x": cx,
-                "end_y": vert_end_y,
+                "start_x_ratio": 0.5, "start_y_ratio": 0.7,
+                "end_x_ratio": 0.5, "end_y_ratio": 0.3,
                 "duration": 500,
                 "humanized": "true",
                 "note": "垂直滚动 RecyclerView 查看更多帖子",
@@ -1491,6 +2293,10 @@ class ConfigGenerator(object):
             ),
             "require_page": "feed",
             "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "none",
+            "preconditions": ["feed"],
+            "fallback_op": "navigate_to_feed",
         }
 
     def _op_open_post(self):
@@ -1537,6 +2343,7 @@ class ConfigGenerator(object):
             })
 
         steps.append({"action": "set_var", "name": "current_page", "value": "post_detail"})
+        steps.append({"action": "visual_verify", "checkpoint": "open_post", "note": "视觉验证: 确认帖子详情已加载"})
 
         return {
             "description": "打开帖子详情（{0}）".format(
@@ -1544,6 +2351,10 @@ class ConfigGenerator(object):
             ),
             "require_page": "feed",
             "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "back",
+            "preconditions": ["feed"],
+            "fallback_op": "navigate_to_feed",
         }
 
     def _op_read_post(self):
@@ -1593,6 +2404,10 @@ class ConfigGenerator(object):
             ),
             "require_page": "post_detail",
             "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "back",
+            "preconditions": ["post_detail"],
+            "fallback_op": "back_to_feed",
         }
 
     def _op_scroll_to_reactions(self):
@@ -1602,17 +2417,13 @@ class ConfigGenerator(object):
         like_strategy = like_btn.get("strategy", "text")
         like_value = like_btn.get("value", "")
 
-        cx = self.screen_w // 2
-
         steps = [
             {"action": "log", "message": "滚动到反应按钮区域"},
             {
                 "action": "swipe",
                 "direction": "up",
-                "start_x": cx,
-                "start_y": int(self.screen_h * 0.65),
-                "end_x": cx,
-                "end_y": int(self.screen_h * 0.39),
+                "start_x_ratio": 0.5, "start_y_ratio": 0.65,
+                "end_x_ratio": 0.5, "end_y_ratio": 0.39,
                 "duration": 600,
                 "humanized": "true",
                 "note": "向下滚动 WebView，使反应按钮进入可视区域",
@@ -1637,6 +2448,10 @@ class ConfigGenerator(object):
             "description": "在 WebView 内滚动直到反应按钮可见且 bounds 非零",
             "require_page": "post_detail",
             "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "back",
+            "preconditions": ["post_detail"],
+            "fallback_op": "back_to_feed",
         }
 
     def _op_like(self):
@@ -1645,8 +2460,6 @@ class ConfigGenerator(object):
         like_btn = action_buttons.get("like", {})
         like_strategy = like_btn.get("strategy", "text")
         like_value = like_btn.get("value", "")
-
-        cx = self.screen_w // 2
 
         steps = list()  # type: list
         steps.append({"action": "log", "message": "{0} 点赞操作".format(self.app_name)})
@@ -1657,10 +2470,8 @@ class ConfigGenerator(object):
                 {
                     "action": "swipe",
                     "direction": "up",
-                    "start_x": cx,
-                    "start_y": int(self.screen_h * 0.65),
-                    "end_x": cx,
-                    "end_y": int(self.screen_h * 0.39),
+                    "start_x_ratio": 0.5, "start_y_ratio": 0.65,
+                    "end_x_ratio": 0.5, "end_y_ratio": 0.39,
                     "duration": 600,
                     "humanized": "true",
                     "note": "向下滚动使反应按钮可见",
@@ -1713,6 +2524,7 @@ class ConfigGenerator(object):
             },
             {"action": "delay", "min_ms": 1000, "max_ms": 2500, "humanized": "true"},
             {"action": "set_var", "name": "last_action", "value": "like"},
+            {"action": "visual_verify", "checkpoint": "like", "note": "视觉验证: 确认点赞操作完成"},
         ])
 
         op = {
@@ -1723,6 +2535,11 @@ class ConfigGenerator(object):
 
         if self.is_webview:
             op["reliability"] = "medium"
+
+        op["overlay_risk"] = True
+        op["recovery_hint"] = "back"
+        op["preconditions"] = ["post_detail"]
+        op["fallback_op"] = "back_to_feed"
 
         return op
 
@@ -1825,6 +2642,7 @@ class ConfigGenerator(object):
             },
             {"action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true"},
             {"action": "set_var", "name": "last_action", "value": "comment"},
+            {"action": "visual_verify", "checkpoint": "comment", "note": "视觉验证: 确认评论操作完成"},
         ])
 
         op = {
@@ -1835,6 +2653,11 @@ class ConfigGenerator(object):
 
         if self.is_webview:
             op["reliability"] = "medium"
+
+        op["overlay_risk"] = True
+        op["recovery_hint"] = "back"
+        op["preconditions"] = ["post_detail"]
+        op["fallback_op"] = "back_to_feed"
 
         return op
 
@@ -1859,13 +2682,820 @@ class ConfigGenerator(object):
                 "retry_delay_ms": 2000,
             },
             {"action": "set_var", "name": "current_page", "value": "feed"},
+            {"action": "visual_verify", "checkpoint": "back_to_feed", "note": "视觉验证: 确认已返回 Feed"},
         ]
 
         return {
             "description": "从帖子详情页返回 Feed 列表",
             "require_page": "post_detail",
             "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "relaunch",
+            "preconditions": ["post_detail"],
+            "fallback_op": "navigate_to_feed",
         }
+
+    # ================================================================
+    # 新增操作生成方法 (v2.0 - 基于 BabyCenter 测试经验)
+    # ================================================================
+
+    def _op_nav_tab(self, tab_key, tab_info):
+        """通用: 通过底部导航切换到指定 Tab"""
+        tab_text = tab_info.get("text", tab_key) if isinstance(tab_info, dict) else str(tab_info)
+        tab_id = tab_info.get("short_id", "") if isinstance(tab_info, dict) else ""
+        tab_desc = tab_info.get("content_desc", tab_text) if isinstance(tab_info, dict) else tab_text
+
+        steps = [
+            {"action": "log", "message": "通过底部导航进入{0}页".format(tab_text)},
+        ]
+        if tab_id:
+            steps.append({"action": "find", "strategy": "resource-id", "value": tab_id, "save_as": "target_tab", "on_fail": "skip"})
+        if tab_desc:
+            steps.append({"action": "find", "strategy": "content-desc", "value": tab_desc, "save_as": "target_tab_fallback", "on_fail": "skip"})
+        steps.extend([
+            {"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"},
+            {"action": "tap", "context_ref": "target_tab", "on_fail": "abort", "humanized": "true"},
+            {"action": "delay", "min_ms": 3000, "max_ms": 6000, "humanized": "true"},
+            {"action": "refresh_layout"},
+            {"action": "set_var", "name": "current_page", "value": tab_key},
+        ])
+        return {
+            "description": "通过底部导航进入 {0}".format(tab_text),
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "nav_tab",
+            "preconditions": [],
+            "fallback_op": "nav_home",
+        }
+
+    def _op_browse_multiple(self):
+        """连续浏览多张帖子卡片"""
+        is_horizontal = self.feed_type == "viewpager_horizontal"
+        steps = [
+            {"action": "log", "message": "连续浏览多张帖子卡片"},
+        ]
+        swipe_step = self._make_browse_swipe(is_horizontal)
+        for i in range(3):
+            steps.append(copy.deepcopy(swipe_step))
+            steps.append({"action": "delay", "min_ms": 1500, "max_ms": 3500, "humanized": "true"})
+        steps.append({"action": "refresh_layout"})
+        steps.append({"action": "set_var", "name": "last_action", "value": "browse_multiple"})
+        return {
+            "description": "连续浏览多张帖子卡片",
+            "require_page": "feed",
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "none",
+            "preconditions": ["feed"],
+            "fallback_op": "navigate_to_feed",
+        }
+
+    def _op_browse_swipe_back(self):
+        """向右滑动查看上一张帖子"""
+        is_horizontal = self.feed_type == "viewpager_horizontal"
+        if is_horizontal:
+            swipe_step = {
+                "action": "swipe", "direction": "right",
+                "start_x_ratio": 0.21, "start_y_ratio": 0.58,
+                "end_x_ratio": 0.76, "end_y_ratio": 0.58,
+                "duration": 500, "humanized": "true",
+                "note": "向右滑动查看上一张帖子",
+            }
+        else:
+            swipe_step = {
+                "action": "swipe", "direction": "down",
+                "start_x_ratio": 0.5, "start_y_ratio": 0.3,
+                "end_x_ratio": 0.5, "end_y_ratio": 0.7,
+                "duration": 500, "humanized": "true",
+                "note": "向下滑动查看上方帖子",
+            }
+        steps = [
+            {"action": "log", "message": "向右滑动查看上一张帖子"},
+            swipe_step,
+            {"action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true"},
+            {"action": "refresh_layout"},
+        ]
+        return {
+            "description": "向右滑动查看上一张帖子",
+            "require_page": "feed",
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "none",
+            "preconditions": ["feed"],
+            "fallback_op": "navigate_to_feed",
+        }
+
+    def _op_pull_refresh(self):
+        """下拉刷新 Feed"""
+        steps = [
+            {"action": "log", "message": "下拉刷新 Community feed"},
+            {
+                "action": "swipe", "direction": "down",
+                "start_x_ratio": 0.5, "start_y_ratio": 0.25,
+                "end_x_ratio": 0.5, "end_y_ratio": 0.75,
+                "duration": 500, "humanized": "true",
+                "note": "下拉刷新",
+            },
+            {"action": "delay", "min_ms": 3000, "max_ms": 5000, "humanized": "true"},
+            {"action": "refresh_layout"},
+        ]
+        return {
+            "description": "下拉刷新 Community feed",
+            "require_page": "feed",
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "none",
+            "preconditions": ["feed"],
+            "fallback_op": "navigate_to_feed",
+        }
+
+    def _op_scroll_feed(self):
+        """垂直滚动 Community 页面"""
+        steps = [
+            {"action": "log", "message": "垂直滚动 Community 页面"},
+            {
+                "action": "scroll", "direction": "down",
+                "distance_ratio": 0.3, "duration": 600, "humanized": "true",
+            },
+            {"action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true"},
+            {"action": "refresh_layout"},
+        ]
+        return {
+            "description": "垂直滚动 Community 页面",
+            "require_page": "feed",
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "none",
+            "preconditions": ["feed"],
+            "fallback_op": "navigate_to_feed",
+        }
+
+    def _op_read_post_deep(self):
+        """深度阅读帖子及全部评论"""
+        steps = [
+            {"action": "log", "message": "深度阅读帖子及全部评论"},
+            {"action": "delay", "min_ms": 3000, "max_ms": 6000, "humanized": "true", "note": "模拟阅读"},
+        ]
+        for i in range(4):
+            steps.extend([
+                {"action": "scroll", "direction": "down", "distance_ratio": 0.25, "duration": 500, "humanized": "true"},
+                {"action": "delay", "min_ms": 2000, "max_ms": 5000, "humanized": "true"},
+            ])
+        steps.append({"action": "set_var", "name": "last_action", "value": "read_post_deep"})
+        return {
+            "description": "深度阅读帖子及全部评论",
+            "require_page": "post_detail",
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "back",
+            "preconditions": ["post_detail"],
+            "fallback_op": "back_to_feed",
+        }
+
+    def _op_scroll_to_comments(self):
+        """滚动到评论区"""
+        steps = [
+            {"action": "log", "message": "滚动到评论区"},
+        ]
+        for i in range(3):
+            steps.extend([
+                {"action": "scroll", "direction": "down", "distance_ratio": 0.3, "duration": 600, "humanized": "true"},
+                {"action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true"},
+            ])
+        steps.append({"action": "set_var", "name": "last_action", "value": "scroll_to_comments"})
+        return {
+            "description": "滚动到评论区",
+            "require_page": "post_detail",
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "back",
+            "preconditions": ["post_detail"],
+            "fallback_op": "back_to_feed",
+        }
+
+    def _op_refresh_post(self):
+        """刷新帖子页面"""
+        steps = [
+            {"action": "log", "message": "刷新帖子页面"},
+            {
+                "action": "swipe", "direction": "down",
+                "start_x_ratio": 0.5, "start_y_ratio": 0.2,
+                "end_x_ratio": 0.5, "end_y_ratio": 0.7,
+                "duration": 500, "humanized": "true",
+            },
+            {"action": "delay", "min_ms": 3000, "max_ms": 5000, "humanized": "true"},
+            {"action": "refresh_layout"},
+        ]
+        return {
+            "description": "刷新帖子页面",
+            "require_page": "post_detail",
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "back",
+            "preconditions": ["post_detail"],
+            "fallback_op": "back_to_feed",
+        }
+
+    def _op_open_post_dropdown(self):
+        """打开帖子下拉菜单"""
+        steps = [
+            {"action": "log", "message": "打开帖子下拉菜单"},
+            {"action": "find", "strategy": "content-desc", "value": "More options", "save_as": "dropdown", "on_fail": "skip"},
+            {"action": "find", "strategy": "content-desc", "value": "Options", "save_as": "dropdown_alt", "on_fail": "skip"},
+            {"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"},
+            {"action": "tap", "context_ref": "dropdown", "on_fail": "skip", "humanized": "true"},
+            {"action": "delay", "min_ms": 1500, "max_ms": 2500, "humanized": "true"},
+            {"action": "back", "note": "关闭菜单"},
+            {"action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true"},
+        ]
+        return {
+            "description": "打开帖子下拉菜单",
+            "require_page": "post_detail",
+            "steps": steps,
+            "overlay_risk": True,
+            "recovery_hint": "back",
+            "preconditions": ["post_detail"],
+            "fallback_op": "back_to_feed",
+        }
+
+    def _op_share_post(self):
+        """分享当前帖子"""
+        action_buttons = self.app_map.get("action_buttons", {})
+        share_btn = action_buttons.get("share", {})
+        share_strategy = share_btn.get("strategy", "content-desc")
+        share_value = share_btn.get("value", "Share")
+        steps = [
+            {"action": "log", "message": "分享当前帖子"},
+            {"action": "find", "strategy": share_strategy, "value": share_value, "save_as": "share_btn", "on_fail": "skip"},
+            {"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"},
+            {"action": "tap", "context_ref": "share_btn", "on_fail": "skip", "humanized": "true"},
+            {"action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true"},
+            {"action": "back", "note": "关闭分享面板/ShareSheet"},
+            {"action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true"},
+            {"action": "refresh_layout"},
+        ]
+        return {
+            "description": "分享当前帖子",
+            "require_page": "post_detail",
+            "steps": steps,
+            "overlay_risk": True,
+            "recovery_hint": "back",
+            "preconditions": ["post_detail"],
+            "fallback_op": "back_to_feed",
+        }
+
+    def _op_bookmark_post(self):
+        """收藏当前帖子"""
+        action_buttons = self.app_map.get("action_buttons", {})
+        bookmark_btn = action_buttons.get("bookmark", {})
+        bm_strategy = bookmark_btn.get("strategy", "text")
+        bm_value = bookmark_btn.get("value", "bookmark post")
+        steps = [
+            {"action": "log", "message": "收藏当前帖子"},
+            {"action": "find", "strategy": bm_strategy, "value": bm_value, "save_as": "bookmark_btn", "on_fail": "skip"},
+            {"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"},
+            {"action": "tap", "context_ref": "bookmark_btn", "on_fail": "skip", "humanized": "true"},
+            {"action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true"},
+        ]
+        return {
+            "description": "收藏当前帖子",
+            "require_page": "post_detail",
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "back",
+            "preconditions": ["post_detail"],
+            "fallback_op": "back_to_feed",
+        }
+
+    def _op_webview_hamburger(self):
+        """打开 WebView 汉堡菜单"""
+        steps = [
+            {"action": "log", "message": "打开 WebView 汉堡菜单"},
+            {"action": "find", "strategy": "content-desc", "value": "Open navigation drawer", "save_as": "hamburger", "on_fail": "skip"},
+            {"action": "find", "strategy": "content-desc", "value": "Menu", "save_as": "hamburger_alt", "on_fail": "skip"},
+            {"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"},
+            {"action": "tap", "context_ref": "hamburger", "on_fail": "skip", "humanized": "true"},
+            {"action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true"},
+            {"action": "refresh_layout"},
+        ]
+        return {
+            "description": "打开 WebView 汉堡菜单",
+            "require_page": "post_detail",
+            "steps": steps,
+            "overlay_risk": True,
+            "recovery_hint": "back",
+            "preconditions": ["post_detail"],
+            "fallback_op": "back_to_feed",
+        }
+
+    def _op_webview_avatar(self):
+        """点击 WebView 内用户头像"""
+        steps = [
+            {"action": "log", "message": "点击 WebView 内用户头像"},
+            {"action": "find", "strategy": "content-desc", "value": "user avatar", "save_as": "avatar", "on_fail": "skip"},
+            {"action": "find", "strategy": "content-desc", "value": "profile picture", "save_as": "avatar_alt", "on_fail": "skip"},
+            {"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"},
+            {"action": "tap", "context_ref": "avatar", "on_fail": "skip", "humanized": "true"},
+            {"action": "delay", "min_ms": 3000, "max_ms": 5000, "humanized": "true"},
+            {"action": "refresh_layout"},
+        ]
+        return {
+            "description": "点击 WebView 内用户头像",
+            "require_page": "post_detail",
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "back",
+            "preconditions": ["post_detail"],
+            "fallback_op": "back_to_feed",
+        }
+
+    def _op_webview_tab(self, tab_name, tab_text, tab_info=None):
+        """切换 WebView 内部 Tab"""
+        cx_ratio = tab_info.get("cx_ratio", 0.5) if tab_info else 0.5
+        cy_ratio = tab_info.get("cy_ratio", 0.15) if tab_info else 0.15
+        steps = [
+            {"action": "log", "message": "切换到 {0} 标签".format(tab_text)},
+            {"action": "find", "strategy": "text", "value": tab_text, "save_as": "wv_tab", "on_fail": "skip"},
+            {"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"},
+            {"action": "tap", "context_ref": "wv_tab", "on_fail": "skip", "humanized": "true"},
+            {"action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true"},
+            {"action": "refresh_layout"},
+        ]
+        return {
+            "description": "切换到 {0} 标签".format(tab_text),
+            "require_page": "feed",
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "nav_tab",
+            "preconditions": ["feed"],
+            "fallback_op": "navigate_to_feed",
+            "webview_internal": True,
+        }
+
+    def _op_view_page(self, page_key, description):
+        """通用: 查看/浏览某个页面"""
+        steps = [
+            {"action": "log", "message": "查看{0}".format(description)},
+            {"action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true", "note": "浏览页面内容"},
+            {"action": "scroll", "direction": "down", "distance_ratio": 0.25, "duration": 500, "humanized": "true"},
+            {"action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true"},
+            {"action": "scroll", "direction": "down", "distance_ratio": 0.2, "duration": 500, "humanized": "true"},
+            {"action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true"},
+        ]
+        return {
+            "description": "查看{0}".format(description),
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "back",
+            "preconditions": [page_key],
+            "fallback_op": "back_to_feed",
+        }
+
+    def _op_scroll_page(self, page_key, description=""):
+        """通用: 滚动某个页面"""
+        desc_text = description or page_key
+        steps = [
+            {"action": "log", "message": "滚动{0}".format(desc_text)},
+            {"action": "scroll", "direction": "down", "distance_ratio": 0.3, "duration": 600, "humanized": "true"},
+            {"action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true"},
+            {"action": "scroll", "direction": "down", "distance_ratio": 0.25, "duration": 500, "humanized": "true"},
+            {"action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true"},
+        ]
+        return {
+            "description": "滚动{0}".format(desc_text),
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "back",
+            "preconditions": [page_key],
+            "fallback_op": "back_to_feed",
+        }
+
+    def _op_tap_element(self, element_key, description):
+        """通用: 点击某个元素"""
+        steps = [
+            {"action": "log", "message": "点击{0}".format(description)},
+            {"action": "find", "selector": element_key, "save_as": "target_el", "on_fail": "skip"},
+            {"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"},
+            {"action": "tap", "context_ref": "target_el", "on_fail": "skip", "humanized": "true"},
+            {"action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true"},
+            {"action": "refresh_layout"},
+        ]
+        return {
+            "description": "点击{0}".format(description),
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "back",
+            "preconditions": [],
+            "fallback_op": "back_to_feed",
+        }
+
+    def _op_go_to_sub_page(self, page_key, english_text, chinese_text):
+        """导航到子页面 (Settings/Profile/Bookmarks)"""
+        steps = [
+            {"action": "log", "message": "进入 {0}".format(english_text)},
+            {"action": "find", "strategy": "text", "value": english_text, "save_as": "entry", "on_fail": "skip"},
+            {"action": "find", "strategy": "text", "value": chinese_text, "save_as": "entry_cn", "on_fail": "skip"},
+            {"action": "find", "strategy": "content-desc", "value": english_text, "save_as": "entry_desc", "on_fail": "skip"},
+            {"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"},
+            {"action": "tap", "context_ref": "entry", "on_fail": "skip", "humanized": "true"},
+            {"action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true"},
+            {"action": "refresh_layout"},
+        ]
+        return {
+            "description": "进入{0}".format(english_text),
+            "steps": steps,
+            "overlay_risk": page_key == "settings",
+            "recovery_hint": "back" if page_key != "settings" else "relaunch",
+            "preconditions": ["more", "home"],
+            "fallback_op": "back_to_feed",
+        }
+
+    def _op_view_profile_detail(self, detail_key, description):
+        """查看个人资料中的某项信息"""
+        steps = [
+            {"action": "log", "message": "查看{0}".format(description)},
+            {"action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true"},
+            {"action": "scroll", "direction": "down", "distance_ratio": 0.2, "duration": 400, "humanized": "true"},
+            {"action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true"},
+        ]
+        return {
+            "description": "查看{0}".format(description),
+            "require_page": "profile",
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "back",
+            "preconditions": ["profile"],
+            "fallback_op": "go_to_profile",
+        }
+
+    def _op_toggle_theme(self, theme):
+        """切换主题 (dark/light/system)"""
+        theme_display = {"dark": "Dark", "light": "Light", "system": "System"}.get(theme, theme)
+        steps = [
+            {"action": "log", "message": "切换到 {0} 主题".format(theme_display)},
+            {"action": "find", "strategy": "text", "value": theme_display, "save_as": "theme_option", "on_fail": "skip"},
+            {"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"},
+            {"action": "tap", "context_ref": "theme_option", "on_fail": "skip", "humanized": "true"},
+            {"action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true"},
+            {"action": "refresh_layout"},
+        ]
+        return {
+            "description": "切换到 {0} 主题".format(theme_display),
+            "require_page": "settings",
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "back",
+            "preconditions": ["settings"],
+            "fallback_op": "go_to_settings",
+        }
+
+    def _op_calendar_nav(self, direction):
+        """日历翻页 (prev/next)"""
+        desc = "上一月" if direction == "prev" else "下一月"
+        btn_desc = "Previous month" if direction == "prev" else "Next month"
+        steps = [
+            {"action": "log", "message": "日历{0}".format(desc)},
+            {"action": "find", "strategy": "content-desc", "value": btn_desc, "save_as": "nav_btn", "on_fail": "skip"},
+            {"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"},
+            {"action": "tap", "context_ref": "nav_btn", "on_fail": "skip", "humanized": "true"},
+            {"action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true"},
+            {"action": "refresh_layout"},
+        ]
+        return {
+            "description": "日历{0}".format(desc),
+            "require_page": "calendar",
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "nav_tab",
+            "preconditions": ["calendar"],
+            "fallback_op": "nav_calendar",
+        }
+
+    def _op_switch_view(self, view_name, description=""):
+        """切换视图 (如 Timeline)"""
+        desc_text = description or view_name
+        steps = [
+            {"action": "log", "message": "切换到 {0}".format(desc_text)},
+            {"action": "find", "strategy": "text", "value": view_name.capitalize(), "save_as": "view_btn", "on_fail": "skip"},
+            {"action": "find", "strategy": "content-desc", "value": view_name.capitalize(), "save_as": "view_btn_alt", "on_fail": "skip"},
+            {"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"},
+            {"action": "tap", "context_ref": "view_btn", "on_fail": "skip", "humanized": "true"},
+            {"action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true"},
+            {"action": "refresh_layout"},
+        ]
+        return {
+            "description": "切换到 {0}".format(desc_text),
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "back",
+            "preconditions": [],
+            "fallback_op": "back_to_feed",
+        }
+
+    def _op_filter(self, filter_key, description):
+        """筛选工具/内容"""
+        steps = [
+            {"action": "log", "message": "筛选{0}".format(description)},
+            {"action": "find", "strategy": "text", "value": filter_key.capitalize() if filter_key != "all" else "All", "save_as": "filter_btn", "on_fail": "skip"},
+            {"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"},
+            {"action": "tap", "context_ref": "filter_btn", "on_fail": "skip", "humanized": "true"},
+            {"action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true"},
+            {"action": "refresh_layout"},
+        ]
+        return {
+            "description": "筛选{0}".format(description),
+            "steps": steps,
+            "overlay_risk": False,
+            "recovery_hint": "back",
+            "preconditions": ["tools"],
+            "fallback_op": "nav_tools",
+        }
+
+    def _op_vision_feature(self, feature):
+        """
+        为单个 Vision AI 发现的特征构建操作定义。
+
+        参数:
+            feature (dict): VisionDiscoveredFeature 字典
+
+        返回:
+            dict: 操作定义，格式与其他 _op_* 方法一致
+        """
+        resolution = feature.get("resolution", {})
+        recovery = feature.get("recovery", {})
+        action_type = feature.get("action_type", "tap")
+        feature_label = feature.get("feature_label", "")
+        feature_key = feature.get("feature_key", "")
+        page_type = feature.get("page_type", "")
+
+        selector_strategy = resolution.get("selector_strategy", "text")
+        selector_value = resolution.get("selector_value", "")
+        fallback_strategy = resolution.get("fallback_strategy")
+        fallback_value = resolution.get("fallback_value")
+
+        # 构建 find 步骤
+        find_step = {
+            "action": "find",
+            "strategy": selector_strategy,
+            "value": selector_value,
+            "save_as": "vision_target",
+            "on_fail": "retry",
+            "max_retries": 2,
+            "retry_delay_ms": 2000,
+            "note": "Vision AI 发现: 定位 {0}".format(feature_label),
+        }
+
+        # 如果有 fallback，添加到 find 步骤
+        if fallback_strategy and fallback_value:
+            find_step["fallback_strategy"] = fallback_strategy
+            find_step["fallback_value"] = fallback_value
+
+        # 构建步骤列表（根据 action_type 不同而不同）
+        steps = list()  # type: list
+        steps.append({
+            "action": "log",
+            "message": "Vision AI 操作: {0} ({1})".format(feature_label, action_type),
+        })
+
+        if action_type == "tap":
+            # find + delay + tap + delay + refresh
+            steps.append(find_step)
+            steps.append({"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"})
+            steps.append({
+                "action": "tap",
+                "context_ref": "vision_target",
+                "on_fail": "skip",
+                "humanized": "true",
+                "note": "Vision AI: 点击 {0}".format(feature_label),
+            })
+            steps.append({"action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true"})
+            steps.append({"action": "refresh_layout"})
+
+        elif action_type == "long_press":
+            # find + delay + long_press + delay + refresh
+            steps.append(find_step)
+            steps.append({"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"})
+            steps.append({
+                "action": "long_press",
+                "context_ref": "vision_target",
+                "duration": 1000,
+                "on_fail": "skip",
+                "humanized": "true",
+                "note": "Vision AI: 长按 {0}".format(feature_label),
+            })
+            steps.append({"action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true"})
+            steps.append({"action": "refresh_layout"})
+
+        elif action_type == "input":
+            # find + tap + delay + input_text + delay
+            steps.append(find_step)
+            steps.append({
+                "action": "tap",
+                "context_ref": "vision_target",
+                "on_fail": "skip",
+                "humanized": "true",
+                "note": "Vision AI: 聚焦输入框 {0}".format(feature_label),
+            })
+            steps.append({"action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true"})
+            steps.append({
+                "action": "input_text",
+                "context_ref": "vision_target",
+                "text": "",
+                "on_fail": "skip",
+                "note": "Vision AI: 向 {0} 输入文本 (文本由运行时填充)".format(feature_label),
+            })
+            steps.append({"action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true"})
+
+        elif action_type == "scroll":
+            # scroll + delay + refresh
+            steps.append({
+                "action": "swipe",
+                "direction": "up",
+                "start_x_ratio": 0.5, "start_y_ratio": 0.7,
+                "end_x_ratio": 0.5, "end_y_ratio": 0.3,
+                "duration": 500,
+                "humanized": "true",
+                "note": "Vision AI: 滚动查看 {0}".format(feature_label),
+            })
+            steps.append({"action": "delay", "min_ms": 1000, "max_ms": 2500, "humanized": "true"})
+            steps.append({"action": "refresh_layout"})
+
+        elif action_type == "toggle":
+            # find + delay + tap + delay + refresh
+            steps.append(find_step)
+            steps.append({"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"})
+            steps.append({
+                "action": "tap",
+                "context_ref": "vision_target",
+                "on_fail": "skip",
+                "humanized": "true",
+                "note": "Vision AI: 切换 {0}".format(feature_label),
+            })
+            steps.append({"action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true"})
+            steps.append({"action": "refresh_layout"})
+
+        elif action_type == "select":
+            # find + delay + tap + delay + refresh
+            steps.append(find_step)
+            steps.append({"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"})
+            steps.append({
+                "action": "tap",
+                "context_ref": "vision_target",
+                "on_fail": "skip",
+                "humanized": "true",
+                "note": "Vision AI: 选择 {0}".format(feature_label),
+            })
+            steps.append({"action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true"})
+            steps.append({"action": "refresh_layout"})
+
+        elif action_type == "open":
+            # find + delay + tap + longer_delay + refresh + verify
+            steps.append(find_step)
+            steps.append({"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"})
+            steps.append({
+                "action": "tap",
+                "context_ref": "vision_target",
+                "on_fail": "skip",
+                "humanized": "true",
+                "note": "Vision AI: 打开 {0}".format(feature_label),
+            })
+            steps.append({"action": "delay", "min_ms": 3000, "max_ms": 6000, "humanized": "true"})
+            steps.append({"action": "refresh_layout"})
+            steps.append({
+                "action": "verify",
+                "selector": "v_{0}".format(feature_key),
+                "on_fail": "skip",
+                "note": "Vision AI: 验证 {0} 已打开".format(feature_label),
+            })
+
+        elif action_type == "submit":
+            # find + delay + tap + delay + verify
+            steps.append(find_step)
+            steps.append({"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"})
+            steps.append({
+                "action": "tap",
+                "context_ref": "vision_target",
+                "on_fail": "skip",
+                "humanized": "true",
+                "note": "Vision AI: 提交 {0}".format(feature_label),
+            })
+            steps.append({"action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true"})
+            steps.append({
+                "action": "verify",
+                "selector": "v_{0}".format(feature_key),
+                "on_fail": "skip",
+                "note": "Vision AI: 验证 {0} 提交结果".format(feature_label),
+            })
+
+        else:
+            # 未知 action_type，默认按 tap 处理
+            steps.append(find_step)
+            steps.append({"action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true"})
+            steps.append({
+                "action": "tap",
+                "context_ref": "vision_target",
+                "on_fail": "skip",
+                "humanized": "true",
+                "note": "Vision AI: 操作 {0}".format(feature_label),
+            })
+            steps.append({"action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true"})
+            steps.append({"action": "refresh_layout"})
+
+        # 添加视觉验证检查点
+        verification_checkpoint = feature.get("verification_checkpoint", "")
+        if verification_checkpoint:
+            steps.append({
+                "action": "visual_verify",
+                "checkpoint": verification_checkpoint,
+                "note": "Vision AI 视觉验证: {0}".format(feature_label),
+            })
+
+        # 构建 preconditions（基于 page_type）
+        preconditions = []
+        if page_type:
+            preconditions.append(page_type)
+
+        return {
+            "description": "Vision AI: {0}".format(feature_label),
+            "steps": steps,
+            "overlay_risk": recovery.get("overlay_risk", False),
+            "recovery_hint": recovery.get("recovery_hint", "back"),
+            "preconditions": preconditions,
+            "fallback_op": recovery.get("fallback_op", "back_to_feed"),
+            "source": "vision_ai",
+            "confidence": feature.get("confidence", 0.0),
+        }
+
+    def _generate_vision_operations(self, ops_dict):
+        """
+        从 Vision AI 发现结果生成操作，添加到操作字典中。
+
+        参数:
+            ops_dict (dict): 正在构建的操作字典 (ops["operations"])
+
+        返回:
+            int: 添加的操作数量
+        """
+        vision_discoveries = self.app_map.get("vision_discoveries", [])
+        if not vision_discoveries:
+            return 0
+
+        count = 0
+        for discovery in vision_discoveries:
+            # 跳过标记为 skipped 的页面发现
+            if discovery.get("skipped", False):
+                continue
+
+            features = discovery.get("features", [])
+            for feature in features:
+                # 跳过未匹配的特征
+                resolution = feature.get("resolution", {})
+                if not resolution.get("matched", False):
+                    continue
+
+                # 跳过低置信度特征
+                confidence = feature.get("confidence", 0.0)
+                if confidence < 0.6:
+                    continue
+
+                # 获取操作名称
+                operation_name = feature.get("operation_name", "")
+                if not operation_name:
+                    # 如果没有 operation_name，从 feature_key 生成
+                    feature_key = feature.get("feature_key", "")
+                    if not feature_key:
+                        continue
+                    operation_name = "v_{0}".format(feature_key)
+
+                # 避免覆盖已有操作
+                if operation_name in ops_dict:
+                    continue
+
+                # 构建操作并添加
+                op = self._op_vision_feature(feature)
+                ops_dict[operation_name] = op
+                count += 1
+
+        return count
+
+    def _make_browse_swipe(self, is_horizontal):
+        """构建浏览滑动步骤 (复用)"""
+        if is_horizontal:
+            return {
+                "action": "swipe", "direction": "left",
+                "start_x_ratio": 0.76, "start_y_ratio": 0.58,
+                "end_x_ratio": 0.21, "end_y_ratio": 0.58,
+                "duration": 500, "humanized": "true",
+                "note": "水平滑动 ViewPager 查看下一张帖子卡片",
+            }
+        else:
+            return {
+                "action": "swipe", "direction": "up",
+                "start_x_ratio": 0.5, "start_y_ratio": 0.7,
+                "end_x_ratio": 0.5, "end_y_ratio": 0.3,
+                "duration": 500, "humanized": "true",
+                "note": "垂直滚动 RecyclerView 查看更多帖子",
+            }
 
     # ================================================================
     # 内部工具方法

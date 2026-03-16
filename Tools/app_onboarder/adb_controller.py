@@ -21,17 +21,50 @@ class ADBController:
     REMOTE_DUMP_PATH = "/data/local/tmp/window_dump.xml"
     REMOTE_SCREENSHOT_PATH = "/data/local/tmp/onboarder_screenshot.png"
 
-    def __init__(self, device_id=None, work_dir=None):
+    # 已知的 ADB 可执行文件搜索路径（按优先级排列）
+    KNOWN_ADB_PATHS = [
+        r"D:\Program Files\ZennoLab\EN\ZennoDroid Enterprise\2.4.7.0\Progs\adb.exe",
+        r"C:\Program Files\ZennoLab\EN\ZennoDroid Enterprise\2.4.7.0\Progs\adb.exe",
+        r"D:\Program Files (x86)\ZennoLab\EN\ZennoDroid Enterprise\2.4.7.0\Progs\adb.exe",
+    ]
+
+    def __init__(self, device_id=None, work_dir=None, adb_path=None):
         """
         初始化 ADB 控制器
 
         Args:
             device_id: 指定设备 ID（多设备时使用），None 则使用默认设备
             work_dir: 本地工作目录，用于存放 dump/截图文件
+            adb_path: ADB 可执行文件的完整路径。None 则自动探测：
+                      先尝试系统 PATH 中的 'adb'，再搜索已知 ZennoDroid 安装路径。
         """
         self.device_id = device_id
         self.work_dir = work_dir or os.path.expanduser("~")
         self._screen_size = None  # 缓存屏幕分辨率
+        self.adb_path = adb_path or self._detect_adb()
+
+    def _detect_adb(self):
+        """
+        自动探测 ADB 可执行文件路径。
+
+        优先使用系统 PATH 中的 adb，其次搜索已知的 ZennoDroid 安装路径。
+
+        Returns:
+            str: ADB 可执行文件路径
+        """
+        import shutil
+        # 1. 尝试系统 PATH
+        system_adb = shutil.which("adb")
+        if system_adb:
+            return system_adb
+
+        # 2. 搜索已知路径
+        for candidate in self.KNOWN_ADB_PATHS:
+            if os.path.isfile(candidate):
+                return candidate
+
+        # 3. 兜底：返回 "adb"，让 subprocess 报 FileNotFoundError
+        return "adb"
 
     def run_cmd(self, args, timeout=30):
         """
@@ -44,7 +77,7 @@ class ADBController:
         Returns:
             tuple: (exit_code, stdout_output)
         """
-        cmd = ["adb"]
+        cmd = [self.adb_path]
         if self.device_id:
             cmd.extend(["-s", self.device_id])
         if isinstance(args, str):
@@ -128,6 +161,70 @@ class ADBController:
                         return part.rstrip("}")
         return ""
 
+    def get_device_info(self):
+        """
+        获取完整设备信息
+
+        Returns:
+            dict: {
+                "model": "Pixel 6",
+                "brand": "google",
+                "android_version": "13",
+                "sdk_version": "33",
+                "screen_size": (1080, 2400),
+                "dpi": 420,
+                "serial": "XXXX"
+            }
+        """
+        info = {
+            "model": "",
+            "brand": "",
+            "android_version": "",
+            "sdk_version": "",
+            "screen_size": self.get_screen_size(),
+            "dpi": 0,
+            "serial": self.device_id or "",
+        }
+
+        # Model
+        code, output = self.run_cmd(["shell", "getprop", "ro.product.model"])
+        if code == 0 and output:
+            info["model"] = output.strip()
+
+        # Brand
+        code, output = self.run_cmd(["shell", "getprop", "ro.product.brand"])
+        if code == 0 and output:
+            info["brand"] = output.strip()
+
+        # Android version
+        code, output = self.run_cmd(["shell", "getprop", "ro.build.version.release"])
+        if code == 0 and output:
+            info["android_version"] = output.strip()
+
+        # SDK version
+        code, output = self.run_cmd(["shell", "getprop", "ro.build.version.sdk"])
+        if code == 0 and output:
+            info["sdk_version"] = output.strip()
+
+        # DPI
+        code, output = self.run_cmd(["shell", "wm", "density"])
+        if code == 0 and output:
+            for line in output.strip().split("\n"):
+                line = line.strip()
+                if ":" in line:
+                    try:
+                        info["dpi"] = int(line.split(":")[-1].strip())
+                    except ValueError:
+                        pass
+
+        # Serial (if not provided)
+        if not info["serial"]:
+            code, output = self.run_cmd(["get-serialno"])
+            if code == 0 and output:
+                info["serial"] = output.strip()
+
+        return info
+
     # === APP 控制 ===
 
     def launch_app(self, package_name):
@@ -186,6 +283,13 @@ class ADBController:
 
             # 检查 dump 命令是否成功
             if code != 0 or "Killed" in output:
+                # ZennoDroid/Appium UIAutomator2 Server 可能占用 uiautomator
+                # 尝试 kill 它后重试
+                if attempt == 1 and (code == 137 or "Killed" in output):
+                    self.run_cmd(
+                        ["shell", "am", "force-stop", "io.appium.uiautomator2.server"]
+                    )
+                    time.sleep(1.5)
                 if attempt < max_retries:
                     time.sleep(wait_time)
                     continue

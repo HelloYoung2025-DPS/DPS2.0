@@ -426,6 +426,103 @@ class UIAnalyzer:
 
         return "unknown"
 
+    def detect_app_state(self):
+        """
+        综合分析当前 APP 所处状态（比 classify_page 更完整）
+
+        结合底部导航、feed 容器、帖子容器、WebView、action buttons 等多维度
+        信号做综合判断。
+
+        Returns:
+            dict: {
+                "state": "home" | "feed" | "post_detail" | "profile" | "unknown",
+                "confidence": float (0.0-1.0),
+                "signals": list[str],  # 判断依据
+                "page_type": str,  # classify_page() 的结果
+                "has_bottom_nav": bool,
+                "has_feed": bool,
+                "has_webview": bool,
+                "action_buttons_found": list[str],
+            }
+        """
+        signals = []
+        scores = {
+            "home": 0.0,
+            "feed": 0.0,
+            "post_detail": 0.0,
+            "profile": 0.0,
+            "unknown": 0.1,  # 兜底基准分
+        }
+
+        # 1. 基础页面分类
+        page_type = self.classify_page()
+        has_bottom_nav = self.detect_bottom_nav() is not None
+        has_webview = self.detect_webview() is not None
+        posts = self.detect_post_containers()
+        feed_type = self.detect_feed_type()
+        action_buttons = self.find_action_buttons()
+        action_button_names = list(action_buttons.keys())
+
+        # 2. Feed 信号
+        if posts and feed_type != "unknown":
+            scores["feed"] += 0.5
+            signals.append("feed: posts={}, type={}".format(len(posts), feed_type))
+        if has_bottom_nav:
+            scores["feed"] += 0.1
+            scores["home"] += 0.2
+
+        # 3. Post detail 信号
+        if has_webview and not posts:
+            scores["post_detail"] += 0.4
+            signals.append("post_detail: webview without feed")
+        if "back" in action_buttons:
+            scores["post_detail"] += 0.15
+            signals.append("post_detail: back button found")
+        if "like" in action_buttons and "comment" in action_buttons:
+            scores["post_detail"] += 0.2
+            signals.append("post_detail: like+comment buttons")
+        if not has_bottom_nav and (has_webview or "back" in action_buttons):
+            scores["post_detail"] += 0.15
+            signals.append("post_detail: no bottom nav + back/webview")
+
+        # 4. Home 信号
+        if has_bottom_nav and not posts and not has_webview:
+            scores["home"] += 0.4
+            signals.append("home: bottom nav, no feed/webview")
+        if page_type == "home":
+            scores["home"] += 0.2
+
+        # 5. Profile 信号
+        profile_hints = self.find_by_resource_id("profile")
+        profile_hints += self.find_by_text("followers", exact=False, case_sensitive=False)
+        profile_hints += self.find_by_text("following", exact=False, case_sensitive=False)
+        if len(profile_hints) >= 2:
+            scores["profile"] += 0.5
+            signals.append("profile: {} profile hints".format(len(profile_hints)))
+
+        # 6. 选择最高分的状态
+        best_state = max(scores, key=lambda k: scores[k])
+        best_score = scores[best_state]
+
+        # 计算置信度（基于最高分与次高分的差距）
+        sorted_scores = sorted(scores.values(), reverse=True)
+        if len(sorted_scores) >= 2 and sorted_scores[0] > 0:
+            gap = sorted_scores[0] - sorted_scores[1]
+            confidence = min(1.0, best_score * 0.7 + gap * 0.3)
+        else:
+            confidence = best_score
+
+        return {
+            "state": best_state,
+            "confidence": round(confidence, 2),
+            "signals": signals,
+            "page_type": page_type,
+            "has_bottom_nav": has_bottom_nav,
+            "has_feed": len(posts) > 0,
+            "has_webview": has_webview,
+            "action_buttons_found": action_button_names,
+        }
+
     def find_social_elements(self):
         """
         查找包含社交关键词的元素
@@ -564,3 +661,233 @@ class UIAnalyzer:
         if y_spread > 100:
             return False
         return True
+
+    # === Vision 匹配方法（供 VisionDiscoveryClient 使用）===
+
+    def build_clickable_catalog(self, max_elements=30):
+        """构建可点击元素目录，供 Vision 模型交叉参考"""
+        catalog = []
+        for el in self.find_visible_clickable():
+            if not el.has_reasonable_size:
+                continue
+            entry = {
+                "text": el.text or "",
+                "desc": el.content_desc or "",
+                "id": el.short_id or "",
+                "class": el.class_name.split(".")[-1] if el.class_name else "",
+                "bounds": "[{},{},{}x{}]".format(el.x1, el.y1, el.width, el.height),
+                "clickable": el.clickable,
+            }
+            catalog.append(entry)
+            if len(catalog) >= max_elements:
+                break
+        return catalog
+
+    def find_best_match_for_vision(self, feature, screen_w=1440, screen_h=3120):
+        """
+        将 Vision 发现的功能匹配到 XML 元素，返回 resolution 字典
+
+        参数:
+            feature (dict): Vision 发现的功能，包含 target_text, target_content_desc,
+                           target_resource_id_hint, target_bbox_norm 等字段
+            screen_w (int): 屏幕宽度
+            screen_h (int): 屏幕高度
+
+        返回:
+            dict: ResolutionInfo 结构
+        """
+        candidates = self.find_visible_clickable()
+        if not candidates:
+            candidates = self.find_visible()
+
+        # 策略1: 按文本匹配 (最高优先级)
+        target_text = feature.get("target_text")
+        if target_text:
+            result = self._match_by_text_or_desc(target_text, "text", candidates)
+            if result and result["match_score"] >= 0.7:
+                return result
+
+        # 策略2: 按 content-desc 匹配
+        target_desc = feature.get("target_content_desc")
+        if target_desc:
+            result = self._match_by_text_or_desc(target_desc, "content-desc", candidates)
+            if result and result["match_score"] >= 0.7:
+                return result
+
+        # 策略3: 按 resource-id 匹配
+        target_id = feature.get("target_resource_id_hint")
+        if target_id:
+            id_matches = self.find_by_resource_id(target_id, partial=True)
+            visible_matches = [el for el in id_matches if el.is_visible and el.has_reasonable_size]
+            if visible_matches:
+                el = visible_matches[0]
+                return self._build_resolution(el, "resource-id", el.short_id, 0.8)
+
+        # 策略4: 按 bbox IOU 匹配 (兜底)
+        target_bbox = feature.get("target_bbox_norm")
+        if target_bbox and len(target_bbox) == 4:
+            result = self._match_by_bbox(target_bbox, candidates, screen_w, screen_h)
+            if result and result["match_score"] >= 0.3:
+                return result
+
+        # 未匹配
+        return {
+            "matched": False,
+            "match_score": 0.0,
+            "selector_strategy": None,
+            "selector_value": None,
+            "fallback_strategy": None,
+            "fallback_value": None,
+            "bounds_px": None,
+            "center_x": None,
+            "center_y": None,
+            "matched_text": None,
+            "matched_content_desc": None,
+            "matched_resource_id": None,
+            "matched_class_name": None,
+        }
+
+    def _match_by_text_or_desc(self, target, match_type, candidates):
+        """按文本或 content-desc 匹配元素"""
+        target_lower = target.lower().strip()
+        best_el = None
+        best_score = 0.0
+
+        for el in candidates:
+            if match_type == "text":
+                el_value = (el.text or "").lower().strip()
+            else:
+                el_value = (el.content_desc or "").lower().strip()
+
+            if not el_value:
+                continue
+
+            # 完全匹配
+            if el_value == target_lower:
+                score = 1.0
+            # 包含匹配
+            elif target_lower in el_value or el_value in target_lower:
+                longer = max(len(target_lower), len(el_value))
+                shorter = min(len(target_lower), len(el_value))
+                score = shorter / longer if longer > 0 else 0.0
+            else:
+                continue
+
+            if score > best_score:
+                best_score = score
+                best_el = el
+
+        if best_el and best_score >= 0.5:
+            strategy = match_type
+            value = best_el.text if match_type == "text" else best_el.content_desc
+            return self._build_resolution(best_el, strategy, value, best_score)
+
+        return None
+
+    def _match_by_bbox(self, norm_bbox, candidates, screen_w, screen_h):
+        """按 Vision 返回的归一化 bbox 匹配最近的 XML 元素"""
+        px_bbox = self._normalize_bbox_to_pixels(norm_bbox, screen_w, screen_h)
+        if not px_bbox:
+            return None
+
+        best_el = None
+        best_iou = 0.0
+
+        for el in candidates:
+            if not el.is_visible or not el.has_reasonable_size:
+                continue
+            el_bbox = (el.x1, el.y1, el.x2, el.y2)
+            iou = self._compute_iou(px_bbox, el_bbox)
+            if iou > best_iou:
+                best_iou = iou
+                best_el = el
+
+        if best_el and best_iou >= 0.2:
+            # 选择最佳 selector strategy
+            if best_el.short_id:
+                strategy, value = "resource-id", best_el.short_id
+            elif best_el.text:
+                strategy, value = "text", best_el.text
+            elif best_el.content_desc:
+                strategy, value = "content-desc", best_el.content_desc
+            else:
+                strategy, value = "coordinates", "{},{}".format(best_el.cx, best_el.cy)
+
+            # Score: IOU weighted (max 0.7 for bbox-only matches)
+            score = min(best_iou * 1.4, 0.7)
+            return self._build_resolution(best_el, strategy, value, score)
+
+        return None
+
+    def _build_resolution(self, el, strategy, value, score):
+        """构建 ResolutionInfo 字典"""
+        # 确定 fallback
+        fallback_strategy = None
+        fallback_value = None
+        if strategy == "resource-id" and el.text:
+            fallback_strategy = "text"
+            fallback_value = el.text
+        elif strategy == "resource-id" and el.content_desc:
+            fallback_strategy = "content-desc"
+            fallback_value = el.content_desc
+        elif strategy == "text" and el.short_id:
+            fallback_strategy = "resource-id"
+            fallback_value = el.short_id
+        elif strategy == "text" and el.content_desc:
+            fallback_strategy = "content-desc"
+            fallback_value = el.content_desc
+        elif strategy == "content-desc" and el.short_id:
+            fallback_strategy = "resource-id"
+            fallback_value = el.short_id
+
+        return {
+            "matched": True,
+            "match_score": round(score, 3),
+            "selector_strategy": strategy,
+            "selector_value": value,
+            "fallback_strategy": fallback_strategy,
+            "fallback_value": fallback_value,
+            "bounds_px": [el.x1, el.y1, el.x2, el.y2],
+            "center_x": el.cx,
+            "center_y": el.cy,
+            "matched_text": el.text or None,
+            "matched_content_desc": el.content_desc or None,
+            "matched_resource_id": el.short_id or None,
+            "matched_class_name": el.class_name or None,
+        }
+
+    def _compute_iou(self, bbox_a, bbox_b):
+        """计算两个 bbox 的 IoU (Intersection over Union)"""
+        x1 = max(bbox_a[0], bbox_b[0])
+        y1 = max(bbox_a[1], bbox_b[1])
+        x2 = min(bbox_a[2], bbox_b[2])
+        y2 = min(bbox_a[3], bbox_b[3])
+
+        if x2 <= x1 or y2 <= y1:
+            return 0.0
+
+        intersection = (x2 - x1) * (y2 - y1)
+        area_a = (bbox_a[2] - bbox_a[0]) * (bbox_a[3] - bbox_a[1])
+        area_b = (bbox_b[2] - bbox_b[0]) * (bbox_b[3] - bbox_b[1])
+        union = area_a + area_b - intersection
+
+        if union <= 0:
+            return 0.0
+
+        return intersection / union
+
+    def _normalize_bbox_to_pixels(self, norm_bbox, screen_w, screen_h):
+        """将 0.0-1.0 归一化 bbox 转为像素坐标"""
+        if not norm_bbox or len(norm_bbox) != 4:
+            return None
+        try:
+            x1 = int(norm_bbox[0] * screen_w)
+            y1 = int(norm_bbox[1] * screen_h)
+            x2 = int(norm_bbox[2] * screen_w)
+            y2 = int(norm_bbox[3] * screen_h)
+            # 确保合法
+            if x2 <= x1 or y2 <= y1:
+                return None
+            return (x1, y1, x2, y2)
+        except (TypeError, ValueError):
+            return None
