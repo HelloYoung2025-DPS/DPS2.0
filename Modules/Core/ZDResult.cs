@@ -75,6 +75,11 @@ public class ZDResult
     public string ScreenshotData { get; set; }
 
     /// <summary>
+    /// 执行后的截图文件路径（兼容旧代码）
+    /// </summary>
+    public string ScreenshotPath { get; set; }
+
+    /// <summary>
     /// 尝试次数
     /// </summary>
     public int AttemptCount { get; set; }
@@ -97,6 +102,7 @@ public class ZDResult
         ElapsedMilliseconds = 0;
         AfterLayoutXml = "";
         ScreenshotData = "";
+        ScreenshotPath = "";
         AttemptCount = 1;
         ExtraData = new System.Collections.Generic.Dictionary<string, string>();
     }

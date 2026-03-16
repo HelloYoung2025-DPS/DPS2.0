@@ -226,6 +226,7 @@ public class ActionExecutor
             if (action == "scroll") return StepScroll(stepJson);
             if (action == "delay") return StepDelay(stepJson);
             if (action == "type") return StepType(stepJson);
+            if (action == "input_text") return StepType(stepJson);
             if (action == "verify") return StepVerify(stepJson, selectorsJson);
             if (action == "require") return StepRequire(stepJson, platformConfig);
             if (action == "refresh_layout") return StepRefreshLayout();
@@ -264,21 +265,42 @@ public class ActionExecutor
             return HandleOnFail(stepJson, "选择器解析失败");
         }
 
-        string xml = CoreHelper.GetLayout();
-        List<string> results = SelectorEngine.Find(xml, selectorJson);
-
         string saveAs = JsonHelper.Get(stepJson, "save_as");
+        string onFail = JsonHelper.Get(stepJson, "on_fail");
+        int maxRetries = 1;
+        if (onFail == "retry")
+        {
+            maxRetries = JsonHelper.GetInt(stepJson, "max_retries", 3);
+            if (maxRetries < 1) maxRetries = 1;
+        }
+        int retryDelayMs = JsonHelper.GetInt(stepJson, "retry_delay_ms", 1000);
+
+        string xml = "";
+        List<string> results = new List<string>();
+        for (int attempt = 0; attempt < maxRetries; attempt++)
+        {
+            xml = CoreHelper.GetLayout();
+            results = SelectorEngine.Find(xml, selectorJson);
+            if (results.Count > 0)
+            {
+                break;
+            }
+
+            if (attempt < maxRetries - 1)
+            {
+                CoreHelper.Log(TAG, string.Format("find: 重试 {0}/{1}", attempt + 1, maxRetries));
+                System.Threading.Thread.Sleep(retryDelayMs);
+            }
+        }
+
         if (!string.IsNullOrEmpty(saveAs))
         {
-            // 存储第一个结果的 bounds 和总数
             if (results.Count > 0)
             {
                 context.SetVariable(saveAs, results[0]);
                 context.SetVariable(saveAs + "_count", results.Count.ToString());
-                // 存储所有结果（用 | 分隔）
                 context.SetVariable(saveAs + "_all", string.Join("|", results.ToArray()));
 
-                // 同步节点语义文本，供 SessionRunner/RuleEngine 读取
                 string firstNode = FindNodeByBounds(xml, results[0]);
                 string nodeText = "";
                 string nodeDesc = "";
@@ -334,14 +356,15 @@ public class ActionExecutor
         if (humanized)
         {
             string profileName = CoreHelper.GetVar("humanization_profile", "casual");
-            var profile = ScriptHelpers.GetProfileConfig(profileName);
+            Dictionary<string, double> profile = GetHumanizationProfile(profileName);
             int[] bounds = ResolveBounds(stepJson, selectorsJson, context);
             if (bounds != null)
             {
-                ScriptHelpers.HumanizedTap(bounds, profile, _random);
+                ApplyHumanizedTap(input, bounds, profile);
                 CoreHelper.Log(TAG, string.Format("humanized tap: ({0}, {1}) bounds={2}", (bounds[0]+bounds[2])/2, (bounds[1]+bounds[3])/2, bounds[0] + "," + bounds[1] + "," + bounds[2] + "," + bounds[3]));
                 return "OK";
             }
+            System.Threading.Thread.Sleep(ApplyHumanizedDelay(120, profile));
         }
 
         input.Tap(center[0], center[1]);
@@ -355,10 +378,10 @@ public class ActionExecutor
     /// </summary>
     private static string StepSwipe(string stepJson)
     {
-        int x1 = JsonHelper.GetInt(stepJson, "x1", 540);
-        int y1 = JsonHelper.GetInt(stepJson, "y1", 1600);
-        int x2 = JsonHelper.GetInt(stepJson, "x2", 540);
-        int y2 = JsonHelper.GetInt(stepJson, "y2", 800);
+        int x1 = ReadIntWithAliases(stepJson, new string[] { "x1", "start_x" }, 540);
+        int y1 = ReadIntWithAliases(stepJson, new string[] { "y1", "start_y" }, 1600);
+        int x2 = ReadIntWithAliases(stepJson, new string[] { "x2", "end_x" }, 540);
+        int y2 = ReadIntWithAliases(stepJson, new string[] { "y2", "end_y" }, 800);
         int duration = JsonHelper.GetInt(stepJson, "duration", 500);
 
         dynamic input = CoreHelper.GetInput();
@@ -371,8 +394,8 @@ public class ActionExecutor
         if (humanized)
         {
             string profileName = CoreHelper.GetVar("humanization_profile", "casual");
-            var profile = ScriptHelpers.GetProfileConfig(profileName);
-            ScriptHelpers.HumanizedSwipe(x1, y1, x2, y2, profile, _random);
+            Dictionary<string, double> profile = GetHumanizationProfile(profileName);
+            ApplyHumanizedSwipe(input, x1, y1, x2, y2, duration, profile);
             CoreHelper.Log(TAG, string.Format("humanized swipe: ({0},{1})->({2},{3})", x1, y1, x2, y2));
             return "OK";
         }
@@ -411,8 +434,8 @@ public class ActionExecutor
         if (humanized)
         {
             string profileName = CoreHelper.GetVar("humanization_profile", "casual");
-            var profile = ScriptHelpers.GetProfileConfig(profileName);
-            ScriptHelpers.HumanizedSwipe(x1, y1, x2, y2, profile, _random);
+            Dictionary<string, double> profile = GetHumanizationProfile(profileName);
+            ApplyHumanizedSwipe(input, x1, y1, x2, y2, duration, profile);
             CoreHelper.Log(TAG, string.Format("humanized scroll {0}: distance={1}", direction, distance));
             return "OK";
         }
@@ -434,10 +457,11 @@ public class ActionExecutor
 
         bool humanized = JsonHelper.Get(stepJson, "humanized") == "true";
         int delayMs = _random.Next(minMs, maxMs + 1);
-        if (humanized) {
+        if (humanized)
+        {
             string profileName = CoreHelper.GetVar("humanization_profile", "casual");
-            var profile = ScriptHelpers.GetProfileConfig(profileName);
-            delayMs = ScriptHelpers.HumanizedDelay(delayMs, profile, _random);
+            Dictionary<string, double> profile = GetHumanizationProfile(profileName);
+            delayMs = ApplyHumanizedDelay(delayMs, profile);
         }
         System.Threading.Thread.Sleep(delayMs);
         CoreHelper.Log(TAG, string.Format("delay: {0}ms", delayMs));
@@ -451,13 +475,19 @@ public class ActionExecutor
     /// </summary>
     private static string StepType(string stepJson)
     {
-        string text = JsonHelper.Get(stepJson, "text");
+        string text = ResolveTemplateText(JsonHelper.Get(stepJson, "text"));
         if (string.IsNullOrEmpty(text))
         {
             string varName = JsonHelper.Get(stepJson, "var");
             if (!string.IsNullOrEmpty(varName))
             {
                 text = CoreHelper.GetVar(varName, "");
+                // 防御回退: CoreHelper.GetVar 已有虚拟变量机制
+                // 此处为额外防线，查询 ActionExecutor 静态上下文
+                if (string.IsNullOrEmpty(text))
+                {
+                    text = GetContextVariable(varName);
+                }
             }
         }
 
@@ -1014,6 +1044,19 @@ public class ActionExecutor
             return SelectorEngine.BuildSelector("resource-id", selectorKey);
         }
 
+        string strategy = JsonHelper.Get(stepJson, "strategy");
+        string value = JsonHelper.Get(stepJson, "value");
+        if (!string.IsNullOrEmpty(strategy) && !string.IsNullOrEmpty(value))
+        {
+            string fbStrategy = JsonHelper.Get(stepJson, "fallback_strategy");
+            string fbValue = JsonHelper.Get(stepJson, "fallback_value");
+            if (!string.IsNullOrEmpty(fbStrategy) && !string.IsNullOrEmpty(fbValue))
+            {
+                return SelectorEngine.BuildSelector(strategy, value, fbStrategy, fbValue);
+            }
+            return SelectorEngine.BuildSelector(strategy, value);
+        }
+
         // 方式2：内联选择器
         string inlineSelector = JsonHelper.ExtractObject(stepJson, "selector_inline");
         if (!string.IsNullOrEmpty(inlineSelector))
@@ -1022,6 +1065,151 @@ public class ActionExecutor
         }
 
         return null;
+    }
+
+    private static Dictionary<string, double> GetHumanizationProfile(string profileName)
+    {
+        Dictionary<string, double> profile = new Dictionary<string, double>();
+        if (profileName == "speed_demon")
+        {
+            profile["base_delay_mult"] = 0.6;
+            profile["delay_variance"] = 0.15;
+            profile["tap_offset_max"] = 5.0;
+            profile["swipe_jitter"] = 6.0;
+        }
+        else if (profileName == "deep_reader")
+        {
+            profile["base_delay_mult"] = 1.5;
+            profile["delay_variance"] = 0.30;
+            profile["tap_offset_max"] = 10.0;
+            profile["swipe_jitter"] = 10.0;
+        }
+        else if (profileName == "distracted")
+        {
+            profile["base_delay_mult"] = 1.2;
+            profile["delay_variance"] = 0.40;
+            profile["tap_offset_max"] = 20.0;
+            profile["swipe_jitter"] = 16.0;
+        }
+        else
+        {
+            profile["base_delay_mult"] = 1.0;
+            profile["delay_variance"] = 0.25;
+            profile["tap_offset_max"] = 15.0;
+            profile["swipe_jitter"] = 12.0;
+        }
+        return profile;
+    }
+
+    private static int ApplyHumanizedDelay(int baseDelayMs, Dictionary<string, double> profile)
+    {
+        if (profile == null)
+        {
+            return baseDelayMs;
+        }
+
+        double mult = profile.ContainsKey("base_delay_mult") ? profile["base_delay_mult"] : 1.0;
+        double variance = profile.ContainsKey("delay_variance") ? profile["delay_variance"] : 0.25;
+        double targetBase = baseDelayMs * mult;
+        double min = targetBase * (1.0 - variance);
+        double max = targetBase * (1.0 + variance);
+        if (max < min)
+        {
+            double temp = min;
+            min = max;
+            max = temp;
+        }
+        if (max <= min)
+        {
+            max = min + 1.0;
+        }
+        return (int)Math.Round(min + (_random.NextDouble() * (max - min)));
+    }
+
+    private static void ApplyHumanizedTap(dynamic input, int[] bounds, Dictionary<string, double> profile)
+    {
+        if (input == null || bounds == null || bounds.Length < 4)
+        {
+            return;
+        }
+
+        int centerX = (bounds[0] + bounds[2]) / 2;
+        int centerY = (bounds[1] + bounds[3]) / 2;
+        double offsetMax = profile.ContainsKey("tap_offset_max") ? profile["tap_offset_max"] : 10.0;
+        int offsetX = (int)((_random.NextDouble() * 2.0 - 1.0) * offsetMax);
+        int offsetY = (int)((_random.NextDouble() * 2.0 - 1.0) * offsetMax);
+        int finalX = centerX + offsetX;
+        int finalY = centerY + offsetY;
+
+        if (finalX < bounds[0]) finalX = bounds[0];
+        if (finalX > bounds[2]) finalX = bounds[2];
+        if (finalY < bounds[1]) finalY = bounds[1];
+        if (finalY > bounds[3]) finalY = bounds[3];
+
+        System.Threading.Thread.Sleep(ApplyHumanizedDelay(120, profile));
+        input.Tap(finalX, finalY);
+    }
+
+    private static void ApplyHumanizedSwipe(dynamic input, int x1, int y1, int x2, int y2, int duration, Dictionary<string, double> profile)
+    {
+        if (input == null)
+        {
+            return;
+        }
+
+        double jitterMax = profile.ContainsKey("swipe_jitter") ? profile["swipe_jitter"] : 8.0;
+        int jitter = (int)Math.Round(jitterMax);
+        x1 += _random.Next(-jitter, jitter + 1);
+        y1 += _random.Next(-jitter, jitter + 1);
+        x2 += _random.Next(-jitter, jitter + 1);
+        y2 += _random.Next(-jitter, jitter + 1);
+
+        System.Threading.Thread.Sleep(ApplyHumanizedDelay(100, profile));
+        input.Swipe(x1, y1, x2, y2, duration);
+    }
+
+    private static int ReadIntWithAliases(string json, string[] keys, int defaultValue)
+    {
+        if (keys == null)
+        {
+            return defaultValue;
+        }
+
+        for (int i = 0; i < keys.Length; i++)
+        {
+            int value = JsonHelper.GetInt(json, keys[i], int.MinValue);
+            if (value != int.MinValue)
+            {
+                return value;
+            }
+        }
+
+        return defaultValue;
+    }
+
+    private static string ResolveTemplateText(string rawText)
+    {
+        if (string.IsNullOrEmpty(rawText))
+        {
+            return rawText;
+        }
+
+        int start = rawText.IndexOf("{{", StringComparison.Ordinal);
+        while (start >= 0)
+        {
+            int end = rawText.IndexOf("}}", start + 2, StringComparison.Ordinal);
+            if (end < 0)
+            {
+                break;
+            }
+
+            string varName = rawText.Substring(start + 2, end - start - 2).Trim();
+            string value = CoreHelper.GetVar(varName, "");
+            rawText = rawText.Substring(0, start) + value + rawText.Substring(end + 2);
+            start = rawText.IndexOf("{{", StringComparison.Ordinal);
+        }
+
+        return rawText;
     }
 
     /// <summary>

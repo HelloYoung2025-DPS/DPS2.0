@@ -280,14 +280,49 @@ public class AIService
         if (string.IsNullOrEmpty(response)) return "";
         if (response.StartsWith("ERROR:")) return response;
         
-        if (provider == "gemini")
+        string normalizedProvider = provider != null ? provider.Trim().ToLowerInvariant() : "";
+        
+        if (LooksLikeGeminiResponse(response))
         {
-            return ExtractGeminiText(response);
+            string geminiText = ExtractGeminiText(response);
+            if (!string.IsNullOrEmpty(geminiText) && geminiText != response)
+            {
+                return geminiText;
+            }
         }
-        else
+        
+        if (LooksLikeOpenAIResponse(response))
         {
+            string openAiText = ExtractOpenAIText(response);
+            if (!string.IsNullOrEmpty(openAiText) && openAiText != response)
+            {
+                return openAiText;
+            }
+        }
+        
+        if (normalizedProvider == "gemini")
+        {
+            string geminiText = ExtractGeminiText(response);
+            if (!string.IsNullOrEmpty(geminiText) && geminiText != response)
+            {
+                return geminiText;
+            }
             return ExtractOpenAIText(response);
         }
+        
+        string fallbackOpenAiText = ExtractOpenAIText(response);
+        if (!string.IsNullOrEmpty(fallbackOpenAiText) && fallbackOpenAiText != response)
+        {
+            return fallbackOpenAiText;
+        }
+        
+        string fallbackGeminiText = ExtractGeminiText(response);
+        if (!string.IsNullOrEmpty(fallbackGeminiText) && fallbackGeminiText != response)
+        {
+            return fallbackGeminiText;
+        }
+        
+        return response;
     }
     
     /// <summary>
@@ -391,6 +426,15 @@ public class AIService
     {
         if (string.IsNullOrEmpty(text)) return "";
         
+        if (LooksLikeWrappedAiResponse(text))
+        {
+            string extractedText = ExtractText(text, "");
+            if (!string.IsNullOrEmpty(extractedText) && extractedText != text && !extractedText.StartsWith("ERROR:"))
+            {
+                text = extractedText;
+            }
+        }
+        
         // 尝试从 ```json 代码块提取
         int jsonStart = text.IndexOf("```json");
         if (jsonStart >= 0)
@@ -431,6 +475,23 @@ public class AIService
         }
         
         return text;
+    }
+
+    private static bool LooksLikeGeminiResponse(string response)
+    {
+        return !string.IsNullOrEmpty(response)
+            && response.IndexOf("\"candidates\"", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private static bool LooksLikeOpenAIResponse(string response)
+    {
+        return !string.IsNullOrEmpty(response)
+            && response.IndexOf("\"choices\"", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private static bool LooksLikeWrappedAiResponse(string response)
+    {
+        return LooksLikeGeminiResponse(response) || LooksLikeOpenAIResponse(response);
     }
     
     // ========== HTTP 请求 ==========

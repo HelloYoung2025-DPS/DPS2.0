@@ -1,19 +1,8 @@
 // =====================================================
 // ZennoDroidAdapter.cs - ZennoDroid API 适配器
 // ⚠️ C# 5.0 语法 - 禁止使用 $""、?.、nameof() 等
+// v4.5.11 - 清理重复方法块并统一执行/截图逻辑
 // =====================================================
-// v4.5.2 架构重构 - DPS "手"层
-//
-// ZennoDroidAdapter 是 DPS 与 ZennoDroid API 之间的唯一接口，
-// 负责将 ZDCommand 转换为实际的 ZennoDroid API 调用。
-//
-// 设计原则：
-//   1. 封装所有 ZennoDroid API 调用
-//   2. 提供统一的错误处理
-//   3. 支持重试机制
-//   4. 返回标准化的 ZDResult
-// =====================================================
-
 using System;
 using System.Threading;
 
@@ -25,9 +14,7 @@ public class ZennoDroidAdapter
 {
     private const string TAG = "ZennoDroidAdapter";
     private static Random _random = new Random();
-    private static bool _fastMode = true; // 默认开启快速模式，成功时不截图节省性能
-
-    // ========== 核心执行方法 ==========
+    private static bool _fastMode = true;
 
     /// <summary>
     /// 设置快速模式
@@ -40,13 +27,7 @@ public class ZennoDroidAdapter
     /// <summary>
     /// 执行单个 ZDCommand
     /// </summary>
-    /// <param name="command">要执行的命令</param>
-    /// <param name="captureOnSuccess">是否在成功时也捕获截图（即使在快速模式下）</param>
-    /// <returns>执行结果</returns>
-    public static ZDResult Execute(ZDCommand command, bool captureOnSuccess = false)
-
-    /// <returns>执行结果</returns>
-    public static ZDResult Execute(ZDCommand command)
+    public static ZDResult Execute(ZDCommand command, bool captureOnSuccess)
     {
         if (command == null)
         {
@@ -70,81 +51,30 @@ public class ZennoDroidAdapter
                 case ZDCommandType.Tap:
                     result = ExecuteTap(command, captureOnSuccess);
                     break;
-
                 case ZDCommandType.LongPress:
                     result = ExecuteLongPress(command, captureOnSuccess);
                     break;
-
                 case ZDCommandType.Swipe:
                     result = ExecuteSwipe(command, captureOnSuccess);
                     break;
-
                 case ZDCommandType.SendText:
                     result = ExecuteSendText(command, captureOnSuccess);
                     break;
-
                 case ZDCommandType.PressBack:
                     result = ExecutePressBack(command, captureOnSuccess);
                     break;
-
                 case ZDCommandType.Delay:
                     result = ExecuteDelay(command);
                     break;
-
                 case ZDCommandType.ShellCommand:
                     result = ExecuteShell(command, captureOnSuccess);
                     break;
-
                 case ZDCommandType.GetLayout:
                     result = ExecuteGetLayout(command);
                     break;
-
                 case ZDCommandType.Screenshot:
                     result = ExecuteScreenshot(command);
                     break;
-
-                default:
-                    result = ZDResult.FailedRetryable("未知命令类型: " + command.Type.ToString());
-                    break;
-            }
-
-            {
-                case ZDCommandType.Tap:
-                    result = ExecuteTap(command);
-                    break;
-
-                case ZDCommandType.LongPress:
-                    result = ExecuteLongPress(command);
-                    break;
-
-                case ZDCommandType.Swipe:
-                    result = ExecuteSwipe(command);
-                    break;
-
-                case ZDCommandType.SendText:
-                    result = ExecuteSendText(command);
-                    break;
-
-                case ZDCommandType.PressBack:
-                    result = ExecutePressBack(command);
-                    break;
-
-                case ZDCommandType.Delay:
-                    result = ExecuteDelay(command);
-                    break;
-
-                case ZDCommandType.ShellCommand:
-                    result = ExecuteShell(command);
-                    break;
-
-                case ZDCommandType.GetLayout:
-                    result = ExecuteGetLayout(command);
-                    break;
-
-                case ZDCommandType.Screenshot:
-                    result = ExecuteScreenshot(command);
-                    break;
-
                 default:
                     result = ZDResult.FailedRetryable("未知命令类型: " + command.Type.ToString());
                     break;
@@ -154,32 +84,28 @@ public class ZennoDroidAdapter
         {
             CoreHelper.LogErr(TAG, "命令执行异常: " + ex.Message);
             result = ZDResult.FromException(ex);
-            
-            // 失败时总是尝试捕获截图用于分析
-            try
-            {
-                string screenshotPath = VisionCorrector.CaptureScreenshot();
-                if (!string.IsNullOrEmpty(screenshotPath))
-                {
-                    result.ScreenshotPath = screenshotPath;
-                }
-            }
-            catch {}
+            AttachScreenshot(result, false, true);
         }
 
+        if (result == null)
         {
-            CoreHelper.LogErr(TAG, "命令执行异常: " + ex.Message);
-            result = ZDResult.FromException(ex);
+            result = ZDResult.FailedRetryable("命令执行未返回结果");
         }
 
-        // 计算执行时间
         TimeSpan elapsed = DateTime.Now - startTime;
         result.ElapsedMilliseconds = (long)elapsed.TotalMilliseconds;
         result.AttemptCount = 1;
 
         CoreHelper.Log(TAG, "命令完成: " + result.ToLogString());
-
         return result;
+    }
+
+    /// <summary>
+    /// 执行单个 ZDCommand（默认成功时不截图）
+    /// </summary>
+    public static ZDResult Execute(ZDCommand command)
+    {
+        return Execute(command, false);
     }
 
     /// <summary>
@@ -187,28 +113,33 @@ public class ZennoDroidAdapter
     /// </summary>
     public static ZDResult ExecuteWithRetry(ZDCommand command)
     {
+        if (command == null)
+        {
+            return ZDResult.FailedRetryable("命令为 null");
+        }
+
         int maxRetries = command.MaxRetries > 0 ? command.MaxRetries : 1;
         int retryDelay = command.RetryDelay > 0 ? command.RetryDelay : 1000;
-
         ZDResult lastResult = null;
 
         for (int attempt = 0; attempt < maxRetries; attempt++)
         {
-            lastResult = Execute(command);
-            lastResult.AttemptCount = attempt + 1;
+            lastResult = Execute(command, false);
+            if (lastResult != null)
+            {
+                lastResult.AttemptCount = attempt + 1;
+            }
 
-            if (lastResult.IsSuccess())
+            if (lastResult == null || lastResult.IsSuccess())
             {
                 return lastResult;
             }
 
             if (!lastResult.CanRetry())
             {
-                // 不可重试的失败，直接返回
                 return lastResult;
             }
 
-            // 还有重试机会，等待后重试
             if (attempt < maxRetries - 1)
             {
                 CoreHelper.Log(TAG, string.Format("重试 {0}/{1}: {2}",
@@ -219,8 +150,6 @@ public class ZennoDroidAdapter
 
         return lastResult;
     }
-
-    // ========== 具体命令实现 ==========
 
     /// <summary>
     /// 执行点击命令
@@ -238,60 +167,20 @@ public class ZennoDroidAdapter
 
         if (command.Humanized)
         {
-            // 人性化点击：添加随机偏移
-            int offset = _random.Next(5, 15);
-            x += _random.Next(-offset, offset);
-            y += _random.Next(-offset, offset);
-
-            // 添加随机延迟
-            int thinkTime = _random.Next(50, 200);
-            Thread.Sleep(thinkTime);
+            int offset = _random.Next(5, 16);
+            x += _random.Next(-offset, offset + 1);
+            y += _random.Next(-offset, offset + 1);
+            Thread.Sleep(_random.Next(50, 201));
         }
 
+        if (x < 0) x = 0;
+        if (y < 0) y = 0;
+
         input.Tap(x, y);
-        
+
         ZDResult result = ZDResult.Success(0);
-        
-        // 性能优化：快速模式且不要求成功截图时，直接返回
-        if (_fastMode && !captureOnSuccess)
-        {
-            return result;
-        }
-        
-        // 捕获截图
-        string path = VisionCorrector.CaptureScreenshot();
-        if (!string.IsNullOrEmpty(path))
-        {
-            result.ScreenshotPath = path;
-        }
-        
+        AttachScreenshot(result, captureOnSuccess, false);
         return result;
-    }
-
-    {
-        dynamic input = CoreHelper.GetInput();
-        if (input == null)
-        {
-            return ZDResult.FailedFatal("DroidInstance.Input 未初始化");
-        }
-
-        int x = command.X1;
-        int y = command.Y1;
-
-        if (command.Humanized)
-        {
-            // 人性化点击：添加随机偏移
-            int offset = _random.Next(5, 15);
-            x += _random.Next(-offset, offset);
-            y += _random.Next(-offset, offset);
-
-            // 添加随机延迟
-            int thinkTime = _random.Next(50, 200);
-            Thread.Sleep(thinkTime);
-        }
-
-        input.Tap(x, y);
-        return ZDResult.Success(0);
     }
 
     /// <summary>
@@ -305,38 +194,18 @@ public class ZennoDroidAdapter
             return ZDResult.FailedFatal("DroidInstance.Input 未初始化");
         }
 
-        int x = command.X1;
-        int y = command.Y1;
         int duration = command.Duration > 0 ? command.Duration : 1000;
+        if (command.Humanized)
+        {
+            Thread.Sleep(_random.Next(50, 151));
+        }
 
-        input.LongTap(x, y);
+        input.LongTap(command.X1, command.Y1);
         Thread.Sleep(duration);
 
         ZDResult result = ZDResult.Success(duration);
-        
-        if (_fastMode && !captureOnSuccess) return result;
-        
-        string path = VisionCorrector.CaptureScreenshot();
-        if (!string.IsNullOrEmpty(path)) result.ScreenshotPath = path;
-        
+        AttachScreenshot(result, captureOnSuccess, false);
         return result;
-    }
-
-    {
-        dynamic input = CoreHelper.GetInput();
-        if (input == null)
-        {
-            return ZDResult.FailedFatal("DroidInstance.Input 未初始化");
-        }
-
-        int x = command.X1;
-        int y = command.Y1;
-        int duration = command.Duration > 0 ? command.Duration : 1000;
-
-        input.LongTap(x, y);
-        Thread.Sleep(duration);
-
-        return ZDResult.Success(duration);
     }
 
     /// <summary>
@@ -358,45 +227,19 @@ public class ZennoDroidAdapter
 
         if (command.Humanized)
         {
-            int thinkTime = _random.Next(50, 150);
-            Thread.Sleep(thinkTime);
+            int jitter = _random.Next(3, 16);
+            x1 += _random.Next(-jitter, jitter + 1);
+            y1 += _random.Next(-jitter, jitter + 1);
+            x2 += _random.Next(-jitter, jitter + 1);
+            y2 += _random.Next(-jitter, jitter + 1);
+            Thread.Sleep(_random.Next(50, 151));
         }
 
         input.Swipe(x1, y1, x2, y2, duration);
-        
+
         ZDResult result = ZDResult.Success(duration);
-        if (_fastMode && !captureOnSuccess) return result;
-        
-        string path = VisionCorrector.CaptureScreenshot();
-        if (!string.IsNullOrEmpty(path)) result.ScreenshotPath = path;
-        
+        AttachScreenshot(result, captureOnSuccess, false);
         return result;
-    }
-
-    {
-        dynamic input = CoreHelper.GetInput();
-        if (input == null)
-        {
-            return ZDResult.FailedFatal("DroidInstance.Input 未初始化");
-        }
-
-        int x1 = command.X1;
-        int y1 = command.Y1;
-        int x2 = command.X2;
-        int y2 = command.Y2;
-        int duration = command.Duration > 0 ? command.Duration : 300;
-
-        if (command.Humanized)
-        {
-            // 调用 Core/ScriptHelpers 中的人性化滑动
-            // 注意：这里需要访问 ScriptHelpers 的方法
-            // 由于 C# 5.0 的限制，我们手动实现简化版本
-            int thinkTime = _random.Next(50, 150);
-            Thread.Sleep(thinkTime);
-        }
-
-        input.Swipe(x1, y1, x2, y2, duration);
-        return ZDResult.Success(duration);
     }
 
     /// <summary>
@@ -418,12 +261,10 @@ public class ZennoDroidAdapter
 
         if (command.Humanized)
         {
-            // 人性化输入：逐字符输入，带随机延迟
-            foreach (char c in text)
+            for (int i = 0; i < text.Length; i++)
             {
-                input.SendText(c.ToString());
-                int delay = _random.Next(50, 150);
-                Thread.Sleep(delay);
+                input.SendText(text[i].ToString());
+                Thread.Sleep(_random.Next(50, 151));
             }
         }
         else
@@ -432,43 +273,8 @@ public class ZennoDroidAdapter
         }
 
         ZDResult result = ZDResult.Success(0);
-        if (_fastMode && !captureOnSuccess) return result;
-        
-        string path = VisionCorrector.CaptureScreenshot();
-        if (!string.IsNullOrEmpty(path)) result.ScreenshotPath = path;
-        
+        AttachScreenshot(result, captureOnSuccess, false);
         return result;
-    }
-
-    {
-        dynamic input = CoreHelper.GetInput();
-        if (input == null)
-        {
-            return ZDResult.FailedFatal("DroidInstance.Input 未初始化");
-        }
-
-        string text = command.Text;
-        if (string.IsNullOrEmpty(text))
-        {
-            return ZDResult.FailedRetryable("文本内容为空");
-        }
-
-        if (command.Humanized)
-        {
-            // 人性化输入：逐字符输入，带随机延迟
-            foreach (char c in text)
-            {
-                input.SendText(c.ToString());
-                int delay = _random.Next(50, 150);
-                Thread.Sleep(delay);
-            }
-        }
-        else
-        {
-            input.SendText(text);
-        }
-
-        return ZDResult.Success(0);
     }
 
     /// <summary>
@@ -483,25 +289,10 @@ public class ZennoDroidAdapter
         }
 
         input.Shell("input keyevent 4");
-        
+
         ZDResult result = ZDResult.Success(0);
-        if (_fastMode && !captureOnSuccess) return result;
-        
-        string path = VisionCorrector.CaptureScreenshot();
-        if (!string.IsNullOrEmpty(path)) result.ScreenshotPath = path;
-        
+        AttachScreenshot(result, captureOnSuccess, false);
         return result;
-    }
-
-    {
-        dynamic input = CoreHelper.GetInput();
-        if (input == null)
-        {
-            return ZDResult.FailedFatal("DroidInstance.Input 未初始化");
-        }
-
-        input.Shell("input keyevent 4");
-        return ZDResult.Success(0);
     }
 
     /// <summary>
@@ -513,14 +304,23 @@ public class ZennoDroidAdapter
         string msStr = command.GetExtraParam("milliseconds", "");
         if (!string.IsNullOrEmpty(msStr))
         {
-            int.TryParse(msStr, out ms);
+            int parsed = 0;
+            if (int.TryParse(msStr, out parsed))
+            {
+                ms = parsed;
+            }
         }
+
+        if (ms < 0) ms = 0;
 
         if (command.Humanized)
         {
-            // 添加随机变化
             int variance = ms / 10;
-            ms += _random.Next(-variance, variance);
+            if (variance > 0)
+            {
+                ms += _random.Next(-variance, variance + 1);
+            }
+            if (ms < 0) ms = 0;
         }
 
         Thread.Sleep(ms);
@@ -538,38 +338,16 @@ public class ZennoDroidAdapter
             return ZDResult.FailedFatal("DroidInstance.Input 未初始化");
         }
 
-        string shellCmd = command.Text;
-        if (string.IsNullOrEmpty(shellCmd))
+        if (string.IsNullOrEmpty(command.Text))
         {
             return ZDResult.FailedRetryable("Shell 命令为空");
         }
 
-        input.Shell(shellCmd);
-        
+        input.Shell(command.Text);
+
         ZDResult result = ZDResult.Success(0);
-        if (_fastMode && !captureOnSuccess) return result;
-        
-        string path = VisionCorrector.CaptureScreenshot();
-        if (!string.IsNullOrEmpty(path)) result.ScreenshotPath = path;
-        
+        AttachScreenshot(result, captureOnSuccess, false);
         return result;
-    }
-
-    {
-        dynamic input = CoreHelper.GetInput();
-        if (input == null)
-        {
-            return ZDResult.FailedFatal("DroidInstance.Input 未初始化");
-        }
-
-        string shellCmd = command.Text;
-        if (string.IsNullOrEmpty(shellCmd))
-        {
-            return ZDResult.FailedRetryable("Shell 命令为空");
-        }
-
-        input.Shell(shellCmd);
-        return ZDResult.Success(0);
     }
 
     /// <summary>
@@ -588,14 +366,16 @@ public class ZennoDroidAdapter
     /// </summary>
     private static ZDResult ExecuteScreenshot(ZDCommand command)
     {
-        // 截图功能需要在 CoreHelper 中实现
-        // 这里返回占位结果
+        string path = VisionCorrector.CaptureScreenshot();
+        if (string.IsNullOrEmpty(path))
+        {
+            return ZDResult.FailedRetryable("截图失败");
+        }
+
         ZDResult result = ZDResult.Success(0);
-        result.SetExtraData("screenshot_saved", "false");
+        result.ScreenshotPath = path;
         return result;
     }
-
-    // ========== 批量执行 ==========
 
     /// <summary>
     /// 批量执行命令序列
@@ -612,9 +392,7 @@ public class ZennoDroidAdapter
         for (int i = 0; i < commands.Length; i++)
         {
             results[i] = ExecuteWithRetry(commands[i]);
-
-            // 如果某个命令失败且是致命错误，停止执行
-            if (results[i].IsFailed() && !results[i].CanRetry())
+            if (results[i] != null && results[i].IsFailed() && !results[i].CanRetry())
             {
                 CoreHelper.LogErr(TAG, string.Format("批量执行在步骤 {0} 中止", i));
                 break;
@@ -623,8 +401,6 @@ public class ZennoDroidAdapter
 
         return results;
     }
-
-    // ========== 辅助方法 ==========
 
     /// <summary>
     /// 获取当前 UI 布局
@@ -639,15 +415,62 @@ public class ZennoDroidAdapter
     /// </summary>
     public static bool ElementExistsAt(int x, int y)
     {
-        // 简单实现：检查坐标是否有可点击元素
         string xml = CoreHelper.GetLayout();
         if (string.IsNullOrEmpty(xml))
         {
             return false;
         }
 
-        // 检查 bounds 是否包含该坐标
-        string pattern = string.Format("bounds=\"[{0},{1}]", x, y);
-        return xml.IndexOf(pattern) >= 0;
+        int pos = 0;
+        while (pos < xml.Length)
+        {
+            int boundsPos = xml.IndexOf("bounds=\"", pos, StringComparison.Ordinal);
+            if (boundsPos < 0)
+            {
+                break;
+            }
+
+            int valueStart = boundsPos + 8;
+            int valueEnd = xml.IndexOf("\"", valueStart, StringComparison.Ordinal);
+            if (valueEnd <= valueStart)
+            {
+                break;
+            }
+
+            string bounds = xml.Substring(valueStart, valueEnd - valueStart);
+            int[] parsed = SelectorEngine.ParseBounds(bounds);
+            if (parsed != null &&
+                x >= parsed[0] && x <= parsed[2] &&
+                y >= parsed[1] && y <= parsed[3])
+            {
+                return true;
+            }
+
+            pos = valueEnd + 1;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 根据模式附加截图
+    /// </summary>
+    private static void AttachScreenshot(ZDResult result, bool captureOnSuccess, bool forceCapture)
+    {
+        if (result == null)
+        {
+            return;
+        }
+
+        if (!forceCapture && _fastMode && !captureOnSuccess)
+        {
+            return;
+        }
+
+        string path = VisionCorrector.CaptureScreenshot();
+        if (!string.IsNullOrEmpty(path))
+        {
+            result.ScreenshotPath = path;
+        }
     }
 }

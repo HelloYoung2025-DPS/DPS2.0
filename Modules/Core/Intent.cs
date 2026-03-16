@@ -50,12 +50,25 @@ public class Intent
     /// 结果保存位置（用于 find 操作）
     /// </summary>
     public string SaveAs { get; set; }
-    
+
+    /// <summary>
+    /// 回退意图链
+    /// </summary>
+    public List<Intent> FallbackIntents { get; set; }
+     
     public Intent()
     {
         Parameters = new Dictionary<string, string>();
+        FallbackIntents = new List<Intent>();
         OnFail = "skip";
         Humanized = false;
+    }
+
+    public Intent(string action, string target)
+        : this()
+    {
+        Action = action;
+        Target = target;
     }
     
     /// <summary>
@@ -125,7 +138,39 @@ public class Intent
         
         return intent;
     }
-    
+
+    public bool IsValid()
+    {
+        return !string.IsNullOrEmpty(Action);
+    }
+
+    public string GetParameter(string key, string defaultValue)
+    {
+        if (Parameters == null || string.IsNullOrEmpty(key) || !Parameters.ContainsKey(key))
+        {
+            return defaultValue;
+        }
+
+        string value = Parameters[key];
+        return string.IsNullOrEmpty(value) ? defaultValue : value;
+    }
+
+    public int GetParameter(string key, int defaultValue)
+    {
+        string value = GetParameter(key, "");
+        if (string.IsNullOrEmpty(value))
+        {
+            return defaultValue;
+        }
+
+        int parsed;
+        if (int.TryParse(value, out parsed))
+        {
+            return parsed;
+        }
+        return defaultValue;
+    }
+     
     /// <summary>
     /// 转换为日志字符串
     /// </summary>

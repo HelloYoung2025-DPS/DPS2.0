@@ -153,7 +153,8 @@ public class AppExplorer_v2
 {
             // 1. 启动 APP
             Log("启动 APP: " + packageName);
-            dynamic droid = instance.DroidInstance;
+            dynamic inst = instance;
+            dynamic droid = inst.DroidInstance;
             dynamic app = droid.App;
 
             app.Open(packageName);
@@ -205,10 +206,10 @@ public class AppExplorer_v2
             return manifestPath;
 }
         catch (Exception ex)
-#MRS|{
+        {
             LogErr("探索过程异常: " + ex.Message);
             return "ERROR: " + ex.Message;
-}
+        }
 }
 
 
@@ -228,7 +229,8 @@ public class AppExplorer_v2
 
         try
 {
-            dynamic droid = instance.DroidInstance;
+            dynamic inst = instance;
+            dynamic droid = inst.DroidInstance;
             dynamic input = droid.Input;
             dynamic hierarchy = droid.Hierarchy;
 
@@ -289,7 +291,12 @@ public class AppExplorer_v2
                 string screenshotPath = Path.Combine(sessionDir,
                     string.Format("step_{0:D3}.png", stepNumber));
 
-                droid.SaveScreenshot(screenshotPath);
+                // BUG-08 fix: 使用正确的 ZennoDroid Screen API
+                byte[] ssBytes = droid.Screen.ScreenshotAsArray();
+                if (ssBytes != null && ssBytes.Length > 0)
+                {
+                    File.WriteAllBytes(screenshotPath, ssBytes);
+                }
                 step.ScreenshotPath = screenshotPath;
 }
             else
@@ -351,7 +358,7 @@ public class AppExplorer_v2
             if (!response.StartsWith("ERROR:"))
 {
                 // 解析结果
-                string jsonStr = AIService.ExtractJson(response);
+                string jsonStr = AIService.ExtractJson(AIService.ExtractText(response, ""));
                 if (!string.IsNullOrEmpty(jsonStr))
 {
                     step.DetectedState = JsonHelper.Get(jsonStr, "state_name");
@@ -456,7 +463,7 @@ public class AppExplorer_v2
 
             stateGraph[step.DetectedState] = node;
 }
-#        else
+        else
 {
             stateGraph[step.DetectedState].VisitCount++;
 
@@ -514,7 +521,7 @@ public class AppExplorer_v2
 {
             actionCounts[step.Action]++;
 }
-#        else
+        else
 {
             actionCounts[step.Action] = 1;
 }

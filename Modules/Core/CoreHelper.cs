@@ -18,6 +18,11 @@ public class CoreHelper
     private static dynamic _project;
     private static dynamic _instance;
     
+    // 虚拟变量存储：当 ZD 变量未预建时的回退存储
+    // SetVar 写入 ZD 变量失败时自动写入此字典
+    // GetVar 在 ZD 变量为空时自动查询此字典
+    private static Dictionary<string, string> _virtualVars = new Dictionary<string, string>();
+    
     /// <summary>
     /// 初始化辅助函数库（仅 project）
     /// </summary>
@@ -157,35 +162,56 @@ public class CoreHelper
     
     /// <summary>
     /// 获取变量值
+    /// 优先读取 ZD 变量，若为空则回退到虚拟变量存储
     /// </summary>
     public static string GetVar(string name, string defaultValue)
     {
+        // 先尝试从 ZD 变量读取
         try
         {
             string v = _project.Variables[name].Value;
-            return string.IsNullOrEmpty(v) ? defaultValue : v;
+            if (!string.IsNullOrEmpty(v))
+            {
+                return v;
+            }
         }
         catch
         {
-            return defaultValue;
+            // ZD 变量不存在，继续尝试虚拟变量
         }
+        
+        // 回退到虚拟变量存储
+        if (_virtualVars.ContainsKey(name))
+        {
+            string vv = _virtualVars[name];
+            if (!string.IsNullOrEmpty(vv))
+            {
+                return vv;
+            }
+        }
+        
+        return defaultValue;
     }
     
     /// <summary>
     /// 设置变量值
-    /// 注意：变量必须在 ZD 项目中预先创建，否则设置会失败
+    /// 同时写入 ZD 变量和虚拟变量存储，确保即使 ZD 变量未预建也不丢失
     /// </summary>
     public static void SetVar(string name, string value)
     {
+        string safeValue = value ?? "";
+        
+        // 始终写入虚拟变量（保底存储）
+        _virtualVars[name] = safeValue;
+        
+        // 尝试写入 ZD 变量
         try
         {
-            _project.Variables[name].Value = value ?? "";
+            _project.Variables[name].Value = safeValue;
         }
         catch
         {
-            // 变量不存在时静默忽略（避免日志刷屏）
-            // 如需调试，取消下行注释
-            // LogWarn("CoreHelper", "SetVar: 变量 '" + name + "' 不存在，请在ZD中创建");
+            // ZD 变量不存在时静默忽略，值已保存到虚拟变量
         }
     }
     

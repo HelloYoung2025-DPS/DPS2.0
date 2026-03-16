@@ -99,9 +99,19 @@ public class VisionCorrector
                 Directory.CreateDirectory(dir);
             }
 
-            // 调用 ZennoDroid 截图 API
+            // BUG-08 fix: 使用正确的 ZennoDroid Screen API
+            // SaveScreenshot 不存在于 DroidInstanceService
+            // 正确 API: Screen.ScreenshotAsArray() -> byte[]
             dynamic droid = _instance.DroidInstance;
-            droid.SaveScreenshot(outputPath);
+            byte[] screenshotBytes = droid.Screen.ScreenshotAsArray();
+
+            if (screenshotBytes == null || screenshotBytes.Length == 0)
+            {
+                LogErr("截图数据为空");
+                return "";
+            }
+
+            File.WriteAllBytes(outputPath, screenshotBytes);
 
             // 验证文件是否创建成功
             if (File.Exists(outputPath))
@@ -189,7 +199,7 @@ public class VisionCorrector
         sb.Append("【返回格式】: {\"actually_success\": true/false, \"reason\": \"简短说明\"}");
 
         string aiResponse = AIService.CallWithRetryAndImage(sb.ToString(), screenshotPath, aiConfig);
-        string json = AIService.ExtractJson(aiResponse);
+        string json = AIService.ExtractJson(AIService.ExtractText(aiResponse, ""));
 
         if (string.IsNullOrEmpty(json)) return false;
 
@@ -246,7 +256,7 @@ public class VisionCorrector
         }
 
         // 6. 提取 JSON 结果
-        string jsonResult = AIService.ExtractJson(aiResponse);
+        string jsonResult = AIService.ExtractJson(AIService.ExtractText(aiResponse, ""));
 
         // 7. 记录结果
         Log("分析完成: " + jsonResult.Substring(0, Math.Min(200, jsonResult.Length)));

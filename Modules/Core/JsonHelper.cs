@@ -467,7 +467,11 @@ public class JsonHelper
     /// </summary>
     public static string[] GetArray(string json, string key)
     {
-        string arrayJson = Get(json, key);
+        string arrayJson = json;
+        if (!string.IsNullOrEmpty(key))
+        {
+            arrayJson = Get(json, key);
+        }
         if (string.IsNullOrEmpty(arrayJson))
         {
             return new string[0];
