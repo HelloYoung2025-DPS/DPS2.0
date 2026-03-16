@@ -1,75 +1,406 @@
 {
     "platform": "babycenter",
-    "version": "1.0",
+    "version": "2.0",
+    "description": "BabyCenter 意图映射 v2.0 — 覆盖全部 ~100 操作，含回退链",
+
     "intents": {
+
+        "_comment_tier1": "=== Tier 1: 核心浏览操作 ===",
+
         "browse_feed": {
-            "operations": [
-                "browse"
-            ],
+            "operations": ["navigate_to_community", "browse"],
             "fallback_intents": []
         },
+        "enter_group": {
+            "operations": ["navigate_to_community", "enter_group"],
+            "fallback_intents": ["browse_feed"]
+        },
         "open_post": {
-            "operations": [
-                "open_post"
-            ],
-            "fallback_intents": [
-                "browse_feed"
-            ]
+            "operations": ["open_post"],
+            "fallback_intents": ["browse_feed"]
         },
         "read_post": {
-            "operations": [
-                "open_post",
-                "read_post",
-                "back_to_feed"
-            ],
-            "fallback_intents": [
-                "browse_feed"
-            ]
+            "operations": ["open_post", "read_post", "back_to_feed"],
+            "fallback_intents": ["browse_feed"]
         },
-        "like_content": {
-            "operations": [
-                "like"
-            ],
-            "fallback_intents": [
-                "browse_feed"
-            ]
+        "read_post_deep": {
+            "operations": ["open_post", "read_post_deep", "back_to_feed"],
+            "fallback_intents": ["read_post", "browse_feed"]
+        },
+        "read_comments": {
+            "operations": ["open_post", "scroll_to_comments", "back_to_feed"],
+            "fallback_intents": ["read_post", "browse_feed"]
         },
         "reply_post": {
-            "operations": [
-                "open_post",
-                "comment",
-                "back_to_feed"
-            ],
-            "fallback_intents": [
-                "read_post",
-                "browse_feed"
-            ]
+            "operations": ["open_post", "comment", "back_to_feed"],
+            "fallback_intents": ["read_post", "browse_feed"]
+        },
+        "reply_comment": {
+            "operations": ["open_post", "scroll_to_comments", "reply_to_comment", "back_to_feed"],
+            "fallback_intents": ["reply_post", "read_post", "browse_feed"]
+        },
+        "emoji_reply": {
+            "operations": ["open_post", "scroll_to_comments", "emoji_reply", "back_to_feed"],
+            "fallback_intents": ["reply_comment", "reply_post", "browse_feed"]
+        },
+        "be_first_to_comment": {
+            "operations": ["open_post", "be_first_to_comment", "back_to_feed"],
+            "fallback_intents": ["reply_post", "browse_feed"]
+        },
+        "like_content": {
+            "operations": ["open_post", "scroll_to_reactions", "like", "back_to_feed"],
+            "fallback_intents": ["read_post", "browse_feed"]
+        },
+        "scroll_feed": {
+            "operations": ["scroll_feed"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "pull_refresh_feed": {
+            "operations": ["pull_refresh_feed"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "browse_multiple": {
+            "operations": ["browse_multiple"],
+            "fallback_intents": ["browse_feed"]
+        },
+
+        "_comment_tier2": "=== Tier 2: 帖子详情操作 ===",
+
+        "bookmark_post": {
+            "operations": ["open_post", "bookmark_post", "back_to_feed"],
+            "fallback_intents": ["read_post", "browse_feed"]
+        },
+        "share_content": {
+            "operations": ["open_post", "share_post", "back_to_feed"],
+            "fallback_intents": ["read_post", "browse_feed"]
+        },
+        "report_post": {
+            "operations": ["open_post", "report_post", "back_to_feed"],
+            "fallback_intents": ["read_post", "browse_feed"]
+        },
+        "upload_image_to_post": {
+            "operations": ["open_post", "upload_image_to_post", "back_to_feed"],
+            "fallback_intents": ["reply_post", "browse_feed"]
+        },
+        "select_gif": {
+            "operations": ["open_post", "select_gif", "back_to_feed"],
+            "fallback_intents": ["reply_post", "browse_feed"]
+        },
+        "dismiss_consent_banner": {
+            "operations": ["dismiss_consent_banner"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "read_recommended_posts": {
+            "operations": ["open_post", "read_recommended_posts", "back_to_feed"],
+            "fallback_intents": ["read_post", "browse_feed"]
+        },
+        "open_post_dropdown": {
+            "operations": ["open_post", "open_post_dropdown", "back_to_feed"],
+            "fallback_intents": ["read_post", "browse_feed"]
+        },
+        "webview_go_community_home": {
+            "operations": ["open_post", "webview_go_community_home"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "webview_open_notifications": {
+            "operations": ["open_post", "webview_open_notifications", "back_to_feed"],
+            "fallback_intents": ["read_post", "browse_feed"]
+        },
+        "refresh_post": {
+            "operations": ["open_post", "refresh_post", "back_to_feed"],
+            "fallback_intents": ["read_post", "browse_feed"]
+        },
+        "open_webview_hamburger": {
+            "operations": ["open_post", "open_webview_hamburger", "back_to_feed"],
+            "fallback_intents": ["read_post", "browse_feed"]
+        },
+
+        "_comment_tier3": "=== Tier 3: Community 标签操作 ===",
+
+        "switch_community_home_tab": {
+            "operations": ["navigate_to_community", "switch_community_home_tab"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "switch_community_activity_tab": {
+            "operations": ["navigate_to_community", "switch_community_activity_tab"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "switch_community_bookmark_tab": {
+            "operations": ["navigate_to_community", "switch_community_bookmark_tab"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "switch_community_groups_tab": {
+            "operations": ["navigate_to_community", "switch_community_groups_tab"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "switch_community_trending_tab": {
+            "operations": ["navigate_to_community", "switch_community_trending_tab"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "view_group_description": {
+            "operations": ["navigate_to_community", "enter_group", "view_group_description"],
+            "fallback_intents": ["enter_group", "browse_feed"]
+        },
+        "tap_comment_count": {
+            "operations": ["tap_comment_count"],
+            "fallback_intents": ["read_comments", "browse_feed"]
+        },
+        "tap_reactions_count": {
+            "operations": ["tap_reactions_count"],
+            "fallback_intents": ["like_content", "browse_feed"]
+        },
+        "tap_author_avatar": {
+            "operations": ["tap_author_avatar"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "tap_post_group": {
+            "operations": ["tap_post_group"],
+            "fallback_intents": ["enter_group", "browse_feed"]
+        },
+        "see_more_content": {
+            "operations": ["see_more_content"],
+            "fallback_intents": ["scroll_feed", "browse_feed"]
+        },
+
+        "_comment_tier4": "=== Tier 4: 底部导航栏 ===",
+
+        "navigate_home": {
+            "operations": ["nav_home"],
+            "fallback_intents": []
+        },
+        "navigate_community": {
+            "operations": ["nav_community"],
+            "fallback_intents": []
+        },
+        "navigate_calendar": {
+            "operations": ["nav_calendar"],
+            "fallback_intents": []
+        },
+        "navigate_tools": {
+            "operations": ["nav_tools"],
+            "fallback_intents": []
+        },
+        "navigate_more": {
+            "operations": ["nav_more"],
+            "fallback_intents": []
+        },
+
+        "_comment_tier5": "=== Tier 5: Home 页面操作 ===",
+
+        "view_home_content": {
+            "operations": ["nav_home", "view_home_content"],
+            "fallback_intents": ["navigate_home"]
+        },
+        "tap_notification_button": {
+            "operations": ["nav_home", "tap_notification_button"],
+            "fallback_intents": ["navigate_home"]
+        },
+        "tap_child_image": {
+            "operations": ["nav_home", "tap_child_image"],
+            "fallback_intents": ["view_home_content", "navigate_home"]
+        },
+        "tap_child_name": {
+            "operations": ["nav_home", "tap_child_name"],
+            "fallback_intents": ["view_home_content", "navigate_home"]
+        },
+        "view_week_range": {
+            "operations": ["nav_home", "view_week_range"],
+            "fallback_intents": ["view_home_content", "navigate_home"]
+        },
+        "scroll_home": {
+            "operations": ["nav_home", "scroll_home"],
+            "fallback_intents": ["view_home_content", "navigate_home"]
+        },
+
+        "_comment_tier6": "=== Tier 6: Calendar 操作 ===",
+
+        "view_calendar": {
+            "operations": ["nav_calendar", "view_calendar"],
+            "fallback_intents": ["navigate_calendar"]
+        },
+        "navigate_prev_month": {
+            "operations": ["nav_calendar", "navigate_prev_month"],
+            "fallback_intents": ["view_calendar", "navigate_calendar"]
+        },
+        "navigate_next_month": {
+            "operations": ["nav_calendar", "navigate_next_month"],
+            "fallback_intents": ["view_calendar", "navigate_calendar"]
+        },
+        "tap_day_cell": {
+            "operations": ["nav_calendar", "tap_day_cell"],
+            "fallback_intents": ["view_calendar", "navigate_calendar"]
+        },
+        "add_calendar_event": {
+            "operations": ["nav_calendar", "add_calendar_event"],
+            "fallback_intents": ["view_calendar", "navigate_calendar"]
+        },
+        "switch_to_timeline": {
+            "operations": ["nav_calendar", "switch_to_timeline"],
+            "fallback_intents": ["view_calendar", "navigate_calendar"]
+        },
+        "view_pregnancy_period": {
+            "operations": ["nav_calendar", "view_pregnancy_period"],
+            "fallback_intents": ["view_calendar", "navigate_calendar"]
+        },
+        "scroll_calendar": {
+            "operations": ["nav_calendar", "scroll_calendar"],
+            "fallback_intents": ["view_calendar", "navigate_calendar"]
+        },
+
+        "_comment_tier7": "=== Tier 7: Tools 操作 ===",
+
+        "view_tools": {
+            "operations": ["nav_tools", "view_tools"],
+            "fallback_intents": ["navigate_tools"]
+        },
+        "filter_tools_all": {
+            "operations": ["nav_tools", "filter_tools_all"],
+            "fallback_intents": ["view_tools", "navigate_tools"]
+        },
+        "filter_tools_pregnancy": {
+            "operations": ["nav_tools", "filter_tools_pregnancy"],
+            "fallback_intents": ["view_tools", "navigate_tools"]
+        },
+        "filter_tools_baby": {
+            "operations": ["nav_tools", "filter_tools_baby"],
+            "fallback_intents": ["view_tools", "navigate_tools"]
+        },
+        "filter_tools_ttc": {
+            "operations": ["nav_tools", "filter_tools_ttc"],
+            "fallback_intents": ["view_tools", "navigate_tools"]
+        },
+        "tap_tool_item": {
+            "operations": ["nav_tools", "tap_tool_item"],
+            "fallback_intents": ["view_tools", "navigate_tools"]
+        },
+        "scroll_tools": {
+            "operations": ["nav_tools", "scroll_tools"],
+            "fallback_intents": ["view_tools", "navigate_tools"]
+        },
+
+        "_comment_tier8": "=== Tier 8: More 页面操作 ===",
+
+        "view_more_page": {
+            "operations": ["nav_more", "view_more_page"],
+            "fallback_intents": ["navigate_more"]
+        },
+        "go_to_profile": {
+            "operations": ["nav_more", "go_to_profile"],
+            "fallback_intents": ["view_more_page", "navigate_more"]
+        },
+        "go_to_registry": {
+            "operations": ["nav_more", "go_to_registry"],
+            "fallback_intents": ["view_more_page", "navigate_more"]
+        },
+        "go_to_points": {
+            "operations": ["nav_more", "go_to_points"],
+            "fallback_intents": ["view_more_page", "navigate_more"]
+        },
+        "go_to_rewards": {
+            "operations": ["nav_more", "go_to_rewards"],
+            "fallback_intents": ["view_more_page", "navigate_more"]
+        },
+        "go_to_faq": {
+            "operations": ["nav_more", "go_to_faq"],
+            "fallback_intents": ["view_more_page", "navigate_more"]
+        },
+        "go_to_bookmarks": {
+            "operations": ["nav_more", "go_to_bookmarks"],
+            "fallback_intents": ["view_more_page", "navigate_more"]
+        },
+        "go_to_settings": {
+            "operations": ["nav_more", "go_to_settings"],
+            "fallback_intents": ["view_more_page", "navigate_more"]
+        },
+        "open_babycenter_website": {
+            "operations": ["nav_more", "open_babycenter_website"],
+            "fallback_intents": ["view_more_page", "navigate_more"]
+        },
+        "rate_app": {
+            "operations": ["nav_more", "rate_app"],
+            "fallback_intents": ["view_more_page", "navigate_more"]
+        },
+
+        "_comment_tier9": "=== Tier 9: Settings 操作 ===",
+
+        "view_settings": {
+            "operations": ["nav_more", "go_to_settings", "view_settings"],
+            "fallback_intents": ["go_to_settings", "navigate_more"]
+        },
+        "open_measurements": {
+            "operations": ["nav_more", "go_to_settings", "open_measurements"],
+            "fallback_intents": ["view_settings", "go_to_settings"]
+        },
+        "open_notifications_settings": {
+            "operations": ["nav_more", "go_to_settings", "open_notifications_settings"],
+            "fallback_intents": ["view_settings", "go_to_settings"]
+        },
+        "customize_home_feed": {
+            "operations": ["nav_more", "go_to_settings", "customize_home_feed"],
+            "fallback_intents": ["view_settings", "go_to_settings"]
+        },
+        "open_email_subscriptions": {
+            "operations": ["nav_more", "go_to_settings", "open_email_subscriptions"],
+            "fallback_intents": ["view_settings", "go_to_settings"]
+        },
+        "toggle_theme_light": {
+            "operations": ["nav_more", "go_to_settings", "toggle_theme_light"],
+            "fallback_intents": ["view_settings", "go_to_settings"]
+        },
+        "toggle_theme_dark": {
+            "operations": ["nav_more", "go_to_settings", "toggle_theme_dark"],
+            "fallback_intents": ["view_settings", "go_to_settings"]
+        },
+        "toggle_theme_system": {
+            "operations": ["nav_more", "go_to_settings", "toggle_theme_system"],
+            "fallback_intents": ["view_settings", "go_to_settings"]
+        },
+
+        "_comment_tier10": "=== Tier 10: Profile 操作 ===",
+
+        "view_profile": {
+            "operations": ["nav_more", "go_to_profile", "view_profile"],
+            "fallback_intents": ["go_to_profile", "navigate_more"]
+        },
+        "tap_avatar": {
+            "operations": ["nav_more", "go_to_profile", "tap_avatar"],
+            "fallback_intents": ["view_profile", "go_to_profile"]
+        },
+        "create_screen_name": {
+            "operations": ["nav_more", "go_to_profile", "create_screen_name"],
+            "fallback_intents": ["view_profile", "go_to_profile"]
+        },
+        "add_child": {
+            "operations": ["nav_more", "go_to_profile", "add_child"],
+            "fallback_intents": ["view_profile", "go_to_profile"]
+        },
+        "view_profile_email": {
+            "operations": ["nav_more", "go_to_profile", "view_profile_email"],
+            "fallback_intents": ["view_profile", "go_to_profile"]
+        },
+        "open_more_options": {
+            "operations": ["nav_more", "go_to_profile", "open_more_options"],
+            "fallback_intents": ["view_profile", "go_to_profile"]
+        },
+
+        "_comment_misc": "=== 杂项 / 基础操作 ===",
+
+        "back_to_feed": {
+            "operations": ["back_to_feed"],
+            "fallback_intents": []
         },
         "follow_entity": {
             "operations": [],
-            "fallback_intents": [
-                "browse_feed"
-            ]
-        },
-        "share_content": {
-            "operations": [],
-            "fallback_intents": [
-                "browse_feed"
-            ]
+            "fallback_intents": ["browse_feed"],
+            "_note": "BabyCenter has no follow system — always falls back to browse"
         },
         "check_dm": {
             "operations": [],
-            "fallback_intents": [
-                "browse_feed"
-            ]
-        },
-        "edit_profile": {
-            "operations": [],
-            "fallback_intents": [
-                "browse_feed"
-            ]
+            "fallback_intents": ["browse_feed"],
+            "_note": "BabyCenter has no inbox/DM — always falls back to browse"
         }
     },
+
     "action_to_intent": {
         "browse": "browse_feed",
         "read_post": "read_post",

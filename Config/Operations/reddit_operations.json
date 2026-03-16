@@ -5,6 +5,7 @@
         "browse": {
             "description": "浏览 feed 并滚动",
             "require_page": "feed",
+            "result_page": "feed",
             "steps": [
                 { "action": "log", "message": "开始浏览 Reddit feed" },
                 { "action": "find", "selector": "post_unit", "save_as": "posts", "on_fail": "abort" },
@@ -19,6 +20,7 @@
         "like": {
             "description": "对当前可见帖子点赞（upvote）",
             "require_page": "feed",
+            "result_page": "feed",
             "steps": [
                 { "action": "log", "message": "执行 Reddit upvote" },
                 { "action": "find", "selector": "post_unit", "save_as": "target_post", "on_fail": "skip" },
@@ -32,6 +34,7 @@
         "open_post": {
             "description": "打开帖子详情页",
             "require_page": "feed",
+            "result_page": "post_detail",
             "steps": [
                 { "action": "log", "message": "打开帖子详情" },
                 { "action": "find", "selector": "post_unit", "save_as": "target_post", "on_fail": "abort" },
@@ -45,6 +48,7 @@
         "read_post": {
             "description": "阅读帖子内容（模拟阅读时间）",
             "require_page": "post_detail",
+            "result_page": "post_detail",
             "steps": [
                 { "action": "log", "message": "阅读帖子内容" },
                 { "action": "find", "selector": "post_body", "save_as": "post_body", "on_fail": "skip" },
@@ -57,6 +61,7 @@
         "comment": {
             "description": "在帖子详情页发表评论",
             "require_page": "post_detail",
+            "result_page": "post_detail",
             "steps": [
                 { "action": "log", "message": "执行 Reddit 评论" },
                 { "action": "find", "selector": "comment_input", "save_as": "input_box", "on_fail": "abort" },
@@ -103,13 +108,1287 @@
             ]
         },
         "back_to_feed": {
-            "description": "从详情页返回 feed",
+            "description": "从详情页返回 feed（优先点击 Reddit 返回按钮，回退到 Android 返回键）",
+            "require_page": "post_detail",
+            "result_page": "feed",
             "steps": [
                 { "action": "log", "message": "返回 feed" },
-                { "action": "back" },
+                { "action": "find", "selector": "back_button", "save_as": "back_btn", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "back_btn", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "verify", "selector": "feed_container", "on_fail": "retry", "max_retries": 3, "retry_delay_ms": 2000 },
+                { "action": "require", "page": "feed", "on_fail": "abort" }
+            ]
+        },
+        "pull_refresh": {
+            "description": "下拉刷新 feed",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "下拉刷新 feed" },
+                { "action": "scroll", "direction": "up", "distance": 1200, "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "verify", "selector": "feed_container", "on_fail": "skip" },
+                { "action": "set_var", "name": "last_action", "value": "pull_refresh" }
+            ]
+        },
+        "downvote_post": {
+            "description": "在 feed 给帖子踩",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "在 feed 给帖子点踩" },
+                { "action": "find", "selector": "post_unit", "save_as": "target_post", "on_fail": "skip" },
+                { "action": "find", "selector": "downvote_button", "save_as": "down_btn", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1500, "humanized": "true" },
+                { "action": "tap", "context_ref": "down_btn", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "downvote_post" }
+            ]
+        },
+        "undo_vote": {
+            "description": "取消已有赞/踩",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "取消当前投票状态" },
+                { "action": "find", "selector": "post_unit", "save_as": "target_post", "on_fail": "skip" },
+                { "action": "find", "selector": "upvote_button", "save_as": "vote_btn", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "tap", "context_ref": "vote_btn", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "undo_vote" }
+            ]
+        },
+        "open_comments": {
+            "description": "点击评论数进入评论区",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "从 feed 进入评论区" },
+                { "action": "find", "selector": "post_unit", "save_as": "target", "on_fail": "abort" },
+                { "action": "find", "selector": "comment_button", "save_as": "cmt_btn", "on_fail": "abort" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "cmt_btn", "on_fail": "abort", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "require", "page": "post_detail", "on_fail": "abort" },
+                { "action": "set_var", "name": "last_action", "value": "open_comments" }
+            ]
+        },
+        "save_post": {
+            "description": "收藏帖子（通过 overflow 菜单）",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "通过菜单收藏帖子" },
+                { "action": "find", "selector": "post_overflow", "save_as": "overflow", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "overflow", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Save", "save_as": "menu_item", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "menu_item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "save_post" }
+            ]
+        },
+        "hide_post": {
+            "description": "隐藏帖子（通过 overflow 菜单）",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "通过菜单隐藏帖子" },
+                { "action": "find", "selector": "post_overflow", "save_as": "overflow", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "overflow", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Hide post", "save_as": "menu_item", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "menu_item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "hide_post" }
+            ]
+        },
+        "report_post": {
+            "description": "举报帖子（通过 overflow 菜单）",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "通过菜单举报帖子" },
+                { "action": "find", "selector": "post_overflow", "save_as": "overflow", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "overflow", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Report", "save_as": "menu_item", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "menu_item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "report_post" }
+            ]
+        },
+        "copy_link": {
+            "description": "复制帖子链接（通过 overflow 菜单）",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "通过菜单复制帖子链接" },
+                { "action": "find", "selector": "post_overflow", "save_as": "overflow", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "overflow", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Copy link", "save_as": "menu_item", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "menu_item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "copy_link" }
+            ]
+        },
+        "block_author": {
+            "description": "屏蔽作者（通过 overflow 菜单）",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "通过菜单屏蔽作者" },
+                { "action": "find", "selector": "post_overflow", "save_as": "overflow", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "overflow", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Block account", "save_as": "menu_item", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "menu_item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "block_author" }
+            ]
+        },
+        "mute_subreddit": {
+            "description": "屏蔽社区（通过 overflow 菜单）",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "通过菜单屏蔽社区" },
+                { "action": "find", "selector": "post_overflow", "save_as": "overflow", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "overflow", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Mute", "save_as": "menu_item", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "menu_item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "mute_subreddit" }
+            ]
+        },
+        "tap_subreddit": {
+            "description": "点击社区名进入社区页",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "点击社区名进入社区页" },
+                { "action": "find", "selector": "subreddit_name", "save_as": "sub", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "sub", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "tap_subreddit" }
+            ]
+        },
+        "tap_author": {
+            "description": "点击作者名进入主页",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "点击作者名进入主页" },
+                { "action": "find", "selector": "post_header", "save_as": "author", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "author", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "tap_author" }
+            ]
+        },
+        "scroll_to_top": {
+            "description": "回到 feed 顶部",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "回到 feed 顶部" },
+                { "action": "find", "selector": "toolbar", "save_as": "top_bar", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "top_bar", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "scroll_to_top" }
+            ]
+        },
+        "dismiss_ad": {
+            "description": "关闭推广帖子",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "关闭推广帖子" },
+                { "action": "find", "strategy": "resource-id", "value": "promoted_post_unit", "save_as": "ad", "on_fail": "skip" },
+                { "action": "find", "selector": "post_overflow", "save_as": "overflow", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "overflow", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Hide", "save_as": "hide", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "hide", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "dismiss_ad" }
+            ]
+        },
+        "switch_feed_home": {
+            "description": "切换到 Home feed",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "切换到 Home feed" },
+                { "action": "find", "selector": "feed_options", "save_as": "options", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "options", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Home", "save_as": "item", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "item", "on_fail": "skip", "humanized": "true" },
                 { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
                 { "action": "refresh_layout" },
-                { "action": "verify", "selector": "post_unit", "on_fail": "retry", "max_retries": 3, "retry_delay_ms": 2000 }
+                { "action": "set_var", "name": "last_action", "value": "switch_feed_home" }
+            ]
+        },
+        "switch_feed_popular": {
+            "description": "切换到 Popular feed",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "切换到 Popular feed" },
+                { "action": "find", "selector": "feed_options", "save_as": "options", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "options", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Popular", "save_as": "item", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "switch_feed_popular" }
+            ]
+        },
+        "switch_feed_latest": {
+            "description": "切换到 Latest feed",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "切换到 Latest feed" },
+                { "action": "find", "selector": "feed_options", "save_as": "options", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "options", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Latest", "save_as": "item", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "switch_feed_latest" }
+            ]
+        },
+        "sort_feed_hot": {
+            "description": "排序 feed: Hot",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "排序 feed 为 Hot" },
+                { "action": "find", "selector": "feed_options", "save_as": "options", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "options", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Hot", "save_as": "sort", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "sort", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "sort_feed_hot" }
+            ]
+        },
+        "sort_feed_new": {
+            "description": "排序 feed: New",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "排序 feed 为 New" },
+                { "action": "find", "selector": "feed_options", "save_as": "options", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "options", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "New", "save_as": "sort", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "sort", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "sort_feed_new" }
+            ]
+        },
+        "sort_feed_top": {
+            "description": "排序 feed: Top",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "排序 feed 为 Top" },
+                { "action": "find", "selector": "feed_options", "save_as": "options", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "options", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Top", "save_as": "sort", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "sort", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "sort_feed_top" }
+            ]
+        },
+        "sort_feed_rising": {
+            "description": "排序 feed: Rising",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "排序 feed 为 Rising" },
+                { "action": "find", "selector": "feed_options", "save_as": "options", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "options", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Rising", "save_as": "sort", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "sort", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "sort_feed_rising" }
+            ]
+        },
+        "upvote_detail": {
+            "description": "在详情页点赞",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "在详情页点赞" },
+                { "action": "find", "selector": "vote_upvote", "save_as": "up", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1500, "humanized": "true" },
+                { "action": "tap", "context_ref": "up", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "upvote_detail" }
+            ]
+        },
+        "downvote_detail": {
+            "description": "在详情页踩",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "在详情页点踩" },
+                { "action": "find", "selector": "vote_downvote", "save_as": "down", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1500, "humanized": "true" },
+                { "action": "tap", "context_ref": "down", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "downvote_detail" }
+            ]
+        },
+        "save_post_detail": {
+            "description": "详情页收藏（通过 overflow 菜单）",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "在详情页收藏帖子（通过 overflow 菜单）" },
+                { "action": "find", "selector": "detail_overflow", "save_as": "overflow", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "overflow", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 2500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Save", "save_as": "save_item", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "save_item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "save_post_detail" }
+            ]
+        },
+        "share_post_detail": {
+            "description": "详情页分享",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "在详情页分享帖子" },
+                { "action": "find", "selector": "detail_share", "save_as": "share", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "share", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "back" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "share_post_detail" }
+            ]
+        },
+        "copy_link_detail": {
+            "description": "详情页复制链接（overflow）",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "在详情页复制链接" },
+                { "action": "find", "selector": "detail_overflow", "save_as": "overflow", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "overflow", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 2500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Copy link", "save_as": "item", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "copy_link_detail" }
+            ]
+        },
+        "hide_post_detail": {
+            "description": "详情页隐藏帖子（overflow）",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "在详情页隐藏帖子" },
+                { "action": "find", "selector": "detail_overflow", "save_as": "overflow", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "overflow", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 2500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Hide post", "save_as": "item", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "hide_post_detail" }
+            ]
+        },
+        "report_post_detail": {
+            "description": "详情页举报（overflow）",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "在详情页举报帖子" },
+                { "action": "find", "selector": "detail_overflow", "save_as": "overflow", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "overflow", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 2500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Report", "save_as": "item", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "report_post_detail" }
+            ]
+        },
+        "crosspost": {
+            "description": "交叉发帖（overflow）",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "在详情页执行 Crosspost" },
+                { "action": "find", "selector": "detail_overflow", "save_as": "overflow", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "overflow", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 2500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Crosspost", "save_as": "item", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "crosspost" }
+            ]
+        },
+        "follow_author_detail": {
+            "description": "详情页关注作者（overflow）",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "在详情页关注作者" },
+                { "action": "find", "selector": "detail_overflow", "save_as": "overflow", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "overflow", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 2500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Follow", "save_as": "item", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "follow_author_detail" }
+            ]
+        },
+        "open_media_fullscreen": {
+            "description": "打开全屏媒体",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "打开全屏媒体" },
+                { "action": "find", "selector": "media_video_view", "save_as": "media", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "media", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "open_media_fullscreen" }
+            ]
+        },
+        "play_video": {
+            "description": "播放/暂停视频",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "播放或暂停视频" },
+                { "action": "find", "selector": "media_play_button", "save_as": "play", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "tap", "context_ref": "play", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 3000, "max_ms": 8000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "play_video" }
+            ]
+        },
+        "scroll_comments": {
+            "description": "滚动浏览评论",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "滚动浏览评论区" },
+                { "action": "scroll", "direction": "down", "distance": 600, "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 5000, "humanized": "true" },
+                { "action": "scroll", "direction": "down", "distance": 600, "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 5000, "humanized": "true" },
+                { "action": "scroll", "direction": "down", "distance": 400, "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "scroll_comments" }
+            ]
+        },
+        "upvote_comment": {
+            "description": "给评论点赞",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "给评论点赞" },
+                { "action": "scroll", "direction": "down", "distance": 800, "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "selector": "comment_vote_upvote", "save_as": "up", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "up", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "upvote_comment" }
+            ]
+        },
+        "downvote_comment": {
+            "description": "给评论踩",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "给评论点踩" },
+                { "action": "scroll", "direction": "down", "distance": 800, "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "selector": "comment_vote_downvote", "save_as": "down", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "down", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "downvote_comment" }
+            ]
+        },
+        "reply_comment": {
+            "description": "回复评论",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "回复评论" },
+                { "action": "find", "selector": "comment_reply_button", "save_as": "reply", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "reply", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "selector": "comment_text_input", "save_as": "input", "on_fail": "abort" },
+                { "action": "tap", "context_ref": "input", "on_fail": "abort", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "type", "var": "ai_comment_text", "on_fail": "abort" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
+                { "action": "find", "strategy": "text", "value": "Reply", "save_as": "submit", "on_fail": "abort" },
+                { "action": "tap", "context_ref": "submit", "on_fail": "abort", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "reply_comment" }
+            ]
+        },
+        "sort_comments": {
+            "description": "排序评论",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "切换评论排序" },
+                { "action": "find", "selector": "detail_comment_sort", "save_as": "sort", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "sort", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Best", "save_as": "option", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "option", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "sort_comments" }
+            ]
+        },
+        "load_more_comments": {
+            "description": "加载更多评论",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "加载更多评论" },
+                { "action": "find", "strategy": "text-contains", "value": "more repl", "save_as": "more", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "more", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "load_more_comments" }
+            ]
+        },
+        "collapse_thread": {
+            "description": "折叠评论线程",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "折叠评论线程" },
+                { "action": "scroll", "direction": "down", "distance": 800, "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "selector": "comment_header", "save_as": "header", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "header", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "collapse_thread" }
+            ]
+        },
+        "expand_thread": {
+            "description": "展开评论线程",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "展开评论线程" },
+                { "action": "scroll", "direction": "down", "distance": 800, "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "selector": "comment_header", "save_as": "header", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "header", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "expand_thread" }
+            ]
+        },
+        "save_comment": {
+            "description": "收藏评论（长按菜单）",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "通过长按菜单收藏评论" },
+                { "action": "find", "selector": "comment_body", "save_as": "body", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "long_press", "context_ref": "body", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Save", "save_as": "item", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "save_comment" }
+            ]
+        },
+        "report_comment": {
+            "description": "举报评论（长按菜单）",
+            "require_page": "post_detail",
+            "steps": [
+                { "action": "log", "message": "通过长按菜单举报评论" },
+                { "action": "find", "selector": "comment_body", "save_as": "body", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "long_press", "context_ref": "body", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Report", "save_as": "item", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "report_comment" }
+            ]
+        },
+        "nav_home": {
+            "description": "底部导航到首页",
+            "steps": [
+                { "action": "log", "message": "通过底部导航进入首页" },
+                { "action": "refresh_layout" },
+                { "action": "find", "selector": "bottom_nav_home", "save_as": "home", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "home", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "nav_home" }
+            ]
+        },
+        "nav_create": {
+            "description": "底部导航到创建",
+            "steps": [
+                { "action": "log", "message": "通过底部导航进入创建页" },
+                { "action": "refresh_layout" },
+                { "action": "find", "selector": "bottom_nav_create", "save_as": "create", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "create", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "nav_create" }
+            ]
+        },
+        "nav_inbox": {
+            "description": "底部导航到通知",
+            "steps": [
+                { "action": "log", "message": "通过底部导航进入通知页" },
+                { "action": "refresh_layout" },
+                { "action": "find", "selector": "bottom_nav_inbox", "save_as": "inbox", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "inbox", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "nav_inbox" }
+            ]
+        },
+        "nav_you": {
+            "description": "底部导航到个人主页",
+            "steps": [
+                { "action": "log", "message": "通过底部导航进入个人页" },
+                { "action": "refresh_layout" },
+                { "action": "find", "selector": "bottom_nav_you", "save_as": "you", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "you", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "nav_you" }
+            ]
+        },
+        "open_drawer": {
+            "description": "打开左侧抽屉菜单",
+            "steps": [
+                { "action": "log", "message": "打开左侧抽屉菜单" },
+                { "action": "find", "selector": "drawer_nav_icon", "save_as": "icon", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "icon", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "open_drawer" }
+            ]
+        },
+        "nav_settings": {
+            "description": "进入设置",
+            "steps": [
+                { "action": "log", "message": "进入设置页面" },
+                { "action": "refresh_layout" },
+                { "action": "find", "selector": "bottom_nav_you", "save_as": "you", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "you", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 3000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "content-desc", "value": "More profile actions", "save_as": "more", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "more", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 2500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Settings", "save_as": "settings", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "settings", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "nav_settings" }
+            ]
+        },
+        "switch_account": {
+            "description": "切换账号",
+            "require_page": "profile",
+            "steps": [
+                { "action": "log", "message": "切换账号" },
+                { "action": "find", "selector": "account_switcher", "save_as": "switcher", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "switcher", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "switch_account" }
+            ]
+        },
+        "view_profile": {
+            "description": "查看个人主页",
+            "require_page": "profile",
+            "steps": [
+                { "action": "log", "message": "浏览个人主页" },
+                { "action": "find", "selector": "profile_scrollable", "save_as": "profile", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 3000, "humanized": "true" },
+                { "action": "scroll", "direction": "down", "distance": 400, "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 5000, "humanized": "true" },
+                { "action": "scroll", "direction": "down", "distance": 400, "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "view_profile" }
+            ]
+        },
+        "switch_profile_tab_posts": {
+            "description": "切换到帖子标签",
+            "require_page": "profile",
+            "steps": [
+                { "action": "log", "message": "切换到 Posts 标签" },
+                { "action": "find", "selector": "profile_tabs", "save_as": "tabs", "on_fail": "skip" },
+                { "action": "find", "strategy": "text", "value": "Posts", "save_as": "tab", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "tab", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "switch_profile_tab_posts" }
+            ]
+        },
+        "switch_profile_tab_comments": {
+            "description": "切换到评论标签",
+            "require_page": "profile",
+            "steps": [
+                { "action": "log", "message": "切换到 Comments 标签" },
+                { "action": "find", "selector": "profile_tabs", "save_as": "tabs", "on_fail": "skip" },
+                { "action": "find", "strategy": "text", "value": "Comments", "save_as": "tab", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "tab", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "switch_profile_tab_comments" }
+            ]
+        },
+        "switch_profile_tab_about": {
+            "description": "切换到关于标签",
+            "require_page": "profile",
+            "steps": [
+                { "action": "log", "message": "切换到 About 标签" },
+                { "action": "find", "selector": "profile_tabs", "save_as": "tabs", "on_fail": "skip" },
+                { "action": "find", "strategy": "text", "value": "About", "save_as": "tab", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "tab", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "switch_profile_tab_about" }
+            ]
+        },
+        "edit_own_profile": {
+            "description": "编辑个人资料",
+            "require_page": "profile",
+            "steps": [
+                { "action": "log", "message": "编辑个人资料" },
+                { "action": "find", "selector": "profile_edit_button", "save_as": "edit", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "edit", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "edit_own_profile" }
+            ]
+        },
+        "follow_user": {
+            "description": "关注用户",
+            "require_page": "profile",
+            "steps": [
+                { "action": "log", "message": "关注当前用户" },
+                { "action": "find", "strategy": "text", "value": "Follow", "save_as": "follow", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "follow", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "follow_user" }
+            ]
+        },
+        "view_saved": {
+            "description": "查看已收藏",
+            "require_page": "profile",
+            "steps": [
+                { "action": "log", "message": "进入已收藏列表" },
+                { "action": "find", "strategy": "content-desc", "value": "More profile actions", "save_as": "more", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "more", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 2500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Saved", "save_as": "saved", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "saved", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "view_saved" }
+            ]
+        },
+        "message_user": {
+            "description": "私信用户",
+            "require_page": "profile",
+            "steps": [
+                { "action": "log", "message": "向用户发起私信" },
+                { "action": "find", "strategy": "content-desc", "value": "Chat", "save_as": "chat", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "chat", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "message_user" }
+            ]
+        },
+        "block_user": {
+            "description": "屏蔽用户",
+            "require_page": "profile",
+            "steps": [
+                { "action": "log", "message": "屏蔽当前用户" },
+                { "action": "find", "strategy": "content-desc", "value": "More options", "save_as": "more", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "more", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Block account", "save_as": "block", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "block", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "block_user" }
+            ]
+        },
+        "read_notification": {
+            "description": "查看通知",
+            "require_page": "inbox",
+            "steps": [
+                { "action": "log", "message": "查看一条通知" },
+                { "action": "find", "selector": "notification_row", "save_as": "notif", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "notif", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "read_notification" }
+            ]
+        },
+        "mark_all_read": {
+            "description": "全部标记已读",
+            "require_page": "inbox",
+            "steps": [
+                { "action": "log", "message": "全部标记为已读" },
+                { "action": "find", "selector": "mark_read_button", "save_as": "mark", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "mark", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "mark_all_read" }
+            ]
+        },
+        "join_community": {
+            "description": "加入社区",
+            "steps": [
+                { "action": "log", "message": "加入当前社区" },
+                { "action": "find", "selector": "join_button", "save_as": "join", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "join", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "join_community" }
+            ]
+        },
+        "leave_community": {
+            "description": "退出社区",
+            "steps": [
+                { "action": "log", "message": "退出当前社区" },
+                { "action": "find", "strategy": "text", "value": "Joined", "save_as": "joined", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "joined", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Leave", "save_as": "leave", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "leave", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "leave_community" }
+            ]
+        },
+        "sort_community_posts": {
+            "description": "排序社区帖子",
+            "steps": [
+                { "action": "log", "message": "排序社区帖子为 Hot" },
+                { "action": "find", "selector": "feed_options", "save_as": "options", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "options", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Hot", "save_as": "sort", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "sort", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "sort_community_posts" }
+            ]
+        },
+        "toggle_dark_mode": {
+            "description": "切换深色模式",
+            "require_page": "settings",
+            "steps": [
+                { "action": "log", "message": "切换深色模式" },
+                { "action": "scroll", "direction": "down", "distance": 800, "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Dark mode", "save_as": "item", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "toggle_dark_mode" }
+            ]
+        },
+        "toggle_nsfw": {
+            "description": "开关 NSFW 内容",
+            "require_page": "settings",
+            "steps": [
+                { "action": "log", "message": "切换 NSFW 内容显示" },
+                { "action": "find", "strategy": "text-contains", "value": "mature content", "save_as": "item", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "toggle_nsfw" }
+            ]
+        },
+        "toggle_autoplay": {
+            "description": "开关视频自动播放",
+            "require_page": "settings",
+            "steps": [
+                { "action": "log", "message": "切换自动播放设置" },
+                { "action": "scroll", "direction": "down", "distance": 1200, "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "scroll", "direction": "down", "distance": 800, "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Autoplay", "save_as": "item", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "toggle_autoplay" }
+            ]
+        },
+        "change_default_sort": {
+            "description": "修改默认排序",
+            "require_page": "settings",
+            "steps": [
+                { "action": "log", "message": "修改默认排序设置" },
+                { "action": "find", "strategy": "text", "value": "Default view", "save_as": "item", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "change_default_sort" }
+            ]
+        },
+        "manage_notifications": {
+            "description": "管理通知偏好",
+            "require_page": "settings",
+            "steps": [
+                { "action": "log", "message": "管理通知偏好" },
+                { "action": "scroll", "direction": "down", "distance": 1200, "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "scroll", "direction": "down", "distance": 1200, "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text-contains", "value": "Notification", "save_as": "item", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "item", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "manage_notifications" }
+            ]
+        },
+        "open_search": {
+            "description": "打开搜索",
+            "steps": [
+                { "action": "log", "message": "打开搜索入口" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Find anything", "fallback_strategy": "content-desc", "fallback_value": "Search", "save_as": "search", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "search", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "open_search" }
+            ]
+        },
+        "type_search": {
+            "description": "输入搜索词",
+            "steps": [
+                { "action": "log", "message": "输入搜索关键词" },
+                { "action": "find", "strategy": "resource-id", "value": "search", "save_as": "input", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "input", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
+                { "action": "type", "var": "search_query", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "type_search" }
+            ]
+        },
+        "submit_search": {
+            "description": "提交搜索",
+            "steps": [
+                { "action": "log", "message": "提交搜索请求" },
+                { "action": "find", "strategy": "resource-id", "value": "toolbar_search_icon", "save_as": "submit", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "submit", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "submit_search" }
+            ]
+        },
+        "tap_trending": {
+            "description": "点击热门搜索",
+            "steps": [
+                { "action": "log", "message": "点击热门搜索词" },
+                { "action": "find", "strategy": "resource-id", "value": "query_prompt_text", "save_as": "trend", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "trend", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "tap_trending" }
+            ]
+        },
+        "filter_results_tab": {
+            "description": "切换搜索结果标签",
+            "steps": [
+                { "action": "log", "message": "切换搜索结果标签" },
+                { "action": "find", "strategy": "text", "value": "Communities", "save_as": "tab", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "tab", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "filter_results_tab" }
+            ]
+        },
+        "sort_results": {
+            "description": "排序搜索结果",
+            "steps": [
+                { "action": "log", "message": "排序搜索结果" },
+                { "action": "find", "strategy": "text", "value": "Most relevant", "save_as": "sort", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "sort", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 800, "max_ms": 1500, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Top", "save_as": "option", "on_fail": "skip" },
+                { "action": "tap", "context_ref": "option", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "sort_results" }
+            ]
+        },
+        "join_from_search": {
+            "description": "搜索结果中加入社区",
+            "steps": [
+                { "action": "log", "message": "从搜索结果加入社区" },
+                { "action": "find", "strategy": "text", "value": "Join", "save_as": "join", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "join", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "join_from_search" }
+            ]
+        },
+        "clear_search_history": {
+            "description": "清除搜索历史",
+            "steps": [
+                { "action": "log", "message": "清除搜索历史" },
+                { "action": "find", "strategy": "text", "value": "Clear", "save_as": "clear", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "clear", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 1000, "max_ms": 2000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "clear_search_history" }
+            ]
+        },
+        "open_chat": {
+            "description": "打开聊天",
+            "require_page": "inbox",
+            "steps": [
+                { "action": "log", "message": "打开聊天入口" },
+                { "action": "refresh_layout" },
+                { "action": "find", "strategy": "text", "value": "Messages", "save_as": "messages_tab", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "messages_tab", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 3000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "open_chat" }
+            ]
+        },
+        "send_message": {
+            "description": "发送私信（stub）",
+            "steps": [
+                { "action": "log", "message": "发送私信（占位）" },
+                { "action": "set_var", "name": "last_action", "value": "send_message" }
+            ]
+        },
+        "read_message": {
+            "description": "阅读消息（stub）",
+            "steps": [
+                { "action": "log", "message": "阅读消息（占位）" },
+                { "action": "set_var", "name": "last_action", "value": "read_message" }
+            ]
+        },
+        "accept_chat_invite": {
+            "description": "接受聊天邀请（stub）",
+            "steps": [
+                { "action": "log", "message": "接受聊天邀请（占位）" },
+                { "action": "set_var", "name": "last_action", "value": "accept_chat_invite" }
+            ]
+        },
+        "create_text_post": {
+            "description": "创建文字帖子（stub）",
+            "steps": [
+                { "action": "log", "message": "进入创建文字帖子流程（占位）" },
+                { "action": "refresh_layout" },
+                { "action": "find", "selector": "bottom_nav_create", "save_as": "create", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "create", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "create_text_post" }
+            ]
+        },
+        "create_image_post": {
+            "description": "创建图片帖子（stub）",
+            "steps": [
+                { "action": "log", "message": "进入创建图片帖子流程（占位）" },
+                { "action": "refresh_layout" },
+                { "action": "find", "selector": "bottom_nav_create", "save_as": "create", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "create", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "create_image_post" }
+            ]
+        },
+        "create_link_post": {
+            "description": "创建链接帖子（stub）",
+            "steps": [
+                { "action": "log", "message": "创建链接帖子（占位）" },
+                { "action": "set_var", "name": "last_action", "value": "create_link_post" }
+            ]
+        },
+        "create_video_post": {
+            "description": "创建视频帖子（stub）",
+            "steps": [
+                { "action": "log", "message": "创建视频帖子（占位）" },
+                { "action": "set_var", "name": "last_action", "value": "create_video_post" }
+            ]
+        },
+        "create_poll": {
+            "description": "创建投票（stub）",
+            "steps": [
+                { "action": "log", "message": "创建投票（占位）" },
+                { "action": "set_var", "name": "last_action", "value": "create_poll" }
+            ]
+        },
+        "select_post_flair": {
+            "description": "选择帖子标签（stub）",
+            "steps": [
+                { "action": "log", "message": "选择帖子标签（占位）" },
+                { "action": "set_var", "name": "last_action", "value": "select_post_flair" }
+            ]
+        },
+        "toggle_feed_layout": {
+            "description": "切换 Card/Compact 视图（stub）",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "切换 feed 布局（占位）" },
+                { "action": "set_var", "name": "last_action", "value": "toggle_feed_layout" }
+            ]
+        },
+        "tap_flair": {
+            "description": "点击标签筛选帖子",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "点击帖子标签进行筛选" },
+                { "action": "find", "strategy": "resource-id", "value": "post_flairs", "save_as": "flair", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
+                { "action": "tap", "context_ref": "flair", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "refresh_layout" },
+                { "action": "set_var", "name": "last_action", "value": "tap_flair" }
+            ]
+        },
+        "vote_poll": {
+            "description": "参与投票（stub）",
+            "require_page": "feed",
+            "steps": [
+                { "action": "log", "message": "参与投票（占位）" },
+                { "action": "set_var", "name": "last_action", "value": "vote_poll" }
+            ]
+        },
+        "view_community_about": {
+            "description": "查看社区简介",
+            "steps": [
+                { "action": "log", "message": "查看社区 About 页面" },
+                { "action": "find", "strategy": "text", "value": "About", "save_as": "about", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "about", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "scroll", "direction": "down", "distance": 400, "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "view_community_about" }
+            ]
+        },
+        "view_community_rules": {
+            "description": "查看社区规则",
+            "steps": [
+                { "action": "log", "message": "查看社区 Rules 页面" },
+                { "action": "find", "strategy": "text", "value": "Rules", "save_as": "rules", "on_fail": "skip" },
+                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
+                { "action": "tap", "context_ref": "rules", "on_fail": "skip", "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "scroll", "direction": "down", "distance": 400, "humanized": "true" },
+                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
+                { "action": "set_var", "name": "last_action", "value": "view_community_rules" }
+            ]
+        },
+        "view_community_wiki": {
+            "description": "查看社区 Wiki（stub）",
+            "steps": [
+                { "action": "log", "message": "查看社区 Wiki（占位）" },
+                { "action": "set_var", "name": "last_action", "value": "view_community_wiki" }
+            ]
+        },
+        "filter_by_flair": {
+            "description": "按 Flair 筛选（stub）",
+            "steps": [
+                { "action": "log", "message": "按 Flair 筛选（占位）" },
+                { "action": "set_var", "name": "last_action", "value": "filter_by_flair" }
+            ]
+        },
+        "favorite_community": {
+            "description": "收藏社区到侧边栏（stub）",
+            "steps": [
+                { "action": "log", "message": "收藏社区到侧边栏（占位）" },
+                { "action": "set_var", "name": "last_action", "value": "favorite_community" }
             ]
         }
     }

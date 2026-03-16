@@ -1,102 +1,462 @@
 {
     "platform": "reddit",
-    "version": "1.0",
+    "version": "2.0",
+    "description": "Reddit 意图映射 v2.0 — 覆盖全部 ~80 操作，含回退链",
+
     "intents": {
+
+        "_comment_tier1": "=== Tier 1: 核心浏览操作 ===",
+
         "browse_feed": {
-            "operations": [
-                "browse"
-            ],
+            "operations": ["browse"],
             "fallback_intents": []
         },
         "open_post": {
-            "operations": [
-                "open_post"
-            ],
-            "fallback_intents": [
-                "browse_feed"
-            ]
+            "operations": ["open_post"],
+            "fallback_intents": ["browse_feed"]
         },
         "read_post": {
-            "operations": [
-                "open_post",
-                "read_post",
-                "back_to_feed"
-            ],
-            "fallback_intents": [
-                "browse_feed"
-            ]
+            "operations": ["open_post", "read_post", "back_to_feed"],
+            "fallback_intents": ["browse_feed"]
         },
         "read_comments": {
-            "operations": [
-                "open_post",
-                "read_post",
-                "back_to_feed"
-            ],
-            "fallback_intents": [
-                "read_post",
-                "browse_feed"
-            ]
+            "operations": ["open_comments", "scroll_comments", "back_to_feed"],
+            "fallback_intents": ["read_post", "browse_feed"]
         },
         "reply_post": {
-            "operations": [
-                "open_post",
-                "comment",
-                "back_to_feed"
-            ],
-            "fallback_intents": [
-                "read_post",
-                "browse_feed"
-            ]
+            "operations": ["open_post", "comment", "back_to_feed"],
+            "fallback_intents": ["read_post", "browse_feed"]
         },
         "reply_comment": {
-            "operations": [
-                "open_post",
-                "comment",
-                "back_to_feed"
-            ],
-            "fallback_intents": [
-                "reply_post",
-                "read_post",
-                "browse_feed"
-            ]
+            "operations": ["open_post", "scroll_comments", "reply_comment", "back_to_feed"],
+            "fallback_intents": ["reply_post", "read_post", "browse_feed"]
         },
         "like_content": {
-            "operations": [
-                "like"
-            ],
-            "fallback_intents": [
-                "browse_feed"
-            ]
+            "operations": ["like"],
+            "fallback_intents": ["browse_feed"]
         },
-        "follow_entity": {
-            "operations": [
-                "follow"
-            ],
-            "fallback_intents": [
-                "browse_feed"
-            ]
+        "pull_refresh_feed": {
+            "operations": ["pull_refresh"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "scroll_to_top_feed": {
+            "operations": ["scroll_to_top"],
+            "fallback_intents": ["browse_feed"]
+        },
+
+        "_comment_tier1_vote": "=== Tier 1: 投票操作 ===",
+
+        "downvote_content": {
+            "operations": ["downvote_post"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "undo_vote_content": {
+            "operations": ["undo_vote"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "upvote_detail_content": {
+            "operations": ["open_post", "upvote_detail", "back_to_feed"],
+            "fallback_intents": ["like_content", "browse_feed"]
+        },
+        "downvote_detail_content": {
+            "operations": ["open_post", "downvote_detail", "back_to_feed"],
+            "fallback_intents": ["downvote_content", "browse_feed"]
+        },
+
+        "_comment_tier1_feed_options": "=== Tier 1: Feed 选项 ===",
+
+        "switch_feed_home": {
+            "operations": ["switch_feed_home"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "switch_feed_popular": {
+            "operations": ["switch_feed_popular"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "switch_feed_latest": {
+            "operations": ["switch_feed_latest"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "sort_feed_hot": {
+            "operations": ["sort_feed_hot"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "sort_feed_new": {
+            "operations": ["sort_feed_new"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "sort_feed_top": {
+            "operations": ["sort_feed_top"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "sort_feed_rising": {
+            "operations": ["sort_feed_rising"],
+            "fallback_intents": ["browse_feed"]
+        },
+
+        "_comment_tier2_overflow": "=== Tier 2: Feed Overflow 菜单操作 ===",
+
+        "save_post_feed": {
+            "operations": ["save_post"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "hide_post_feed": {
+            "operations": ["hide_post"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "report_post_feed": {
+            "operations": ["report_post"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "copy_link_feed": {
+            "operations": ["copy_link"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "block_author_feed": {
+            "operations": ["block_author"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "mute_subreddit_feed": {
+            "operations": ["mute_subreddit"],
+            "fallback_intents": ["browse_feed"]
         },
         "share_content": {
-            "operations": [
-                "share"
-            ],
-            "fallback_intents": [
-                "browse_feed"
-            ]
+            "operations": ["share"],
+            "fallback_intents": ["browse_feed"]
         },
-        "check_dm": {
-            "operations": [],
-            "fallback_intents": [
-                "browse_feed"
-            ]
+        "dismiss_ad_feed": {
+            "operations": ["dismiss_ad"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "tap_flair_feed": {
+            "operations": ["tap_flair"],
+            "fallback_intents": ["browse_feed"]
+        },
+
+        "_comment_tier2_feed_social": "=== Tier 2: Feed 社交操作 ===",
+
+        "tap_subreddit": {
+            "operations": ["tap_subreddit"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "tap_author": {
+            "operations": ["tap_author"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "follow_entity": {
+            "operations": ["follow"],
+            "fallback_intents": ["browse_feed"]
+        },
+
+        "_comment_tier2_detail": "=== Tier 2: 帖子详情操作 ===",
+
+        "save_post_detail": {
+            "operations": ["open_post", "save_post_detail", "back_to_feed"],
+            "fallback_intents": ["save_post_feed", "browse_feed"]
+        },
+        "share_post_detail": {
+            "operations": ["open_post", "share_post_detail", "back_to_feed"],
+            "fallback_intents": ["share_content", "browse_feed"]
+        },
+        "copy_link_detail": {
+            "operations": ["open_post", "copy_link_detail", "back_to_feed"],
+            "fallback_intents": ["copy_link_feed", "browse_feed"]
+        },
+        "hide_post_detail": {
+            "operations": ["open_post", "hide_post_detail", "back_to_feed"],
+            "fallback_intents": ["hide_post_feed", "browse_feed"]
+        },
+        "report_post_detail": {
+            "operations": ["open_post", "report_post_detail", "back_to_feed"],
+            "fallback_intents": ["report_post_feed", "browse_feed"]
+        },
+        "crosspost_detail": {
+            "operations": ["open_post", "crosspost", "back_to_feed"],
+            "fallback_intents": ["share_content", "browse_feed"]
+        },
+        "follow_author_detail": {
+            "operations": ["open_post", "follow_author_detail", "back_to_feed"],
+            "fallback_intents": ["follow_entity", "browse_feed"]
+        },
+
+        "_comment_tier2_media": "=== Tier 2: 媒体操作 ===",
+
+        "view_media": {
+            "operations": ["open_post", "open_media_fullscreen", "back_to_feed"],
+            "fallback_intents": ["read_post", "browse_feed"]
+        },
+        "play_video": {
+            "operations": ["open_post", "play_video", "back_to_feed"],
+            "fallback_intents": ["view_media", "browse_feed"]
+        },
+
+        "_comment_tier2_comments": "=== Tier 2: 评论区操作 ===",
+
+        "upvote_comment": {
+            "operations": ["open_comments", "scroll_comments", "upvote_comment", "back_to_feed"],
+            "fallback_intents": ["read_comments", "browse_feed"]
+        },
+        "downvote_comment": {
+            "operations": ["open_comments", "scroll_comments", "downvote_comment", "back_to_feed"],
+            "fallback_intents": ["read_comments", "browse_feed"]
+        },
+        "sort_comments": {
+            "operations": ["open_comments", "sort_comments", "back_to_feed"],
+            "fallback_intents": ["read_comments", "browse_feed"]
+        },
+        "load_more_comments": {
+            "operations": ["open_comments", "scroll_comments", "load_more_comments", "back_to_feed"],
+            "fallback_intents": ["read_comments", "browse_feed"]
+        },
+        "collapse_thread": {
+            "operations": ["open_comments", "scroll_comments", "collapse_thread", "back_to_feed"],
+            "fallback_intents": ["read_comments", "browse_feed"]
+        },
+        "expand_thread": {
+            "operations": ["open_comments", "scroll_comments", "expand_thread", "back_to_feed"],
+            "fallback_intents": ["read_comments", "browse_feed"]
+        },
+        "save_comment": {
+            "operations": ["open_comments", "scroll_comments", "save_comment", "back_to_feed"],
+            "fallback_intents": ["read_comments", "browse_feed"]
+        },
+        "report_comment": {
+            "operations": ["open_comments", "scroll_comments", "report_comment", "back_to_feed"],
+            "fallback_intents": ["read_comments", "browse_feed"]
+        },
+
+        "_comment_tier3_nav": "=== Tier 3: 导航操作 ===",
+
+        "navigate_home": {
+            "operations": ["nav_home"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "navigate_create": {
+            "operations": ["nav_create"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "navigate_inbox": {
+            "operations": ["nav_inbox"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "navigate_profile": {
+            "operations": ["nav_you"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "navigate_settings": {
+            "operations": ["nav_settings"],
+            "fallback_intents": ["navigate_profile", "browse_feed"]
+        },
+        "open_drawer_menu": {
+            "operations": ["open_drawer"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "switch_account": {
+            "operations": ["switch_account"],
+            "fallback_intents": ["navigate_profile", "browse_feed"]
+        },
+
+        "_comment_tier3_search": "=== Tier 3: 搜索操作 ===",
+
+        "search_content": {
+            "operations": ["open_search", "type_search", "submit_search"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "tap_trending_search": {
+            "operations": ["open_search", "tap_trending"],
+            "fallback_intents": ["search_content", "browse_feed"]
+        },
+        "filter_search_results": {
+            "operations": ["filter_results_tab"],
+            "fallback_intents": ["search_content", "browse_feed"]
+        },
+        "sort_search_results": {
+            "operations": ["sort_results"],
+            "fallback_intents": ["search_content", "browse_feed"]
+        },
+        "join_from_search": {
+            "operations": ["open_search", "type_search", "submit_search", "join_from_search"],
+            "fallback_intents": ["search_content", "browse_feed"]
+        },
+        "clear_search_history": {
+            "operations": ["open_search", "clear_search_history"],
+            "fallback_intents": ["browse_feed"]
+        },
+
+        "_comment_tier3_profile": "=== Tier 3: 个人主页操作 ===",
+
+        "view_own_profile": {
+            "operations": ["nav_you", "view_profile"],
+            "fallback_intents": ["browse_feed"]
         },
         "edit_profile": {
-            "operations": [],
-            "fallback_intents": [
-                "browse_feed"
-            ]
+            "operations": ["nav_you", "edit_own_profile"],
+            "fallback_intents": ["view_own_profile", "browse_feed"]
+        },
+        "view_profile_posts": {
+            "operations": ["switch_profile_tab_posts"],
+            "fallback_intents": ["view_own_profile", "browse_feed"]
+        },
+        "view_profile_comments": {
+            "operations": ["switch_profile_tab_comments"],
+            "fallback_intents": ["view_own_profile", "browse_feed"]
+        },
+        "view_profile_about": {
+            "operations": ["switch_profile_tab_about"],
+            "fallback_intents": ["view_own_profile", "browse_feed"]
+        },
+        "follow_user": {
+            "operations": ["follow_user"],
+            "fallback_intents": ["follow_entity", "browse_feed"]
+        },
+        "view_saved_content": {
+            "operations": ["view_saved"],
+            "fallback_intents": ["view_own_profile", "browse_feed"]
+        },
+        "message_user": {
+            "operations": ["message_user"],
+            "fallback_intents": ["check_dm", "browse_feed"]
+        },
+        "block_user_profile": {
+            "operations": ["block_user"],
+            "fallback_intents": ["browse_feed"]
+        },
+
+        "_comment_tier3_inbox": "=== Tier 3: 通知/收件箱 ===",
+
+        "check_dm": {
+            "operations": ["nav_inbox", "open_chat"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "read_notification": {
+            "operations": ["nav_inbox", "read_notification"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "mark_all_read": {
+            "operations": ["nav_inbox", "mark_all_read"],
+            "fallback_intents": ["browse_feed"]
+        },
+
+        "_comment_tier3_community": "=== Tier 3: 社区操作 ===",
+
+        "explore_group": {
+            "operations": ["tap_subreddit"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "join_community": {
+            "operations": ["join_community"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "leave_community": {
+            "operations": ["leave_community"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "sort_community_posts": {
+            "operations": ["sort_community_posts"],
+            "fallback_intents": ["explore_group", "browse_feed"]
+        },
+        "view_community_about": {
+            "operations": ["view_community_about"],
+            "fallback_intents": ["explore_group", "browse_feed"]
+        },
+        "view_community_rules": {
+            "operations": ["view_community_rules"],
+            "fallback_intents": ["explore_group", "browse_feed"]
+        },
+        "view_community_wiki": {
+            "operations": ["view_community_wiki"],
+            "fallback_intents": ["explore_group", "browse_feed"]
+        },
+        "filter_by_flair": {
+            "operations": ["filter_by_flair"],
+            "fallback_intents": ["explore_group", "browse_feed"]
+        },
+        "favorite_community": {
+            "operations": ["favorite_community"],
+            "fallback_intents": ["explore_group", "browse_feed"]
+        },
+
+        "_comment_tier3_settings": "=== Tier 3: 设置操作 ===",
+
+        "toggle_dark_mode": {
+            "operations": ["nav_settings", "toggle_dark_mode"],
+            "fallback_intents": ["navigate_settings", "browse_feed"]
+        },
+        "toggle_nsfw": {
+            "operations": ["nav_settings", "toggle_nsfw"],
+            "fallback_intents": ["navigate_settings", "browse_feed"]
+        },
+        "toggle_autoplay": {
+            "operations": ["nav_settings", "toggle_autoplay"],
+            "fallback_intents": ["navigate_settings", "browse_feed"]
+        },
+        "change_default_sort": {
+            "operations": ["nav_settings", "change_default_sort"],
+            "fallback_intents": ["navigate_settings", "browse_feed"]
+        },
+        "manage_notifications": {
+            "operations": ["nav_settings", "manage_notifications"],
+            "fallback_intents": ["navigate_settings", "browse_feed"]
+        },
+
+        "_comment_tier3_chat": "=== Tier 3: 聊天操作（stub） ===",
+
+        "send_message": {
+            "operations": ["open_chat", "send_message"],
+            "fallback_intents": ["check_dm", "browse_feed"]
+        },
+        "read_message": {
+            "operations": ["open_chat", "read_message"],
+            "fallback_intents": ["check_dm", "browse_feed"]
+        },
+        "accept_chat_invite": {
+            "operations": ["open_chat", "accept_chat_invite"],
+            "fallback_intents": ["check_dm", "browse_feed"]
+        },
+
+        "_comment_tier3_create": "=== Tier 3: 创建操作（stub） ===",
+
+        "create_text_post": {
+            "operations": ["create_text_post"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "create_image_post": {
+            "operations": ["create_image_post"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "create_link_post": {
+            "operations": ["create_link_post"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "create_video_post": {
+            "operations": ["create_video_post"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "create_poll": {
+            "operations": ["create_poll"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "select_post_flair": {
+            "operations": ["select_post_flair"],
+            "fallback_intents": ["create_text_post", "browse_feed"]
+        },
+
+        "_comment_tier3_misc": "=== Tier 3: 杂项 ===",
+
+        "toggle_feed_layout": {
+            "operations": ["toggle_feed_layout"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "vote_poll": {
+            "operations": ["vote_poll"],
+            "fallback_intents": ["browse_feed"]
+        },
+        "back_to_feed": {
+            "operations": ["back_to_feed"],
+            "fallback_intents": []
         }
     },
+
     "action_to_intent": {
         "browse": "browse_feed",
         "read_post": "read_post",

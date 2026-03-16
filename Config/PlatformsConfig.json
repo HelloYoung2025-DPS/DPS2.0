@@ -17,8 +17,9 @@
                 "post_unit": {
                     "strategy": "resource-id",
                     "value": "post_unit",
-                    "fallback_strategy": "class",
-                    "fallback_value": "android.widget.FrameLayout"
+                    "fallback_strategy": "resource-id",
+                    "fallback_value": "promoted_post_unit",
+                    "note": "实机验证 2026-03-08: post_unit 在 feed 页存在。fallback 改为 promoted_post_unit（也是 feed 独有），不再用 FrameLayout（会在所有页面匹配导致假阳性）"
                 },
                 "post_footer": {
                     "strategy": "resource-id",
@@ -27,9 +28,7 @@
                 "upvote_button": {
                     "strategy": "content-desc",
                     "value": "Upvote",
-                    "fallback_strategy": "resource-id",
-                    "fallback_value": "post_footer",
-                    "note": "Reddit Jetpack Compose 无独立 upvote resource-id，优先用 content-desc，回退到 post_footer 左 1/3 区域"
+                    "note": "FIXED 2026-03-13 BUG-4: 移除 post_footer fallback。post_footer 是整个底栏容器，FindCenter 返回中心点会命中评论按钮导致意外跳转。Upvote 找不到时应 skip 而非 fallback 到不安全目标"
                 },
                 "downvote_button": {
                     "strategy": "content-desc",
@@ -55,23 +54,28 @@
                 },
                 "comment_input": {
                     "strategy": "resource-id",
-                    "value": "comment_input",
-                    "fallback_strategy": "class",
-                    "fallback_value": "android.widget.EditText"
+                    "value": "comment_button",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "comments",
+                    "note": "FIXED 2026-03-09: add_comment_button 不存在于 post_detail XML。实际为 comment_button resource-id（区别于 feed 的 post_comment_button）"
                 },
                 "submit_button": {
                     "strategy": "resource-id",
-                    "value": "submit_comment",
+                    "value": "reply_text_view",
                     "fallback_strategy": "text",
-                    "fallback_value": "Post"
+                    "fallback_value": "Post",
+                    "note": "FIXED 2026-03-08: submit_comment 在真机 dump 不存在"
                 },
                 "post_title": {
                     "strategy": "resource-id",
                     "value": "post_title"
                 },
                 "post_body": {
-                    "strategy": "resource-id",
-                    "value": "post_body"
+                    "strategy": "content-desc",
+                    "value": "Post body",
+                    "fallback_strategy": "resource-id",
+                    "fallback_value": "video_text_content",
+                    "note": "FIXED 2026-03-09: post_body resource-id 不存在于真机 dump。实际为 content-desc 以 'Post body' 开头"
                 },
                 "subreddit_name": {
                     "strategy": "resource-id",
@@ -130,44 +134,511 @@
                 "detail_screen": {
                     "strategy": "resource-id",
                     "value": "fbp_screen"
+                },
+                "feed_search_icon": {
+                    "strategy": "text",
+                    "value": "Find anything",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Search",
+                    "note": "FIXED 2026-03-09: feed_control_search_icon 不存在于真机 XML。搜索栏实际为 text='Find anything'"
+                },
+                "feed_options": {
+                    "strategy": "content-desc",
+                    "value": "Feed Options",
+                    "fallback_strategy": "resource-id",
+                    "fallback_value": "feed_options",
+                    "note": "FIXED 2026-03-09: feed_options resource-id 仅在 profile/community 页存在，主 feed 无此元素。content-desc='Feed Options' 在 profile/community 页有效"
+                },
+                "bottom_nav_home": {
+                    "strategy": "text",
+                    "value": "Home",
+                    "note": "VERIFIED from device dump: 底部导航4标签之一"
+                },
+                "bottom_nav_create": {
+                    "strategy": "text",
+                    "value": "Create",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Create",
+                    "note": "VERIFIED from device dump"
+                },
+                "bottom_nav_inbox": {
+                    "strategy": "text",
+                    "value": "Inbox",
+                    "note": "VERIFIED from device dump"
+                },
+                "bottom_nav_you": {
+                    "strategy": "text",
+                    "value": "You",
+                    "note": "VERIFIED from device dump: 进入个人主页/设置"
+                },
+                "detail_overflow": {
+                    "strategy": "resource-id",
+                    "value": "fbp_overflow_button",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "More options",
+                    "note": "VERIFIED from device dump: 帖子详情页溢出菜单按钮"
+                },
+                "detail_share": {
+                    "strategy": "resource-id",
+                    "value": "share_button",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Share this post",
+                    "note": "VERIFIED from device dump: 帖子详情页分享按钮"
+                },
+                "detail_save_bookmark": {
+                    "strategy": "content-desc",
+                    "value": "Save",
+                    "fallback_strategy": "resource-id",
+                    "fallback_value": "fbp_overflow_button",
+                    "note": "FIXED 2026-03-09: post_detail 无独立 Save 按钮，Save 在 overflow 菜单内。fallback 指向 overflow 按钮"
+                },
+                "detail_comment_sort": {
+                    "strategy": "resource-id",
+                    "value": "action_sort",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Sort comments",
+                    "note": "FIXED 2026-03-09: action_sort 不存在于真机 dump，保留但 on_fail=skip"
+                },
+                "detail_search_comments": {
+                    "strategy": "resource-id",
+                    "value": "action_search_comments",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Search comments",
+                    "note": "VERIFIED from device dump"
+                },
+                "detail_next_comment": {
+                    "strategy": "content-desc",
+                    "value": "Next comment",
+                    "note": "VERIFIED from device dump: 跳到下一个顶级评论"
+                },
+                "detail_lazy_column": {
+                    "strategy": "resource-id",
+                    "value": "post_detail_lazy_column",
+                    "note": "VERIFIED from device dump: 帖子详情页滚动容器"
+                },
+                "detail_app_bar": {
+                    "strategy": "resource-id",
+                    "value": "post_detail_app_bar",
+                    "note": "VERIFIED from device dump"
+                },
+                "comment_layout": {
+                    "strategy": "resource-id",
+                    "value": "comment_layout",
+                    "note": "VERIFIED from device dump: 单条评论容器"
+                },
+                "comment_header": {
+                    "strategy": "resource-id",
+                    "value": "comment_header",
+                    "note": "VERIFIED from device dump: 评论头部（作者名+时间）"
+                },
+                "comment_body": {
+                    "strategy": "resource-id",
+                    "value": "comment_body_tag",
+                    "note": "VERIFIED from device dump: 评论正文"
+                },
+                "comment_vote_upvote": {
+                    "strategy": "content-desc",
+                    "value": "Upvote",
+                    "note": "评论区赞按钮，和帖子共用 content-desc"
+                },
+                "comment_vote_downvote": {
+                    "strategy": "content-desc",
+                    "value": "Downvote",
+                    "note": "评论区踩按钮"
+                },
+                "comment_reply_button": {
+                    "strategy": "resource-id",
+                    "value": "gif_reply_button",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Reply",
+                    "note": "VERIFIED from device dump: 评论回复按钮"
+                },
+                "add_comment_button": {
+                    "strategy": "resource-id",
+                    "value": "add_comment_button",
+                    "note": "VERIFIED from device dump: 添加评论入口按钮"
+                },
+                "comment_text_input": {
+                    "strategy": "resource-id",
+                    "value": "reply_text_view",
+                    "fallback_strategy": "class",
+                    "fallback_value": "android.widget.EditText",
+                    "note": "VERIFIED from device dump: 评论输入框"
+                },
+                "profile_scrollable": {
+                    "strategy": "resource-id",
+                    "value": "profile_scrollable_test_tag",
+                    "note": "VERIFIED from device dump: 个人主页滚动容器"
+                },
+                "profile_name": {
+                    "strategy": "resource-id",
+                    "value": "profile_name",
+                    "note": "VERIFIED from device dump: 用户显示名"
+                },
+                "profile_username": {
+                    "strategy": "resource-id",
+                    "value": "profile_username_text",
+                    "note": "VERIFIED from device dump"
+                },
+                "profile_tabs": {
+                    "strategy": "resource-id",
+                    "value": "profile_tabs_group",
+                    "note": "VERIFIED from device dump: 个人主页标签组(Posts/Comments/About)"
+                },
+                "profile_edit_button": {
+                    "strategy": "resource-id",
+                    "value": "edit_button",
+                    "note": "VERIFIED from device dump: 编辑个人资料按钮"
+                },
+                "profile_avatar": {
+                    "strategy": "resource-id",
+                    "value": "profile_avatar_picture",
+                    "note": "VERIFIED from device dump"
+                },
+                "profile_karma": {
+                    "strategy": "resource-id",
+                    "value": "profile_highlights_karma",
+                    "note": "VERIFIED from device dump: karma 数值"
+                },
+                "profile_followers": {
+                    "strategy": "resource-id",
+                    "value": "profile_followers",
+                    "note": "VERIFIED from device dump"
+                },
+                "inbox_screen": {
+                    "strategy": "resource-id",
+                    "value": "inbox_screen",
+                    "note": "VERIFIED from device dump: 通知页容器"
+                },
+                "inbox_tab_group": {
+                    "strategy": "resource-id",
+                    "value": "inbox_tab_group",
+                    "note": "VERIFIED from device dump"
+                },
+                "notification_row": {
+                    "strategy": "resource-id",
+                    "value": "notification_row",
+                    "note": "VERIFIED from device dump"
+                },
+                "notification_title": {
+                    "strategy": "resource-id",
+                    "value": "notification_title",
+                    "note": "VERIFIED from device dump"
+                },
+                "mark_read_button": {
+                    "strategy": "resource-id",
+                    "value": "mark_read_button",
+                    "note": "VERIFIED from device dump: 标记已读按钮"
+                },
+                "drawer_container": {
+                    "strategy": "resource-id",
+                    "value": "com.reddit.frontpage:id/community_drawer_container",
+                    "note": "VERIFIED from device dump: 左侧抽屉容器"
+                },
+                "drawer_items_list": {
+                    "strategy": "resource-id",
+                    "value": "com.reddit.frontpage:id/items_list",
+                    "note": "VERIFIED from device dump: 抽屉菜单列表"
+                },
+                "drawer_nav_icon": {
+                    "strategy": "resource-id",
+                    "value": "main_top_app_bar_navigation_icon",
+                    "note": "VERIFIED from device dump: 左上角汉堡菜单图标"
+                },
+                "settings_sheet_list": {
+                    "strategy": "resource-id",
+                    "value": "my_account_bottom_sheet_list",
+                    "note": "VERIFIED from device dump: 设置底部弹出菜单列表"
+                },
+                "settings_sheet_close": {
+                    "strategy": "resource-id",
+                    "value": "close_sheet",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Close sheet",
+                    "note": "VERIFIED from device dump"
+                },
+                "settings_recycler": {
+                    "strategy": "resource-id",
+                    "value": "com.reddit.frontpage:id/recycler_view",
+                    "note": "VERIFIED from device dump: 设置页列表"
+                },
+                "settings_switch": {
+                    "strategy": "resource-id",
+                    "value": "com.reddit.frontpage:id/switchWidget",
+                    "note": "VERIFIED from device dump: 设置页开关控件"
+                },
+                "account_switcher": {
+                    "strategy": "resource-id",
+                    "value": "account_switcher_button",
+                    "fallback_strategy": "resource-id",
+                    "fallback_value": "account_switcher_arrow",
+                    "note": "VERIFIED from device dump: 账号切换按钮"
+                },
+                "media_video_view": {
+                    "strategy": "resource-id",
+                    "value": "content_video_view",
+                    "note": "VERIFIED from device dump: 视频播放器"
+                },
+                "media_audio_toggle": {
+                    "strategy": "resource-id",
+                    "value": "post_media_audio_toggle",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Unmute",
+                    "note": "VERIFIED from device dump: 静音/取消静音"
+                },
+                "media_play_button": {
+                    "strategy": "content-desc",
+                    "value": "Play",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Open video",
+                    "note": "VERIFIED from device dump: 播放按钮"
+                },
+                "gallery_counter": {
+                    "strategy": "resource-id",
+                    "value": "gallery_counter",
+                    "note": "VERIFIED from device dump: 画廊计数器(1/5)"
+                },
+                "detail_comment_button": {
+                    "strategy": "resource-id",
+                    "value": "comment_button",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "5 comments",
+                    "note": "ADDED 2026-03-09: post_detail 页评论按钮（不同于 feed 的 post_comment_button）"
+                },
+                "profile_more_actions": {
+                    "strategy": "content-desc",
+                    "value": "More profile actions",
+                    "note": "ADDED 2026-03-09: profile 页右上角三点菜单"
+                },
+                "profile_search": {
+                    "strategy": "content-desc",
+                    "value": "Search",
+                    "note": "ADDED 2026-03-09: profile 页搜索按钮"
                 }
             },
             "page_signatures": {
                 "feed": {
                     "threshold": 0.5,
                     "signals": [
-                        { "strategy": "resource-id", "value": "post_unit", "weight": 0.3 },
-                        { "strategy": "resource-id", "value": "home_screen_surface", "weight": 0.2 },
-                        { "strategy": "resource-id", "value": "feed_lazy_column", "weight": 0.2 },
-                        { "strategy": "resource-id", "value": "post_footer", "weight": 0.2 },
-                        { "strategy": "resource-id", "value": "bottom_nav", "weight": 0.1 }
-                    ]
+                        {
+                            "strategy": "resource-id",
+                            "value": "post_unit",
+                            "weight": 0.25
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "home_screen_surface",
+                            "weight": 0.25
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "feed_lazy_column",
+                            "weight": 0.2
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "post_footer",
+                            "weight": 0.15
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "post_header",
+                            "weight": 0.15
+                        }
+                    ],
+                    "note": "实机验证 2026-03-08: 5 个信号全部确认存在于 feed 页。移除不存在的 bottom_nav，替换为 post_header"
                 },
                 "post_detail": {
                     "threshold": 0.5,
                     "signals": [
-                        { "strategy": "resource-id", "value": "fbp_screen", "weight": 0.3 },
-                        { "strategy": "resource-id", "value": "voteButtonGroup", "weight": 0.2 },
-                        { "strategy": "resource-id", "value": "bottom_controls", "weight": 0.2 },
-                        { "strategy": "resource-id", "value": "action_bar", "weight": 0.15 },
-                        { "strategy": "content-desc", "value": "Back", "weight": 0.15 }
-                    ]
+                        {
+                            "strategy": "resource-id",
+                            "value": "fbp_screen",
+                            "weight": 0.3
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "voteButtonGroup",
+                            "weight": 0.2
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "fbp_back_button",
+                            "weight": 0.2
+                        },
+                        {
+                            "strategy": "content-desc",
+                            "value": "Back",
+                            "weight": 0.15
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "comment_button",
+                            "weight": 0.15
+                        }
+                    ],
+                    "note": "实机验证 2026-03-08: 移除不存在的 bottom_controls 和 action_bar，替换为 fbp_back_button 和 comment_button（均为 post_detail 独有）"
                 },
                 "comment": {
-                    "threshold": 0.6,
+                    "threshold": 0.5,
                     "signals": [
-                        { "strategy": "resource-id", "value": "comment_input", "weight": 0.5 },
-                        { "strategy": "class", "value": "android.widget.EditText", "weight": 0.3 },
-                        { "strategy": "resource-id", "value": "submit_comment", "weight": 0.2 }
-                    ]
+                        {
+                            "strategy": "resource-id",
+                            "value": "add_comment_button",
+                            "weight": 0.3
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "reply_text_view",
+                            "weight": 0.3
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "comment_layout",
+                            "weight": 0.2
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "comment_body_tag",
+                            "weight": 0.2
+                        }
+                    ],
+                    "note": "FIXED 2026-03-08: 替换不存在的 comment_input 和 submit_comment，使用真机验证的 resource-id"
                 },
                 "profile": {
                     "threshold": 0.5,
                     "signals": [
-                        { "strategy": "resource-id", "value": "post_header", "weight": 0.3 },
-                        { "strategy": "resource-id", "value": "post_join_button", "weight": 0.4 },
-                        { "strategy": "text-contains", "value": "karma", "weight": 0.3 }
-                    ]
+                        {
+                            "strategy": "resource-id",
+                            "value": "profile_scrollable_test_tag",
+                            "weight": 0.25
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "profile_name",
+                            "weight": 0.25
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "profile_tabs_group",
+                            "weight": 0.2
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "profile_highlights_karma",
+                            "weight": 0.15
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "edit_button",
+                            "weight": 0.15
+                        }
+                    ],
+                    "note": "FIXED 2026-03-08: 替换误用的 post_header/post_join_button（会在 feed 页假阳性），使用真机验证的 profile 独有元素"
+                },
+                "inbox": {
+                    "threshold": 0.5,
+                    "signals": [
+                        {
+                            "strategy": "resource-id",
+                            "value": "inbox_screen",
+                            "weight": 0.3
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "notifications_list",
+                            "weight": 0.25
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "inbox_tab_group",
+                            "weight": 0.2
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "mark_read_button",
+                            "weight": 0.15
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "activity_title",
+                            "weight": 0.1
+                        }
+                    ],
+                    "note": "VERIFIED from device dump 2026-03-08: 通知/收件箱页面"
+                },
+                "drawer": {
+                    "threshold": 0.5,
+                    "signals": [
+                        {
+                            "strategy": "resource-id",
+                            "value": "com.reddit.frontpage:id/community_drawer_container",
+                            "weight": 0.4
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "com.reddit.frontpage:id/items_list",
+                            "weight": 0.3
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "com.reddit.frontpage:id/resource_title",
+                            "weight": 0.3
+                        }
+                    ],
+                    "note": "VERIFIED from device dump 2026-03-08: 左侧抽屉菜单"
+                },
+                "settings": {
+                    "threshold": 0.5,
+                    "signals": [
+                        {
+                            "strategy": "resource-id",
+                            "value": "com.reddit.frontpage:id/recycler_view",
+                            "weight": 0.3
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "com.reddit.frontpage:id/toolbar",
+                            "weight": 0.2
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "com.reddit.frontpage:id/switchWidget",
+                            "weight": 0.2
+                        },
+                        {
+                            "strategy": "text",
+                            "value": "Settings",
+                            "weight": 0.15
+                        },
+                        {
+                            "strategy": "text",
+                            "value": "Account settings",
+                            "weight": 0.15
+                        }
+                    ],
+                    "note": "VERIFIED from device dump 2026-03-08: 原生设置页面"
+                },
+                "settings_sheet": {
+                    "threshold": 0.5,
+                    "signals": [
+                        {
+                            "strategy": "resource-id",
+                            "value": "my_account_bottom_sheet_list",
+                            "weight": 0.4
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "bottom_sheet_layout",
+                            "weight": 0.3
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "close_sheet",
+                            "weight": 0.3
+                        }
+                    ],
+                    "note": "VERIFIED from device dump 2026-03-08: 设置底部弹出菜单（My Account/Settings/Profile curation/Saved/History）"
                 }
             },
             "action_weights": {
@@ -278,36 +749,96 @@
                 "feed": {
                     "threshold": 0.5,
                     "signals": [
-                        { "strategy": "resource-id", "value": "media_container", "weight": 0.3 },
-                        { "strategy": "resource-id", "value": "row_feed_photo_profile_name", "weight": 0.3 },
-                        { "strategy": "resource-id", "value": "like_button", "weight": 0.2 },
-                        { "strategy": "resource-id", "value": "action_bar_container", "weight": 0.2 }
+                        {
+                            "strategy": "resource-id",
+                            "value": "media_container",
+                            "weight": 0.3
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "row_feed_photo_profile_name",
+                            "weight": 0.3
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "like_button",
+                            "weight": 0.2
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "action_bar_container",
+                            "weight": 0.2
+                        }
                     ]
                 },
                 "post_detail": {
                     "threshold": 0.5,
                     "signals": [
-                        { "strategy": "resource-id", "value": "media_image", "weight": 0.3 },
-                        { "strategy": "resource-id", "value": "like_button", "weight": 0.2 },
-                        { "strategy": "resource-id", "value": "row_feed_comment_textview_layout", "weight": 0.3 },
-                        { "strategy": "resource-id", "value": "comment_button", "weight": 0.2 }
+                        {
+                            "strategy": "resource-id",
+                            "value": "media_image",
+                            "weight": 0.3
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "like_button",
+                            "weight": 0.2
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "row_feed_comment_textview_layout",
+                            "weight": 0.3
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "comment_button",
+                            "weight": 0.2
+                        }
                     ]
                 },
                 "comment": {
                     "threshold": 0.6,
                     "signals": [
-                        { "strategy": "resource-id", "value": "comment_composer_text_view", "weight": 0.5 },
-                        { "strategy": "class", "value": "android.widget.EditText", "weight": 0.3 },
-                        { "strategy": "resource-id", "value": "post_button", "weight": 0.2 }
+                        {
+                            "strategy": "resource-id",
+                            "value": "comment_composer_text_view",
+                            "weight": 0.5
+                        },
+                        {
+                            "strategy": "class",
+                            "value": "android.widget.EditText",
+                            "weight": 0.3
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "post_button",
+                            "weight": 0.2
+                        }
                     ]
                 },
                 "profile": {
                     "threshold": 0.5,
                     "signals": [
-                        { "strategy": "resource-id", "value": "profile_username", "weight": 0.3 },
-                        { "strategy": "resource-id", "value": "follow_button", "weight": 0.3 },
-                        { "strategy": "text-contains", "value": "posts", "weight": 0.2 },
-                        { "strategy": "text-contains", "value": "followers", "weight": 0.2 }
+                        {
+                            "strategy": "resource-id",
+                            "value": "profile_username",
+                            "weight": 0.3
+                        },
+                        {
+                            "strategy": "resource-id",
+                            "value": "follow_button",
+                            "weight": 0.3
+                        },
+                        {
+                            "strategy": "text-contains",
+                            "value": "posts",
+                            "weight": 0.2
+                        },
+                        {
+                            "strategy": "text-contains",
+                            "value": "followers",
+                            "weight": 0.2
+                        }
                     ]
                 }
             },
@@ -330,7 +861,7 @@
             }
         },
         "babycenter": {
-            "name": "BabyCenter",
+            "name": "",
             "package_name": "com.babycenter.pregnancytracker",
             "enabled": true,
             "rate_limits": {
@@ -342,224 +873,55 @@
                 "max_action_delay_ms": 10000
             },
             "ui_selectors": {
-                "post_unit": {
-                    "strategy": "resource-id",
-                    "value": "postContainer",
-                    "fallback_strategy": "class",
-                    "fallback_value": "android.view.ViewGroup",
-                    "note": "实机验证: Community 页 ViewPager 内的帖子卡片容器"
-                },
-                "post_title": {
-                    "strategy": "resource-id",
-                    "value": "title",
-                    "fallback_strategy": "resource-id",
-                    "fallback_value": "titleView",
-                    "note": "实机验证: 帖子标题（title 在 feed 页，titleView 在某些列表视图）"
-                },
-                "post_body": {
-                    "strategy": "resource-id",
-                    "value": "text",
-                    "fallback_strategy": "resource-id",
-                    "fallback_value": "content",
-                    "note": "实机验证: 帖子正文预览"
-                },
-                "post_author": {
-                    "strategy": "resource-id",
-                    "value": "subtitle",
-                    "note": "实机验证: 帖子作者名"
-                },
-                "post_group": {
-                    "strategy": "resource-id",
-                    "value": "groupReference",
-                    "note": "实机验证: 帖子所属社区/群组名"
-                },
-                "comment_count": {
-                    "strategy": "resource-id",
-                    "value": "commentCount",
-                    "note": "实机验证: 评论数显示（仅展示，不可点击）"
-                },
-                "reactions_count": {
-                    "strategy": "resource-id",
-                    "value": "reactionsCount",
-                    "note": "实机验证: 点赞/反应数显示（仅展示，不可点击）"
-                },
-                "like_button": {
-                    "strategy": "text",
-                    "value": "select for list of reactions",
-                    "fallback_strategy": "class",
-                    "fallback_value": "android.widget.Button",
-                    "note": "✅ 实机验证: WebView 内点赞按钮，uiautomator 可通过 accessibility node 访问。clickable=true。需先滚动到可见区域（bounds 非零）。滚动后 bounds≈[49,1688][147,1846]"
-                },
-                "comment_button": {
-                    "strategy": "text",
-                    "value": "ADD A COMMENT",
-                    "fallback_strategy": "text",
-                    "fallback_value": "Comment",
-                    "note": "✅ 实机验证: WebView 内评论按钮。'ADD A COMMENT' 为浮动按钮(bounds≈[756,2553][1393,2721])，'Comment' 为滚动后可见的内嵌按钮(bounds≈[49,1916][518,2094])"
-                },
-                "comment_input": {
-                    "strategy": "text",
-                    "value": "Add a comment",
-                    "fallback_strategy": "class",
-                    "fallback_value": "android.widget.EditText",
-                    "note": "✅ 实机验证: WebView 内评论输入区域，class=android.view.View，text='Add a comment '"
-                },
                 "submit_button": {
                     "strategy": "text",
                     "value": "Post",
                     "fallback_strategy": "content-desc",
                     "fallback_value": "Submit",
-                    "note": "✅ 实机验证: 评论提交按钮（具体文本待运行时确认，可能是 Post 或 Submit）"
-                },
-                "bookmark_button": {
-                    "strategy": "text",
-                    "value": "bookmark post",
-                    "note": "✅ 实机验证: WebView 内书签/收藏按钮，clickable=true"
-                },
-                "reply_button": {
-                    "strategy": "text",
-                    "value": "reply to comment",
-                    "note": "✅ 实机验证: WebView 内回复评论按钮，clickable=true"
-                },
-                "emoji_reply_button": {
-                    "strategy": "text",
-                    "value": "reply with emoji",
-                    "note": "✅ 实机验证: WebView 内 emoji 回复按钮，clickable=true"
-                },
-                "back_button": {
-                    "strategy": "content-desc",
-                    "value": "Navigate up",
-                    "fallback_strategy": "resource-id",
-                    "fallback_value": "toolbar",
-                    "note": "实机验证: 帖子详情页 toolbar 内返回按钮"
-                },
-                "share_button": {
-                    "strategy": "resource-id",
-                    "value": "share",
-                    "fallback_strategy": "content-desc",
-                    "fallback_value": "Share",
-                    "note": "实机验证: 帖子详情页原生分享按钮"
-                },
-                "refresh_button": {
-                    "strategy": "resource-id",
-                    "value": "refresh",
-                    "fallback_strategy": "content-desc",
-                    "fallback_value": "Refresh",
-                    "note": "实机验证: 帖子详情页刷新按钮"
-                },
-                "community_tab": {
-                    "strategy": "resource-id",
-                    "value": "menu_birthclub",
-                    "fallback_strategy": "content-desc",
-                    "fallback_value": "Community",
-                    "note": "实机验证: 底部导航 Community 标签"
-                },
-                "home_tab": {
-                    "strategy": "resource-id",
-                    "value": "menu_home",
-                    "fallback_strategy": "content-desc",
-                    "fallback_value": "Home",
-                    "note": "实机验证: 底部导航 Home 标签"
-                },
-                "bottom_nav": {
-                    "strategy": "resource-id",
-                    "value": "bottom_navigator",
-                    "note": "实机验证: 底部导航栏容器"
-                },
-                "feed_container": {
-                    "strategy": "resource-id",
-                    "value": "posts",
-                    "note": "实机验证: 帖子列表容器（ViewPager，水平滑动）"
-                },
-                "web_view": {
-                    "strategy": "resource-id",
-                    "value": "webViewLayout",
-                    "fallback_strategy": "class",
-                    "fallback_value": "android.webkit.WebView",
-                    "note": "✅ 实机验证: 帖子详情 WebView 容器，resource-id 为 webViewLayout（带包名前缀 com.babycenter.pregnancytracker:id/webViewLayout）"
-                },
-                "see_more_button": {
-                    "strategy": "resource-id",
-                    "value": "button",
-                    "fallback_strategy": "text",
-                    "fallback_value": "See more",
-                    "note": "实机验证: Community 页 'See more' 按钮，进入完整帖子列表"
-                },
-                "community_tabs": {
-                    "strategy": "resource-id",
-                    "value": "tabs",
-                    "note": "实机验证: Community 子标签（My Birth Club / My groups / Trending）"
+                    "note": "由 App Onboarder 自动映射: 评论提交按钮"
                 }
             },
-            "page_signatures": {
-                "feed": {
-                    "threshold": 0.5,
-                    "signals": [
-                        { "strategy": "resource-id", "value": "postContainer", "weight": 0.3 },
-                        { "strategy": "resource-id", "value": "posts", "weight": 0.2 },
-                        { "strategy": "resource-id", "value": "bottom_navigator", "weight": 0.2 },
-                        { "strategy": "content-desc", "value": "Community", "weight": 0.2 },
-                        { "strategy": "resource-id", "value": "tabs", "weight": 0.1 }
-                    ],
-                    "note": "实机验证: Community 标签页的帖子列表"
-                },
-                "home": {
-                    "threshold": 0.5,
-                    "signals": [
-                        { "strategy": "resource-id", "value": "recycler", "weight": 0.3 },
-                        { "strategy": "resource-id", "value": "salutation", "weight": 0.2 },
-                        { "strategy": "resource-id", "value": "weekRange", "weight": 0.2 },
-                        { "strategy": "resource-id", "value": "bottom_navigator", "weight": 0.2 },
-                        { "strategy": "content-desc", "value": "Home", "weight": 0.1 }
-                    ],
-                    "note": "实机验证: Home 标签页（周报/每日阅读）"
-                },
-                "post_detail": {
-                    "threshold": 0.5,
-                    "signals": [
-                        { "strategy": "resource-id", "value": "webViewLayout", "weight": 0.3 },
-                        { "strategy": "resource-id", "value": "webViewLayout", "weight": 0.15 },
-                        { "strategy": "resource-id", "value": "share", "weight": 0.15 },
-                        { "strategy": "content-desc", "value": "Navigate up", "weight": 0.15 },
-                        { "strategy": "text", "value": "select for list of reactions", "weight": 0.15 },
-                        { "strategy": "text", "value": "ADD A COMMENT", "weight": 0.1 }
-                    ],
-                    "note": "✅ 实机验证: WebView 帖子详情页 (WebViewActivity)，含 WebView 内部 accessibility 信号"
-                },
-                "comment": {
-                    "threshold": 0.6,
-                    "signals": [
-                        { "strategy": "text", "value": "Add a comment", "weight": 0.4 },
-                        { "strategy": "text", "value": "ADD A COMMENT", "weight": 0.3 },
-                        { "strategy": "class", "value": "android.widget.EditText", "weight": 0.3 }
-                    ],
-                    "note": "✅ 评论界面在 WebView 内部，但 uiautomator 可通过 accessibility node 检测到文本节点"
-                }
-            },
+            "page_signatures": {},
             "action_weights": {
                 "browse": 40,
-                "like": 20,
-                "comment": 10,
-                "follow": 0,
-                "share": 3,
                 "open_post": 20,
-                "read_post": 7
+                "read_post": 7,
+                "like": 0,
+                "comment": 0,
+                "share": 0,
+                "follow": 0
             },
             "scroll_config": {
                 "min_scroll_distance": 850,
                 "max_scroll_distance": 1250,
                 "scroll_duration_ms": 550,
-                "note": "实机验证: Community feed 使用 ViewPager 水平滑动，browse 操作应使用水平 swipe 而非垂直 scroll"
+                "scroll_start_y_ratio": 0.7,
+                "scroll_end_y_ratio": 0.3,
+                "scroll_x_ratio": 0.5
             },
             "error_thresholds": {
                 "max_ui_not_found": 6,
                 "max_app_crashes": 2,
                 "max_network_errors": 8
             },
-            "verified": true,
-            "verified_date": "2026-03-04",
-            "verified_version": "6.02.0",
-            "notes": "✅ 实机验证完成 (2026-03-04, v6.02.0)。关键发现：WebView (WebViewActivity) 中的 DOM 元素作为 accessibility nodes 暴露给 uiautomator。点赞按钮 text='select for list of reactions'，评论按钮 text='ADD A COMMENT'/'Comment'，评论输入 text='Add a comment'。like/comment 操作现已可用。Community feed 使用 ViewPager 水平滑动。action_weights 已上调 like(20%) 和 comment(10%)。"
+            "vision_config": {
+                "enabled": true,
+                "model": "gpt-4o-mini",
+                "use_as_fallback": true,
+                "trigger_conditions": [
+                    "ui_element_not_found_after_retries",
+                    "page_state_unknown",
+                    "webview_content_unreadable"
+                ],
+                "screenshot_before_action": false,
+                "screenshot_on_failure": true,
+                "max_vision_calls_per_session": 20,
+                "confidence_threshold": 0.7,
+                "note": "三层恢复机制: ADB前台检测 -> UI XML覆盖检测 -> Vision模型兜底"
+            },
+            "verified": false,
+            "verified_date": null,
+            "notes": "由 App Onboarder 自动生成 (2026-03-14)"
         },
         "tiktok": {
             "name": "TikTok",
@@ -574,11 +936,26 @@
                 "max_action_delay_ms": 10000
             },
             "ui_selectors": {
-                "post_unit": { "strategy": "resource-id", "value": "video_container" },
-                "like_button": { "strategy": "resource-id", "value": "like_button" },
-                "comment_button": { "strategy": "resource-id", "value": "comment_button" },
-                "share_button": { "strategy": "resource-id", "value": "share_button" },
-                "follow_button": { "strategy": "resource-id", "value": "follow_button" }
+                "post_unit": {
+                    "strategy": "resource-id",
+                    "value": "video_container"
+                },
+                "like_button": {
+                    "strategy": "resource-id",
+                    "value": "like_button"
+                },
+                "comment_button": {
+                    "strategy": "resource-id",
+                    "value": "comment_button"
+                },
+                "share_button": {
+                    "strategy": "resource-id",
+                    "value": "share_button"
+                },
+                "follow_button": {
+                    "strategy": "resource-id",
+                    "value": "follow_button"
+                }
             },
             "page_signatures": {},
             "action_weights": {
@@ -612,11 +989,26 @@
                 "max_action_delay_ms": 15000
             },
             "ui_selectors": {
-                "post_unit": { "strategy": "resource-id", "value": "story_container" },
-                "like_button": { "strategy": "resource-id", "value": "like_button" },
-                "comment_button": { "strategy": "resource-id", "value": "comment_button" },
-                "share_button": { "strategy": "resource-id", "value": "share_button" },
-                "follow_button": { "strategy": "resource-id", "value": "add_friend_button" }
+                "post_unit": {
+                    "strategy": "resource-id",
+                    "value": "story_container"
+                },
+                "like_button": {
+                    "strategy": "resource-id",
+                    "value": "like_button"
+                },
+                "comment_button": {
+                    "strategy": "resource-id",
+                    "value": "comment_button"
+                },
+                "share_button": {
+                    "strategy": "resource-id",
+                    "value": "share_button"
+                },
+                "follow_button": {
+                    "strategy": "resource-id",
+                    "value": "add_friend_button"
+                }
             },
             "page_signatures": {},
             "action_weights": {
@@ -636,6 +1028,164 @@
                 "max_app_crashes": 2,
                 "max_network_errors": 8
             }
+        },
+        "babycenter_test": {
+            "name": "",
+            "package_name": "com.babycenter.pregnancytracker",
+            "enabled": true,
+            "rate_limits": {
+                "max_actions_per_hour": 80,
+                "max_likes_per_hour": 24,
+                "max_comments_per_hour": 12,
+                "max_follows_per_hour": 8,
+                "min_action_delay_ms": 2500,
+                "max_action_delay_ms": 10000
+            },
+            "ui_selectors": {
+                "back_button": {
+                    "strategy": "content-desc",
+                    "value": "Navigate up",
+                    "note": "由 App Onboarder 自动映射"
+                },
+                "submit_button": {
+                    "strategy": "text",
+                    "value": "Post",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Submit",
+                    "note": "由 App Onboarder 自动映射: 评论提交按钮"
+                }
+            },
+            "page_signatures": {
+                "post_detail": {
+                    "threshold": 0.5,
+                    "signals": [
+                        {
+                            "strategy": "content-desc",
+                            "value": "Navigate up",
+                            "weight": 1.0
+                        }
+                    ]
+                }
+            },
+            "action_weights": {
+                "browse": 40,
+                "open_post": 20,
+                "read_post": 7,
+                "like": 0,
+                "comment": 0,
+                "share": 0,
+                "follow": 0
+            },
+            "scroll_config": {
+                "min_scroll_distance": 850,
+                "max_scroll_distance": 1250,
+                "scroll_duration_ms": 550,
+                "scroll_start_y_ratio": 0.7,
+                "scroll_end_y_ratio": 0.3,
+                "scroll_x_ratio": 0.5
+            },
+            "error_thresholds": {
+                "max_ui_not_found": 6,
+                "max_app_crashes": 2,
+                "max_network_errors": 8
+            },
+            "vision_config": {
+                "enabled": true,
+                "model": "gpt-4o-mini",
+                "use_as_fallback": true,
+                "trigger_conditions": [
+                    "ui_element_not_found_after_retries",
+                    "page_state_unknown",
+                    "webview_content_unreadable"
+                ],
+                "screenshot_before_action": false,
+                "screenshot_on_failure": true,
+                "max_vision_calls_per_session": 20,
+                "confidence_threshold": 0.7,
+                "note": "三层恢复机制: ADB前台检测 -> UI XML覆盖检测 -> Vision模型兜底"
+            },
+            "verified": false,
+            "verified_date": null,
+            "notes": "由 App Onboarder 自动生成 (2026-03-14)"
+        },
+        "babycenter_vision": {
+            "name": "",
+            "package_name": "com.babycenter.pregnancytracker",
+            "enabled": true,
+            "rate_limits": {
+                "max_actions_per_hour": 80,
+                "max_likes_per_hour": 24,
+                "max_comments_per_hour": 12,
+                "max_follows_per_hour": 8,
+                "min_action_delay_ms": 2500,
+                "max_action_delay_ms": 10000
+            },
+            "ui_selectors": {
+                "back_button": {
+                    "strategy": "content-desc",
+                    "value": "Navigate up",
+                    "note": "由 App Onboarder 自动映射"
+                },
+                "submit_button": {
+                    "strategy": "text",
+                    "value": "Post",
+                    "fallback_strategy": "content-desc",
+                    "fallback_value": "Submit",
+                    "note": "由 App Onboarder 自动映射: 评论提交按钮"
+                }
+            },
+            "page_signatures": {
+                "post_detail": {
+                    "threshold": 0.5,
+                    "signals": [
+                        {
+                            "strategy": "content-desc",
+                            "value": "Navigate up",
+                            "weight": 1.0
+                        }
+                    ]
+                }
+            },
+            "action_weights": {
+                "browse": 40,
+                "open_post": 20,
+                "read_post": 7,
+                "like": 0,
+                "comment": 0,
+                "share": 0,
+                "follow": 0
+            },
+            "scroll_config": {
+                "min_scroll_distance": 850,
+                "max_scroll_distance": 1250,
+                "scroll_duration_ms": 550,
+                "scroll_start_y_ratio": 0.7,
+                "scroll_end_y_ratio": 0.3,
+                "scroll_x_ratio": 0.5
+            },
+            "error_thresholds": {
+                "max_ui_not_found": 6,
+                "max_app_crashes": 2,
+                "max_network_errors": 8
+            },
+            "vision_config": {
+                "enabled": true,
+                "model": "gpt-4o-mini",
+                "use_as_fallback": true,
+                "trigger_conditions": [
+                    "ui_element_not_found_after_retries",
+                    "page_state_unknown",
+                    "webview_content_unreadable"
+                ],
+                "screenshot_before_action": false,
+                "screenshot_on_failure": true,
+                "max_vision_calls_per_session": 20,
+                "confidence_threshold": 0.7,
+                "note": "三层恢复机制: ADB前台检测 -> UI XML覆盖检测 -> Vision模型兜底"
+            },
+            "verified": false,
+            "verified_date": null,
+            "notes": "由 App Onboarder 自动生成 (2026-03-14)"
         }
     },
     "device_platform_mapping": {

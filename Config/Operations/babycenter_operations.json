@@ -1,193 +1,1887 @@
 {
     "platform": "babycenter",
-    "version": "3.0",
-    "verified": true,
-    "verified_date": "2026-03-04",
-    "verified_app_version": "6.02.0",
-    "architecture_notes": "帖子详情使用 WebView (WebViewActivity) 渲染。WebView 内部 DOM 元素作为 accessibility nodes 暴露给 uiautomator。点赞按钮 text='select for list of reactions'，评论按钮 text='ADD A COMMENT'/'Comment'，评论输入 text='Add a comment'。Community feed 使用 ViewPager 水平滑动帖子卡片。",
+    "version": "4.0",
+    "verified": false,
+    "verified_date": null,
+    "architecture_notes": "Feed 使用 RecyclerView 垂直滚动。",
+    "generation_notes": "由 App Onboarder v2.0 自动生成，包含恢复元数据和比例坐标",
     "operations": {
         "navigate_to_community": {
-            "description": "从任意页面导航到 Community 标签",
+            "description": "从任意页面导航到 Feed 标签",
             "steps": [
-                { "action": "log", "message": "导航到 BabyCenter Community 标签" },
-                { "action": "find", "selector": "community_tab", "save_as": "comm_tab", "on_fail": "abort" },
-                { "action": "delay", "min_ms": 300, "max_ms": 800, "humanized": "true" },
-                { "action": "tap", "context_ref": "comm_tab", "on_fail": "abort", "humanized": "true" },
-                { "action": "delay", "min_ms": 3000, "max_ms": 6000, "humanized": "true" },
-                { "action": "refresh_layout" },
-                { "action": "verify", "selector": "post_unit", "on_fail": "retry", "max_retries": 3, "retry_delay_ms": 2000 },
-                { "action": "set_var", "name": "current_page", "value": "feed" }
-            ]
+                {
+                    "action": "log",
+                    "message": "导航到  Feed 标签"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 300,
+                    "max_ms": 800,
+                    "humanized": "true"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "feed_tab",
+                    "on_fail": "abort",
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 3000,
+                    "max_ms": 6000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                },
+                {
+                    "action": "verify",
+                    "selector": "post_unit",
+                    "on_fail": "retry",
+                    "max_retries": 3,
+                    "retry_delay_ms": 2000
+                },
+                {
+                    "action": "set_var",
+                    "name": "current_page",
+                    "value": "feed"
+                },
+                {
+                    "action": "visual_verify",
+                    "checkpoint": "navigate_to_feed",
+                    "note": "视觉验证: 确认已到达 Feed 页面"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "nav_tab",
+            "preconditions": [],
+            "fallback_op": "nav_home"
         },
-        "enter_group": {
-            "description": "进入 Community 中的一个群组（通过帖子上的 groupReference 链接）",
-            "require_page": "feed",
+        "navigate_to_feed": {
+            "description": "从任意页面导航到 Feed 标签",
             "steps": [
-                { "action": "log", "message": "进入群组：查找帖子上的 groupReference 链接" },
-                { "action": "find", "selector": "post_group", "save_as": "group_link", "on_fail": "skip" },
-                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
-                { "action": "tap", "context_ref": "group_link", "on_fail": "abort", "humanized": "true",
-                    "note": "点击 groupReference 进入群组页面" },
-                { "action": "delay", "min_ms": 3000, "max_ms": 6000, "humanized": "true",
-                    "note": "等待群组页面加载" },
-                { "action": "refresh_layout" },
-                { "action": "verify", "selector": "post_unit", "on_fail": "retry", "max_retries": 3, "retry_delay_ms": 2000,
-                    "note": "验证群组页面帖子列表可见" },
-                { "action": "set_var", "name": "current_page", "value": "group_feed" }
-            ]
-        },
-        "browse": {
-            "description": "浏览 Community 帖子列表（水平滑动 ViewPager）",
-            "require_page": "feed",
-            "steps": [
-                { "action": "log", "message": "开始浏览 BabyCenter Community 帖子" },
-                { "action": "find", "selector": "post_unit", "save_as": "posts", "on_fail": "skip" },
-                { "action": "verify", "selector": "post_unit", "on_fail": "retry", "max_retries": 2, "retry_delay_ms": 2000 },
-                { "action": "delay", "min_ms": 2500, "max_ms": 6500, "humanized": "true" },
-                { "action": "swipe", "direction": "left", "start_x": 1100, "start_y": 1800, "end_x": 300, "end_y": 1800, "duration": 500, "humanized": "true",
-                    "note": "水平滑动 ViewPager 查看下一张帖子卡片" },
-                { "action": "delay", "min_ms": 1500, "max_ms": 4000, "humanized": "true" },
-                { "action": "refresh_layout" },
-                { "action": "find", "selector": "post_unit", "save_as": "posts", "on_fail": "skip" },
-                { "action": "delay", "min_ms": 2000, "max_ms": 5000, "humanized": "true" },
-                { "action": "swipe", "direction": "left", "start_x": 1100, "start_y": 1800, "end_x": 300, "end_y": 1800, "duration": 500, "humanized": "true" },
-                { "action": "delay", "min_ms": 800, "max_ms": 2000, "humanized": "true" },
-                { "action": "refresh_layout" },
-                { "action": "set_var", "name": "last_action", "value": "browse" }
-            ]
-        },
-        "open_post": {
-            "description": "打开帖子详情（进入 WebView 页面）",
-            "require_page": "feed",
-            "steps": [
-                { "action": "log", "message": "打开 BabyCenter 帖子详情" },
-                { "action": "find", "selector": "post_unit", "save_as": "target_post", "on_fail": "skip" },
-                { "action": "delay", "min_ms": 400, "max_ms": 1200, "humanized": "true" },
-                { "action": "tap", "context_ref": "target_post", "on_fail": "abort", "humanized": "true" },
-                { "action": "delay", "min_ms": 3000, "max_ms": 6000, "humanized": "true",
-                    "note": "WebView 页面加载较慢，需要较长等待" },
-                { "action": "refresh_layout" },
-                { "action": "verify", "selector": "web_view", "on_fail": "retry", "max_retries": 3, "retry_delay_ms": 2000,
-                    "note": "验证进入 WebViewActivity (webViewLayout)" },
-                { "action": "set_var", "name": "current_page", "value": "post_detail" }
-            ]
-        },
-        "read_post": {
-            "description": "阅读帖子内容（在 WebView 内滚动）",
-            "require_page": "post_detail",
-            "steps": [
-                { "action": "log", "message": "阅读 BabyCenter 帖子" },
-                { "action": "find", "selector": "web_view", "save_as": "webview", "on_fail": "skip" },
-                { "action": "delay", "min_ms": 4000, "max_ms": 12000, "humanized": "true",
-                    "note": "模拟阅读停留" },
-                { "action": "scroll", "direction": "down", "distance": 500, "duration": 600, "humanized": "true",
-                    "note": "在 WebView 内向下滚动阅读更多内容" },
-                { "action": "delay", "min_ms": 3000, "max_ms": 8000, "humanized": "true" },
-                { "action": "scroll", "direction": "down", "distance": 400, "duration": 500, "humanized": "true" },
-                { "action": "delay", "min_ms": 2000, "max_ms": 6000, "humanized": "true" },
-                { "action": "set_var", "name": "last_action", "value": "read_post" }
-            ]
-        },
-        "scroll_to_reactions": {
-            "description": "在 WebView 内滚动直到反应按钮（select for list of reactions）可见且 bounds 非零",
-            "require_page": "post_detail",
-            "steps": [
-                { "action": "log", "message": "滚动到反应按钮区域" },
-                { "action": "swipe", "direction": "up", "start_x": 720, "start_y": 2000, "end_x": 720, "end_y": 1200, "duration": 600, "humanized": "true",
-                    "note": "向下滚动 WebView，使反应按钮进入可视区域" },
-                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
-                { "action": "refresh_layout" },
-                { "action": "find", "strategy": "text", "value": "select for list of reactions", "save_as": "reaction_btn", "on_fail": "retry", "max_retries": 3, "retry_delay_ms": 2000,
-                    "note": "查找点赞/反应按钮，如果未找到会重试（每次重试前自动再滚动一次）" },
-                { "action": "delay", "min_ms": 800, "max_ms": 2000, "humanized": "true" },
-                { "action": "set_var", "name": "last_action", "value": "scroll_to_reactions" }
-            ]
-        },
-        "like": {
-            "description": "点赞当前帖子（通过 WebView accessibility node 定位反应按钮）",
-            "require_page": "post_detail",
-            "reliability": "medium",
-            "steps": [
-                { "action": "log", "message": "BabyCenter 点赞操作" },
-                { "action": "swipe", "direction": "up", "start_x": 720, "start_y": 2000, "end_x": 720, "end_y": 1200, "duration": 600, "humanized": "true",
-                    "note": "向下滚动使反应按钮可见" },
-                { "action": "delay", "min_ms": 1500, "max_ms": 3000, "humanized": "true" },
-                { "action": "refresh_layout" },
-                { "action": "find", "strategy": "text", "value": "select for list of reactions", "save_as": "reaction_btn", "on_fail": "retry", "max_retries": 2, "retry_delay_ms": 2000,
-                    "note": "定位反应按钮" },
-                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
-                { "action": "tap", "context_ref": "reaction_btn", "on_fail": "skip", "humanized": "true",
-                    "note": "点击反应按钮打开表情选择器" },
-                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true",
-                    "note": "等待表情选择器弹出" },
-                { "action": "refresh_layout" },
-                { "action": "find", "strategy": "text", "value": "Love", "save_as": "love_emoji", "on_fail": "skip",
-                    "note": "尝试找到 Love 表情选项" },
-                { "action": "tap", "context_ref": "love_emoji", "on_fail": "skip", "humanized": "true",
-                    "note": "选择 Love 表情（如果表情选择器可见）" },
-                { "action": "delay", "min_ms": 1000, "max_ms": 2500, "humanized": "true" },
-                { "action": "set_var", "name": "last_action", "value": "like" }
-            ]
-        },
-        "comment": {
-            "description": "在帖子下发表评论（通过 WebView accessibility node 定位评论按钮和输入框）",
-            "require_page": "post_detail",
-            "reliability": "medium",
-            "steps": [
-                { "action": "log", "message": "BabyCenter 评论操作" },
-                { "action": "find", "strategy": "text", "value": "ADD A COMMENT", "save_as": "add_comment_btn", "on_fail": "skip",
-                    "note": "查找浮动评论按钮" },
-                { "action": "find", "strategy": "text", "value": "Comment", "save_as": "comment_btn_fallback", "on_fail": "skip",
-                    "note": "查找内嵌评论按钮（兜底）" },
-                { "action": "delay", "min_ms": 500, "max_ms": 1200, "humanized": "true" },
-                { "action": "tap", "context_ref": "add_comment_btn", "on_fail": "skip", "humanized": "true",
-                    "note": "优先点击 ADD A COMMENT 浮动按钮" },
-                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true",
-                    "note": "等待评论输入界面出现" },
-                { "action": "refresh_layout" },
-                { "action": "find", "strategy": "text", "value": "Add a comment", "save_as": "comment_input", "on_fail": "skip",
-                    "note": "查找评论输入区域" },
-                { "action": "find", "strategy": "class", "value": "android.widget.EditText", "save_as": "comment_input_fallback", "on_fail": "skip",
-                    "note": "兜底查找 EditText 输入框" },
-                { "action": "tap", "context_ref": "comment_input", "on_fail": "skip", "humanized": "true",
-                    "note": "点击评论输入区域获取焦点" },
-                { "action": "delay", "min_ms": 500, "max_ms": 1000, "humanized": "true" },
-                { "action": "input_text", "text": "{{comment_text}}",
-                    "note": "输入评论文本（来自变量）" },
-                { "action": "delay", "min_ms": 1000, "max_ms": 2500, "humanized": "true" },
-                { "action": "find", "strategy": "text", "value": "Post", "save_as": "submit_btn", "on_fail": "skip",
-                    "note": "查找提交按钮" },
-                { "action": "tap", "context_ref": "submit_btn", "on_fail": "skip", "humanized": "true",
-                    "note": "提交评论" },
-                { "action": "delay", "min_ms": 2000, "max_ms": 4000, "humanized": "true" },
-                { "action": "set_var", "name": "last_action", "value": "comment" }
-            ]
+                {
+                    "action": "log",
+                    "message": "导航到  Feed 标签"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 300,
+                    "max_ms": 800,
+                    "humanized": "true"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "feed_tab",
+                    "on_fail": "abort",
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 3000,
+                    "max_ms": 6000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                },
+                {
+                    "action": "verify",
+                    "selector": "post_unit",
+                    "on_fail": "retry",
+                    "max_retries": 3,
+                    "retry_delay_ms": 2000
+                },
+                {
+                    "action": "set_var",
+                    "name": "current_page",
+                    "value": "feed"
+                },
+                {
+                    "action": "visual_verify",
+                    "checkpoint": "navigate_to_feed",
+                    "note": "视觉验证: 确认已到达 Feed 页面"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "nav_tab",
+            "preconditions": [],
+            "fallback_op": "nav_home"
         },
         "back_to_feed": {
-            "description": "从帖子详情页返回 Community 列表",
+            "description": "从帖子详情页返回 Feed 列表",
             "require_page": "post_detail",
             "steps": [
-                { "action": "log", "message": "返回 BabyCenter Community 列表" },
-                { "action": "find", "selector": "back_button", "save_as": "back_btn", "on_fail": "skip" },
-                { "action": "tap", "context_ref": "back_btn", "on_fail": "skip", "humanized": "true" },
-                { "action": "delay", "min_ms": 500, "max_ms": 1500, "humanized": "true" },
-                { "action": "back", "note": "KEYCODE_BACK 兜底，确保返回（对应 Reddit 验证中发现的 back 按钮遮挡问题）" },
-                { "action": "delay", "min_ms": 1200, "max_ms": 2800, "humanized": "true" },
-                { "action": "refresh_layout" },
-                { "action": "verify", "selector": "post_unit", "on_fail": "retry", "max_retries": 3, "retry_delay_ms": 2000 },
-                { "action": "set_var", "name": "current_page", "value": "feed" }
-            ]
+                {
+                    "action": "log",
+                    "message": "返回  Feed 列表"
+                },
+                {
+                    "action": "find",
+                    "selector": "back_button",
+                    "save_as": "back_btn",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "back_btn",
+                    "on_fail": "skip",
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 500,
+                    "max_ms": 1500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "back",
+                    "note": "KEYCODE_BACK 兜底，确保返回"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1200,
+                    "max_ms": 2800,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                },
+                {
+                    "action": "verify",
+                    "selector": "post_unit",
+                    "on_fail": "retry",
+                    "max_retries": 3,
+                    "retry_delay_ms": 2000
+                },
+                {
+                    "action": "set_var",
+                    "name": "current_page",
+                    "value": "feed"
+                },
+                {
+                    "action": "visual_verify",
+                    "checkpoint": "back_to_feed",
+                    "note": "视觉验证: 确认已返回 Feed"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "relaunch",
+            "preconditions": [
+                "post_detail"
+            ],
+            "fallback_op": "navigate_to_feed"
         },
-        "scroll_feed": {
-            "description": "在 Community 页面垂直滚动（查看 See more 按钮下方内容）",
+        "browse": {
+            "description": "浏览帖子列表（垂直滚动 RecyclerView）",
             "require_page": "feed",
             "steps": [
-                { "action": "log", "message": "垂直滚动 Community 页面" },
-                { "action": "scroll", "direction": "down", "distance": 950, "duration": 550, "humanized": "true" },
-                { "action": "delay", "min_ms": 1500, "max_ms": 4000, "humanized": "true" },
-                { "action": "refresh_layout" },
-                { "action": "set_var", "name": "last_action", "value": "scroll_feed" }
-            ]
+                {
+                    "action": "log",
+                    "message": "开始浏览  帖子"
+                },
+                {
+                    "action": "find",
+                    "selector": "post_unit",
+                    "save_as": "posts",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "verify",
+                    "selector": "post_unit",
+                    "on_fail": "retry",
+                    "max_retries": 2,
+                    "retry_delay_ms": 2000
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2500,
+                    "max_ms": 6500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "swipe",
+                    "direction": "up",
+                    "start_x_ratio": 0.5,
+                    "start_y_ratio": 0.7,
+                    "end_x_ratio": 0.5,
+                    "end_y_ratio": 0.3,
+                    "duration": 500,
+                    "humanized": "true",
+                    "note": "垂直滚动 RecyclerView 查看更多帖子"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1500,
+                    "max_ms": 4000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                },
+                {
+                    "action": "find",
+                    "selector": "post_unit",
+                    "save_as": "posts",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 5000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "swipe",
+                    "direction": "up",
+                    "start_x_ratio": 0.5,
+                    "start_y_ratio": 0.7,
+                    "end_x_ratio": 0.5,
+                    "end_y_ratio": 0.3,
+                    "duration": 500,
+                    "humanized": "true",
+                    "note": "垂直滚动 RecyclerView 查看更多帖子"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 800,
+                    "max_ms": 2000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                },
+                {
+                    "action": "set_var",
+                    "name": "last_action",
+                    "value": "browse"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "none",
+            "preconditions": [
+                "feed"
+            ],
+            "fallback_op": "navigate_to_feed"
+        },
+        "browse_multiple": {
+            "description": "连续浏览多张帖子卡片",
+            "require_page": "feed",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "连续浏览多张帖子卡片"
+                },
+                {
+                    "action": "swipe",
+                    "direction": "up",
+                    "start_x_ratio": 0.5,
+                    "start_y_ratio": 0.7,
+                    "end_x_ratio": 0.5,
+                    "end_y_ratio": 0.3,
+                    "duration": 500,
+                    "humanized": "true",
+                    "note": "垂直滚动 RecyclerView 查看更多帖子"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1500,
+                    "max_ms": 3500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "swipe",
+                    "direction": "up",
+                    "start_x_ratio": 0.5,
+                    "start_y_ratio": 0.7,
+                    "end_x_ratio": 0.5,
+                    "end_y_ratio": 0.3,
+                    "duration": 500,
+                    "humanized": "true",
+                    "note": "垂直滚动 RecyclerView 查看更多帖子"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1500,
+                    "max_ms": 3500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "swipe",
+                    "direction": "up",
+                    "start_x_ratio": 0.5,
+                    "start_y_ratio": 0.7,
+                    "end_x_ratio": 0.5,
+                    "end_y_ratio": 0.3,
+                    "duration": 500,
+                    "humanized": "true",
+                    "note": "垂直滚动 RecyclerView 查看更多帖子"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1500,
+                    "max_ms": 3500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                },
+                {
+                    "action": "set_var",
+                    "name": "last_action",
+                    "value": "browse_multiple"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "none",
+            "preconditions": [
+                "feed"
+            ],
+            "fallback_op": "navigate_to_feed"
+        },
+        "browse_swipe_back": {
+            "description": "向右滑动查看上一张帖子",
+            "require_page": "feed",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "向右滑动查看上一张帖子"
+                },
+                {
+                    "action": "swipe",
+                    "direction": "down",
+                    "start_x_ratio": 0.5,
+                    "start_y_ratio": 0.3,
+                    "end_x_ratio": 0.5,
+                    "end_y_ratio": 0.7,
+                    "duration": 500,
+                    "humanized": "true",
+                    "note": "向下滑动查看上方帖子"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1500,
+                    "max_ms": 3000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "none",
+            "preconditions": [
+                "feed"
+            ],
+            "fallback_op": "navigate_to_feed"
+        },
+        "pull_refresh_feed": {
+            "description": "下拉刷新 Community feed",
+            "require_page": "feed",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "下拉刷新 Community feed"
+                },
+                {
+                    "action": "swipe",
+                    "direction": "down",
+                    "start_x_ratio": 0.5,
+                    "start_y_ratio": 0.25,
+                    "end_x_ratio": 0.5,
+                    "end_y_ratio": 0.75,
+                    "duration": 500,
+                    "humanized": "true",
+                    "note": "下拉刷新"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 3000,
+                    "max_ms": 5000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "none",
+            "preconditions": [
+                "feed"
+            ],
+            "fallback_op": "navigate_to_feed"
+        },
+        "scroll_feed": {
+            "description": "垂直滚动 Community 页面",
+            "require_page": "feed",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "垂直滚动 Community 页面"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.3,
+                    "duration": 600,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1500,
+                    "max_ms": 3000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "none",
+            "preconditions": [
+                "feed"
+            ],
+            "fallback_op": "navigate_to_feed"
+        },
+        "open_post": {
+            "description": "打开帖子详情（原生详情页）",
+            "require_page": "feed",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "打开  帖子详情"
+                },
+                {
+                    "action": "find",
+                    "selector": "post_unit",
+                    "save_as": "target_post",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 400,
+                    "max_ms": 1200,
+                    "humanized": "true"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "target_post",
+                    "on_fail": "abort",
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                },
+                {
+                    "action": "verify",
+                    "selector": "back_button",
+                    "on_fail": "retry",
+                    "max_retries": 3,
+                    "retry_delay_ms": 2000,
+                    "note": "验证进入详情页（存在返回按钮）"
+                },
+                {
+                    "action": "set_var",
+                    "name": "current_page",
+                    "value": "post_detail"
+                },
+                {
+                    "action": "visual_verify",
+                    "checkpoint": "open_post",
+                    "note": "视觉验证: 确认帖子详情已加载"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "feed"
+            ],
+            "fallback_op": "navigate_to_feed"
+        },
+        "read_post": {
+            "description": "阅读帖子内容（原生页面滚动）",
+            "require_page": "post_detail",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "阅读  帖子"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 4000,
+                    "max_ms": 12000,
+                    "humanized": "true",
+                    "note": "模拟阅读停留"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance": 500,
+                    "duration": 600,
+                    "humanized": "true",
+                    "note": "向下滚动阅读更多内容"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 3000,
+                    "max_ms": 8000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance": 400,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 6000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "set_var",
+                    "name": "last_action",
+                    "value": "read_post"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "post_detail"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "read_post_deep": {
+            "description": "深度阅读帖子及全部评论",
+            "require_page": "post_detail",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "深度阅读帖子及全部评论"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 3000,
+                    "max_ms": 6000,
+                    "humanized": "true",
+                    "note": "模拟阅读"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.25,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 5000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.25,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 5000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.25,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 5000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.25,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 5000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "set_var",
+                    "name": "last_action",
+                    "value": "read_post_deep"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "post_detail"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "scroll_to_comments": {
+            "description": "滚动到评论区",
+            "require_page": "post_detail",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "滚动到评论区"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.3,
+                    "duration": 600,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1000,
+                    "max_ms": 2000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.3,
+                    "duration": 600,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1000,
+                    "max_ms": 2000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.3,
+                    "duration": 600,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1000,
+                    "max_ms": 2000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "set_var",
+                    "name": "last_action",
+                    "value": "scroll_to_comments"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "post_detail"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "refresh_post": {
+            "description": "刷新帖子页面",
+            "require_page": "post_detail",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "刷新帖子页面"
+                },
+                {
+                    "action": "swipe",
+                    "direction": "down",
+                    "start_x_ratio": 0.5,
+                    "start_y_ratio": 0.2,
+                    "end_x_ratio": 0.5,
+                    "end_y_ratio": 0.7,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 3000,
+                    "max_ms": 5000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "post_detail"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "open_post_dropdown": {
+            "description": "打开帖子下拉菜单",
+            "require_page": "post_detail",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "打开帖子下拉菜单"
+                },
+                {
+                    "action": "find",
+                    "strategy": "content-desc",
+                    "value": "More options",
+                    "save_as": "dropdown",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "find",
+                    "strategy": "content-desc",
+                    "value": "Options",
+                    "save_as": "dropdown_alt",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 300,
+                    "max_ms": 800,
+                    "humanized": "true"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "dropdown",
+                    "on_fail": "skip",
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1500,
+                    "max_ms": 2500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "back",
+                    "note": "关闭菜单"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 800,
+                    "max_ms": 1500,
+                    "humanized": "true"
+                }
+            ],
+            "overlay_risk": true,
+            "recovery_hint": "back",
+            "preconditions": [
+                "post_detail"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "like": {
+            "description": "点赞当前帖子",
+            "require_page": "post_detail",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": " 点赞操作"
+                },
+                {
+                    "action": "find",
+                    "strategy": "text",
+                    "value": "",
+                    "save_as": "reaction_btn",
+                    "on_fail": "retry",
+                    "max_retries": 2,
+                    "retry_delay_ms": 2000,
+                    "note": "定位反应/点赞按钮"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 500,
+                    "max_ms": 1200,
+                    "humanized": "true"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "reaction_btn",
+                    "on_fail": "skip",
+                    "humanized": "true",
+                    "note": "点击反应按钮"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true",
+                    "note": "等待反应效果"
+                },
+                {
+                    "action": "refresh_layout"
+                },
+                {
+                    "action": "find",
+                    "strategy": "text",
+                    "value": "Love",
+                    "save_as": "love_emoji",
+                    "on_fail": "skip",
+                    "note": "尝试找到 Love 表情选项（如果有表情选择器）"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "love_emoji",
+                    "on_fail": "skip",
+                    "humanized": "true",
+                    "note": "选择 Love 表情"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1000,
+                    "max_ms": 2500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "set_var",
+                    "name": "last_action",
+                    "value": "like"
+                },
+                {
+                    "action": "visual_verify",
+                    "checkpoint": "like",
+                    "note": "视觉验证: 确认点赞操作完成"
+                }
+            ],
+            "overlay_risk": true,
+            "recovery_hint": "back",
+            "preconditions": [
+                "post_detail"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "comment": {
+            "description": "在帖子下发表评论",
+            "require_page": "post_detail",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": " 评论操作"
+                },
+                {
+                    "action": "find",
+                    "strategy": "text",
+                    "value": "",
+                    "save_as": "comment_btn",
+                    "on_fail": "skip",
+                    "note": "查找主评论按钮"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 500,
+                    "max_ms": 1200,
+                    "humanized": "true"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "comment_btn",
+                    "on_fail": "skip",
+                    "humanized": "true",
+                    "note": "点击评论按钮"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true",
+                    "note": "等待评论输入界面出现"
+                },
+                {
+                    "action": "refresh_layout"
+                },
+                {
+                    "action": "find",
+                    "strategy": "text",
+                    "value": "",
+                    "save_as": "comment_input",
+                    "on_fail": "skip",
+                    "note": "查找评论输入区域"
+                },
+                {
+                    "action": "find",
+                    "strategy": "class",
+                    "value": "android.widget.EditText",
+                    "save_as": "comment_input_fallback",
+                    "on_fail": "skip",
+                    "note": "兜底查找 EditText 输入框"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "comment_input",
+                    "on_fail": "skip",
+                    "humanized": "true",
+                    "note": "点击评论输入区域获取焦点"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 500,
+                    "max_ms": 1000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "input_text",
+                    "text": "{{comment_text}}",
+                    "note": "输入评论文本（来自变量）"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1000,
+                    "max_ms": 2500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "find",
+                    "strategy": "text",
+                    "value": "Post",
+                    "save_as": "submit_btn",
+                    "on_fail": "skip",
+                    "note": "查找提交按钮"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "submit_btn",
+                    "on_fail": "skip",
+                    "humanized": "true",
+                    "note": "提交评论"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "set_var",
+                    "name": "last_action",
+                    "value": "comment"
+                },
+                {
+                    "action": "visual_verify",
+                    "checkpoint": "comment",
+                    "note": "视觉验证: 确认评论操作完成"
+                }
+            ],
+            "overlay_risk": true,
+            "recovery_hint": "back",
+            "preconditions": [
+                "post_detail"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "share_post": {
+            "description": "分享当前帖子",
+            "require_page": "post_detail",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "分享当前帖子"
+                },
+                {
+                    "action": "find",
+                    "strategy": "content-desc",
+                    "value": "Share",
+                    "save_as": "share_btn",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 300,
+                    "max_ms": 800,
+                    "humanized": "true"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "share_btn",
+                    "on_fail": "skip",
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "back",
+                    "note": "关闭分享面板/ShareSheet"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1000,
+                    "max_ms": 2000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                }
+            ],
+            "overlay_risk": true,
+            "recovery_hint": "back",
+            "preconditions": [
+                "post_detail"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "bookmark_post": {
+            "description": "收藏当前帖子",
+            "require_page": "post_detail",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "收藏当前帖子"
+                },
+                {
+                    "action": "find",
+                    "strategy": "text",
+                    "value": "bookmark post",
+                    "save_as": "bookmark_btn",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 300,
+                    "max_ms": 800,
+                    "humanized": "true"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "bookmark_btn",
+                    "on_fail": "skip",
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1500,
+                    "max_ms": 3000,
+                    "humanized": "true"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "post_detail"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "view_home_content": {
+            "description": "查看首页内容",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "查看首页内容"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true",
+                    "note": "浏览页面内容"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.25,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1500,
+                    "max_ms": 3000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.2,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1000,
+                    "max_ms": 2000,
+                    "humanized": "true"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "home"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "view_salutation": {
+            "description": "查看问候语",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "查看问候语"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true",
+                    "note": "浏览页面内容"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.25,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1500,
+                    "max_ms": 3000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.2,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1000,
+                    "max_ms": 2000,
+                    "humanized": "true"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "salutation"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "scroll_home": {
+            "description": "滚动首页",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "滚动首页"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.3,
+                    "duration": 600,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.25,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1500,
+                    "max_ms": 3000,
+                    "humanized": "true"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "home"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "tap_child_image": {
+            "description": "点击宝宝图标",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "点击宝宝图标"
+                },
+                {
+                    "action": "find",
+                    "selector": "child_image",
+                    "save_as": "target_el",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 300,
+                    "max_ms": 800,
+                    "humanized": "true"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "target_el",
+                    "on_fail": "skip",
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [],
+            "fallback_op": "back_to_feed"
+        },
+        "go_to_settings": {
+            "description": "进入Settings",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "进入 Settings"
+                },
+                {
+                    "action": "find",
+                    "strategy": "text",
+                    "value": "Settings",
+                    "save_as": "entry",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "find",
+                    "strategy": "text",
+                    "value": "设置",
+                    "save_as": "entry_cn",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "find",
+                    "strategy": "content-desc",
+                    "value": "Settings",
+                    "save_as": "entry_desc",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 300,
+                    "max_ms": 800,
+                    "humanized": "true"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "entry",
+                    "on_fail": "skip",
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                }
+            ],
+            "overlay_risk": true,
+            "recovery_hint": "relaunch",
+            "preconditions": [
+                "more",
+                "home"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "view_settings": {
+            "description": "查看设置页面",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "查看设置页面"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true",
+                    "note": "浏览页面内容"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.25,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1500,
+                    "max_ms": 3000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.2,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1000,
+                    "max_ms": 2000,
+                    "humanized": "true"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "settings"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "go_to_profile": {
+            "description": "进入Profile",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "进入 Profile"
+                },
+                {
+                    "action": "find",
+                    "strategy": "text",
+                    "value": "Profile",
+                    "save_as": "entry",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "find",
+                    "strategy": "text",
+                    "value": "个人资料",
+                    "save_as": "entry_cn",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "find",
+                    "strategy": "content-desc",
+                    "value": "Profile",
+                    "save_as": "entry_desc",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 300,
+                    "max_ms": 800,
+                    "humanized": "true"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "entry",
+                    "on_fail": "skip",
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "more",
+                "home"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "view_profile": {
+            "description": "查看个人资料",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "查看个人资料"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true",
+                    "note": "浏览页面内容"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.25,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1500,
+                    "max_ms": 3000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.2,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1000,
+                    "max_ms": 2000,
+                    "humanized": "true"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "profile"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "view_profile_email": {
+            "description": "查看邮箱信息",
+            "require_page": "profile",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "查看邮箱信息"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1500,
+                    "max_ms": 3000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.2,
+                    "duration": 400,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1000,
+                    "max_ms": 2000,
+                    "humanized": "true"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "profile"
+            ],
+            "fallback_op": "go_to_profile"
+        },
+        "tap_avatar": {
+            "description": "点击头像",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "点击头像"
+                },
+                {
+                    "action": "find",
+                    "selector": "avatar",
+                    "save_as": "target_el",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 300,
+                    "max_ms": 800,
+                    "humanized": "true"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "target_el",
+                    "on_fail": "skip",
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [],
+            "fallback_op": "back_to_feed"
+        },
+        "go_to_bookmarks": {
+            "description": "进入Bookmarks",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "进入 Bookmarks"
+                },
+                {
+                    "action": "find",
+                    "strategy": "text",
+                    "value": "Bookmarks",
+                    "save_as": "entry",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "find",
+                    "strategy": "text",
+                    "value": "书签",
+                    "save_as": "entry_cn",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "find",
+                    "strategy": "content-desc",
+                    "value": "Bookmarks",
+                    "save_as": "entry_desc",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 300,
+                    "max_ms": 800,
+                    "humanized": "true"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "entry",
+                    "on_fail": "skip",
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "more",
+                "home"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "view_reward_points": {
+            "description": "查看积分数值",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "查看积分数值"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true",
+                    "note": "浏览页面内容"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.25,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1500,
+                    "max_ms": 3000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.2,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1000,
+                    "max_ms": 2000,
+                    "humanized": "true"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "rewards"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "view_more_page": {
+            "description": "查看更多页面",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "查看更多页面"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true",
+                    "note": "浏览页面内容"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.25,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1500,
+                    "max_ms": 3000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.2,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1000,
+                    "max_ms": 2000,
+                    "humanized": "true"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "more"
+            ],
+            "fallback_op": "back_to_feed"
+        },
+        "toggle_theme_dark": {
+            "description": "切换到 Dark 主题",
+            "require_page": "settings",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "切换到 Dark 主题"
+                },
+                {
+                    "action": "find",
+                    "strategy": "text",
+                    "value": "Dark",
+                    "save_as": "theme_option",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 300,
+                    "max_ms": 800,
+                    "humanized": "true"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "theme_option",
+                    "on_fail": "skip",
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "settings"
+            ],
+            "fallback_op": "go_to_settings"
+        },
+        "toggle_theme_light": {
+            "description": "切换到 Light 主题",
+            "require_page": "settings",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "切换到 Light 主题"
+                },
+                {
+                    "action": "find",
+                    "strategy": "text",
+                    "value": "Light",
+                    "save_as": "theme_option",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 300,
+                    "max_ms": 800,
+                    "humanized": "true"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "theme_option",
+                    "on_fail": "skip",
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "settings"
+            ],
+            "fallback_op": "go_to_settings"
+        },
+        "toggle_theme_system": {
+            "description": "切换到 System 主题",
+            "require_page": "settings",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "切换到 System 主题"
+                },
+                {
+                    "action": "find",
+                    "strategy": "text",
+                    "value": "System",
+                    "save_as": "theme_option",
+                    "on_fail": "skip"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 300,
+                    "max_ms": 800,
+                    "humanized": "true"
+                },
+                {
+                    "action": "tap",
+                    "context_ref": "theme_option",
+                    "on_fail": "skip",
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "refresh_layout"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "settings"
+            ],
+            "fallback_op": "go_to_settings"
+        },
+        "view_group_description": {
+            "description": "查看群组描述",
+            "steps": [
+                {
+                    "action": "log",
+                    "message": "查看群组描述"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 2000,
+                    "max_ms": 4000,
+                    "humanized": "true",
+                    "note": "浏览页面内容"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.25,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1500,
+                    "max_ms": 3000,
+                    "humanized": "true"
+                },
+                {
+                    "action": "scroll",
+                    "direction": "down",
+                    "distance_ratio": 0.2,
+                    "duration": 500,
+                    "humanized": "true"
+                },
+                {
+                    "action": "delay",
+                    "min_ms": 1000,
+                    "max_ms": 2000,
+                    "humanized": "true"
+                }
+            ],
+            "overlay_risk": false,
+            "recovery_hint": "back",
+            "preconditions": [
+                "group_description"
+            ],
+            "fallback_op": "back_to_feed"
         }
     }
 }
