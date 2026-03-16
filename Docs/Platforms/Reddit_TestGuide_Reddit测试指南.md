@@ -2,6 +2,7 @@
 
 > 合并自: Reddit_TestGuide.md + Reddit_EvidenceChecklist.md (2026-03-06)
 > 适用于: DPS v4.5 Reddit 自动化模块验证
+> 文档类型: 测试 / 验证文档，不是新人主链施工文档
 
 ---
 
@@ -15,7 +16,7 @@
 | **Reddit_Like.cs** | 点赞帖子 | `ZDProjects/Reddit_Like.cs` |
 | **Reddit_ReadPost.cs** | 阅读帖子内容 | `ZDProjects/Reddit_ReadPost.cs` |
 | **Reddit_Comment.cs** | 读取评论，可选回复 | `ZDProjects/Reddit_Comment.cs` |
-| **Reddit_IntegrationTest.cs** | 集成测试（全流程） | `ZDProjects/Reddit_IntegrationTest.cs` |
+| **Reddit_IntegrationTest.cs** | 集成测试（全流程） | `ZDProjects/Tests/Reddit_IntegrationTest.cs` |
 
 ### 前置准备
 
@@ -146,7 +147,7 @@
 
 > 注意：当前版本使用模拟结果。真实自动化需将各脚本设置为 ZennoDroid 子项目。
 
-1. 复制 `Reddit_IntegrationTest.cs` 到 Own Code → 运行
+1. 复制 `ZDProjects/Tests/Reddit_IntegrationTest.cs` 到 Own Code → 运行
 
 **预期日志输出**:
 ```

@@ -1,7 +1,7 @@
-# 平台模块文档模板
+# 平台接入文档模板
 
-> **用途**: 此模板用于为新平台模块创建统一格式的文档
-> **复制此模板**，重命名为 `{PlatformName}Module.md`，然后填写具体内容
+> **用途**: 此模板用于为新平台接入编写统一格式的文档
+> **使用方式**: 优先在 `Docs/Platforms/{AppName}_APP_Guide_平台指南.md` 中套用本模板；不要在 `Docs/` 根目录新建新文档
 
 ---
 
@@ -12,7 +12,7 @@
 |------|-----|
 | **平台名称** | `[例: BabyCenter]` |
 | **包名** | `[例: com.babycenter.pregnancytracker]` |
-| **模块文件（可选）** | `[例: 无（配置驱动）或 Platforms/Reddit/RedditModule.cs]` |
+| **模块文件（可选）** | `[无需（所有平台通过 ActionExecutor + operations.json 配置驱动）]` |
 | **操作配置** | `[例: Config/Operations/babycenter_operations.json]` |
 | **意图映射** | `[例: Config/IntentMappings/babycenter_intents.json]` |
 | **状态** | `[开发中 / 已完成 / 已废弃]` |
@@ -23,7 +23,7 @@
 
 ---
 
-## 2. 支持的操作
+## 2. 支持的操作 / Intent
 
 | 操作 | JSON 名称 | Intent 映射 | 描述 |
 |------|-----------|-------------|------|
@@ -62,8 +62,14 @@
 **文件**: `Config/IntentMappings/[platform_name]_intents.json`
 ```json
 {
-  "browse_feed": { "operation": "browse" },
-  "like_content": { "operation": "like" }
+  "intents": {
+    "browse_feed": { "operations": ["browse"], "fallback_intents": [] },
+    "like_content": { "operations": ["like"], "fallback_intents": ["browse_feed"] }
+  },
+  "action_to_intent": {
+    "browse": "browse_feed",
+    "like": "like_content"
+  }
 }
 ```
 
@@ -110,9 +116,14 @@
   "like": {
     "steps": [
       {
-        "action": "tap",
-        "target": "if_exists(like_button)",
-        "else": "call_operation(double_tap_like)"
+        "action": "if_exists",
+        "condition": { "selector": "like_button" },
+        "then": [
+          { "action": "tap", "selector": "like_button" }
+        ],
+        "else": [
+          { "action": "call_operation", "operation": "double_tap_like" }
+        ]
       }
     ]
   }
@@ -162,9 +173,9 @@
 ## 10. 相关链接
 
 - **主项目文档**: `Docs/README.md`
-- **框架架构**: `Docs/MultiPlatformFramework.md`
-- **Intent 系统**: `Docs/UnifiedIntentArchitecture.md`
-- **测试分析**: `Docs/PLAYWRIGHT_ANDROID_ANALYSIS.md`
+- **新人施工**: `Docs/ConfigGuide_配置指南.md`
+- **架构参考**: `Docs/TechManual_技术手册.md`
+- **测试工具**: `Tools/app_onboarder/README.md`
 
 ---
 

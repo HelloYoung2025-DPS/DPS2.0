@@ -1,5 +1,420 @@
 # DPS v4.5 更新日志
 
+
+## [4.6.1] - 2026-03-14
+
+### SmartOrchestrator 智能编排器实现 (Phase 1)
+
+新增 `Modules/Core/SmartOrchestrator.cs` 智能编排器子模块，并集成到 SessionRunner 的 `ExecuteWithUnifiedEngine` 方法中。
+
+#### 新增
+- **SmartOrchestrator.cs** (Modules/Core/) — 智能编排器核心模块
+  - `EvaluateResult()`: 双层成功判定（执行成功 + 业务成功），检出假成功
+  - `DecideRecovery()`: 分级恢复决策（Retry → LocalRecovery → VisionAssist → FallbackScript → Abort）
+  - `RecordSuccess/Failure()`: 操作级与会话级状态追踪
+  - `LoadConfig()`: 从 BehaviorConfig.json 的 `smart_orchestrator` 节加载恢复预算
+  - `GetSessionSummary()`: 会话级恢复统计摘要
+
+#### 改动
+- **SessionRunner.cs** (Modules/) — 集成 SmartOrchestrator
+  - `ExecuteWithUnifiedEngine` 操作循环改造: 散落的 SUCCESS/ERROR/SKIP 判断 → SmartOrchestrator.EvaluateResult 双层判定
+  - 恢复逻辑改造: 硬编码 Vision 验证 → SmartOrchestrator.DecideRecovery 分级恢复循环
+  - 会话结束时输出编排器统计摘要（恢复总次数、视觉调用、假成功检出数）
+
+#### 向后兼容
+- SessionRunner.Run() 签名与返回值不变
+- 不配置 `smart_orchestrator` 节时使用默认恢复预算（retry=2, localRecovery=2, vision=3, fallback=1）
+- 现有 VisionCorrector 和 PostOperationHealthCheck 行为保留
+
+#### 受影响文件
+- `Modules/Core/SmartOrchestrator.cs` — 新增
+- `Modules/SessionRunner.cs` — 修改
+- `.omo/modules/SessionRunner.md` — 任务追踪同步
+
+
+## [4.6.0] - 2026-03-14
+
+### SessionRunner 执行层向 ZennoDroid 原生动作迁移 (架构设计)
+
+以 Reddit 为试点，设计执行层从 C# 直接驱动向 ZennoDroid 原生拟人动作迁移的四层架构。
+
+#### 架构决策 (ADR-015)
+- **ZD 原子动作层**: tap、swipe、input_text 等最小执行单元由 ZD 动作块承载，Switch 编号分发
+- **ZD 组合动作层**: open_post、comment 等业务子流程，复用现有 Operations JSON 定义
+- **智能编排层**: SessionRunner 保留编排、恢复、日志；新增智能编排器子模块（先内嵌后独立）
+- **AI 视觉纠偏层**: 分级恢复失败后介入，权限限于功能块或小流程级别临时修正
+- **双层成功判定**: ZD 判执行成功，编排器判业务成功
+- **回滚策略**: feature-flag 实现新旧路径并存
+
+#### SessionRunner 职责边界梳理
+- 保留: 会话生命周期总控、策略编排与门控、统一意图执行链、恢复编排、成功门控
+- 候选下沉: 评论回退文案、帖子上下文构建、遮挡物处理细节、自动接入桥接
+
+#### 受影响文件
+- `.omo/current-task/plan.md` — 迁移任务计划
+- `.omo/modules/SessionRunner.md` — 模块追踪更新
+- `.omo/decisions_架构决策.md` — ADR-015 新增
+- `.omo/layers/l1-project.yaml` — 编码规则与技术债登记
+- `.omo/layers/l2-module.yaml` — 模块级编码规则追加
+- `.omo/layers/l3-operation.yaml` — 操作级编码规则追加
+- `.omo/layers/l4-step.yaml` — 步骤级编码规则追加
+- `Docs/TechManual_技术手册.md` — 版本历史更新
+
+
+## [4.5.24] - 2026-03-11
+
+### SessionRunner v4.5.8 会话成功门控升级
+
+实现 CHANGELOG v4.5.8 中声明但未落地的会话成功门控逻辑，使代码与文档完全一致。
+
+#### 修改内容
+- **成功门控阈值**: 从 `failedActions <= actionCount/2` (50%) 改为 `sessionSuccessRate >= 0.95` 且 `successfulActions >= min_successful_actions`（默认 6）
+- **分类计数器**: 新增 `successfulActions`、`skippedActions` 与 `failedActions` 三路分类计数（SKIP 不计入分母）
+- **门控阈值可配置**: 从 `BehaviorConfig.json` 的 `session_gate` 节读取 `min_success_rate` 和 `min_successful_actions`，不配置时使用默认值
+- **输出变量补齐**: `action_count`（=成功数）、`action_attempt_count`（=总尝试数）、`session_successful_actions`、`session_failed_actions`、`session_skipped_actions`、`session_success_rate`
+- **`action_count` 语义修正**: 从"每轮累加（=总尝试数）"改为"仅成功动作数"，与 v4.5.8 文档定义一致
+- **StateSaver.cs 兼容**: `total_actions` 累计统计现在正确计入成功动作数
+
+#### 受影响文件
+- `Modules/SessionRunner.cs` — 计数逻辑 + 门控逻辑 + 输出变量
+- `.omo/modules/SessionRunner.md` — 任务追踪同步
+- `.omo/modules/index.md` — 模块索引同步
+
+
+## [4.5.23] - 2026-03-08
+
+### SessionRunner 无限循环 Bug 修复与导航恢复机制
+
+修复 E2E 测试中发现的 50 动作无限循环 Bug（`back_to_feed` 假阳性验证 + 过期 UI 签名 + 无导航恢复），并新增三级导航恢复机制。
+
+#### Bug Fix 1: Reddit UI 签名更新（实机验证）
+- `Config/PlatformsConfig.json`
+  - **feed 页面签名**: 替换 5 个全部失效的信号（`bottom_nav` 等），更新为实机验证通过的 `post_unit`、`home_screen_surface`、`feed_lazy_column`、`post_footer`、`post_header`
+  - **post_detail 页面签名**: 替换失效的 `bottom_controls`、`action_bar`，更新为 `fbp_screen`、`voteButtonGroup`、`fbp_back_button`、`Back`（content-desc）、`comment_button`
+  - **post_unit 选择器**: fallback 从 `class=android.widget.FrameLayout`（所有页面匹配，导致假阳性）改为 `resource-id=promoted_post_unit`（feed 独有）
+  - **新增选择器**: `feed_container`、`post_header`、`post_overflow`、`join_button`、`back_button`、`vote_group`、`vote_upvote`、`vote_downvote`、`detail_screen`
+
+#### Bug Fix 2: back_to_feed 验证逻辑
+- `Config/Operations/reddit_operations.json`
+  - verify 步骤 selector 从 `post_unit` 改为 `feed_container`（映射到 `feed_lazy_column`，无 fallback，无假阳性风险）
+  - 新增 `require` 步骤 `page=feed, on_fail=abort`，确保页面检测也通过
+
+#### Bug Fix 3: 导航恢复机制
+- `Modules/SessionRunner.cs`
+  - 新增 `_consecutiveSkips` 计数器和 `MAX_CONSECUTIVE_SKIPS=3` 阈值
+  - 主循环中跟踪连续 SKIP：连续 3 次触发 `ForceNavigateToFeed()`
+  - `ForceNavigateToFeed()` 三级恢复策略:
+    1. 点击 Reddit `fbp_back_button`（最可靠）
+    2. Android 返回键连续按压（最多 5 次），每次检测页面状态
+    3. `am force-stop` + `monkey` 重启 APP（最后手段）
+  - 每级恢复后检测页面状态，成功即停止
+
+### 影响范围
+- 层级: L3（跨文件配置 + 逻辑修复）
+- 功能影响: 修复运行时无限循环，新增导航恢复，不改变正常流程
+- 向后兼容: 所有修改仅影响 Reddit 平台配置和 SessionRunner 恢复逻辑
+
+## [4.5.22] - 2026-03-08
+
+### App Onboarder 智能升级（v1.1）
+
+升级 `Tools/app_onboarder/` 工具模块，使其在打开 APP 时智能检测当前页面状态，动态规划探索流程，并在每个阶段使用视觉验证检查点。增强手机适配能力。
+
+#### Feature 1: 智能页面状态检测
+- `ui_analyzer.py`
+  - 新增 `detect_app_state()` 方法：综合分析当前 APP 页面状态（home/feed/post_detail/profile/unknown），返回状态、置信度和判断依据
+- `app_explorer.py`
+  - 新增 `detect_current_state()` 方法：在探索开始前检测 APP 当前页面
+- `main.py`
+  - 新增 `step_detect_state()` 步骤：在探索前报告当前页面状态
+
+#### Feature 2: 动态剧本规划
+- `app_explorer.py`
+  - 新增 `plan_exploration(current_state)` 方法：根据检测到的状态动态规划探索阶段
+    - feed → 跳过 Phase 1/2，直接 Feed 分析
+    - post_detail / profile / unknown → 先导航回首页，再全流程
+    - home → 正常全流程
+  - 新增 `navigate_to_home()` 方法：从任意页面导航回首页（Back 键 + 重启兜底）
+  - 修改 `run()` 方法：集成状态检测 → 剧本规划 → 按计划执行，支持 Phase 跳过
+
+#### Feature 3: 步骤级视觉验证
+- `app_explorer.py`
+  - 新增 `visual_checkpoint(phase_name)` 方法：每个 Phase 后截图并记录到 `app_map["visual_checkpoints"]`
+- `config_generator.py`
+  - 在 open_post/like/comment 操作后插入 `visual_verify` 日志步骤
+- `test_runner.py`
+  - 新增 `_capture_phase_screenshot(phase)` 方法：E2E 测试每个失败 Phase 后截图保存
+  - 测试报告新增 `phase_screenshots` 字段
+
+#### Feature 4: 手机适配增强
+- `adb_controller.py`
+  - 新增 `get_device_info()` 方法：返回完整设备信息（型号、品牌、Android 版本、SDK 版本、分辨率、DPI、序列号）
+- `main.py`
+  - 启动时显示完整设备信息（型号、Android 版本、DPI）
+  - 版本号升级至 1.1
+
+### 影响范围
+- 层级: L2（模块增强）+ L4（新增步骤）
+- 功能影响: 增强探索智能化，不改变现有生成配置的格式
+- 向后兼容: 无参数调用行为不变，新增功能为增量特性
+
+## [4.5.21] - 2026-03-08
+
+### SessionRunner 初始页面检测与剧本规划
+
+- `Modules/SessionRunner.cs`
+  - 在 `Run()` 方法初始化阶段（平台配置加载后、主循环前）新增初始页面检测与剧本规划：
+    1. `DetectInitialPage()` — 调用 `PageDetector.Detect()` 判断 APP 当前所处页面（feed/post_detail/comment/profile/unknown）
+    2. `PlanPreSessionActions()` — 根据检测到的页面状态规划预设动作序列：
+       - **feed（首页）**: 无需预设动作，直接开始正常会话
+       - **post_detail（帖子详情页）**: 先阅读当前帖子 → 返回首页 → 正常会话
+       - **其他页面 / unknown**: 先返回首页 → 正常会话
+    3. `ExecutePreSessionActions()` — 在主循环前执行规划的预设动作序列，每步更新页面状态
+  - 替换原有的 `_currentPage = "unknown"` 硬编码初始化为实际页面检测
+  - 新增 ZD 变量输出 `initial_page`，记录 APP 启动时的页面状态
+
+### 影响范围
+- 层级: L4（局部代码新增）
+- 功能影响: 仅新增前置检测与预设动作，不改变现有主循环逻辑
+- 向后兼容: 检测失败时退化为 "unknown"，行为与修改前完全一致
+
+## [4.5.20] - 2026-03-08
+
+### SessionRunner 设备连接检测
+
+- `Modules/SessionRunner.cs`
+  - 在 `Run()` 方法初始化阶段（`CoreHelper.Init` 之后、业务逻辑之前）新增三级设备连接检测：
+    1. `CoreHelper.HasInstance()` — 验证 instance 对象存在
+    2. `CoreHelper.GetDroid()` — 验证 DroidInstance 可用
+    3. `CoreHelper.GetLayout()` — 尝试获取 UI 层级，验证设备真实连接
+  - 任一检测失败立即返回明确 ERROR 信息并记录日志，避免后续操作随机失败
+  - 所有检测通过后输出「设备连接检测通过」日志
+
+### 影响范围
+- 层级: L4（局部代码新增）
+- 功能影响: 仅新增前置检测，不改变现有业务逻辑
+
+## [4.5.19] - 2026-03-08
+
+### SessionRunner 编译错误修复（第二轮）
+
+- `Modules/UIHelper.cs`（删除）
+  - 该文件已标注 [已废弃]，依赖 System.Xml.Linq（不在 CSharpCodeProvider 引用列表中）
+  - 功能已被 `Modules/Core/SelectorEngine.cs` 完全替代（纯字符串解析，无外部依赖）
+  - 无任何其他模块调用 UIHelper 的方法
+  - 因位于 Modules/ 目录被同级扫描自动加入编译，导致 15 处 System.Xml.Linq 引用错误
+
+### 影响范围
+- 层级: L4（废弃文件清理）
+- 功能影响: 无（已废弃且无调用者）
+
+## [4.5.18] - 2026-03-08
+
+### SessionRunner 编译错误修复
+
+- `ZDProjects/SessionRunner_OwnCode.cs`
+  - 移除 Core/ 引擎文件加载块（ScriptHelpers/HumanizationEngine/UILocator/ErrorRecovery）
+  - 这些文件是 Own Code 风格的裸 Func/Action 代码，无法与 class 风格模块一起通过 CSharpCodeProvider 编译
+  - 与 ModuleLoader.cs 已有的修复保持一致（v4.5.2 已移除，但 SessionRunner_OwnCode.cs 未同步）
+  - 修复 CS0116/CS1518/CS1022 三个编译错误
+
+### 影响范围
+- 层级: L4（局部代码修复）
+- 仅改动 ZDProjects 入口脚本，Modules/SessionRunner.cs 模块代码本身结构正确无需修改
+
+## [4.5.17] - 2026-03-08
+
+### Docs 施工图修正（ZennoDroid 新人搭建）
+
+- `.omo/decisions_架构决策.md`
+  - 为 `ADR-014` 补充约束：施工图必须标明“ZennoDroid 施工图 / 模块内部逻辑图”，并为每个分支写清变量依据、返回值和条件表达式
+- `.omo/layers/l1-project.yaml`
+  - 将“文档体系治理”扩展到“分支依据缺失”场景，并补充施工图标注规则
+- `Docs/ConfigGuide_配置指南.md`
+  - 重写 `4.2 首次运行流程`，改成可直接照着在 ZennoDroid 中搭建的最小闭环施工图
+  - 新增“每个分支的依据是什么”“在 ZennoDroid 里如何实现”“这张图不包含什么”，避免把模块内部逻辑图误当成外层接线图
+  - 重写 `4.4`，明确 Reddit / Instagram 当前走的是 `SessionRunner + IntentMappings + Operations + ActionExecutor` 主链，不再误导新人去外层拆平台动作块
+- `Docs/TechManual_技术手册.md`
+  - 修正旧模块回退、RateLimiter 和 SessionRunner 的文档口径，使之与当前统一主链一致
+- `Docs/README.md`
+  - 明确新手第一次搭建应优先阅读 `ConfigGuide` 的施工章节，并提醒不要把 `4.3 / 4.4` 内部逻辑图拆成额外动作块
+
+### 架构遗留清理（第一轮 + 第二轮收尾）
+
+经全面验证确认项目主执行链已完全切换到 `ActionExecutor + operations.json` 路径后，清除所有遗留的旧平台模块架构残留。
+
+**删除**:
+- `Platforms/Reddit/RedditModule.cs` — 不被主链加载的旧 C# 平台模块（~700 行）
+- `Platforms/Instagram/InstagramModule.cs` — 不被主链加载的旧 C# 平台模块（~600 行）
+- `Core/PlatformBase.cs` — 旧平台基类接口，不被编译/加载
+- `Modules/SessionRunner.cs` 中的 `LoadPlatformModule()` 死方法 — 永远返回 ERROR 的回退分支
+
+**重写**:
+- `ZDProjects/Tests/MultiPlatform_IntegrationTest.cs` — 移除所有对已删除 `Platforms/` 文件的断言，改为测试 JSON 配置驱动流程（operations.json 结构验证、intent mappings 存在性、PlatformsConfig 速率限制配置）
+  - 新增 `operations_structure` 测试场景：验证 reddit/instagram/babycenter 三个平台的 operations JSON 结构
+  - 修正 ErrorRecovery 路径：从 `Core\ErrorRecovery.cs` 改为 `Modules\Core\ErrorRecovery.cs`
+
+**文档清理**:
+- `Docs/TechManual_技术手册.md` — 移除 PlatformBase.cs 架构图引用、LoadPlatformModule() 流程节点、术语表中的 Platform Base/Platform Module 条目
+- `Modules/README.md` — 移除 PlatformBase.cs 和 Platforms/ 子目录引用，更新 v4.5 特性描述为配置驱动
+- `ZDProjects/README.md` — 移除 RedditModule_OwnCode.cs 和 InstagramModule_OwnCode.cs 文件列表条目，更新 v4.5 特性描述
+- `.omo/context.md` — 清除幽灵文件引用（BabyCenterModule.cs 等）
+- `Modules/Core/README.md` — 移除 PlatformBase 引用
+
+**保留**:
+- `Modules/Core/RateLimiter.cs` — 通用速率限制模块，已在 ModuleLoader 编译列表中就绪，待未来接入主链
+
+## [4.5.16] - 2026-03-07
+
+### 📚 Docs 文档体系优化
+
+- `.omo/current-task/plan.md`
+  - 登记本次 `Docs` 文档体系优化计划，明确 L1 文件顺序、验证顺序与 Gate 命令
+- `.omo/decisions_架构决策.md`
+  - 新增 `ADR-014`，明确 `ConfigGuide` 作为新人施工文档、`TechManual` 作为架构参考文档的双层职责
+- `.omo/layers/l1-project.yaml`
+  - 补充 `文档体系治理` 项目级操作，并更新项目层最后更新时间
+- `Docs/DOCS_RULES.md`
+  - 同步 `Platforms/Reddit_TestGuide_Reddit测试指南.md` 到文档清单
+  - 新增 README 清单同步与“施工文档必须与真实代码一致”的约束
+- `Docs/README.md`
+  - 重写文档导航定位，区分新人施工、架构参考、平台指南和测试指南
+  - 补上 Reddit 测试指南索引与更适合新人的阅读顺序
+- `Docs/ConfigGuide_配置指南.md`
+  - 重写 ZennoDroid 新人施工路径：最小变量集、必建动作块、复制来源文件、条件表达式与首次运行闭环
+  - 修正文档口径：`current_platform` 为运行时输出，`SessionRunner` 成功返回值为 `SUCCESS`
+  - 修正帮助链接、变量说明和 `action_count` 语义，删除失真的旧变量/旧死链口径
+- `Docs/TechManual_技术手册.md`
+  - 修正历史来源说明、Docs 文件结构、SessionRunner 主链说明和输出变量说明
+  - 明确旧模块模式不再作为成功回退路径，并修正测试章节编号重复问题
+- `Docs/PlatformTemplate_平台模块模板.md`
+  - 改为“平台接入文档模板”，强调配置驱动优先与 `Docs/Platforms/` 命名规则
+  - 修正 intent 映射示例、回退链示例与相关链接
+- `Docs/Platforms/BabyCenter_APP_Guide_平台指南.md`
+  - 明确 BabyCenter 当前以配置驱动接入为主
+  - 修正核心模块文档链接到 `Docs/TechManual_技术手册.md`
+- `Docs/Platforms/Reddit_TestGuide_Reddit测试指南.md`
+  - 修正 `Reddit_IntegrationTest.cs` 的真实路径为 `ZDProjects/Tests/Reddit_IntegrationTest.cs`
+  - 标明其定位为测试/验证文档
+- `Docs/GitWorkflow_Git工作流.md`
+  - 补充 Windows PowerShell 环境下的 `Copy-Item` 与 release 脚本调用方式
+
+## [4.5.15] - 2026-03-07
+
+### 📗 根目录说明书补充层级对照表
+
+- `OpenCode_工作流说明书.md`
+  - 增加 `L1 / L2 / L3 / L4` 对照表
+  - 明确每一层在 DPS_v4.5 中对应什么对象、目录和典型修改
+  - 补充快速判断法与常见例子，方便按主模块 / 主 L3 任务使用
+
+## [4.5.14] - 2026-03-07
+
+### 📘 根目录开发说明书
+
+- `OpenCode_工作流说明书.md`
+  - 新增根目录说明书，面向日常 OpenCode 开发使用
+  - 说明“用户怎么提需求、AI 应怎么执行、Gate 如何参与、一次 session 如何完整走完”
+  - 覆盖单主模块 / 单主 L3 的实际开发流程与常用提示词
+- `Tools/omo_guard/Invoke-OmoGate.ps1`
+  - 修复 `Advance` 阶段写入 `advanced_at_utc` 时因属性缺失导致的状态记录错误
+
+## [4.5.13] - 2026-03-06
+
+### 🚧 .omo Gate 脚本级强制
+
+- `Tools/omo_guard/Invoke-OmoGate.ps1`
+  - 新增脚本级 Gate，支持 `Preflight`、`Advance`、`Postflight`
+  - `Preflight` 校验 `plan.md`、模块追踪文件、协议引用与顺序约束
+  - `Advance` 按 `plan.md` 的文件顺序逐项打卡，阻止乱序修改
+  - `Postflight` 校验全部文件已打卡，并可统一执行计划中的验证命令
+- `.omo/current-task/plan.md`
+  - 升级为 Gate 落地计划，新增 `主模块` 与 `强制运行命令`
+- `.omo/layers/EXECUTION_PROTOCOL.md`
+  - 增加脚本级 Gate 章节，要求所有任务先跑 `Preflight`、逐项 `Advance`、最后 `Postflight`
+- `.omo/modules/WORKFLOW.md`
+  - 增加 Gate 执行要求，模块任务必须记录并运行脚本级 Gate
+- `.omo/modules/TEMPLATE.md`
+  - 新增 `强制运行命令` 与 `Gate 当前状态`
+- `.omo/layers/l1-project.yaml`
+  - 为 L1 增加 `gate_script`、`gate_phases` 与 Gate 停止条件
+- `.omo/layers/l2-module.yaml`
+  - 为 L2 增加 `gate_script`、`gate_phases` 与 Gate 停止条件
+- `.omo/layers/l3-operation.yaml`
+  - 为 L3 增加 `gate_script`、`gate_phases` 与 Gate 停止条件
+- `.omo/layers/l4-step.yaml`
+  - 为 L4 增加 `gate_script`、`gate_phases` 与 Gate 停止条件
+- `.omo.conf`
+  - 增加 `mandatory_gate_script`、`mandatory_gate_phases` 与 Gate 强制开关
+- `AGENTS.md`
+  - 改为强制要求运行 Gate 脚本，不再只靠文档约束
+
+## [4.5.12] - 2026-03-06
+
+### 🧭 .omo 分层治理强制化
+
+- `AGENTS.md`
+  - 新增 L1/L2/L3/L4 强制执行规则
+  - 明确主层级判定、修改顺序、验证顺序、配置优先与 `CHANGELOG.md` 最后更新
+- `.omo.conf`
+  - 增加 layered workflow 强制配置，要求先更新层级登记再改实现
+- `.omo/current-task/plan.md`
+  - 改为本次分层治理落地计划，写明主层级、受影响层级、文件顺序与验证顺序
+- `.omo/layers/EXECUTION_PROTOCOL.md`
+  - 新增统一执行协议，规定 `L1 -> L2 -> L3 -> L4` 修改顺序和 `L4 -> L3 -> L2 -> L1` 验证顺序
+- `.omo/modules/WORKFLOW.md`
+  - 重写为模块追踪与分层落地流程，要求先计划、后登记、再实现
+- `.omo/modules/TEMPLATE.md`
+  - 扩展模块模板，加入主层级、受影响层级、强制文件顺序、强制验证顺序
+- `.omo/layers/l1-project.yaml`
+  - 补充 L1 级修改/验证顺序与架构硬规则
+- `.omo/layers/l2-module.yaml`
+  - 补充 L2 级模块追踪、修改顺序、验证顺序与编码边界
+- `.omo/layers/l3-operation.yaml`
+  - 补充 L3 级 action / intent / operation 契约修改顺序与验证要求
+- `.omo/layers/l4-step.yaml`
+  - 补充 L4 级 step / primitive 修改顺序、回写要求与最小改动原则
+
+## [4.5.11] - 2026-03-06
+
+### 🔧 CODEX 审核修复（编译链路与运行一致性）
+
+- `Modules/Core/ZennoDroidAdapter.cs`
+  - 重建损坏的适配器源码，恢复统一执行、重试、截图与批量命令接口
+- `Modules/Core/ZDResult.cs`
+  - 补充 `ScreenshotPath` 兼容属性，修复适配器与视觉验证链路的数据契约
+- `Modules/Core/ActionExecutor.cs`
+  - 移除对 `ScriptHelpers` 编译期静态调用的依赖，改为本地拟人化辅助方法
+  - `find` 新增真实重试支持，`input_text` 兼容 `type`，`swipe` 支持 `start_x/end_x` 别名
+  - 选择器解析支持步骤内联 `strategy/value`，修复 BabyCenter 配置无法执行的问题
+- `Modules/Core/Intent.cs`
+  - 补齐 `IsValid`、`GetParameter`、回退链与便捷构造函数，修复 `IntentTranslator` 契约漂移
+- `Modules/SessionRunner.cs`
+  - 评论动作执行前自动补齐 `ai_comment_text/comment_text`，避免统一评论链路因变量缺失直接失败
+  - `current_post_id` 改为优先使用帖子语义字段构建，降低基于屏幕 bounds 的误判与碰撞
+  - `current_post_json` 补充 `body` 等语义字段，`device_app_mapping.json` 支持 `default_platform`
+  - `UserStrategy.json` 改读 `decision_balance`，并尊重 `ai_control.enabled`
+  - 旧平台模块回退路径改为显式报错，避免缺失 operations 配置时出现“静默成功”
+- `Modules/Core/AIService.cs`
+  - `ExtractText/ExtractJson` 增加 Gemini/OpenAI 响应包裹自动识别，修复主模型失败后备用模型响应被误解析
+- `Modules/Core/AppExplorer_v2.cs`
+  - 清理残留噪声标记，修复额外的源码语法损坏
+  - AI 分析结果改为先解包文本再抽取 JSON，修复备用 provider 响应下的状态解析失败
+- `Modules/Core/JsonHelper.cs`
+  - `GetArray()` 支持直接解析数组字符串，修复 `AppExplorer_v2` 等场景传入裸数组时取值为空
+- `Modules/WeeklyEvolve.cs`
+  - 先提取 AI 文本再抽取 JSON，兼容重试链路返回的不同 provider 响应格式
+- `Modules/Core/VisionCorrector.cs`
+  - 图像分析响应改为先解包文本再抽取 JSON，提升视觉验证稳定性
+- `Modules/Main.cs`
+  - `ClearRuntimeData()` 递归清理并备份 `Memory/<device>/<app>/interactions.json`，覆盖结构化记忆目录
+- `Modules/MemoryManager.cs`
+  - 兼容 `JsonHelper.GetArray()` 的数组返回值，修复结构化记忆读写的编译契约问题
+- `Modules/RuleEngine.cs`
+  - 兼容 `JsonHelper.GetArray()` 的数组返回值，修复兴趣词/触发词读取的编译契约问题
+- `Modules/Extension.cs`
+  - 改为按类型名反射注册内置扩展，消除对 `Extensions/DataSources/*.cs` 的编译期硬依赖
+
 ## [4.5.10] - 2026-03-04
 
 ### 🆕 App Onboarder — 新平台自动接入工具

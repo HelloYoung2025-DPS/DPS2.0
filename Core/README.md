@@ -3,7 +3,6 @@
 > **注意**: 此目录与 `Modules/Core/` 是不同的层！
 >
 > - **Core/** (本目录): 运行时引擎，直接与 ZennoDroid API 交互
->   - `PlatformBase.cs` — 平台模块接口定义
 >   - `ScriptHelpers.cs` — ZD API 封装
 >   - `UILocator.cs` — UI 元素定位引擎
 >   - `HumanizationEngine.cs` — 人类行为模拟

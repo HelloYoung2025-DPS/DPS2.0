@@ -9,13 +9,11 @@
 
 ## v4.5 更新
 
-- **多平台支持**: Reddit、Instagram 完整周期
+- **多平台支持**: 通过 `Config/Operations/*.json` + `Config/IntentMappings/*.json` 配置驱动
+- **已接入平台**: Reddit、Instagram、BabyCenter（通过 PlatformsConfig.json 配置）
 - **Core/HumanizationEngine.cs**: 4种行为配置文件（speed_demon, casual, deep_reader, distracted）
 - **Core/UILocator.cs**: 多策略 UI 定位（resource-id → XPath → 图像识别）
 - **Core/ErrorRecovery.cs**: 自动重试 + 指数退避（2s, 4s, 8s）
-- **Core/PlatformBase.cs**: 标准化平台操作接口
-- **Platforms/Reddit/RedditModule.cs**: Reddit 完整自动化
-- **Platforms/Instagram/InstagramModule.cs**: Instagram 完整自动化 + 速率限制
 
 ## v4.1 更新
 
@@ -37,10 +35,7 @@ Modules/
 │   ├── HumanizationEngine.cs # 人性化行为 (v4.5)
 │   ├── UILocator.cs        # UI 定位 (v4.5)
 │   ├── ErrorRecovery.cs    # 错误恢复 (v4.5)
-│   └── PlatformBase.cs     # 平台接口 (v4.5)
-├── Platforms/               # 平台模块 (v4.5)
-│   ├── Reddit/RedditModule.cs
-│   └── Instagram/InstagramModule.cs
+│   └── RateLimiter.cs      # 速率限制 (已就绪，未接入主链)
 ├── Initializer.cs           # [1] 初始化
 ├── Main.cs                  # [2] 主入口（检查画像、生成计划）
 ├── PersonaCreate.cs         # [2a] 画像生成（按需）

@@ -19,7 +19,8 @@ Docs/
 ├── README.md
 ├── DOCS_RULES.md                ← 本文件
 └── Platforms/
-    └── BabyCenter_APP_Guide_平台指南.md
+    ├── BabyCenter_APP_Guide_平台指南.md
+    └── Reddit_TestGuide_Reddit测试指南.md
 ```
 
 ### 2. 允许的操作
@@ -56,3 +57,5 @@ AI 助手在操作 Docs/ 目录时**必须**:
 2. 不主动在 Docs/ 根目录创建新文件
 3. 如果认为需要新建文件，必须先向用户提出请求并等待批准
 4. 所有文档更新优先合并到现有文件中
+5. `Docs/README.md` 与本文件中的文档清单必须和仓库实际存在的文档保持一致
+6. 新人施工文档中的路径、变量名、返回值、流程图必须与当前代码真实行为一致

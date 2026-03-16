@@ -4,13 +4,16 @@
 > **包名**: `com.babycenter.pregnancytracker`  
 > **APP 版本**: 6.02.0  
 > **验证日期**: 2026-03-04  
-> **文档版本**: v2.0 (WebView Accessibility 更新)
+> **文档版本**: v2.1 (配置驱动说明校正)  
+> **文档类型**: 平台实现参考（配置驱动）
 
 ---
 
 ## 1. 平台概述
 
 BabyCenter 是一款面向孕期和育儿家庭的社交内容平台，核心功能包括社区讨论、孕周日历、育儿工具等。DPS v4.5 主要针对其**社区（Birth Club）** 模块进行会话模拟，模拟用户浏览帖子、阅读、点赞、评论等行为。
+
+> ⚠️ **当前仓库说明**: BabyCenter 在当前主链中以 **配置驱动接入** 为主，重点文件是 `Config/PlatformsConfig.json`、`Config/Operations/babycenter_operations.json`、`Config/IntentMappings/babycenter_intents.json`。所有平台通过 ActionExecutor + operations.json 统一引擎执行。
 
 该平台的 UI 架构与 Reddit 有本质区别：社区 feed 采用 **ViewPager 水平滑动**，帖子详情页则是 **WebView 渲染**。这两个特征直接影响了操作配置的设计策略。
 
@@ -350,4 +353,4 @@ APP 可能在使用过程中弹出评分对话框。该弹窗包含一个 `close
 | E2E 测试脚本 | `{output_dir}/babycenter_e2e_test.ps1` | 7 阶段全流程拟人测试（7/7 通过） |
 | WebView 分析脚本 | `bc_webview_deep.ps1`（外部调试脚本） | WebView 内部元素 dump 工具 |
 | ADB 测试脚本 | `babycenter_adb_test.ps1`（项目根目录外） | 23 项元素验证测试 |
-| SessionRunner 说明 | `Docs/SessionRunner使用说明.md` | 核心模块文档 |
+| SessionRunner 说明 | `Docs/TechManual_技术手册.md` | 核心模块文档 |

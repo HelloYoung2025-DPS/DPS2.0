@@ -27,6 +27,12 @@ Create your local file from template:
 cp Config/AIConfig.template.json Config/AIConfig.json
 ```
 
+PowerShell equivalent:
+
+```powershell
+Copy-Item Config\AIConfig.template.json Config\AIConfig.json
+```
+
 ## 3) Daily workflow
 
 Check status:
@@ -84,6 +90,12 @@ Use the helper script:
 
 ```bash
 ./scripts/release.sh v4.6.0 "release: v4.6.0 major upgrade"
+```
+
+PowerShell:
+
+```powershell
+bash ./scripts/release.sh v4.6.0 "release: v4.6.0 major upgrade"
 ```
 
 The script will:
