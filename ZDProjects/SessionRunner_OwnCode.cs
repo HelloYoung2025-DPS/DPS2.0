@@ -13,19 +13,14 @@ Func<string, string, object[], object> RunModule = (filePath, methodName, args) 
     
     var allCodes = new System.Collections.Generic.List<string>();
     
-    // 1. 加载项目根 Core/ 引擎文件（ScriptHelpers, HumanizationEngine, UILocator, ErrorRecovery）
-    string engineDir = System.IO.Path.GetDirectoryName(System.IO.Path.GetDirectoryName(filePath)) + "\\Core\\";
-    string[] engineFiles = new string[] { "ScriptHelpers.cs", "HumanizationEngine.cs", "UILocator.cs", "ErrorRecovery.cs" };
-    foreach (string ef in engineFiles) {
-        string efPath = engineDir + ef;
-        if (System.IO.File.Exists(efPath)) {
-            allCodes.Add(System.IO.File.ReadAllText(efPath, System.Text.Encoding.UTF8));
-        }
-    }
-    
+    // ⚠️ Core/ 引擎文件（ScriptHelpers, HumanizationEngine, UILocator, ErrorRecovery）
+    // 是 "Own Code" 风格的裸代码（Func/Action 委托），不能和 class 一起编译。
+    // 它们仅供 ZDProjects/*.cs Own Code 动作块直接使用。
+    // 编译模块已通过 CoreHelper/SelectorEngine/UIHelper 提供等效功能。
+
     // 2. 加载 Modules/Core 所有依赖文件
     string coreDir = System.IO.Path.GetDirectoryName(filePath) + "\\Core\\";
-    string[] coreFiles = new string[] { "JsonHelper.cs", "CoreHelper.cs", "FileHelper.cs", "IExtension.cs", "Intent.cs", "ZDCommand.cs", "ZDResult.cs", "OperationContext.cs", "ZennoDroidAdapter.cs", "IntentTranslator.cs", "SelectorEngine.cs", "PageDetector.cs", "AIService.cs", "ExtensionManager.cs", "ActionExecutor.cs", "VisionCorrector.cs", "RateLimiter.cs", "NavigationResolver.cs", "AppExplorer.cs", "ManifestLoader.cs" };
+    string[] coreFiles = new string[] { "JsonHelper.cs", "CoreHelper.cs", "FileHelper.cs", "IExtension.cs", "Intent.cs", "ZDCommand.cs", "ZDResult.cs", "OperationContext.cs", "ZennoDroidAdapter.cs", "IntentTranslator.cs", "SelectorEngine.cs", "PageDetector.cs", "AIService.cs", "ExtensionManager.cs", "ActionExecutor.cs", "VisionCorrector.cs", "RateLimiter.cs", "NavigationResolver.cs", "AppExplorer.cs", "ManifestLoader.cs", "SmartOrchestrator.cs" };
     foreach (string cf in coreFiles) {
         string cfPath = coreDir + cf;
         if (System.IO.File.Exists(cfPath)) {

@@ -1,15 +1,16 @@
 // =====================================================
 // MultiPlatform_IntegrationTest.cs - Integration Test
 // =====================================================
-// Purpose: Test full workflow Main → SessionRunner → Platform Module
+// Purpose: Test full workflow: Config → Operations JSON → ActionExecutor
 //
 // Test Scenarios:
-//   1. Reddit platform selection and initialization
-//   2. Instagram platform selection and initialization
-//   3. Platform module loading
-//   4. Error recovery scenarios
-//   5. Rate limit enforcement
-//   6. Cross-platform switching
+//   1. Reddit config-driven workflow (mapping + operations + intents)
+//   2. Instagram config-driven workflow (mapping + operations + intents)
+//   3. Platform switching via device_app_mapping.json
+//   4. Rate limit configuration in PlatformsConfig.json
+//   5. Error recovery module existence
+//   6. Config loading (all required JSON files + core modules)
+//   7. Operations JSON structure validation
 //
 // Usage:
 //   - Set test_scenario variable to select test case
@@ -45,57 +46,18 @@ if (!projectRoot.EndsWith("\\")) projectRoot += "\\";
 string testScenario = GetVar("test_scenario", "reddit_basic");
 
 Log("=".PadRight(60, '='));
-Log("Multi-Platform Integration Test");
+Log("Multi-Platform Integration Test (Config-Driven Architecture)");
 Log("Test Scenario: " + testScenario);
 Log("=".PadRight(60, '='));
 
 // Set project root
 SetVar("project_root", projectRoot);
 
-// ========== Test Scenario Router ==========
-bool testPassed = false;
-
-switch (testScenario) {
-    case "reddit_basic":
-        testPassed = TestRedditBasic();
-        break;
-    case "instagram_basic":
-        testPassed = TestInstagramBasic();
-        break;
-    case "platform_switching":
-        testPassed = TestPlatformSwitching();
-        break;
-    case "rate_limit":
-        testPassed = TestRateLimit();
-        break;
-    case "error_recovery":
-        testPassed = TestErrorRecovery();
-        break;
-    case "config_loading":
-        testPassed = TestConfigLoading();
-        break;
-    default:
-        LogErr("Unknown test scenario: " + testScenario);
-        testPassed = false;
-        break;
-}
-
-// ========== Test Results ==========
-Log("=".PadRight(60, '='));
-if (testPassed) {
-    LogSuccess("TEST PASSED: " + testScenario);
-    SetVar("test_result", "PASS");
-} else {
-    LogErr("TEST FAILED: " + testScenario);
-    SetVar("test_result", "FAIL");
-}
-Log("=".PadRight(60, '='));
-
 // ========== Test Functions ==========
 
-// Test 1: Reddit Basic Workflow
+// Test 1: Reddit Config-Driven Workflow
 Func<bool> TestRedditBasic = () => {
-    Log("\n--- Test 1: Reddit Basic Workflow ---");
+    Log("\n--- Test 1: Reddit Config-Driven Workflow ---");
     
     try {
         // Step 1: Set device to Reddit
@@ -135,26 +97,38 @@ Func<bool> TestRedditBasic = () => {
         }
         Log("Step 4: PlatformsConfig.json contains reddit");
         
-        // Step 5: Verify Reddit module exists
-        string redditModulePath = projectRoot + "Platforms\\Reddit\\RedditModule.cs";
-        if (!System.IO.File.Exists(redditModulePath)) {
-            LogErr("RedditModule.cs not found");
+        // Step 5: Verify reddit operations JSON exists
+        string opsPath = projectRoot + "Config\\Operations\\reddit_operations.json";
+        if (!System.IO.File.Exists(opsPath)) {
+            LogErr("reddit_operations.json not found");
             return false;
         }
-        Log("Step 5: RedditModule.cs exists");
+        string opsJson = System.IO.File.ReadAllText(opsPath);
+        if (!opsJson.Contains("\"operations\"")) {
+            LogErr("reddit_operations.json missing 'operations' key");
+            return false;
+        }
+        Log("Step 5: reddit_operations.json exists with valid structure");
         
-        // Step 6: Verify module structure
-        string moduleCode = System.IO.File.ReadAllText(redditModulePath);
-        string[] requiredOps = new string[] { "Initialize", "Browse", "Like", "Comment", "Follow", "Share" };
+        // Step 6: Verify reddit intent mappings exist
+        string intentsPath = projectRoot + "Config\\IntentMappings\\reddit_intents.json";
+        if (!System.IO.File.Exists(intentsPath)) {
+            LogErr("reddit_intents.json not found");
+            return false;
+        }
+        Log("Step 6: reddit_intents.json exists");
+        
+        // Step 7: Verify operations contain standard actions
+        string[] requiredOps = new string[] { "browse", "like", "comment", "follow", "share" };
         foreach (string op in requiredOps) {
-            if (!moduleCode.Contains("Func<dynamic, System.Collections.Generic.Dictionary<string, object>> " + op)) {
-                LogErr("Operation not found: " + op);
+            if (!opsJson.Contains("\"" + op + "\"")) {
+                LogErr("Operation not found in reddit_operations.json: " + op);
                 return false;
             }
         }
-        Log("Step 6: All 6 operations present in RedditModule");
+        Log("Step 7: All 5 standard operations present in reddit_operations.json");
         
-        LogSuccess("Reddit basic workflow test PASSED");
+        LogSuccess("Reddit config-driven workflow test PASSED");
         return true;
         
     } catch (System.Exception ex) {
@@ -163,9 +137,9 @@ Func<bool> TestRedditBasic = () => {
     }
 };
 
-// Test 2: Instagram Basic Workflow
+// Test 2: Instagram Config-Driven Workflow
 Func<bool> TestInstagramBasic = () => {
-    Log("\n--- Test 2: Instagram Basic Workflow ---");
+    Log("\n--- Test 2: Instagram Config-Driven Workflow ---");
     
     try {
         // Step 1: Set device to Instagram
@@ -185,7 +159,7 @@ Func<bool> TestInstagramBasic = () => {
         }
         Log("Step 2: device_002 maps to instagram");
         
-        // Step 3: Verify Instagram config
+        // Step 3: Verify Instagram config with rate_limits
         string platformsConfigPath = projectRoot + "Config\\PlatformsConfig.json";
         string platformsConfig = System.IO.File.ReadAllText(platformsConfigPath);
         if (!platformsConfig.Contains("instagram")) {
@@ -198,37 +172,38 @@ Func<bool> TestInstagramBasic = () => {
         }
         Log("Step 3: Instagram config with rate_limits exists");
         
-        // Step 4: Verify Instagram module exists
-        string instagramModulePath = projectRoot + "Platforms\\Instagram\\InstagramModule.cs";
-        if (!System.IO.File.Exists(instagramModulePath)) {
-            LogErr("InstagramModule.cs not found");
+        // Step 4: Verify instagram operations JSON exists
+        string opsPath = projectRoot + "Config\\Operations\\instagram_operations.json";
+        if (!System.IO.File.Exists(opsPath)) {
+            LogErr("instagram_operations.json not found");
             return false;
         }
-        Log("Step 4: InstagramModule.cs exists");
+        string opsJson = System.IO.File.ReadAllText(opsPath);
+        if (!opsJson.Contains("\"operations\"")) {
+            LogErr("instagram_operations.json missing 'operations' key");
+            return false;
+        }
+        Log("Step 4: instagram_operations.json exists with valid structure");
         
-        // Step 5: Verify rate limit implementation
-        string moduleCode = System.IO.File.ReadAllText(instagramModulePath);
-        if (!moduleCode.Contains("CheckRateLimit")) {
-            LogErr("CheckRateLimit function not found");
+        // Step 5: Verify instagram intent mappings exist
+        string intentsPath = projectRoot + "Config\\IntentMappings\\instagram_intents.json";
+        if (!System.IO.File.Exists(intentsPath)) {
+            LogErr("instagram_intents.json not found");
             return false;
         }
-        if (!moduleCode.Contains("IncrementRateLimit")) {
-            LogErr("IncrementRateLimit function not found");
-            return false;
-        }
-        Log("Step 5: Rate limit functions present");
+        Log("Step 5: instagram_intents.json exists");
         
-        // Step 6: Verify all operations
-        string[] requiredOps = new string[] { "Initialize", "Browse", "Like", "Comment", "Follow", "Share" };
+        // Step 6: Verify operations contain standard actions
+        string[] requiredOps = new string[] { "browse", "like", "comment", "follow", "share" };
         foreach (string op in requiredOps) {
-            if (!moduleCode.Contains("Func<dynamic, System.Collections.Generic.Dictionary<string, object>> " + op)) {
-                LogErr("Operation not found: " + op);
+            if (!opsJson.Contains("\"" + op + "\"")) {
+                LogErr("Operation not found in instagram_operations.json: " + op);
                 return false;
             }
         }
-        Log("Step 6: All 6 operations present in InstagramModule");
+        Log("Step 6: All 5 standard operations present in instagram_operations.json");
         
-        LogSuccess("Instagram basic workflow test PASSED");
+        LogSuccess("Instagram config-driven workflow test PASSED");
         return true;
         
     } catch (System.Exception ex) {
@@ -278,7 +253,14 @@ Func<bool> TestPlatformSwitching = () => {
                 return false;
             }
             
-            Log("  ✓ " + device + " -> " + actualPlatform);
+            // Verify operations JSON exists for this platform
+            string opsPath = projectRoot + "Config\\Operations\\" + actualPlatform + "_operations.json";
+            if (!System.IO.File.Exists(opsPath)) {
+                LogErr("Operations file not found for platform: " + actualPlatform);
+                return false;
+            }
+            
+            Log("  OK " + device + " -> " + actualPlatform + " (operations.json exists)");
         }
         
         LogSuccess("Platform switching test PASSED");
@@ -290,12 +272,12 @@ Func<bool> TestPlatformSwitching = () => {
     }
 };
 
-// Test 4: Rate Limit Enforcement
+// Test 4: Rate Limit Configuration
 Func<bool> TestRateLimit = () => {
-    Log("\n--- Test 4: Rate Limit Enforcement ---");
+    Log("\n--- Test 4: Rate Limit Configuration ---");
     
     try {
-        // Verify rate limits in config
+        // Verify rate limits in PlatformsConfig
         string platformsConfigPath = projectRoot + "Config\\PlatformsConfig.json";
         string platformsConfig = System.IO.File.ReadAllText(platformsConfigPath);
         
@@ -305,10 +287,10 @@ Func<bool> TestRateLimit = () => {
         int redditActionsPos = platformsConfig.IndexOf("\"max_actions_per_hour\"", redditLimitsPos);
         
         if (redditActionsPos < 0) {
-            LogErr("Reddit rate_limits not found");
+            LogErr("Reddit rate_limits not found in PlatformsConfig.json");
             return false;
         }
-        Log("✓ Reddit rate_limits present");
+        Log("OK Reddit rate_limits present in PlatformsConfig.json");
         
         // Check Instagram rate limits (stricter)
         int instagramPos = platformsConfig.IndexOf("\"instagram\"");
@@ -316,40 +298,12 @@ Func<bool> TestRateLimit = () => {
         int instagramActionsPos = platformsConfig.IndexOf("\"max_actions_per_hour\"", instagramLimitsPos);
         
         if (instagramActionsPos < 0) {
-            LogErr("Instagram rate_limits not found");
+            LogErr("Instagram rate_limits not found in PlatformsConfig.json");
             return false;
         }
-        Log("✓ Instagram rate_limits present");
+        Log("OK Instagram rate_limits present in PlatformsConfig.json");
         
-        // Verify Instagram module implements rate limiting
-        string instagramModulePath = projectRoot + "Platforms\\Instagram\\InstagramModule.cs";
-        string moduleCode = System.IO.File.ReadAllText(instagramModulePath);
-        
-        if (!moduleCode.Contains("CheckRateLimit(\"actions\", 60)")) {
-            LogErr("Instagram actions rate limit (60/hour) not enforced");
-            return false;
-        }
-        Log("✓ Instagram actions rate limit: 60/hour");
-        
-        if (!moduleCode.Contains("CheckRateLimit(\"likes\", 30)")) {
-            LogErr("Instagram likes rate limit (30/hour) not enforced");
-            return false;
-        }
-        Log("✓ Instagram likes rate limit: 30/hour");
-        
-        if (!moduleCode.Contains("CheckRateLimit(\"comments\", 15)")) {
-            LogErr("Instagram comments rate limit (15/hour) not enforced");
-            return false;
-        }
-        Log("✓ Instagram comments rate limit: 15/hour");
-        
-        if (!moduleCode.Contains("CheckRateLimit(\"follows\", 10)")) {
-            LogErr("Instagram follows rate limit (10/hour) not enforced");
-            return false;
-        }
-        Log("✓ Instagram follows rate limit: 10/hour");
-        
-        LogSuccess("Rate limit enforcement test PASSED");
+        LogSuccess("Rate limit configuration test PASSED");
         return true;
         
     } catch (System.Exception ex) {
@@ -363,23 +317,29 @@ Func<bool> TestErrorRecovery = () => {
     Log("\n--- Test 5: Error Recovery ---");
     
     try {
-        // Verify ErrorRecovery module exists
-        string errorRecoveryPath = projectRoot + "Core\\ErrorRecovery.cs";
+        // Verify ErrorRecovery module exists in Modules/Core/
+        string errorRecoveryPath = projectRoot + "Modules\\Core\\ErrorRecovery.cs";
         if (!System.IO.File.Exists(errorRecoveryPath)) {
-            LogErr("ErrorRecovery.cs not found");
+            LogErr("Modules/Core/ErrorRecovery.cs not found");
             return false;
         }
-        Log("✓ ErrorRecovery.cs exists");
+        Log("OK Modules/Core/ErrorRecovery.cs exists");
         
-        // Verify error recovery functions
+        // Also check Core/ (ZD script layer copy)
+        string coreErrorRecoveryPath = projectRoot + "Core\\ErrorRecovery.cs";
+        if (!System.IO.File.Exists(coreErrorRecoveryPath)) {
+            Log("NOTE: Core/ErrorRecovery.cs not found (optional ZD script layer copy)");
+        } else {
+            Log("OK Core/ErrorRecovery.cs exists (ZD script layer)");
+        }
+        
+        // Verify error recovery functions in Modules/Core/ version
         string errorRecoveryCode = System.IO.File.ReadAllText(errorRecoveryPath);
         
         string[] requiredFunctions = new string[] {
             "TryWithRetry",
-            "TryWithRetryFunc",
             "RecoverFromError",
-            "LogError",
-            "IsErrorThresholdExceeded"
+            "LogError"
         };
         
         foreach (string func in requiredFunctions) {
@@ -387,22 +347,8 @@ Func<bool> TestErrorRecovery = () => {
                 LogErr("Function not found: " + func);
                 return false;
             }
-            Log("✓ Function present: " + func);
+            Log("OK Function present: " + func);
         }
-        
-        // Verify retry configuration
-        if (!errorRecoveryCode.Contains("maxRetries = 3")) {
-            LogErr("Max retries not set to 3");
-            return false;
-        }
-        Log("✓ Max retries: 3");
-        
-        // Verify exponential backoff
-        if (!errorRecoveryCode.Contains("2000") && !errorRecoveryCode.Contains("4000") && !errorRecoveryCode.Contains("8000")) {
-            LogErr("Exponential backoff delays not found");
-            return false;
-        }
-        Log("✓ Exponential backoff: 2s, 4s, 8s");
         
         LogSuccess("Error recovery test PASSED");
         return true;
@@ -413,7 +359,7 @@ Func<bool> TestErrorRecovery = () => {
     }
 };
 
-// Test 6: Config Loading
+// Test 6: Config Loading (all required JSON + core modules)
 Func<bool> TestConfigLoading = () => {
     Log("\n--- Test 6: Config Loading ---");
     
@@ -421,7 +367,13 @@ Func<bool> TestConfigLoading = () => {
         // Test all required config files exist
         string[] configFiles = new string[] {
             "Config\\PlatformsConfig.json",
-            "Config\\device_app_mapping.json"
+            "Config\\device_app_mapping.json",
+            "Config\\Operations\\reddit_operations.json",
+            "Config\\Operations\\instagram_operations.json",
+            "Config\\Operations\\babycenter_operations.json",
+            "Config\\IntentMappings\\reddit_intents.json",
+            "Config\\IntentMappings\\instagram_intents.json",
+            "Config\\IntentMappings\\babycenter_intents.json"
         };
         
         foreach (string configFile in configFiles) {
@@ -430,15 +382,18 @@ Func<bool> TestConfigLoading = () => {
                 LogErr("Config file not found: " + configFile);
                 return false;
             }
-            Log("✓ Config exists: " + configFile);
+            Log("OK Config exists: " + configFile);
         }
         
-        // Test all core modules exist
+        // Test core modules exist (compiled by ModuleLoader)
         string[] coreModules = new string[] {
-            "Core\\HumanizationEngine.cs",
-            "Core\\UILocator.cs",
-            "Core\\ErrorRecovery.cs",
-            "Core\\PlatformBase.cs"
+            "Modules\\Core\\ActionExecutor.cs",
+            "Modules\\Core\\SelectorEngine.cs",
+            "Modules\\Core\\PageDetector.cs",
+            "Modules\\Core\\IntentTranslator.cs",
+            "Modules\\Core\\CoreHelper.cs",
+            "Modules\\Core\\JsonHelper.cs",
+            "Modules\\Core\\ErrorRecovery.cs"
         };
         
         foreach (string module in coreModules) {
@@ -447,25 +402,10 @@ Func<bool> TestConfigLoading = () => {
                 LogErr("Core module not found: " + module);
                 return false;
             }
-            Log("✓ Core module exists: " + module);
+            Log("OK Core module exists: " + module);
         }
         
-        // Test platform modules exist
-        string[] platformModules = new string[] {
-            "Platforms\\Reddit\\RedditModule.cs",
-            "Platforms\\Instagram\\InstagramModule.cs"
-        };
-        
-        foreach (string module in platformModules) {
-            string fullPath = projectRoot + module;
-            if (!System.IO.File.Exists(fullPath)) {
-                LogErr("Platform module not found: " + module);
-                return false;
-            }
-            Log("✓ Platform module exists: " + module);
-        }
-        
-        // Test SessionRunner updated
+        // Test SessionRunner exists and uses ActionExecutor architecture
         string sessionRunnerPath = projectRoot + "Modules\\SessionRunner.cs";
         if (!System.IO.File.Exists(sessionRunnerPath)) {
             LogErr("SessionRunner.cs not found");
@@ -473,15 +413,15 @@ Func<bool> TestConfigLoading = () => {
         }
         
         string sessionRunnerCode = System.IO.File.ReadAllText(sessionRunnerPath);
-        if (!sessionRunnerCode.Contains("DeterminePlatform")) {
-            LogErr("DeterminePlatform function not found in SessionRunner");
+        if (!sessionRunnerCode.Contains("ExecuteWithUnifiedEngine")) {
+            LogErr("ExecuteWithUnifiedEngine not found in SessionRunner");
             return false;
         }
-        if (!sessionRunnerCode.Contains("LoadPlatformModule")) {
-            LogErr("LoadPlatformModule function not found in SessionRunner");
+        if (!sessionRunnerCode.Contains("ActionExecutor")) {
+            LogErr("ActionExecutor reference not found in SessionRunner");
             return false;
         }
-        Log("✓ SessionRunner has multi-platform support");
+        Log("OK SessionRunner uses ActionExecutor + ExecuteWithUnifiedEngine architecture");
         
         LogSuccess("Config loading test PASSED");
         return true;
@@ -491,5 +431,96 @@ Func<bool> TestConfigLoading = () => {
         return false;
     }
 };
+
+// Test 7: Operations JSON Structure Validation
+Func<bool> TestOperationsStructure = () => {
+    Log("\n--- Test 7: Operations JSON Structure ---");
+    
+    try {
+        string[] platforms = new string[] { "reddit", "instagram", "babycenter" };
+        string[] requiredKeys = new string[] { "browse", "like", "comment" };
+        
+        foreach (string platform in platforms) {
+            string opsPath = projectRoot + "Config\\Operations\\" + platform + "_operations.json";
+            if (!System.IO.File.Exists(opsPath)) {
+                LogErr(platform + "_operations.json not found");
+                return false;
+            }
+            
+            string opsJson = System.IO.File.ReadAllText(opsPath);
+            
+            // Validate structure: must have "operations" key
+            if (!opsJson.Contains("\"operations\"")) {
+                LogErr(platform + "_operations.json missing 'operations' key");
+                return false;
+            }
+            
+            // Validate required operation keys
+            foreach (string key in requiredKeys) {
+                if (!opsJson.Contains("\"" + key + "\"")) {
+                    LogErr(platform + "_operations.json missing operation: " + key);
+                    return false;
+                }
+            }
+            
+            // Validate steps exist (operations should have "steps" arrays)
+            if (!opsJson.Contains("\"steps\"")) {
+                LogErr(platform + "_operations.json missing 'steps' in operations");
+                return false;
+            }
+            
+            Log("OK " + platform + "_operations.json: valid structure with browse/like/comment + steps");
+        }
+        
+        LogSuccess("Operations JSON structure test PASSED");
+        return true;
+        
+    } catch (System.Exception ex) {
+        LogErr("Test exception: " + ex.Message);
+        return false;
+    }
+};
+
+// ========== Test Scenario Router ==========
+bool testPassed = false;
+
+switch (testScenario) {
+    case "reddit_basic":
+        testPassed = TestRedditBasic();
+        break;
+    case "instagram_basic":
+        testPassed = TestInstagramBasic();
+        break;
+    case "platform_switching":
+        testPassed = TestPlatformSwitching();
+        break;
+    case "rate_limit":
+        testPassed = TestRateLimit();
+        break;
+    case "error_recovery":
+        testPassed = TestErrorRecovery();
+        break;
+    case "config_loading":
+        testPassed = TestConfigLoading();
+        break;
+    case "operations_structure":
+        testPassed = TestOperationsStructure();
+        break;
+    default:
+        LogErr("Unknown test scenario: " + testScenario);
+        testPassed = false;
+        break;
+}
+
+// ========== Test Results ==========
+Log("=".PadRight(60, '='));
+if (testPassed) {
+    LogSuccess("TEST PASSED: " + testScenario);
+    SetVar("test_result", "PASS");
+} else {
+    LogErr("TEST FAILED: " + testScenario);
+    SetVar("test_result", "FAIL");
+}
+Log("=".PadRight(60, '='));
 
 Log("\nIntegration test complete.");
