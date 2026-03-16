@@ -80,8 +80,7 @@ public static class MemoryManager
             return false;
         }
 
-        string interactions = JsonHelper.GetArray(json, "interactions");
-        List<string> list = ParseJsonArray(interactions);
+        List<string> list = ParseJsonArray(JsonHelper.GetArray(json, "interactions"));
 
         int i = 0;
         for (i = 0; i < list.Count; i++)
@@ -622,6 +621,26 @@ public static class MemoryManager
                 {
                     list.Add(obj);
                 }
+            }
+        }
+
+        return list;
+    }
+
+    private static List<string> ParseJsonArray(string[] items)
+    {
+        List<string> list = new List<string>();
+        if (items == null || items.Length == 0)
+        {
+            return list;
+        }
+
+        int i = 0;
+        for (i = 0; i < items.Length; i++)
+        {
+            if (!string.IsNullOrEmpty(items[i]))
+            {
+                list.Add(items[i]);
             }
         }
 

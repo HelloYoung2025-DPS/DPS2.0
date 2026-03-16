@@ -134,7 +134,7 @@ public class WeeklyEvolve
             CoreHelper.Log(TAG, "AI分析完成");
             
             // 提取 JSON 响应
-            string aiJson = AIService.ExtractJson(responseText);
+            string aiJson = AIService.ExtractJson(AIService.ExtractText(responseText, ""));
             
             // 检查是否需要进化
             if (aiJson.Contains("\"should_evolve\": true") || 

@@ -524,6 +524,25 @@ public static class RuleEngine
         }
     }
 
+    private static void AddArrayValues(List<string> target, string[] items)
+    {
+        if (target == null || items == null || items.Length == 0)
+        {
+            return;
+        }
+
+        int i = 0;
+        while (i < items.Length)
+        {
+            string element = items[i];
+            if (!string.IsNullOrEmpty(element))
+            {
+                target.Add(element);
+            }
+            i++;
+        }
+    }
+
     private static List<string> DistinctNonEmpty(List<string> values)
     {
         List<string> result = new List<string>();

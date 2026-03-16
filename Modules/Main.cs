@@ -247,7 +247,7 @@ public class Main
         string memoryDir = projectRoot + "Memory\\" + deviceId;
         if (Directory.Exists(memoryDir))
         {
-            string[] memoryFiles = Directory.GetFiles(memoryDir, "*.json");
+            string[] memoryFiles = Directory.GetFiles(memoryDir, "*.json", SearchOption.AllDirectories);
             if (memoryFiles.Length > 0)
             {
                 string memoryBackupDir = upgradeBackupDir + "\\Memory_" + deviceId;
@@ -257,8 +257,14 @@ public class Main
                 {
                     try
                     {
-                        string fileName = Path.GetFileName(file);
-                        File.Copy(file, memoryBackupDir + "\\" + fileName, true);
+                        string relativePath = file.Substring(memoryDir.Length).TrimStart('\\', '/');
+                        string backupPath = Path.Combine(memoryBackupDir, relativePath);
+                        string backupDir = Path.GetDirectoryName(backupPath);
+                        if (!string.IsNullOrEmpty(backupDir))
+                        {
+                            Directory.CreateDirectory(backupDir);
+                        }
+                        File.Copy(file, backupPath, true);
                         File.Delete(file);
                         backupCount++;
                         deleteCount++;

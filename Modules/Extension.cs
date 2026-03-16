@@ -76,9 +76,62 @@ public class Extension
     /// </summary>
     private static void RegisterBuiltinExtensions()
     {
-        ExtensionManager.Register(new IPLocationExtension());
-        ExtensionManager.Register(new WeatherExtension());
+        TryRegisterBuiltinExtension("IPLocationExtension");
+        TryRegisterBuiltinExtension("WeatherExtension");
         
         CoreHelper.Log(TAG, "内置扩展注册完成");
+    }
+
+    private static void TryRegisterBuiltinExtension(string typeName)
+    {
+        if (string.IsNullOrEmpty(typeName))
+        {
+            return;
+        }
+
+        Type extensionType = FindType(typeName);
+        if (extensionType == null)
+        {
+            CoreHelper.LogWarn(TAG, "未找到内置扩展类型: " + typeName);
+            return;
+        }
+
+        if (!typeof(IExtension).IsAssignableFrom(extensionType))
+        {
+            CoreHelper.LogWarn(TAG, "扩展类型未实现 IExtension: " + typeName);
+            return;
+        }
+
+        try
+        {
+            IExtension extension = (IExtension)Activator.CreateInstance(extensionType);
+            ExtensionManager.Register(extension);
+        }
+        catch (Exception ex)
+        {
+            CoreHelper.LogWarn(TAG, "注册扩展失败 " + typeName + ": " + ex.Message);
+        }
+    }
+
+    private static Type FindType(string typeName)
+    {
+        Type type = Type.GetType(typeName);
+        if (type != null)
+        {
+            return type;
+        }
+
+        System.Reflection.Assembly[] assemblies = AppDomain.CurrentDomain.GetAssemblies();
+        int i = 0;
+        for (i = 0; i < assemblies.Length; i++)
+        {
+            type = assemblies[i].GetType(typeName);
+            if (type != null)
+            {
+                return type;
+            }
+        }
+
+        return null;
     }
 }
