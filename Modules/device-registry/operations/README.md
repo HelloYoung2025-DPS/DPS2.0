@@ -1,0 +1,15 @@
+# Device Registry operations
+
+The module remains proposed. PostgreSQL integration is configured only through `DPS_TEST_POSTGRES`; the required suite fails instead of skipping when the variable, database, or exact PostgreSQL 18.4 server is unavailable. Each test owns a random disposable schema and drops it after execution.
+
+Rollout is synthetic, shadow, and bounded canary. `kill_device_registry_writes` stops new registrations, capability revisions, retirement mutations, and new reservation transitions. A held reservation uses database time and a five-minute lease; confirmation freezes the exact registration revision until binding explicitly releases it. Capability changes and retirement acquire the same device lock and fail closed while a held-unexpired or active reservation exists.
+
+Registration accepts only a precomputed HMAC-SHA-256 fingerprint whose non-secret `fingerprint_key_id` and positive epoch exactly match the registry's configured active version. The registry never receives the HMAC secret. Key rotation is a controlled re-attestation migration: stop writes, preserve the old keyed mapping, prove the new HMAC from an authorized device source, then change the configured epoch through a signed BOM. A normal registration call cannot relabel one digest as another key epoch.
+
+The binding provider exposes a secret-free SHA-256 identity over its canonical non-secret PostgreSQL target, schema, fingerprint key ID/epoch, and positive `trust_epoch`. Password, passfile, and SSL password values are excluded. Binding composition must pin that digest and epoch in its signed attestation before requesting a reservation. Changing any bound field requires a new signed composition; changing only a database credential for the same target does not create a false provider identity change.
+
+If `003_require_keyed_fingerprint_contract.sql` finds any populated pre-release row using `fingerprint_sha256`, startup fails. Operators must not rename the column, reuse the old digest as an HMAC, or invent a key ID. Export the old evidence, obtain authorized device re-attestation, import through a separately reviewed migration, and retain the failure evidence.
+
+Rollback restores only a previous signed BOM that declares compatibility with the keyed-fingerprint schema, without deleting device identity, binding reservations, append-only revisions, receipts, outbox rows, or quarantine evidence. Downgrade to the former unkeyed pre-release shape is forbidden. A rollback must retain the schema until the previous BOM has demonstrated read compatibility. Operators must investigate active reservations that have no matching binding attempt rather than editing provider rows directly.
+
+The module never receives GBrain credentials, raw hardware identifiers, fingerprint HMAC secrets, unkeyed fingerprint digests, email addresses, or phone numbers. Operational diagnostics may report canonical opaque IDs, key IDs/epochs, trust epochs, and hashes but must not log the PostgreSQL connection string.

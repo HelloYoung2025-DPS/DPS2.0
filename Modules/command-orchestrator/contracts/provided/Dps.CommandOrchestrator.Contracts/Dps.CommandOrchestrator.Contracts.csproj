@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.CommandOrchestrator.Contracts</AssemblyName>
+    <RootNamespace>Dps.CommandOrchestrator.Contracts</RootNamespace>
+    <PackageId>Dps.CommandOrchestrator.Contracts</PackageId>
+    <Version>0.2.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="../command.dispatch.v1.schema.json" Pack="true" PackagePath="contracts" />
+    <None Include="../command.receipt.v1.schema.json" Pack="true" PackagePath="contracts" />
+    <None Include="../command.receipt.signed.v1.schema.json" Pack="true" PackagePath="contracts" />
+    <None Include="../execution.authorization.v1.schema.json" Pack="true" PackagePath="contracts" />
+    <None Include="../execution.authorization.v1.canonical.md" Pack="true" PackagePath="contracts" />
+    <None Include="../execution.authorization.v1.canonical.json" Pack="true" PackagePath="contracts" />
+    <EmbeddedResource Include="../command.receipt.signed.v1.schema.json" LogicalName="Dps.CommandOrchestrator.Contracts.command.receipt.signed.v1.schema.json" />
+    <EmbeddedResource Include="../execution.authorization.v1.schema.json" LogicalName="Dps.CommandOrchestrator.Contracts.execution.authorization.v1.schema.json" />
+    <EmbeddedResource Include="../execution.authorization.v1.canonical.json" LogicalName="Dps.CommandOrchestrator.Contracts.execution.authorization.v1.canonical.json" />
+  </ItemGroup>
+</Project>

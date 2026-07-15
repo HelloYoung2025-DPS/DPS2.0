@@ -1,0 +1,32 @@
+{
+  "schema_version": "dps.toolchain-lock/v1",
+  "dotnet": {
+    "sdk": "10.0.301",
+    "runtime": "10.0.9",
+    "test_runner": "Microsoft.Testing.Platform",
+    "source": "https://dotnet.microsoft.com/en-us/download/dotnet/10.0"
+  },
+  "postgresql": {
+    "version": "18.4",
+    "source": "https://www.postgresql.org/download/"
+  },
+  "python": {
+    "version": "3.12.13",
+    "dependencies": "requirements-ci.txt"
+  },
+  "node": {
+    "version": "24.18.0",
+    "npm": "11.16.0",
+    "dependencies": "package-lock.json"
+  },
+  "powershell": {
+    "version": "7.6.2",
+    "source": "https://github.com/PowerShell/PowerShell/releases/tag/v7.6.2"
+  },
+  "android_platform_tools": {
+    "version": "37.0.0",
+    "build": "14910828",
+    "archive_sha256": "094a1395683c509fd4d48667da0d8b5ef4d42b2abfcd29f2e8149e2f989357c7",
+    "source": "https://dl.google.com/android/repository/platform-tools_r37.0.0-darwin.zip"
+  }
+}

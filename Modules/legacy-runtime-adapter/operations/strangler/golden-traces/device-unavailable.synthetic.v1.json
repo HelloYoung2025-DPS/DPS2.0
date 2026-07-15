@@ -1,0 +1,34 @@
+{
+  "schema_version": "dps.legacy-sessionrunner-golden-trace/v1",
+  "trace_id": "trace_291c71283f5e16dbf5daee7514235be8",
+  "fixture_kind": "SYNTHETIC_FORMAT_EXAMPLE",
+  "runtime_observed": false,
+  "evidence_eligibility": [],
+  "source_snapshot_id": "legacy-sessionrunner:3f9f8b9cf1e4f91c84220f6c89a1d7d416bd73d250705f1f0f4c81f41a5e6f97",
+  "scenario": "Fail-closed trace shape while the authenticated modern execution bridge is unavailable.",
+  "identity_scope": {
+    "soul_id": "soul_c763caeee6bfe5034a8fcbb9f626417c263a12c405b1455a9b6798b275eb3b51",
+    "device_binding_id": "db_87618f87a469bd551fceb7e761f05fbe",
+    "platform_account_id": "pa_beb9647a49c81c8f85353365b09483d3"
+  },
+  "steps": [
+    {
+      "sequence": 1,
+      "method": "InitSession",
+      "input_fixture": {
+        "fixture": "modern-bridge-unavailable"
+      },
+      "expected_return": "ERROR: modern authorization bridge unavailable",
+      "expected_state": {
+        "session_result": "ERROR",
+        "zd_step_type": "ERROR_BRIDGE_REQUIRED",
+        "zd_action_result": "UNKNOWN",
+        "terminal": true
+      }
+    }
+  ],
+  "limitations": [
+    "Synthetic format fixture only; no legacy runtime execution occurred.",
+    "No Windows, ZennoDroid, ADB, GBrain, integration, or device evidence is claimed."
+  ]
+}

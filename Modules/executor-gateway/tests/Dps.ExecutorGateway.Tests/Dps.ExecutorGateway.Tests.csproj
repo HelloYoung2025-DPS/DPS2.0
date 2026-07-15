@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.ExecutorGateway.Tests</AssemblyName>
+    <RootNamespace>Dps.ExecutorGateway.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <Compile Include="../../src/Dps.ExecutorGateway/EcdsaNativeStopProofVerifier.cs" Link="HistoricalQuarantine/EcdsaNativeStopProofVerifier.cs" />
+    <ProjectReference Include="../../src/Dps.ExecutorGateway/Dps.ExecutorGateway.csproj" />
+    <ProjectReference Include="../Dps.ExecutorGateway.NativeFixture/Dps.ExecutorGateway.NativeFixture.csproj" ReferenceOutputAssembly="false" />
+    <EmbeddedResource Include="../required-security-tests.v2.json" LogicalName="Dps.ExecutorGateway.Tests.required-security-tests.v2.json" />
+    <EmbeddedResource Include="../required-local-process-tests.v2.json" LogicalName="Dps.ExecutorGateway.Tests.required-local-process-tests.v2.json" />
+    <EmbeddedResource Include="../native-fixture.exchange.v1.schema.json" LogicalName="Dps.ExecutorGateway.Tests.native-fixture.exchange.v1.schema.json" />
+    <EmbeddedResource Include="../../contracts/provided/native.stop.proof.v1.schema.json" LogicalName="Dps.ExecutorGateway.Tests.native.stop.proof.v1.schema.json" />
+  </ItemGroup>
+  <Target Name="CopyNativeFixtureForIntegrationTests" AfterTargets="Build">
+    <ItemGroup>
+      <NativeFixtureFiles Include="$(MSBuildProjectDirectory)/../Dps.ExecutorGateway.NativeFixture/bin/$(Configuration)/$(TargetFramework)/Dps.ExecutorGateway.NativeFixture.dll" />
+      <NativeFixtureFiles Include="$(MSBuildProjectDirectory)/../Dps.ExecutorGateway.NativeFixture/bin/$(Configuration)/$(TargetFramework)/Dps.ExecutorGateway.NativeFixture.deps.json" />
+      <NativeFixtureFiles Include="$(MSBuildProjectDirectory)/../Dps.ExecutorGateway.NativeFixture/bin/$(Configuration)/$(TargetFramework)/Dps.ExecutorGateway.NativeFixture.runtimeconfig.json" />
+    </ItemGroup>
+    <Error Condition="!Exists('%(NativeFixtureFiles.Identity)')" Text="Required REAL_LOCAL_PROCESS native fixture output is missing: %(NativeFixtureFiles.Identity)" />
+    <Copy SourceFiles="@(NativeFixtureFiles)" DestinationFolder="$(TargetDir)native-fixture" SkipUnchangedFiles="false" />
+  </Target>
+</Project>

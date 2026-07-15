@@ -1,0 +1,7 @@
+# Platform Account Registry tests
+
+The deterministic Unit and Contract harness exits non-zero on failure. It uses hashed synthetic aliases, ephemeral test-only P-256 keys, and no platform credentials or network. Tests cover the compiled-root golden signature vector, attacker-key forgery, wrong-scope replay, expiry, unknown issuer, strict missing/unknown/duplicate JSON rejection, canonical identifier newline rejection, options redaction, provider-instance configuration identity, and canonical reservation receipt idempotency. The production private key is not available to tests.
+
+The required Integration suite uses a real PostgreSQL 18.4 database through `DPS_TEST_POSTGRES`, verifies the exact server version before any schema creation, creates a random module-owned schema per test, and drops it afterward. Port `55434` and database `dps_gbrain_company` are rejected before connection because they are reserved for persistent GBrain Company data. Missing database configuration or connectivity fails the suite; it is never converted to `SKIP`. The suite covers concurrent uniqueness, exact idempotent replay, conflicting hashes, revision lifecycle, cross-Soul/account isolation, crash-window rollback, restart recovery, provider-owned reservation persistence across restart, exact-revision mutation freeze and release, outbox atomicity, and the absence of raw identity or secret fields.
+
+These checks are not live-platform, Windows, device, canary, or scale evidence.

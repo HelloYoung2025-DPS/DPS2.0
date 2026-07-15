@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/native.result.v1.schema.json",
+  "title": "native.result/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_id", "producer_module", "native_result_id", "command_id", "lease_id", "attempt", "soul_id", "device_binding_id", "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class", "active_release_bom_sha256", "active_release_bom_generation", "active_release_bom_token_sha256", "step_results"],
+  "properties": {
+    "schema_version": {"type": "string", "pattern": "^1(?:\\.[0-9]+){0,2}$"}, "contract_id": {"const": "native.result/v1"}, "producer_module": {"const": "executor-gateway"},
+    "native_result_id": {"type": "string", "format": "uuid"}, "command_id": {"type": "string", "format": "uuid"}, "lease_id": {"type": "string", "format": "uuid"}, "attempt": {"type": "integer", "minimum": 1, "maximum": 3},
+    "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"}, "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"}, "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"}, "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"}, "occurred_at": {"type": "string", "format": "date-time"}, "privacy_class": {"const": "internal"},
+    "active_release_bom_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "active_release_bom_generation": {"type": "integer", "minimum": 1}, "active_release_bom_token_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "step_results": {"type": "array", "minItems": 1, "maxItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["step_id", "step_kind", "status", "native_code", "evidence_digest"], "properties": {"step_id": {"type": "string", "format": "uuid"}, "step_kind": {"enum": ["ui.observe", "ui.locate", "ui.verify", "control.wait", "fixture.tap", "fixture.type"]}, "status": {"enum": ["SUCCESS", "FAILED", "UNKNOWN"]}, "native_code": {"type": "string", "minLength": 1, "maxLength": 128}, "evidence_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}}}}
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "dps.required-tests/v2",
+  "suiteId": "executor-gateway.local-process",
+  "evidenceKind": "REAL_LOCAL_PROCESS",
+  "requiredTests": [
+    {"id": "Dps.ExecutorGateway.Tests.NativeFixtureProcessIntegrationTests.RealLocalProcessSuccessBindsFullGenerationTokenRequestAndResult", "category": "Integration"},
+    {"id": "Dps.ExecutorGateway.Tests.NativeFixtureProcessIntegrationTests.ProcessCrashAfterSubmissionFlushLeavesPendingAndRestartBlocksSameAttemptWithoutSecondSideEffect", "category": "Integration"},
+    {"id": "Dps.ExecutorGateway.Tests.NativeFixtureProcessIntegrationTests.ProcessCrashBeforeSubmissionFlushLeavesPendingAndRestartBlocksSameAttemptWithoutSideEffect", "category": "Integration"},
+    {"id": "Dps.ExecutorGateway.Tests.NativeFixtureProcessIntegrationTests.OldAttemptReplayFromIndependentProcessFailsClosed", "category": "Integration"},
+    {"id": "Dps.ExecutorGateway.Tests.NativeFixtureProcessIntegrationTests.CrossScopeResponseFromIndependentProcessFailsClosed", "category": "Integration"},
+    {"id": "Dps.ExecutorGateway.Tests.NativeFixtureProcessIntegrationTests.BomSwitchAfterSideEffectFromIndependentProcessIsUnknownOutcome", "category": "Integration"},
+    {"id": "Dps.ExecutorGateway.Tests.NativeFixtureProcessIntegrationTests.AcknowledgedAttemptCannotBlindResubmitOrRepeatSideEffect", "category": "Integration"},
+    {"id": "Dps.ExecutorGateway.Tests.NativeFixtureProcessIntegrationTests.RequiredLocalProcessTestIdsArePresent", "category": "Integration"}
+  ]
+}

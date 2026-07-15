@@ -1,0 +1,272 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/edge.worker.exchange.v1.schema.json",
+  "title": "Windows Edge worker exchange v1",
+  "x-dps-request-sha256-spec": "edge.worker.exchange.v1.request-sha256.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "producer_module",
+    "soul_id",
+    "device_binding_id",
+    "platform_account_id",
+    "trace_id",
+    "idempotency_key",
+    "occurred_at",
+    "privacy_class",
+    "exchange_kind",
+    "command_id",
+    "lease_id",
+    "lease_expires_at",
+    "request_sha256",
+    "action_kind",
+    "step_kind",
+    "selector",
+    "text",
+    "wait_ms",
+    "expected_postcondition",
+    "shadow",
+    "dispatch_acknowledged",
+    "native_status",
+    "postcondition_verified",
+    "result_status",
+    "duplicate",
+    "retry_allowed",
+    "detail"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_id": {"const": "edge.worker.exchange/v1"},
+    "producer_module": {"enum": ["windows-edge-supervisor", "windows-edge-worker"]},
+    "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time", "pattern": "^(?!0000)[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|\\+00:00)$(?![\\s\\S])"},
+    "privacy_class": {"enum": ["internal", "personal", "sensitive"]},
+    "exchange_kind": {"enum": ["COMMAND", "RECEIPT", "HEALTH"]},
+    "command_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 128},
+    "lease_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 128},
+    "lease_expires_at": {"type": ["string", "null"], "format": "date-time", "pattern": "^(?!0000)[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|\\+00:00)$(?![\\s\\S])"},
+    "request_sha256": {"type": ["string", "null"], "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "action_kind": {
+      "type": ["string", "null"],
+      "enum": ["OBSERVE", "LOCATE", "VERIFY", "WAIT", "TAP", "TYPE", null]
+    },
+    "step_kind": {
+      "type": ["string", "null"],
+      "enum": ["OBSERVE_SCREEN", "LOCATE_SELECTOR", "VERIFY_POSTCONDITION", "WAIT_DURATION", "TAP_SELECTOR", "TYPE_TEXT", null]
+    },
+    "selector": {"type": ["string", "null"], "maxLength": 2048},
+    "text": {"type": ["string", "null"], "maxLength": 4096},
+    "wait_ms": {"type": ["integer", "null"], "minimum": 0, "maximum": 300000},
+    "expected_postcondition": {"type": ["string", "null"], "maxLength": 2048},
+    "shadow": {"type": "boolean"},
+    "dispatch_acknowledged": {"type": ["boolean", "null"]},
+    "native_status": {"type": ["string", "null"], "enum": ["SUCCESS", "FAILED", "UNKNOWN_OUTCOME", null]},
+    "postcondition_verified": {"type": ["boolean", "null"]},
+    "result_status": {
+      "type": ["string", "null"],
+      "enum": ["VERIFIED_SUCCESS", "FAILED", "UNKNOWN_OUTCOME", "REJECTED", "QUARANTINED", "IN_PROGRESS", "SHADOWED", "HEALTHY", null]
+    },
+    "duplicate": {"type": ["boolean", "null"]},
+    "retry_allowed": {"type": ["boolean", "null"]},
+    "detail": {"type": ["string", "null"], "maxLength": 4096}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"exchange_kind": {"const": "COMMAND"}}, "required": ["exchange_kind"]},
+      "then": {
+        "properties": {
+          "producer_module": {"const": "windows-edge-supervisor"},
+          "command_id": {"type": "string", "minLength": 1, "maxLength": 128},
+          "lease_id": {"type": "string", "minLength": 1, "maxLength": 128},
+          "lease_expires_at": {"type": "string", "format": "date-time", "pattern": "^(?!0000)[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|\\+00:00)$(?![\\s\\S])"},
+          "request_sha256": {"type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+          "action_kind": {"enum": ["OBSERVE", "LOCATE", "VERIFY", "WAIT", "TAP", "TYPE"]},
+          "step_kind": {"enum": ["OBSERVE_SCREEN", "LOCATE_SELECTOR", "VERIFY_POSTCONDITION", "WAIT_DURATION", "TAP_SELECTOR", "TYPE_TEXT"]},
+          "dispatch_acknowledged": {"type": "null"},
+          "native_status": {"type": "null"},
+          "postcondition_verified": {"type": "null"},
+          "result_status": {"type": "null"},
+          "duplicate": {"type": "null"},
+          "retry_allowed": {"type": "null"},
+          "detail": {"type": "null"}
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "action_kind": {"const": "OBSERVE"},
+              "step_kind": {"const": "OBSERVE_SCREEN"}
+            }
+          },
+          {
+            "properties": {
+              "action_kind": {"const": "LOCATE"},
+              "step_kind": {"const": "LOCATE_SELECTOR"},
+              "selector": {"type": "string", "minLength": 1, "maxLength": 2048}
+            }
+          },
+          {
+            "properties": {
+              "action_kind": {"const": "VERIFY"},
+              "step_kind": {"const": "VERIFY_POSTCONDITION"},
+              "selector": {"type": "string", "minLength": 1, "maxLength": 2048}
+            }
+          },
+          {
+            "properties": {
+              "action_kind": {"const": "WAIT"},
+              "step_kind": {"const": "WAIT_DURATION"},
+              "wait_ms": {"type": "integer", "minimum": 0, "maximum": 300000}
+            }
+          },
+          {
+            "properties": {
+              "action_kind": {"const": "TAP"},
+              "step_kind": {"const": "TAP_SELECTOR"},
+              "selector": {"type": "string", "minLength": 1, "maxLength": 2048}
+            }
+          },
+          {
+            "properties": {
+              "action_kind": {"const": "TYPE"},
+              "step_kind": {"const": "TYPE_TEXT"},
+              "text": {"type": "string", "minLength": 1, "maxLength": 4096}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {"properties": {"exchange_kind": {"const": "RECEIPT"}}, "required": ["exchange_kind"]},
+      "then": {
+        "properties": {
+          "producer_module": {"const": "windows-edge-worker"},
+          "command_id": {"type": "string", "minLength": 1, "maxLength": 128},
+          "lease_id": {"type": "null"},
+          "lease_expires_at": {"type": "null"},
+          "request_sha256": {"type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+          "action_kind": {"type": "null"},
+          "step_kind": {"type": "null"},
+          "selector": {"type": "null"},
+          "text": {"type": "null"},
+          "wait_ms": {"type": "null"},
+          "expected_postcondition": {"type": "null"},
+          "shadow": {"const": false},
+          "result_status": {"enum": ["VERIFIED_SUCCESS", "FAILED", "UNKNOWN_OUTCOME", "REJECTED", "QUARANTINED", "IN_PROGRESS", "SHADOWED"]},
+          "duplicate": {"type": "boolean"},
+          "retry_allowed": {"type": "boolean"},
+          "detail": {"type": "string", "minLength": 1, "maxLength": 4096}
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "result_status": {"const": "VERIFIED_SUCCESS"},
+              "dispatch_acknowledged": {"const": true},
+              "native_status": {"const": "SUCCESS"},
+              "postcondition_verified": {"const": true},
+              "retry_allowed": {"const": false}
+            }
+          },
+          {
+            "properties": {
+              "result_status": {"const": "UNKNOWN_OUTCOME"},
+              "dispatch_acknowledged": {"enum": [true, null]},
+              "native_status": {"const": "UNKNOWN_OUTCOME"},
+              "postcondition_verified": {"type": "null"},
+              "retry_allowed": {"const": false}
+            }
+          },
+          {
+            "properties": {
+              "result_status": {"const": "FAILED"},
+              "retry_allowed": {"const": false}
+            },
+            "oneOf": [
+              {
+                "properties": {
+                  "dispatch_acknowledged": {"const": false},
+                  "native_status": {"const": "FAILED"},
+                  "postcondition_verified": {"const": false}
+                }
+              },
+              {
+                "properties": {
+                  "dispatch_acknowledged": {"const": true},
+                  "native_status": {"const": "SUCCESS"},
+                  "postcondition_verified": {"const": false}
+                }
+              },
+              {
+                "properties": {
+                  "dispatch_acknowledged": {"const": true},
+                  "native_status": {"const": "FAILED"},
+                  "postcondition_verified": {"type": "boolean"}
+                }
+              }
+            ]
+          },
+          {
+            "properties": {
+              "result_status": {"enum": ["REJECTED", "QUARANTINED"]},
+              "dispatch_acknowledged": {"const": false},
+              "native_status": {"type": "null"},
+              "postcondition_verified": {"type": "null"},
+              "duplicate": {"const": false},
+              "retry_allowed": {"const": false}
+            }
+          },
+          {
+            "properties": {
+              "result_status": {"const": "IN_PROGRESS"},
+              "dispatch_acknowledged": {"const": false},
+              "native_status": {"type": "null"},
+              "postcondition_verified": {"type": "null"},
+              "duplicate": {"const": true},
+              "retry_allowed": {"const": true}
+            }
+          },
+          {
+            "properties": {
+              "result_status": {"const": "SHADOWED"},
+              "dispatch_acknowledged": {"const": false},
+              "native_status": {"type": "null"},
+              "postcondition_verified": {"type": "null"},
+              "retry_allowed": {"const": false}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {"properties": {"exchange_kind": {"const": "HEALTH"}}, "required": ["exchange_kind"]},
+      "then": {
+        "properties": {
+          "producer_module": {"const": "windows-edge-worker"},
+          "command_id": {"type": "null"},
+          "lease_id": {"type": "null"},
+          "lease_expires_at": {"type": "null"},
+          "request_sha256": {"type": "null"},
+          "action_kind": {"type": "null"},
+          "step_kind": {"type": "null"},
+          "selector": {"type": "null"},
+          "text": {"type": "null"},
+          "wait_ms": {"type": "null"},
+          "expected_postcondition": {"type": "null"},
+          "shadow": {"const": false},
+          "dispatch_acknowledged": {"type": "null"},
+          "native_status": {"type": "null"},
+          "postcondition_verified": {"type": "null"},
+          "result_status": {"const": "HEALTHY"},
+          "duplicate": {"type": "null"},
+          "retry_allowed": {"type": "null"},
+          "detail": {"type": "string", "minLength": 1, "maxLength": 4096}
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "schema_version": "dps.legacy-sessionrunner-signatures/v1",
+  "snapshot_id": "legacy-sessionrunner:3f9f8b9cf1e4f91c84220f6c89a1d7d416bd73d250705f1f0f4c81f41a5e6f97",
+  "baseline_commit": "cac7ccbcce927a1a3a62cfd376497f0d30cc47e4",
+  "captured_from": {
+    "path": "Modules/SessionRunner.cs",
+    "git_blob": "bd58a92fcc54fb7a65c61da9d6e3c25e38381555",
+    "sha256": "3f9f8b9cf1e4f91c84220f6c89a1d7d416bd73d250705f1f0f4c81f41a5e6f97",
+    "byte_length": 148924
+  },
+  "canonicalization": "collapse-ascii-whitespace-v1",
+  "evidence_scope": "REPOSITORY_STATIC_ONLY",
+  "methods": [
+    {
+      "name": "Run",
+      "qualified_name": "SessionRunner.Run",
+      "declaration": "public static string Run(object projectObj, object instanceObj)",
+      "start_line": 511,
+      "signature_sha256": "9e2f4fb962f78199d4dde27e7dc31183876dfcfa6ec6b039f618c2d0fcd7b29b"
+    },
+    {
+      "name": "InitSession",
+      "qualified_name": "SessionRunner.InitSession",
+      "declaration": "public static string InitSession(object projectObj, object instanceObj)",
+      "start_line": 1091,
+      "signature_sha256": "f0cb4251432d8fc72dd43e89ccf9e3b721ea25e18b09552c767af8cbe05c16b4"
+    },
+    {
+      "name": "DecideNextAction",
+      "qualified_name": "SessionRunner.DecideNextAction",
+      "declaration": "public static string DecideNextAction(object projectObj, object instanceObj)",
+      "start_line": 1572,
+      "signature_sha256": "8a50985b04d2c7c9565204a6703cf81ab581d25e438bbff96e2cb9a6f33efc32"
+    },
+    {
+      "name": "EvaluateActionResult",
+      "qualified_name": "SessionRunner.EvaluateActionResult",
+      "declaration": "public static string EvaluateActionResult(object projectObj, object instanceObj)",
+      "start_line": 1776,
+      "signature_sha256": "ad8d12ce60ddf04222f7acdd61ca0eeeecaa68878fcc309584d76135729923ac"
+    },
+    {
+      "name": "FinalizeSession",
+      "qualified_name": "SessionRunner.FinalizeSession",
+      "declaration": "public static string FinalizeSession(object projectObj, object instanceObj)",
+      "start_line": 2007,
+      "signature_sha256": "e3e239c9ec45bdc9ba159cab0bc4522947c3f254da7269f7c201ab524c618d88"
+    }
+  ],
+  "limitations": [
+    "This snapshot characterizes repository bytes and public declarations only; it does not prove runtime behavior.",
+    "No Windows, ZennoDroid, ADB, GBrain, integration, or device evidence is claimed."
+  ]
+}

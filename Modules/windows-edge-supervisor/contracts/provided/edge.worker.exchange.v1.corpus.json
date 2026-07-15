@@ -1,0 +1,17 @@
+{
+  "corpus_version": "dps.contract-corpus/v1",
+  "owner_module": "windows-edge-supervisor",
+  "contract_id": "edge.worker.exchange/v1",
+  "schema_file": "edge.worker.exchange.v1.schema.json",
+  "base_file": "edge.worker.exchange.v1.command.golden.json",
+  "cases": [
+    {"id": "canonical-command", "expected": "PASS", "patch": {}},
+    {"id": "request-digest-terminal-newline", "expected": "FAIL", "patch": {"request_sha256": "d7a8f4901c7d56f833b2ff24ea169bff565984a6417f165a4f25a5ff233d8d1e\n"}},
+    {"id": "occurred-at-nonzero-offset", "expected": "FAIL", "patch": {"occurred_at": "2026-07-14T08:00:00+08:00"}},
+    {"id": "occurred-at-year-zero", "expected": "FAIL", "patch": {"occurred_at": "0000-07-14T00:00:00Z"}},
+    {"id": "occurred-at-leap-second", "expected": "FAIL", "patch": {"occurred_at": "2026-07-14T00:00:60Z"}},
+    {"id": "lease-nonzero-offset", "expected": "FAIL", "patch": {"lease_expires_at": "2026-07-14T08:05:00+08:00"}},
+    {"id": "lease-terminal-newline", "expected": "FAIL", "patch": {"lease_expires_at": "2026-07-14T00:05:00Z\n"}},
+    {"id": "trace-terminal-newline", "expected": "FAIL", "patch": {"trace_id": "trace_dddddddddddddddddddddddddddddddd\n"}}
+  ]
+}

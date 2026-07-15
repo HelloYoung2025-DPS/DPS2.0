@@ -1,0 +1,314 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {
+    "id": "evidence-service",
+    "name": "Evidence Service",
+    "version": "0.1.0",
+    "description": "Immutable evidence validation and bundle composition without self-approval.",
+    "lifecycle": "proposed",
+    "runtimeState": "proposed",
+    "releaseEligible": false,
+    "riskTier": "R3",
+    "ownerId": "dps-platform"
+  },
+  "paths": {
+    "actualRoot": "Modules/evidence-service",
+    "canonicalRoot": "modules/evidence-service",
+    "owned": [
+      "Modules/evidence-service/**"
+    ],
+    "excluded": [],
+    "runtimeData": []
+  },
+  "artifacts": [
+    {
+      "id": "dps.evidence-service",
+      "kind": "assembly",
+      "status": "proposed",
+      "build": "scripts/dotnet-pinned.sh restore Modules/evidence-service/src --locked-mode && scripts/dotnet-pinned.sh build Modules/evidence-service/src --configuration Release --no-restore",
+      "versioning": "semver"
+    },
+    {
+      "id": "dps.evidence-service.contracts",
+      "kind": "contract-pack",
+      "status": "proposed",
+      "build": "scripts/dotnet-pinned.sh restore Modules/evidence-service/contracts --locked-mode && scripts/dotnet-pinned.sh build Modules/evidence-service/contracts --configuration Release --no-restore",
+      "versioning": "semver"
+    }
+  ],
+  "runtime": {
+    "track": "modern-service",
+    "language": "C# 14",
+    "target": "net10.0",
+    "processBoundary": "modular-monolith",
+    "entrypoints": [],
+    "toolchainStatus": "proposed"
+  },
+  "contracts": {
+    "provided": [
+      {
+        "contractId": "test.evidence",
+        "major": 1,
+        "source": "Modules/evidence-service/contracts/provided/test.evidence.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "evidence-service"
+      }
+    ],
+    "consumed": [
+      {
+        "contractId": "soul.resolved",
+        "major": 1,
+        "source": "Modules/soul-registry/contracts/provided/soul.resolved.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "soul-registry"
+      },
+      {
+        "contractId": "memory.event",
+        "major": 1,
+        "source": "Modules/memory-event-ledger/contracts/provided/memory.event.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "memory-event-ledger"
+      },
+      {
+        "contractId": "interest.snapshot",
+        "major": 1,
+        "source": "Modules/interest-reducer/contracts/provided/interest.snapshot.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "interest-reducer"
+      },
+      {
+        "contractId": "gbrain.projection",
+        "major": 1,
+        "source": "Modules/gbrain-projector/contracts/provided/gbrain.projection.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "gbrain-projector"
+      }
+    ]
+  },
+  "communication": {
+    "inbound": [
+      {
+        "peerModule": "soul-registry",
+        "contractId": "soul.resolved",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "receipt",
+        "timeoutMs": 5000,
+        "retryPolicy": "bounded-exponential-with-jitter",
+        "idempotencyKey": "trace_id:idempotency_key",
+        "authScope": "module:soul-registry",
+        "failureMode": "fail-closed-and-record-evidence"
+      },
+      {
+        "peerModule": "memory-event-ledger",
+        "contractId": "memory.event",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "receipt",
+        "timeoutMs": 5000,
+        "retryPolicy": "bounded-exponential-with-jitter",
+        "idempotencyKey": "trace_id:idempotency_key",
+        "authScope": "module:memory-event-ledger",
+        "failureMode": "fail-closed-and-record-evidence"
+      },
+      {
+        "peerModule": "interest-reducer",
+        "contractId": "interest.snapshot",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "receipt",
+        "timeoutMs": 5000,
+        "retryPolicy": "bounded-exponential-with-jitter",
+        "idempotencyKey": "trace_id:idempotency_key",
+        "authScope": "module:interest-reducer",
+        "failureMode": "fail-closed-and-record-evidence"
+      },
+      {
+        "peerModule": "gbrain-projector",
+        "contractId": "gbrain.projection",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "receipt",
+        "timeoutMs": 5000,
+        "retryPolicy": "bounded-exponential-with-jitter",
+        "idempotencyKey": "trace_id:idempotency_key",
+        "authScope": "module:gbrain-projector",
+        "failureMode": "fail-closed-and-record-evidence"
+      }
+    ],
+    "outbound": []
+  },
+  "dependencies": [
+    {
+      "moduleId": "soul-registry",
+      "versionRange": ">=0.1.0 <1.0.0",
+      "required": true,
+      "reason": "identity-scoped evidence"
+    },
+    {
+      "moduleId": "memory-event-ledger",
+      "versionRange": ">=0.1.0 <1.0.0",
+      "required": true,
+      "reason": "event evidence"
+    },
+    {
+      "moduleId": "interest-reducer",
+      "versionRange": ">=0.1.0 <1.0.0",
+      "required": true,
+      "reason": "snapshot evidence"
+    },
+    {
+      "moduleId": "gbrain-projector",
+      "versionRange": ">=0.1.0 <1.0.0",
+      "required": true,
+      "reason": "projection evidence"
+    }
+  ],
+  "permissions": {
+    "allowed": [
+      "postgresql:evidence",
+      "artifact-hash-verification"
+    ],
+    "denied": [
+      "self-approval",
+      "production action",
+      "device command",
+      "production shell"
+    ],
+    "productionApproval": "human-required"
+  },
+  "data": {
+    "ownedStores": [
+      "postgresql:evidence.test_evidence",
+      "postgresql:evidence.evidence_artifacts"
+    ],
+    "readModels": [
+      "evidence-by-trace"
+    ],
+    "privacyClasses": [
+      "internal",
+      "personal"
+    ],
+    "retention": "immutable evidence retained per verification and privacy policy",
+    "export": "redacted evidence bundle with artifact hashes",
+    "correction": "append superseding evidence; never rewrite issued records",
+    "deletion": "privacy erasure removes payload while retaining non-identifying audit proof"
+  },
+  "security": {
+    "trustBoundaries": [
+      "module API and versioned contract boundary"
+    ],
+    "secretScopes": [
+      "evidence-service-db"
+    ],
+    "untrustedInputs": [
+      "contract payloads",
+      "raw artifact bytes",
+      "receipt and digest metadata",
+      "stored text",
+      "timestamps"
+    ],
+    "failClosedOn": [
+      "unknown contract major",
+      "invalid identity scope",
+      "missing evidence",
+      "receipt or digest mismatch",
+      "database error"
+    ],
+    "policyIds": [
+      "SOUL-ISO-001",
+      "CMD-IDEMP-001",
+      "RESULT-VERIFY-001",
+      "GBRAIN-READBACK-001",
+      "EDGE-NORESTART-001"
+    ]
+  },
+  "tests": {
+    "requiredOutcome": "PASS",
+    "failureOutcomes": [
+      "FAIL",
+      "SKIP",
+      "PARTIAL",
+      "NOT_RUN",
+      "INFRA_ERROR",
+      "NOT_APPLICABLE"
+    ],
+    "suites": [
+      {
+        "id": "evidence-service.unit",
+        "type": "unit",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/evidence-service/tests --locked-mode && scripts/dotnet-pinned.sh test --project Modules/evidence-service/tests --configuration Release --no-restore --filter-trait Category=Unit --minimum-expected-tests 1 --fail-skips on",
+        "environment": "macos-or-hosted",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "evidence-service.contract",
+        "type": "contract",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/evidence-service/tests --locked-mode && scripts/dotnet-pinned.sh test --project Modules/evidence-service/tests --configuration Release --no-restore --filter-trait Category=Contract --minimum-expected-tests 1 --fail-skips on",
+        "environment": "macos-or-hosted",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "evidence-service.integration",
+        "type": "integration",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/evidence-service/tests --locked-mode && scripts/dotnet-pinned.sh test --project Modules/evidence-service/tests --configuration Release --no-restore --filter-trait Category=Integration --minimum-expected-tests 1 --fail-skips on",
+        "environment": "PostgreSQL 18.4 local integration",
+        "evidenceLevel": "INTEGRATION_VERIFIED"
+      }
+    ]
+  },
+  "compatibility": {
+    "policyRef": "governance/policies/compatibility-policy.yaml",
+    "track": "modern",
+    "moduleMajor": 0,
+    "supportedContractMajors": {
+      "test.evidence": [
+        1
+      ],
+      "soul.resolved": [
+        1
+      ],
+      "memory.event": [
+        1
+      ],
+      "interest.snapshot": [
+        1
+      ],
+      "gbrain.projection": [
+        1
+      ]
+    },
+    "unknownMajorBehavior": "reject",
+    "missingMajorBehavior": "reject",
+    "unknownModeBehavior": "reject",
+    "missingModeBehavior": "reject"
+  },
+  "rollout": {
+    "featureFlag": "evidence_service_v1",
+    "canary": "synthetic then shadow then bounded Soul cohort",
+    "rollback": "disable feature flag and restore previous signed Release BOM",
+    "killSwitch": "kill_evidence_service"
+  },
+  "deviceGates": {
+    "requiresWindows": false,
+    "requiresZennoDroid": false,
+    "requiresAdb": false,
+    "minimumVerification": "INTEGRATION_VERIFIED"
+  },
+  "agents": {
+    "spec": "dps.agents/v1",
+    "policyVersion": "1.0.0",
+    "instructionsFile": "AGENTS.md",
+    "manifestFile": "module.yaml",
+    "receiptRequired": true,
+    "resolver": "factory-instruction-resolver"
+  }
+}

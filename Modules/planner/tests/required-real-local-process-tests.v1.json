@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "dps.planner-real-local-process-tests/v1",
+  "environment": "REAL_LOCAL_PROCESS",
+  "requiredTestIds": [
+    "KilledAfterPlanningBeforePublicationRestartsWithByteIdenticalReplay",
+    "PromptRoleAndReferenceInjectionFailClosedInIndependentProcesses",
+    "RealProcessRoundTripUsesProductionPlannerAndStrictContractWithoutSideEffects",
+    "SoulDeviceAndAccountScopesRemainIsolatedAcrossIndependentProcesses",
+    "StrictSerializedIngressRejectsDuplicateUnknownInvalidUtf8AndOversizedWire",
+    "TamperedProposalScopeIdentityAndShadowAuthorityFailClosedAcrossProcesses",
+    "UnknownProtocolMajorActionAndProposalMajorFailClosed"
+  ]
+}

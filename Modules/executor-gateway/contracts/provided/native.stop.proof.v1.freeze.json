@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "dps.contract-byte-freeze/v1",
+  "contractId": "native.stop.proof/v1",
+  "major": 1,
+  "mode": "quarantine-only",
+  "ownerModule": "executor-gateway",
+  "releaseEligible": false,
+  "artifacts": [
+    {
+      "role": "schema",
+      "path": "Modules/executor-gateway/contracts/provided/native.stop.proof.v1.schema.json",
+      "sha256": "8a7fbfca9f0358618c8a27dd3737ca7d034bf5b968870babf816a98020671dd4"
+    },
+    {
+      "role": "dto-and-protocol",
+      "path": "Modules/executor-gateway/contracts/provided/Dps.ExecutorGateway.Contracts/NativeStopProofV1.cs",
+      "sha256": "bf4f2eebaef979597bee94149e6cc97b2187116b1dda4bcb3f3ad4aeae3e3076"
+    },
+    {
+      "role": "strict-json-codec",
+      "path": "Modules/executor-gateway/contracts/provided/Dps.ExecutorGateway.Contracts/ExecutorGatewayContractJson.cs",
+      "sha256": "6d6935f13d65eb10745d1ba7e5ec4905c0260147e9fc7d887e789e8c070cad88"
+    },
+    {
+      "role": "historical-verifier-byte-freeze-only",
+      "path": "Modules/executor-gateway/src/Dps.ExecutorGateway/EcdsaNativeStopProofVerifier.cs",
+      "sha256": "3ac3c8e26ec2e1ab4736fa78bab73a111874247b61cbe834751eef1a8c1468f2"
+    },
+    {
+      "role": "contract-pack-project",
+      "path": "Modules/executor-gateway/contracts/provided/Dps.ExecutorGateway.Contracts/Dps.ExecutorGateway.Contracts.csproj",
+      "sha256": "b05316a9f9bd07c06ae2a1b8e778986cd85fdc590e31075e3ef1b38853690ee8"
+    },
+    {
+      "role": "bounded-quarantine-classifier",
+      "path": "Modules/executor-gateway/contracts/provided/Dps.ExecutorGateway.Contracts/LegacyNativeStopProofV1QuarantineClassifier.cs",
+      "sha256": "4444f2b177b3327adac5033183a3fcacd36d53f675e5993dad1ee31657db88d5"
+    },
+    {
+      "role": "owner-quarantine-corpus",
+      "path": "Modules/executor-gateway/contracts/provided/native.stop.proof.v1.corpus.json",
+      "sha256": "fce6fcf46ea25cc4bcc6b53c13abaf1bd7aa1e796bab6470d60b07dac655135a"
+    }
+  ],
+  "runtimePolicy": {
+    "emit": "forbidden",
+    "verifyForDomainState": "forbidden",
+    "authorizeUnknownSubmission": "forbidden",
+    "authorizeGuardRelease": "forbidden",
+    "authorizeRetry": "forbidden",
+    "businessSuccess": "forbidden",
+    "allowedUse": "bounded-identify-quarantine-and-audit"
+  }
+}

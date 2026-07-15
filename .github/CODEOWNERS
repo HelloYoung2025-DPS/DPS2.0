@@ -1,0 +1,13 @@
+# Baseline ownership for the current personal repository. This file does not
+# replace the required GitHub ruleset: sensitive changes still need a second,
+# distinct human approval and an external/default-branch trusted workflow.
+* @HelloYoung2025
+
+# Governance and release authority surfaces.
+/AGENTS.md @HelloYoung2025
+/.github/ @HelloYoung2025
+/governance/ @HelloYoung2025
+/Tools/ci/ @HelloYoung2025
+/Tools/verification/ @HelloYoung2025
+/scripts/release.sh @HelloYoung2025
+/Modules/factory-*/ @HelloYoung2025

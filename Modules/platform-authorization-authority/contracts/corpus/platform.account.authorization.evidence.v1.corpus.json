@@ -1,0 +1,100 @@
+{
+  "contract_id": "platform.account.authorization.evidence/v1",
+  "cases": [
+    {
+      "name": "valid-z",
+      "valid": true,
+      "json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"platform.account.authorization.evidence/v1\",\"producer_module\":\"platform-authorization-authority\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"platform_account_id\":\"pa_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"trace_id\":\"trace_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"idempotency_key\":\"idem_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"occurred_at\":\"2026-07-15T00:00:01Z\",\"privacy_class\":\"sensitive\",\"authorization_evidence_id\":\"approval_fixture-1\",\"platform\":\"fixture-app\",\"alias_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"alias_key_id\":\"tenant-hmac-v1\",\"alias_key_epoch\":1,\"target_status\":\"authorized\",\"authorization_revision\":1,\"issuer_id\":\"dps-platform-authorization-authority\",\"issuer_key_id\":\"dps-platform-authorization-root-2026-07\",\"release_bom_sha256\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"release_generation\":1,\"issued_at\":\"2026-07-15T00:00:00Z\",\"expires_at\":\"2026-07-15T00:15:00Z\",\"signature_base64\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\"}"
+    },
+    {
+      "name": "valid-plus-zero-and-int64-max",
+      "valid": true,
+      "json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"platform.account.authorization.evidence/v1\",\"producer_module\":\"platform-authorization-authority\",\"soul_id\":\"soul_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"trace_id\":\"trace_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"idempotency_key\":\"idem_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"occurred_at\":\"2026-07-15T00:00:01.1234567+00:00\",\"privacy_class\":\"sensitive\",\"authorization_evidence_id\":\"approval_fixture_2\",\"platform\":\"fixture.app\",\"alias_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"alias_key_id\":\"tenant_hmac.v2\",\"alias_key_epoch\":9223372036854775807,\"target_status\":\"suspended\",\"authorization_revision\":9223372036854775807,\"issuer_id\":\"dps-platform-authorization-authority\",\"issuer_key_id\":\"dps-platform-authorization-root-2026-07\",\"release_bom_sha256\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"release_generation\":9223372036854775807,\"issued_at\":\"2026-07-15T00:00:00.1234567+00:00\",\"expires_at\":\"2026-07-15T00:15:00.1234567+00:00\",\"signature_base64\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==\"}"
+    },
+    {
+      "name": "invalid-platform-uppercase",
+      "valid": false,
+      "replace": {"from": "\"platform\":\"fixture-app\"", "to": "\"platform\":\"Fixture-app\""}
+    },
+    {
+      "name": "invalid-platform-crlf",
+      "valid": false,
+      "replace": {"from": "\"platform\":\"fixture-app\"", "to": "\"platform\":\"fixture\\r\\napp\""}
+    },
+    {
+      "name": "invalid-alias-key-uppercase",
+      "valid": false,
+      "replace": {"from": "\"alias_key_id\":\"tenant-hmac-v1\"", "to": "\"alias_key_id\":\"Tenant-hmac-v1\""}
+    },
+    {
+      "name": "invalid-authorization-evidence-uppercase",
+      "valid": false,
+      "replace": {"from": "\"authorization_evidence_id\":\"approval_fixture-1\"", "to": "\"authorization_evidence_id\":\"approval_Fixture-1\""}
+    },
+    {
+      "name": "invalid-occurred-eight-fractions",
+      "valid": false,
+      "replace": {"from": "2026-07-15T00:00:01Z", "to": "2026-07-15T00:00:01.12345678Z"}
+    },
+    {
+      "name": "invalid-issued-nonzero-offset",
+      "valid": false,
+      "replace": {"from": "2026-07-15T00:00:00Z", "to": "2026-07-15T01:00:00+01:00"}
+    },
+    {
+      "name": "invalid-occurred-year-zero",
+      "valid": false,
+      "replace": {"from": "2026-07-15T00:00:01Z", "to": "0000-07-15T00:00:01Z"}
+    },
+    {
+      "name": "invalid-occurred-leap-second",
+      "valid": false,
+      "replace": {"from": "2026-07-15T00:00:01Z", "to": "2026-07-15T00:00:60Z"}
+    },
+    {
+      "name": "invalid-issued-year-zero",
+      "valid": false,
+      "replace": {"from": "2026-07-15T00:00:00Z", "to": "0000-07-15T00:00:00Z"}
+    },
+    {
+      "name": "invalid-issued-leap-second",
+      "valid": false,
+      "replace": {"from": "2026-07-15T00:00:00Z", "to": "2026-07-15T00:00:60Z"}
+    },
+    {
+      "name": "invalid-expires-year-zero",
+      "valid": false,
+      "replace": {"from": "2026-07-15T00:15:00Z", "to": "0000-07-15T00:15:00Z"}
+    },
+    {
+      "name": "invalid-expires-leap-second",
+      "valid": false,
+      "replace": {"from": "2026-07-15T00:15:00Z", "to": "2026-07-15T00:15:60Z"}
+    },
+    {
+      "name": "invalid-expires-lf",
+      "valid": false,
+      "replace": {"from": "2026-07-15T00:15:00Z", "to": "2026-07-15T00:15:00Z\\n"}
+    },
+    {
+      "name": "invalid-signature-space",
+      "valid": false,
+      "replace": {"from": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==", "to": " AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="}
+    },
+    {
+      "name": "invalid-version-newline",
+      "valid": false,
+      "replace": {"from": "\"schema_version\":\"1.0.0\"", "to": "\"schema_version\":\"1.0.0\\n\""}
+    },
+    {
+      "name": "invalid-int64-overflow",
+      "valid": false,
+      "replace": {"from": "\"release_generation\":1", "to": "\"release_generation\":9223372036854775808"}
+    },
+    {
+      "name": "invalid-recursive-duplicate",
+      "valid": false,
+      "append_before_close": ",\"extra\":{\"value\":1,\"value\":2}"
+    }
+  ]
+}

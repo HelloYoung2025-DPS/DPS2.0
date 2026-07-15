@@ -1,0 +1,27 @@
+{
+  "schema_version": "dps.windows-edge-supervisor-gate/v1",
+  "approved_windows_evidence_trust_root": "/absolute/read-only/path/to/windows-evidence-trust",
+  "allowed_windows_evidence_key_ids": [
+    "sha256_0000000000000000000000000000000000000000000000000000000000000000"
+  ],
+  "approved_windows_evidence_trust_store_fingerprint": "0000000000000000000000000000000000000000000000000000000000000000",
+  "release_bom_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "protected_policy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "expected_host_id": "host_0000000000000000000000000000000000000000000000000000000000000000",
+  "expected_worker_artifact_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "expected_worker_version": "0.0.0-example",
+  "expected_worker_slot": "B",
+  "expected_zennodroid_pid": 4242,
+  "expected_zennodroid_started_at": "2026-07-15T00:00:00.0000000+00:00",
+  "expected_peer_auth_key_id": "sha256_0000000000000000000000000000000000000000000000000000000000000000",
+  "expected_evidence_log_entry_count": 100,
+  "expected_evidence_log_head_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "expected_evidence_log_file_identity_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "minimum_connection_continuity_seconds": 86400,
+  "maximum_connection_drops": 0,
+  "minimum_ab_switch_count": 100,
+  "minimum_soak_seconds": 86400,
+  "maximum_evidence_age_seconds": 300,
+  "maximum_clock_skew_seconds": 30,
+  "capability_evidence_path": "/absolute/read-only/path/to/edge.capability.evidence.v1.json"
+}

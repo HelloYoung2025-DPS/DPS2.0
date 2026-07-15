@@ -1,0 +1,212 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/verification/f6-windows-zenno-input.v1.schema.json",
+  "title": "F6 Windows Edge A/B and ZennoDroid no-restart evidence",
+  "allOf": [
+    { "$ref": "external-evidence-envelope.v1.schema.json" },
+    {
+      "type": "object",
+      "required": ["schema_version", "payload"],
+      "properties": {
+        "schema_version": { "const": "dps.windows-zenno-verification-input/v1" },
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "environment_id",
+            "os_family",
+            "windows_version",
+            "zennodroid_version",
+            "dotnet_framework_version",
+            "csharp_language_version",
+            "codedom_compile",
+            "gac_resolution",
+            "dll_load",
+            "zenno_project_load",
+            "bridge_abi",
+            "adb_authorized_device_count",
+            "adb_authorization",
+            "loopback_host",
+            "loopback_port",
+            "loopback_port_fixed",
+            "loopback_only",
+            "command_timeout_seconds",
+            "timeout_semantics",
+            "error_semantics",
+            "connection_continuity"
+          ],
+          "properties": {
+            "environment_id": { "type": "string", "pattern": "^env_[a-z0-9][a-z0-9_-]{6,63}$" },
+            "os_family": { "const": "Windows" },
+            "windows_version": { "type": "string", "pattern": "^[0-9]+(?:\\.[0-9]+){1,3}$" },
+            "zennodroid_version": {
+              "type": "string",
+              "pattern": "^[0-9]+(?:\\.[0-9]+){1,3}(?:[-+][A-Za-z0-9.-]+)?$"
+            },
+            "dotnet_framework_version": { "type": "string", "pattern": "^[0-9]+(?:\\.[0-9]+){1,3}$" },
+            "csharp_language_version": { "type": "string", "pattern": "^[0-9]+(?:\\.[0-9]+){1,3}$" },
+            "codedom_compile": { "const": "PASS" },
+            "gac_resolution": { "const": "PASS" },
+            "dll_load": { "const": "PASS" },
+            "zenno_project_load": { "const": "PASS" },
+            "bridge_abi": { "type": "string", "pattern": "^dps\\.zenno-bridge/v[1-9][0-9]*$" },
+            "adb_authorized_device_count": { "type": "integer", "minimum": 1 },
+            "adb_authorization": { "const": "PASS" },
+            "loopback_host": { "const": "127.0.0.1" },
+            "loopback_port": { "type": "integer", "minimum": 1024, "maximum": 65535 },
+            "loopback_port_fixed": { "const": true },
+            "loopback_only": { "const": true },
+            "command_timeout_seconds": { "type": "number", "exclusiveMinimum": 0, "maximum": 300 },
+            "timeout_semantics": { "const": "FAIL_CLOSED" },
+            "error_semantics": { "const": "NATIVE_ERROR_PRESERVED" },
+            "connection_continuity": { "const": "PASS" }
+          }
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "capability_probe",
+            "zenno_process",
+            "ab_cycles",
+            "observation_hours",
+            "recovery_checks",
+            "rollback"
+          ],
+          "properties": {
+            "capability_probe": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "windows_version",
+                "zennodroid_version",
+                "dotnet_framework_version",
+                "csharp_language_version",
+                "codedom_compile",
+                "gac_resolution",
+                "dll_load",
+                "zenno_project_load",
+                "bridge_abi",
+                "adb_authorized_device_count",
+                "adb_authorization",
+                "loopback_host",
+                "loopback_port",
+                "loopback_port_fixed",
+                "loopback_only",
+                "command_timeout_seconds",
+                "timeout_semantics",
+                "error_semantics",
+                "connection_continuity"
+              ],
+              "properties": {
+                "status": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                "windows_version": { "type": "string", "minLength": 1 },
+                "zennodroid_version": {
+                  "type": "string",
+                  "pattern": "^[0-9]+(?:\\.[0-9]+){1,3}(?:[-+][A-Za-z0-9.-]+)?$"
+                },
+                "dotnet_framework_version": { "type": "string", "pattern": "^[0-9]+(?:\\.[0-9]+){1,3}$" },
+                "csharp_language_version": { "type": "string", "pattern": "^[0-9]+(?:\\.[0-9]+){1,3}$" },
+                "codedom_compile": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                "gac_resolution": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                "dll_load": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                "zenno_project_load": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                "bridge_abi": { "type": "string", "pattern": "^dps\\.zenno-bridge/v[1-9][0-9]*$" },
+                "adb_authorized_device_count": { "type": "integer", "minimum": 1 },
+                "adb_authorization": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                "loopback_host": { "const": "127.0.0.1" },
+                "loopback_port": { "type": "integer", "minimum": 1024, "maximum": 65535 },
+                "loopback_port_fixed": { "const": true },
+                "loopback_only": { "const": true },
+                "command_timeout_seconds": { "type": "number", "exclusiveMinimum": 0, "maximum": 300 },
+                "timeout_semantics": { "const": "FAIL_CLOSED" },
+                "error_semantics": { "const": "NATIVE_ERROR_PRESERVED" },
+                "connection_continuity": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" }
+              }
+            },
+            "zenno_process": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "pid_before",
+                "pid_after",
+                "started_at_before",
+                "started_at_after",
+                "observed_at_before",
+                "observed_at_after"
+              ],
+              "properties": {
+                "pid_before": { "type": "integer", "minimum": 1 },
+                "pid_after": { "type": "integer", "minimum": 1 },
+                "started_at_before": { "type": "string", "format": "date-time" },
+                "started_at_after": { "type": "string", "format": "date-time" },
+                "observed_at_before": { "type": "string", "format": "date-time" },
+                "observed_at_after": { "type": "string", "format": "date-time" }
+              }
+            },
+            "ab_cycles": {
+              "type": "array",
+              "minItems": 100,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "sequence",
+                  "direction",
+                  "installed_digest_verified",
+                  "signature_verified",
+                  "self_test",
+                  "shadow_side_effect_count",
+                  "drain",
+                  "route_switch",
+                  "rollback_check"
+                ],
+                "properties": {
+                  "sequence": { "type": "integer", "minimum": 1 },
+                  "direction": { "enum": ["A_TO_B", "B_TO_A"] },
+                  "installed_digest_verified": { "const": true },
+                  "signature_verified": { "const": true },
+                  "self_test": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                  "shadow_side_effect_count": { "const": 0 },
+                  "drain": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                  "route_switch": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                  "rollback_check": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" }
+                }
+              }
+            },
+            "observation_hours": { "type": "number", "minimum": 24 },
+            "recovery_checks": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "crash_window",
+                "duplicate_delivery",
+                "offline_recovery",
+                "unknown_contract_rejected",
+                "unknown_step_rejected"
+              ],
+              "properties": {
+                "crash_window": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                "duplicate_delivery": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                "offline_recovery": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                "unknown_contract_rejected": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                "unknown_step_rejected": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" }
+              }
+            },
+            "rollback": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["status", "maximum_minutes", "old_bom_restored"],
+              "properties": {
+                "status": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                "maximum_minutes": { "type": "number", "minimum": 0, "maximum": 5 },
+                "old_bom_restored": { "const": true }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,348 @@
+{
+  "schemaVersion": "dps.module-catalog/v1",
+  "physicalRoot": "Modules",
+  "canonicalRoot": "modules",
+  "caseNormalization": "deferred-until-legacy-retirement",
+  "modules": [
+    {
+      "id": "audit-metrics",
+      "actualRoot": "Modules/audit-metrics",
+      "canonicalRoot": "modules/audit-metrics",
+      "manifest": "Modules/audit-metrics/module.yaml",
+      "agents": "Modules/audit-metrics/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "binding",
+      "actualRoot": "Modules/binding",
+      "canonicalRoot": "modules/binding",
+      "manifest": "Modules/binding/module.yaml",
+      "agents": "Modules/binding/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "command-orchestrator",
+      "actualRoot": "Modules/command-orchestrator",
+      "canonicalRoot": "modules/command-orchestrator",
+      "manifest": "Modules/command-orchestrator/module.yaml",
+      "agents": "Modules/command-orchestrator/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "control-plane-host",
+      "actualRoot": "Modules/control-plane-host",
+      "canonicalRoot": "modules/control-plane-host",
+      "manifest": "Modules/control-plane-host/module.yaml",
+      "agents": "Modules/control-plane-host/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "device-registry",
+      "actualRoot": "Modules/device-registry",
+      "canonicalRoot": "modules/device-registry",
+      "manifest": "Modules/device-registry/module.yaml",
+      "agents": "Modules/device-registry/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "edge-local-journal",
+      "actualRoot": "Modules/edge-local-journal",
+      "canonicalRoot": "modules/edge-local-journal",
+      "manifest": "Modules/edge-local-journal/module.yaml",
+      "agents": "Modules/edge-local-journal/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "evidence-service",
+      "actualRoot": "Modules/evidence-service",
+      "canonicalRoot": "modules/evidence-service",
+      "manifest": "Modules/evidence-service/module.yaml",
+      "agents": "Modules/evidence-service/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "executor-gateway",
+      "actualRoot": "Modules/executor-gateway",
+      "canonicalRoot": "modules/executor-gateway",
+      "manifest": "Modules/executor-gateway/module.yaml",
+      "agents": "Modules/executor-gateway/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "factory-artifact-builder",
+      "actualRoot": "Modules/factory-artifact-builder",
+      "canonicalRoot": "modules/factory-artifact-builder",
+      "manifest": "Modules/factory-artifact-builder/module.yaml",
+      "agents": "Modules/factory-artifact-builder/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R2"
+    },
+    {
+      "id": "factory-control-plane-host",
+      "actualRoot": "Modules/factory-control-plane-host",
+      "canonicalRoot": "modules/factory-control-plane-host",
+      "manifest": "Modules/factory-control-plane-host/module.yaml",
+      "agents": "Modules/factory-control-plane-host/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "factory-evidence-ledger",
+      "actualRoot": "Modules/factory-evidence-ledger",
+      "canonicalRoot": "modules/factory-evidence-ledger",
+      "manifest": "Modules/factory-evidence-ledger/module.yaml",
+      "agents": "Modules/factory-evidence-ledger/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "factory-impact-analyzer",
+      "actualRoot": "Modules/factory-impact-analyzer",
+      "canonicalRoot": "modules/factory-impact-analyzer",
+      "manifest": "Modules/factory-impact-analyzer/module.yaml",
+      "agents": "Modules/factory-impact-analyzer/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "factory-instruction-resolver",
+      "actualRoot": "Modules/factory-instruction-resolver",
+      "canonicalRoot": "modules/factory-instruction-resolver",
+      "manifest": "Modules/factory-instruction-resolver/module.yaml",
+      "agents": "Modules/factory-instruction-resolver/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "factory-merge-controller",
+      "actualRoot": "Modules/factory-merge-controller",
+      "canonicalRoot": "modules/factory-merge-controller",
+      "manifest": "Modules/factory-merge-controller/module.yaml",
+      "agents": "Modules/factory-merge-controller/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R2"
+    },
+    {
+      "id": "factory-release-controller",
+      "actualRoot": "Modules/factory-release-controller",
+      "canonicalRoot": "modules/factory-release-controller",
+      "manifest": "Modules/factory-release-controller/module.yaml",
+      "agents": "Modules/factory-release-controller/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "factory-rollback-controller",
+      "actualRoot": "Modules/factory-rollback-controller",
+      "canonicalRoot": "modules/factory-rollback-controller",
+      "manifest": "Modules/factory-rollback-controller/module.yaml",
+      "agents": "Modules/factory-rollback-controller/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "factory-trusted-runner",
+      "actualRoot": "Modules/factory-trusted-runner",
+      "canonicalRoot": "modules/factory-trusted-runner",
+      "manifest": "Modules/factory-trusted-runner/module.yaml",
+      "agents": "Modules/factory-trusted-runner/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "factory-upgrade-intake",
+      "actualRoot": "Modules/factory-upgrade-intake",
+      "canonicalRoot": "modules/factory-upgrade-intake",
+      "manifest": "Modules/factory-upgrade-intake/module.yaml",
+      "agents": "Modules/factory-upgrade-intake/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "factory-worktree-manager",
+      "actualRoot": "Modules/factory-worktree-manager",
+      "canonicalRoot": "modules/factory-worktree-manager",
+      "manifest": "Modules/factory-worktree-manager/module.yaml",
+      "agents": "Modules/factory-worktree-manager/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "gbrain-projector",
+      "actualRoot": "Modules/gbrain-projector",
+      "canonicalRoot": "modules/gbrain-projector",
+      "manifest": "Modules/gbrain-projector/module.yaml",
+      "agents": "Modules/gbrain-projector/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R2"
+    },
+    {
+      "id": "interest-reducer",
+      "actualRoot": "Modules/interest-reducer",
+      "canonicalRoot": "modules/interest-reducer",
+      "manifest": "Modules/interest-reducer/module.yaml",
+      "agents": "Modules/interest-reducer/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R2"
+    },
+    {
+      "id": "legacy-runtime-adapter",
+      "actualRoot": "Modules/legacy-runtime-adapter",
+      "canonicalRoot": "modules/legacy-runtime-adapter",
+      "manifest": "Modules/legacy-runtime-adapter/module.yaml",
+      "agents": "Modules/legacy-runtime-adapter/AGENTS.md",
+      "lifecycle": "transitional",
+      "runtimeState": "legacy-active",
+      "riskTier": "R3"
+    },
+    {
+      "id": "memory-event-ledger",
+      "actualRoot": "Modules/memory-event-ledger",
+      "canonicalRoot": "modules/memory-event-ledger",
+      "manifest": "Modules/memory-event-ledger/module.yaml",
+      "agents": "Modules/memory-event-ledger/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R2"
+    },
+    {
+      "id": "operation-compiler",
+      "actualRoot": "Modules/operation-compiler",
+      "canonicalRoot": "modules/operation-compiler",
+      "manifest": "Modules/operation-compiler/module.yaml",
+      "agents": "Modules/operation-compiler/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "persona-store",
+      "actualRoot": "Modules/persona-store",
+      "canonicalRoot": "modules/persona-store",
+      "manifest": "Modules/persona-store/module.yaml",
+      "agents": "Modules/persona-store/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R2"
+    },
+    {
+      "id": "planner",
+      "actualRoot": "Modules/planner",
+      "canonicalRoot": "modules/planner",
+      "manifest": "Modules/planner/module.yaml",
+      "agents": "Modules/planner/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "platform-account-registry",
+      "actualRoot": "Modules/platform-account-registry",
+      "canonicalRoot": "modules/platform-account-registry",
+      "manifest": "Modules/platform-account-registry/module.yaml",
+      "agents": "Modules/platform-account-registry/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "platform-authorization-authority",
+      "actualRoot": "Modules/platform-authorization-authority",
+      "canonicalRoot": "modules/platform-authorization-authority",
+      "manifest": "Modules/platform-authorization-authority/module.yaml",
+      "agents": "Modules/platform-authorization-authority/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "policy-approval",
+      "actualRoot": "Modules/policy-approval",
+      "canonicalRoot": "modules/policy-approval",
+      "manifest": "Modules/policy-approval/module.yaml",
+      "agents": "Modules/policy-approval/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "soul-memory-adapter",
+      "actualRoot": "Modules/soul-memory-adapter",
+      "canonicalRoot": "modules/soul-memory-adapter",
+      "manifest": "Modules/soul-memory-adapter/module.yaml",
+      "agents": "Modules/soul-memory-adapter/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "soul-registry",
+      "actualRoot": "Modules/soul-registry",
+      "canonicalRoot": "modules/soul-registry",
+      "manifest": "Modules/soul-registry/module.yaml",
+      "agents": "Modules/soul-registry/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "windows-edge-supervisor",
+      "actualRoot": "Modules/windows-edge-supervisor",
+      "canonicalRoot": "modules/windows-edge-supervisor",
+      "manifest": "Modules/windows-edge-supervisor/module.yaml",
+      "agents": "Modules/windows-edge-supervisor/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "windows-edge-worker",
+      "actualRoot": "Modules/windows-edge-worker",
+      "canonicalRoot": "modules/windows-edge-worker",
+      "manifest": "Modules/windows-edge-worker/module.yaml",
+      "agents": "Modules/windows-edge-worker/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    },
+    {
+      "id": "zenno-bridge",
+      "actualRoot": "Modules/zenno-bridge",
+      "canonicalRoot": "modules/zenno-bridge",
+      "manifest": "Modules/zenno-bridge/module.yaml",
+      "agents": "Modules/zenno-bridge/AGENTS.md",
+      "lifecycle": "proposed",
+      "runtimeState": "proposed",
+      "riskTier": "R3"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.WindowsEdgeSupervisor.Contracts</AssemblyName>
+    <RootNamespace>Dps.WindowsEdgeSupervisor.Contracts</RootNamespace>
+    <PackageId>Dps.WindowsEdgeSupervisor.Contracts</PackageId>
+    <Version>0.4.0</Version>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="../edge.worker.drain.receipt.v1.schema.json" Pack="true" PackagePath="contracts" />
+    <None Include="../edge.worker.drain.receipt.v1.auth.json" Pack="true" PackagePath="contracts" />
+    <None Include="../edge.worker.drain.receipt.v1.corpus.json" Pack="true" PackagePath="contracts" />
+    <None Include="../edge.worker.drain.receipt.v1.golden.json" Pack="true" PackagePath="contracts" />
+    <None Include="../edge.worker.drain.directive.v1.schema.json" Pack="true" PackagePath="contracts" />
+    <None Include="../edge.worker.drain.directive.v1.auth.json" Pack="true" PackagePath="contracts" />
+    <None Include="../edge.worker.drain.directive.v1.corpus.json" Pack="true" PackagePath="contracts" />
+    <None Include="../edge.worker.drain.directive.v1.golden.json" Pack="true" PackagePath="contracts" />
+    <None Include="README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+</Project>

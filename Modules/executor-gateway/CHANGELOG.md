@@ -1,0 +1,43 @@
+# Executor Gateway changelog
+
+## Unreleased
+
+- Deprecate `native.stop.proof/v1` as byte-frozen `quarantine-only`; remove its Worker inbound edge and all runtime emission, receipt, signature-verification, UNKNOWN-authority, guard-release, retry, and success semantics while preserving Executor Gateway as its unique contract owner. Exclude the frozen historical verifier from the production assembly and link it only into contract tests.
+- Add the owner freeze manifest, adversarial corpus, and bounded quarantine classifier. Classification exposes only contract/major/mode/disposition/wire digest/size metadata and rejects malformed UTF-8, oversize input, duplicate or unknown fields, identity-shaped data, unknown majors, and non-canonical versions.
+- Remove legacy stop proof and abort confirmation from positive runtime constructors/interfaces/callbacks. Enforce zero callback invocations for existing uncertain state and exactly one for submitted/retained state, so a provider cannot rewrite an invoked callback as pre-existing PENDING/UNKNOWN. Every uncertain first-byte path remains durable PENDING, retains the process-rooted guard, and returns non-retryable `UNKNOWN_OUTCOME/WAITING_EXTERNAL`; existing PENDING and historical UNKNOWN states never dispatch or retry.
+- Add byte-freeze, serialization/replay, runtime-reflection, concurrent existing-state, and restart attack coverage; raise Unit/Contract floors to 34/15 while keeping release eligibility false.
+- Create a requestless inert native submission attempt before durable PENDING, then permit the first request byte only inside the policy-owned guarded callback after PENDING is durable; remove the outer gateway timeout that could abandon a still-running policy guard call.
+- Replace cancellation-token acknowledgement with `native.stop.proof/v1`: a canonical P-256 signed proof bound to the exact attempt, native request and submitted-request digests, identity scope, Release BOM digest/generation/token digest, worker instance, and worker incarnation.
+- Export the stop-proof DTO, strict JSON codec, evidence digest encoder, and canonical signing encoder from the owner-controlled Contracts pack so Windows Worker can conform without copying the wire protocol or referencing Executor implementation.
+- Recompute stop evidence locally and reject unknown keys, invalid signatures, stale/cross-attempt/cross-worker/cross-BOM proofs, malformed canonical evidence, and ambiguous stop kinds before any PENDING guard may unlock.
+- Transfer abort-unconfirmed submissions to a process-rooted guardian that retains the exact fence lease, inert attempt, late submission task, and stop request until worker-process death; ordinary disposal and garbage collection cannot release it.
+- Add adversarial unit/contract and real-local-process coverage for revocation overlap, ignored-cancellation late writes, gateway non-abandonment, signed-proof attacks, post-return proof/evidence substitution, guarded-provider and guardian-transfer fail-stop, required common `occurred_at`, child kill/reap, sole-root guardian GC survival, and release only after simulated process death; raise Unit/Contract/Integration floors to 33/12/8.
+- Keep release eligibility false: Policy Approval and Executor Gateway currently have different abort coordinators, Policy Approval reduces abort evidence to a Boolean, and no production Windows worker/key/guardian composition has been verified.
+- Replace the implicit “returned Task means submitted” native boundary with a policy-owned lifecycle: durably append `SUBMISSION_PENDING` before native, validate the immutable native acknowledgement, durably append `SUBMISSION_ACKNOWLEDGED`, then use independent completion.
+- Bind native request and acknowledgement to the exact policy submission-attempt ID, intent digest, pending-state digest, canonical command/authorization digests, full identity scope, active-BOM generation/token digest, submitted-request digest, and completion handle.
+- Keep PENDING and ACKNOWLEDGED attempts authority-blocked across restart; remove blind same-attempt reconciliation/resubmission from the local evidence path. Confirmed-not-submitted recovery requires the owner recovery contract, a new lease, and the next bounded attempt.
+- Add REAL_LOCAL_PROCESS write-through/flush evidence and separate crash-before-flush and crash-after-flush restart-blocking tests; raise Unit/Contract/Integration floors to 25/10/8. The file-backed lifecycle authority remains explicitly test-only and is not PostgreSQL or signature evidence.
+- Require a constructor-fixed production adapter to verify Policy Approval lifecycle signatures/canonical digests plus authoritative proposal and fence-request read-back before returning `VerifiedSubmission*` wrappers; keep the proposed module non-release-eligible until that adapter exists.
+- Require that production adapter to hold an owner-coordinated cross-commit policy revocation guard from durable PENDING through acknowledgement or lease disposal; document the current PostgreSQL transaction-close gap as release-blocking rather than treating a fresh read or fake lease lifetime as proof.
+- Register executor-gateway as the unique owner of `native.submission.ack/v1`, publish its JSON Schema and DTO, bind `privacy_class` into the canonical acknowledgement digest, and extend negative coverage for BOM-digest mutation, malformed owner ACK wrappers, and synchronous/null/faulted submission boundaries.
+- Add strict snake_case `native.submission.ack/v1` serialization with duplicate/unknown-field rejection, canonical lowercase non-empty UUIDs, exact seven-fraction UTC `Z` timestamps, schema-aligned constraints, and round-trip/attack tests.
+- Require Policy Approval Begin disposition `Inserted` with `MaySubmit=true`; prove an exact existing PENDING disposition remains blocking evidence and never reaches native submission.
+- Fix all runtime authorities and native boundaries at construction; the public execution API now accepts only a command, its signed authorization, and cancellation.
+- Consume `approval.execution.fence/v1`, validate its exact command/approval/identity/BOM scope, revalidate it immediately before native dispatch, and return non-retryable `UNKNOWN_OUTCOME` when release after dispatch is uncertain.
+- Emit only authoritative P-256 signed receipts bound to the exact receipt, command digest, authorization digest, BOM generation/token digest, and native/postcondition evidence; invalid native/postcondition contracts become signed non-retryable unknown outcomes.
+- Add a checked-in child-process fixture contract for `REAL_LOCAL_PROCESS` integration testing without claiming Windows or device evidence.
+- Remove caller-provided execution time; inject a trusted clock and recheck authorization and lease validity after authorization, after active-BOM lookup, after native execution, and before the final receipt.
+- Bind authorization and native transport to the same supervisor-issued opaque 256-bit active-BOM token and monotonic generation; reread generation after native and before success, returning non-retryable `UNKNOWN_OUTCOME` on a switch.
+- Expand `native.result/v1` to independently report command, lease, attempt, complete identity scope, active-BOM digest/generation/token digest, and ordered step; reject replayed or gateway-filled scope.
+- Align runtime version and length validation with JSON Schema, raise Unit/Contract floors to 21/8, and bind required security IDs through a machine-readable inventory.
+- Require fixed lowercase digest identifiers for device, platform account, trace, and idempotency scope; JSON Schema uses an ECMAScript-safe absolute end assertion and runtime tests reject trailing newlines.
+
+## 0.1.0 - Proposed
+
+- Add `native.result/v1` and an authorized executor gateway.
+- Block false success unless native result and business postcondition both verify.
+- Convert timeout and native unknown states to non-retryable `UNKNOWN_OUTCOME` receipts.
+- Domain-separate and length-prefix command digests and execution-authorization signature payloads so untrusted delimiter characters cannot create cross-field collisions.
+- Consume owner-controlled `execution.authorization/v1` with explicit canonical domain/encoding and ECDSA P-256/SHA-256 IEEE P1363 Base64 semantics.
+- Require a fail-closed authoritative active-BOM reader and compare its exact per-device digest before every native call.
+- Align the unreleased `native.result/v1` schema with the exactly-one-step v1 dispatch invariant and preserve protocol order without sorting by `step_id`.

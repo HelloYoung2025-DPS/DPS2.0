@@ -1,5 +1,62 @@
 # DPS v4.5 更新日志
 
+## [Unreleased] - 2026-07-14
+
+### Governance reset and modernization baseline
+
+#### Removed
+
+- 删除 `.omo/`, `.omo.conf` 和旧 `Tools/omo_guard/` 自定义工作流机制.
+- 删除 AGENTS 中 Preflight, Advance, Postflight 和 L1-L4 本地 Gate 依赖.
+
+#### Added
+
+- `control-plane-host` 新增真实的 Policy submission lifecycle 双向边界：直接引用 Policy 公共严格合同包，实现独立 reconciliation/human-recovery 签名能力、分离端口和签名 state consumer；精确绑定 Soul/device/account/trace/idempotency、attempt/lease、Release BOM、intent/native request、predecessor/evidence，未知或伪造输入失败关闭。该切片仍为 proposed，未获得 PostgreSQL/Windows/真机或生产发布证据.
+- `control-plane-host` 将通用 lifecycle signer 收紧为独立 reconciliation 与强类型 human-recovery approval capability，增加精确端口权限范围、不同凭证权威指纹和最多五秒的失败关闭超时；当前 `in-process-api` 仅是 proposed 合同 facade，不宣称已具备认证传输、独立进程或生产凭证隔离.
+- lifecycle authority 改为可取消异步能力并加入最多五秒硬超时、外部调用前后取消检查及 quarantine：不服从取消的调用不会并行重入，私有 canonical 副本保留到迟到结果完成后，迟到签名和副本均被丢弃并清零.
+
+- 重写 `AGENTS.md`, 使用普通 Git, versioned contracts, automated tests and CI 作为工程约束. 逻辑 module root 固定为 `modules/<module-id>/`; 保守迁移期因大小写不敏感文件系统使用物理 `Modules/<module-id>/`, 避免搬动 legacy runtime.
+- 新增 `Docs/Architecture/TargetArchitecture_目标架构.md`, 定义 DPS Control Plane, GBrain Company 和 ZennoDroid Thin Executor 边界.
+- 新增 `Docs/EngineeringStandards_工程标准.md`, 定义 build, test, CI, security, observability, release and device gates.
+- 新增 `.editorconfig` 和 `.gitattributes`; 新式模块使用 UTF-8/LF, 现有 `Core/`, `Modules/`, `ZDProjects/`, `Extensions/` C# 保持原始 bytes, BOM and line endings.
+- 新增 dependency-free repository validator 和 Hosted Static CI, 覆盖 JSON, Python, Markdown links and removed workflow paths.
+- 新增 Company GBrain 本地非生产运维文档, 锁定 PostgreSQL/pgvector, Voyage embedding, 非 PII Soul-to-Source 映射, loopback HTTP/OAuth 和 F7 证据边界; 不将本机安装冒充 GBrain 实连或真机验收.
+- 新增 GBrain 0.42.42.0 本机兼容性探测记录：用禁用 embedding 的一次性 PGLite brain 验证两个 Source 的同 slug 隔离、精确读取与软删除边界，并锁定原生 32 字符 Source ID 限制；该记录仅是诊断事实，不提升正式验证等级，也未读取用户 API key 文件.
+- 工程标准新增跨模块 JSON hardening：安全字符串必须精确长度并绝对终止，owner/consumer 共用对抗 corpus，UTC 做 Schema/DTO/DB parity；Int64 golden corpus 禁止经过 JavaScript `Number` 等 IEEE-754 路径重写，防止边界值静默舍入.
+- 新增受治理模块目录, 每个都有唯一 `AGENTS.md`, `module.yaml`, 版本合同, 测试, 迁移与运维边界. 模块、合同和套件数量由唯一门禁从当前 Manifest 现场重建，不在文档中维护可漂移的计数副本. 除 `legacy-runtime-adapter` 为 transitional 外, 新模块均保持 `proposed` 且 `releaseEligible=false`.
+- 新增 pinned .NET/Python/Node/PowerShell/ADB 工具链, `Dps.slnx`, 锁文件, PostgreSQL 集成测试基础, Factory 受信门与 F6-F9 外部证据验证器. 这些都是待前置门和外部环境证明的 candidate/foundation, 不是生产发布宣告.
+- 公共合同必须有唯一 provider 模块和必需 Contract 套件覆盖；新增唯一 unsigned Candidate Runner 和固定 Candidate Test Policy，每次从 Manifest 重建精确测试目标、测试树摘要、Factory Instruction Receipt、UpgradeIntent、累计 Phase 0 与写后工作区边界，并拒绝策略或计数漂移.
+- Candidate evidence Schema 强制 `candidate_verification_level=null`, `verification_level=null`, `signed=false`, `formal_evidence_eligible=false`; 本地 Runner 永不签发正式等级.
+- Contract 与 Integration Candidate 的 Phase 0 伴随证据现写入目标目录下保留的 `phase0-prerequisites/` 子目录，禁止候选占用该命名空间，避免候选文件与伴随文件互相覆盖；证据输出强制小写 ASCII `.json`, 逐段拒绝符号链接, 并通过固定目录句柄与 `O_NOFOLLOW` 的 `0600` 原子写入阻断目录替换; 并行目录创建竞态也会安全重开且继续拒绝链接。缺少这些安全原语的平台会失败关闭, 需在 F6 实现 Windows 安全句柄写入器后才能签发证据.
+- Phase 0 与 Candidate 受信执行环境不再采用 ambient PATH/HOME/TMPDIR：.NET/Node 只从固定候选探测，每次运行使用私有 `0700` HOME、CLI cache、scratch 与 temp，保留不可由 Manifest 覆盖的沙箱标记，关闭 MSBuild server/node reuse，并在有效 restore argv 中强制 locked mode、仓库 `NuGet.Config`、static graph 与 NuGetAudit `true/all`。CSSM、离线漏洞源、网络不可达与超时按 `INFRA_ERROR` 失败关闭，不通过关闭审计制造成功.
+- Phase 0 evidence 与 instruction receipt 只能写入 Git-ignored `Reports/ci` 下不同的小写 ASCII JSON 路径，不能覆盖 tracked 文件；候选 JSON 使用单一 `O_NOFOLLOW` 文件描述符完成读取和 SHA-256 绑定，正式证据写后再次核对 HEAD、工作区摘要与 clean 状态，期间发生变化即撤销正式等级.
+- Phase 0 与 Candidate 默认证据改为由 Python runner 生成的唯一 run-id 目录；`release.sh` 未显式指定路径时复用该安全默认，显式路径通过 Bash 数组传递并继续由 runner 校验。Hosted CI 现上传完整 canonical 证据目录，使 payload、marker 和任何 quarantine claim 共同传输；claim unlink 会 fsync 父目录，失败时恢复 claim 并继续失败关闭.
+- Integration 套件显式区分真实 PostgreSQL、真实本地子进程、确定性模拟和外部设备；当前受管沙箱不能启动独立 PostgreSQL，所有必需数据库套件在本轮均按 `INFRA_ERROR/NOT_RUN` 失败关闭. Candidate 门禁从当前 Manifest 动态重算累计覆盖缺口，任一缺口关闭前都必须失败.
+- Candidate Test Policy 进一步将证据类型、测试类别和环境要求做成不可拆分的组合：真实 PostgreSQL 只能运行 `Integration` 且必须声明数据库连接环境，真实本地进程不得接收数据库环境，模拟不得接收运行时秘密，`SecuritySimulation` 只能标记为模拟；错误组合在执行前由 Schema 失败关闭.
+- Candidate Runner 补齐对抗式可信边界：前代基线现在同时钉住根指令、核心治理快照、.NET/NuGet/solution 构建输入、验证器和 release 入口；PostgreSQL 18.4 版本由锁定 `psycopg` 对每个声明 DSN 直接查询，不再相信任意 `psql` stdout；任何必需环境缺失都在测试进程启动前记为 `INFRA_ERROR`，suite 与顶层环境键必须精确互证。Zenno 特例被锁定为无秘密的 `SIMULATION/SecuritySimulation`，UpgradeIntent 必须按当前仓库事实全对象重建，普通执行异常逐套件隔离继续而不吞进程控制异常，日志中的私钥 PEM 会被清除。该本地 runner 仍无进程级网络/文件能力沙箱，因此证据继续保持 unsigned、不可正式签发，真实凭证只允许专用非生产测试用途.
+- Candidate Runner 进一步在任何标准库导入前移除脚本目录，并从活动解释器预加载及验证锁定的 `psycopg`, PyYAML 与 Schema 依赖；本地 DPS 模块加载后立即再次移除 `Tools/ci`，并拒绝该目录中的源码、package、extension 或 sourceless pyc 依赖影子。Git 真相固定使用 `/usr/bin/git`、空 system/global config 与隔离 `GIT_*` 环境。`Directory.Build.targets` 现在属于前代信任根。任意测试 stdout/stderr 不再嵌入可携带的 candidate JSON，只保留输出摘要及 SHA-256，避免测试读取非生产私钥后通过分片、hex 或 URL 解码变体泄漏。该 SHA-256 仍不是签名或原始证据，candidate PASS 仍禁止作为自动发布授权；恶意测试弱化与可重写 unsigned JSON 必须由只读 checkout、隔离 Trusted Runner、不可变原始证据、独立签发和发布审批闭环.
+
+#### Changed
+
+- README 明确当前仓库级正式签发证据为 `NONE`; 定向测试通过不会在唯一 Phase 0, 干净检出可复现性与独立证据签发前自动升级仓库状态.
+- 模块目录或文档存在不再视为实现证明; 状态必须由 Manifest, 源码, required tests and raw evidence 共同支持.
+- Docs 允许按 Architecture, Testing, Operations and Security 等长期主题演进, 不再使用固定文件白名单.
+- Git workflow 改为 scoped staging, 不再推荐 release automation 使用 `git add .`.
+- Release helper 改为纯验证入口: 工作区非干净时失败关闭, 只运行唯一 Phase 0 和 candidate Release BOM 验证; 不 commit, tag, push, sign, deploy 或 approve.
+- 修复 `Configs/Manifests/instagram.json` 和 `Configs/Manifests/template.json` 的 JSON 语法错误, 不改变配置语义.
+- `gbrain.projection/v1` 成为唯一的离线 Source/revision/checksum 语义; `soul-memory-adapter` 改为直接消费该投影并做精确读回校验, 删除第二套平行 ID/revision 算法.
+- 区分 GBrain 原生 OAuth/Source 绑定与 F7 证据别名：真实 `logical_source_id` 只能是 `gbrain-projector` 生成的 `dps-<28hex>`；`gs_<16hex>` 只是由验证器重算的非 PII 外部证据别名，不得作为 GBrain Source 或 OAuth 权限值.
+- 修正 F7 外部证据合同的 revision 漂移：`projection_checks[].projection_revision` 现在强制为与 `gbrain.projection/v1` 和 `soul.memory.readback/v1` 相同的 64 位小写 SHA-256；可选 `external_revision` 只保存平台元数据，不能替代 DPS 逻辑修订。此变更仅修复验证合同与门禁，不生成或声称任何 GBrain 真机证据.
+- F7 外部输入迁移到 `dps.device-gbrain-verification-input/v2`：强制 canonical Soul/device/account ID、逻辑 Source 到确定性非 PII 短别名映射，并让每条 projection check 绑定版本化 raw JSON artifact 的 ID、SHA-256 和完整 scope/revision/checksum tuple；门禁从两份 canonical `gbrain.projection/v1` bytes 独立重算 checksum、核对 scope、按现有 C# canonicalizer 重算 DTO checksum 并要求 exact readback，且拒绝超出 System.Decimal 范围/scale 的非生产 DTO 数字。每个 Soul 还必须绑定独立的版本化 Search 回读制品，保存 canonical 查询/响应 bytes；门禁从 bytes 重算摘要、解析 `gbrain.search-result/v1` 并显式核对 Source、Soul、schema、source-scoped provenance、不超过 300 秒的新鲜度及每条结果的 scope。通用外部 ID 改为字母前缀 opaque 值，拒绝纯数字手机号形态。v1 仅保留作迁移记录且门禁拒绝。全部 F6-F9 environment 改为阶段固定字段及逐字段格式，trust policy 只能固定值而不能扩展自由字段；嵌套值、敏感字段和值失败关闭。POSIX trust policy 改为单一 no-follow FD 链读取，拒绝父目录 symlink 与检查后路径替换；缺少等价安全原语的平台保持 `WAITING_EXTERNAL`。此项仍只增强候选门禁，不生成 `DEVICE_VERIFIED` 证据.
+- 补全 F6/F9 executable external contracts：F6 将 Windows、ZennoDroid、.NET Framework、C#、CodeDom、GAC、DLL/Zenno project load、ADB authorization、Bridge ABI、固定 loopback port、fail-closed timeout、native error 与连接连续性全部纳入 trust-policy exact binding，并使 process observation 精确绑定签名测量窗口；F9 必须验证由可信 CANARY issuer 签名并绑定精确 commit/BOM/candidate 的 F8 receipt，从 BOM-hashed raw Manifests 重建 dependency DAG 和 compatibility matrix，拒绝 evidence 自报缺边，并证明最多四条 rollout line 的传递依赖独立性与普通 module 五分钟回滚。100 sustained、200 burst、400 simulated 三类 run 改用不同的 versioned raw JSON，由门禁重算匿名 actor cardinality、并发、时间/时长、72 小时覆盖、每窗口最老积压不超过 120 秒与结束后 backlog recovery，不再接受 marker bytes 或 summary 自述。F7 另以临时测试密钥完成完整 envelope 与 BOM 的真实 P-256/P1363 正向及篡改负测；这些 synthetic tests 不生成任何外部等级证据.
+- Hosted CI 的 runner 标签改为 `ubuntu-24.04`, 所有 GitHub Actions 改为官方版本对应的完整 commit SHA; 新增 CODEOWNERS 基线与仓库外两人审批/受保护 workflow 运维要求.
+
+#### Runtime impact
+
+- 现有 legacy 业务主干保持不动; `Modules/SessionRunner.cs` 字节哈希被冻结。除两个 `Configs/` manifest 语法修复外, F1 只改动 `ZDProjects/RuntimeTestRunner.cs`, `ZDProjects/TestRunner.cs` 和 `ZDProjects/Tests/Reddit_IntegrationTest.cs` 以清除固定 PASS, 失败不传播和 Mock 冒充 Integration. 新 `Modules/<module-id>/` 代码未接入现有 ZennoDroid 运行路径.
+- F5 的真实 SessionRunner 绞杀接线尚未完成；F6 Windows A/B、F7 GBrain 与两部授权非生产手机、F8 三十台灰度和 F9 两百台/72 小时规模证据仍为外部阻断，不能由本地测试替代.
+- 历史 CHANGELOG 中的 `.omo` 路径保留为当时版本事实.
+
 
 ## [4.6.1] - 2026-03-14
 

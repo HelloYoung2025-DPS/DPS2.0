@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/internal/factory-evidence-append-auth.v1.schema.json",
+  "title": "Internal authenticated append envelope v1",
+  "description": "Internal detached authentication for exact canonical upgrade.event.append/v1 bytes. This is not a product event or a public module-to-module contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "issuer",
+    "audience",
+    "scope",
+    "producer_module",
+    "command_sha256",
+    "issued_at",
+    "expires_at",
+    "revocation_epoch",
+    "nonce",
+    "key_id",
+    "signature"
+  ],
+  "properties": {
+    "schema_version": {"const": "dps.factory-evidence-append-auth/v1"},
+    "issuer": {"enum": ["dps-factory-auth-service", "dps-local-development-authority"]},
+    "audience": {"const": "factory-evidence-ledger"},
+    "scope": {"const": "factory:evidence:append"},
+    "producer_module": {"enum": ["factory-release-controller", "factory-rollback-controller"]},
+    "command_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "issued_at": {"type": "integer", "minimum": 0},
+    "expires_at": {"type": "integer", "minimum": 1},
+    "revocation_epoch": {"type": "integer", "minimum": 0},
+    "nonce": {"type": "string", "pattern": "^auth_[0-9a-f]{32}$(?![\\s\\S])"},
+    "key_id": {"const": "factory-evidence-append-v1"},
+    "signature": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"}
+  }
+}

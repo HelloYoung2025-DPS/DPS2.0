@@ -1,0 +1,16 @@
+{
+  "contractId": "approval.submission.state/v1",
+  "base": {
+    "schema_version": "1.0.0", "contract_id": "approval.submission.state/v1", "producer_module": "policy-approval", "state_event_id": "11111111-1111-1111-1111-111111111111", "submission_attempt_id": "12121212-1212-1212-1212-121212121212", "approval_id": "22222222-2222-2222-2222-222222222222", "proposal_id": "33333333-3333-3333-3333-333333333333", "command_id": "44444444-4444-4444-4444-444444444444", "lease_id": "55555555-5555-5555-5555-555555555555", "attempt": 1,
+    "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "device_binding_id": "db_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "platform_account_id": "pa_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "trace_id": "trace_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "idempotency_key": "idem_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "release_bom_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "release_bom_generation": 1, "native_request_binding_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "submission_intent_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", "state": "SUBMISSION_PENDING", "predecessor_state_sha256": null, "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd", "occurred_at": "2026-07-15T00:00:00Z", "privacy_class": "internal", "state_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "signature_base64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+  },
+  "cases": [
+    {"id": "valid-pending", "schemaValid": true, "codecValid": true, "patch": {}, "remove": []},
+    {"id": "valid-acknowledged", "schemaValid": true, "codecValid": true, "patch": {"state": "SUBMISSION_ACKNOWLEDGED", "predecessor_state_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}, "remove": []},
+    {"id": "valid-unknown", "schemaValid": true, "codecValid": true, "patch": {"state": "UNKNOWN_SUBMISSION", "predecessor_state_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}, "remove": []},
+    {"id": "unknown-state", "schemaValid": false, "codecValid": false, "patch": {"state": "RETRYABLE"}, "remove": []},
+    {"id": "pending-with-predecessor", "schemaValid": false, "codecValid": false, "patch": {"predecessor_state_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"}, "remove": []},
+    {"id": "ack-without-predecessor", "schemaValid": false, "codecValid": false, "patch": {"state": "SUBMISSION_ACKNOWLEDGED"}, "remove": []},
+    {"id": "unknown-field", "schemaValid": false, "codecValid": false, "patch": {"unknown": true}, "remove": []}
+  ]
+}

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.Planner.Tests</AssemblyName>
+    <RootNamespace>Dps.Planner.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <ProjectReference Include="../../src/Dps.Planner/Dps.Planner.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../action-proposal-contract-cases.v1.json" Link="action-proposal-contract-cases.v1.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../action-proposal-contract-cases.v2.json" Link="action-proposal-contract-cases.v2.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../action-proposal-major-modes.v1.json" Link="action-proposal-major-modes.v1.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../required-real-local-process-tests.v1.json" Link="required-real-local-process-tests.v1.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

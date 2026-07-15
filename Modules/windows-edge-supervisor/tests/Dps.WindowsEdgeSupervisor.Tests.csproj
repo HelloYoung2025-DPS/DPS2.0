@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <ProjectReference Include="../../edge-local-journal/contracts/provided/Dps.EdgeLocalJournal.Contracts/Dps.EdgeLocalJournal.Contracts.csproj" />
+    <ProjectReference Include="../contracts/provided/Dps.WindowsEdgeSupervisor.Contracts/Dps.WindowsEdgeSupervisor.Contracts.csproj" />
+    <ProjectReference Include="../src/Dps.WindowsEdgeSupervisor.csproj" />
+  </ItemGroup>
+</Project>

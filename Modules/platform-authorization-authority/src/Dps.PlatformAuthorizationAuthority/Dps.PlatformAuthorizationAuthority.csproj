@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Dps.PlatformAuthorizationAuthority</AssemblyName>
+    <RootNamespace>Dps.PlatformAuthorizationAuthority</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../contracts/Dps.PlatformAuthorizationAuthority.Contracts/Dps.PlatformAuthorizationAuthority.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Dps.PlatformAuthorizationAuthority.Tests" />
+  </ItemGroup>
+</Project>

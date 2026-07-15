@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Dps.ControlPlaneHost/Dps.ControlPlaneHost.csproj" />
+    <ProjectReference Include="../../contracts/Dps.ControlPlaneHost.Contracts/Dps.ControlPlaneHost.Contracts.csproj" />
+    <ProjectReference Include="../../../policy-approval/contracts/provided/Dps.PolicyApproval.Contracts/Dps.PolicyApproval.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../../device-registry/contracts/corpus/device.registered.v1.corpus.json"
+                      LogicalName="Dps.ControlPlaneHost.Tests.ProviderCorpora.device.registered.v1.corpus.json" />
+    <EmbeddedResource Include="../../../platform-account-registry/contracts/corpus/platform.account.authorized.v1.corpus.json"
+                      LogicalName="Dps.ControlPlaneHost.Tests.ProviderCorpora.platform.account.authorized.v1.corpus.json" />
+    <EmbeddedResource Include="../../../binding/contracts/corpus/identity.binding.v1.corpus.json"
+                      LogicalName="Dps.ControlPlaneHost.Tests.ProviderCorpora.identity.binding.v1.corpus.json" />
+    <EmbeddedResource Include="../../../persona-store/contracts/provided/corpus/persona.revision.v1.corpus.json"
+                      LogicalName="Dps.ControlPlaneHost.Tests.ProviderCorpora.persona.revision.v1.corpus.json" />
+    <EmbeddedResource Include="../../../soul-memory-adapter/contracts/provided/soul.memory.readback.v1.corpus.json"
+                      LogicalName="Dps.ControlPlaneHost.Tests.ProviderCorpora.soul.memory.readback.v1.corpus.json" />
+    <EmbeddedResource Include="../../../gbrain-projector/contracts/provided/gbrain.source-id.v1.corpus.json"
+                      LogicalName="Dps.ControlPlaneHost.Tests.ProviderCorpora.gbrain.source-id.v1.corpus.json" />
+  </ItemGroup>
+</Project>

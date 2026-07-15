@@ -161,6 +161,113 @@ public class SessionRunner
         // Run() 通过 InitSession 委托执行时的返回结果
         public const string LegacyRunResult = "sr_legacy_run_result";
     }
+
+    // F5 P0 containment: no authenticated modern authorization/lease/receipt bridge is
+    // currently composed into the legacy ZennoDroid runtime. A writable ZD variable is
+    // never an execution capability. Keep every production entry fail-closed until the
+    // separately reviewed bridge can prove policy approval, lease, Release BOM, native
+    // result, and business postcondition for one exact identity scope.
+    private const string MODERN_BRIDGE_REQUIRED = "modern authorization bridge unavailable";
+    private const string LEGACY_FAILURE_STEP = "ERROR_BRIDGE_REQUIRED";
+
+    private static bool HasVerifiedModernExecutionBridge()
+    {
+        return false;
+    }
+
+    private static string StopUnverifiedLegacyExecution(string entryPoint, string returnValue)
+    {
+        // Write the routing failure before any best-effort cleanup or logging.
+        // A logging failure must never leave a stale DONE token behind.
+        CoreHelper.SetVar(VK.ZdStepType, LEGACY_FAILURE_STEP);
+        try
+        {
+            CoreHelper.LogErr(TAG, entryPoint + ": " + MODERN_BRIDGE_REQUIRED + "; no device side effect was attempted");
+        }
+        catch (Exception)
+        {
+            // Logging is diagnostic only; containment must continue.
+        }
+        _operationQueue.Clear();
+        _operationQueueIndex = 0;
+        _consecutiveSkips = 0;
+        CoreHelper.SetVar(VK.ZdStepPlan, "");
+        CoreHelper.SetVar(VK.ZdStepIndex, "0");
+        CoreHelper.SetVar(VK.ZdStepCount, "0");
+        CoreHelper.SetVar(VK.ZdStepParam, "");
+        CoreHelper.SetVar(VK.ZdSelectorKey, "");
+        CoreHelper.SetVar(VK.ZdTapX1, "");
+        CoreHelper.SetVar(VK.ZdTapX2, "");
+        CoreHelper.SetVar(VK.ZdTapY1, "");
+        CoreHelper.SetVar(VK.ZdTapY2, "");
+        CoreHelper.SetVar(VK.ZdSwipeX1, "");
+        CoreHelper.SetVar(VK.ZdSwipeY1, "");
+        CoreHelper.SetVar(VK.ZdSwipeX2, "");
+        CoreHelper.SetVar(VK.ZdSwipeY2, "");
+        CoreHelper.SetVar(VK.ZdSwipeDuration, "0");
+        CoreHelper.SetVar(VK.ZdWaitSec, "0");
+        CoreHelper.SetVar(VK.ZdFound, "false");
+        CoreHelper.SetVar(VK.ZdVerifyRule, "");
+        CoreHelper.SetVar(VK.ZdSafety, "100");
+        CoreHelper.SetVar(VK.ZdActionResult, "UNKNOWN");
+        CoreHelper.SetVar(VK.ZdActionDuration, "0");
+        CoreHelper.SetVar(VK.ZdActionErrorDetail, MODERN_BRIDGE_REQUIRED);
+        CoreHelper.SetVar(VK.ActionCount, "0");
+        CoreHelper.SetVar(VK.SuccessCount, "0");
+        CoreHelper.SetVar(VK.FailCount, "0");
+        CoreHelper.SetVar(VK.SkipCount, "0");
+        CoreHelper.SetVar(VK.ConsecutiveSkips, "0");
+        CoreHelper.SetVar(VK.VisionRecoveryCount, "0");
+        CoreHelper.SetVar(VK.OrchestratorState, "");
+        CoreHelper.SetVar(VK.OpQueue, "");
+        CoreHelper.SetVar(VK.OpQueueIndex, "0");
+        CoreHelper.SetVar(VK.CurrentSessionAction, "");
+        CoreHelper.SetVar(VK.CurrentOpName, "");
+        CoreHelper.SetVar(VK.MemoryEntries, "");
+        CoreHelper.SetVar(VK.MemoryFile, "");
+        CoreHelper.SetVar(VK.UseLegacyRun, "false");
+        CoreHelper.SetVar(VK.LegacyRunCompleted, "false");
+        CoreHelper.SetVar(VK.LegacyRunResult, "ERROR: " + MODERN_BRIDGE_REQUIRED);
+        CoreHelper.SetVar("action_count", "0");
+        CoreHelper.SetVar("action_attempt_count", "0");
+        CoreHelper.SetVar("session_successful_actions", "0");
+        CoreHelper.SetVar("session_failed_actions", "0");
+        CoreHelper.SetVar("session_skipped_actions", "0");
+        CoreHelper.SetVar("session_success_rate", "0.0000");
+        CoreHelper.SetVar("action_result", "ERROR");
+        CoreHelper.SetVar("current_action", "");
+        CoreHelper.SetVar("current_intent", "");
+        CoreHelper.SetVar("execution_proposal", "");
+        CoreHelper.SetVar("recovery_proposal", "");
+        CoreHelper.SetVar("onboarding_proposal", "");
+        CoreHelper.SetVar("ai_direct_execution", "false");
+        CoreHelper.SetVar("ai_notify_human", "false");
+        CoreHelper.SetVar("vision_verified", "error_preserved");
+        CoreHelper.SetVar("run_result", "ERROR");
+        CoreHelper.SetVar("session_result", "ERROR");
+        CoreHelper.SetVar("last_error", MODERN_BRIDGE_REQUIRED);
+        // Reassert after cleanup so later setters cannot accidentally alter routing.
+        CoreHelper.SetVar(VK.ZdStepType, LEGACY_FAILURE_STEP);
+        return returnValue;
+    }
+
+    private static bool ContainsLegacyStepDsl(string plan)
+    {
+        if (string.IsNullOrEmpty(plan)) return false;
+        string[] steps = plan.Split(new char[] { '|' });
+        for (int i = 0; i < steps.Length; i++)
+        {
+            string token = steps[i].Trim();
+            int colon = token.IndexOf(':');
+            string stepType = colon >= 0 ? token.Substring(0, colon) : token;
+            if (stepType == "L" || stepType == "T" || stepType == "S"
+                || stepType == "W" || stepType == "B" || stepType == "V")
+            {
+                return true;
+            }
+        }
+        return false;
+    }
     
     // ==================== SessionState 序列化 ====================
     
@@ -408,6 +515,11 @@ public class SessionRunner
         try
         {
             CoreHelper.Init(projectObj, instanceObj);
+
+            if (!HasVerifiedModernExecutionBridge())
+            {
+                return StopUnverifiedLegacyExecution("Run", "ERROR: " + MODERN_BRIDGE_REQUIRED);
+            }
             
             
             // ========== 设备连接检测 ==========
@@ -736,12 +848,6 @@ public class SessionRunner
             }
             CoreHelper.Log(TAG, "打字速度: " + typingSpeed + " WPM (级别: " + typingLevel + ")");
             
-            // 准备记忆目录
-            string today = CoreHelper.GetToday();
-            string memoryDir = projectRoot + "Memory\\" + deviceId;
-            CoreHelper.EnsureDir(memoryDir);
-            string memoryFile = memoryDir + "\\" + today + ".json";
-            
             // 模拟会话
             DateTime sessionStart = DateTime.Now;
             DateTime sessionEnd = sessionStart.AddMinutes(sessionDuration);
@@ -749,8 +855,6 @@ public class SessionRunner
             int successfulActions = 0;  // SUCCESS 动作数
             int failedActions = 0;      // ERROR 动作数
             int skippedActions = 0;     // SKIP 动作数
-            List<string> memoryEntries = new List<string>();
-            
             // 重置连续 SKIP 计数
             _consecutiveSkips = 0;
             
@@ -834,35 +938,11 @@ public class SessionRunner
                     CoreHelper.LogErr(TAG, "动作执行失败: " + ex.Message);
                 }
                 
-                // v4.5.12: Vision 验证层 — ERROR 时主动验证是否为 ZD 误报
-                // v4.5.2 原设计: 仅在 SUCCESS 的 like/comment 跳过验证
-                // v4.5.12 升级: ERROR 时截图发给 Vision 模型，检查操作是否实际成功
-                if (actionResult == "ERROR" && VisionCorrector.IsInitialized()
-                    && _visionRecoveryCount < MAX_VISION_RECOVERY_PER_SESSION)
-                {
-                    CoreHelper.Log(TAG, "[VISION] 验证操作是否为误报: " + selectedAction);
-                    _visionRecoveryCount++;
-                    string errScreenshot = VisionCorrector.CaptureScreenshot();
-                    if (!string.IsNullOrEmpty(errScreenshot))
-                    {
-                        ZDResult errResult = ZDResult.FailedRetryable("Operation " + selectedAction + " reported ERROR");
-                        bool actuallyOk = VisionCorrector.VerifyError(selectedIntent, errResult, errScreenshot);
-                        if (actuallyOk)
-                        {
-                            CoreHelper.Log(TAG, "[VISION] 操作实际成功（ZD 误报）: " + selectedAction);
-                            actionResult = "SUCCESS";
-                            CoreHelper.SetVar("vision_verified", "corrected");
-                        }
-                        else
-                        {
-                            CoreHelper.SetVar("vision_verified", "confirmed_error");
-                        }
-                    }
-                }
-                else
-                {
-                    CoreHelper.SetVar("vision_verified", actionResult == "SUCCESS" ? "skipped" : "not_applicable");
-                }
+                // Vision/OCR is untrusted advisory input. It may explain an ERROR but may
+                // never turn ERROR/UNKNOWN into SUCCESS without a signed native receipt
+                // and deterministic business postcondition from the modern bridge.
+                CoreHelper.SetVar("vision_verified",
+                    actionResult == "SUCCESS" ? "not_authoritative" : "error_preserved");
                 
                 // BUG-04 fix: SKIP 不算失败（页面不匹配等正常情况）
                 // v4.5.8: 分类计数 SUCCESS/SKIP/ERROR
@@ -895,23 +975,13 @@ public class SessionRunner
                     _consecutiveSkips = 0;
                 }
                 
-                // v4.5.1: 通过 MemoryManager 记录结构化交互
+                // F5 P0: legacy action text is not proof of a completed side effect.
+                // Memory/spoken projection remains blocked until a modern verified receipt
+                // binds the native result and business postcondition to the identity tuple.
                 if (actionResult == "SUCCESS" && selectedAction != "browse" && !string.IsNullOrEmpty(currentPostId))
                 {
-                    string currentPlatformForRecord = CoreHelper.GetVar("current_platform", "reddit");
-                    MemoryManager.RecordInteraction(deviceId, currentPlatformForRecord, currentPostId, selectedAction);
-                    CoreHelper.Log(TAG, string.Format("MemoryManager 已记录: {0} on {1}", selectedAction, currentPostId));
-                    
-                    // BUG-02 fix v2: 交互完成后清空帖子数据，防止下一轮重复评估同一帖子
-                    CoreHelper.SetVar("current_post_json", "");
-                    CoreHelper.SetVar("current_post_id", "");
+                    CoreHelper.LogWarn(TAG, "Legacy interaction memory blocked: verified receipt required");
                 }
-                
-                // 记录到日记忆文件（兼容 WeeklyEvolve 的文件读取）
-                // BUG-13 fix: 使用 JsonHelper.Escape 防止特殊字符破坏 JSON
-                string timestamp = DateTime.Now.ToString("HH:mm:ss");
-                string logEntry = "{\"time\":\"" + JsonHelper.Escape(timestamp) + "\",\"action_type\":\"" + JsonHelper.Escape(selectedAction) + "\"}";
-                memoryEntries.Add(logEntry);
                 
                 actionCount++;
                 
@@ -936,22 +1006,8 @@ public class SessionRunner
                 }
             }
             
-            // 保存记忆
-            string entriesJson = "[" + string.Join(",", memoryEntries.ToArray()) + "]";
-            string memoryJson = "{"
-                + "\"device_id\":\"" + deviceId + "\","
-                + "\"date\":\"" + today + "\","
-                + "\"session_start\":\"" + sessionStart.ToString("HH:mm:ss") + "\","
-                + "\"session_end\":\"" + DateTime.Now.ToString("HH:mm:ss") + "\","
-                + "\"entries\":" + entriesJson
-                + "}";
-            CoreHelper.WriteFileAtomic(memoryFile, memoryJson);
-            
-            // v4.5.1: 会话结束时清理过期记忆
-            string currentPlatformForCleanup = CoreHelper.GetVar("current_platform", "reddit");
-            MemoryManager.CleanupOldInteractions(deviceId, currentPlatformForCleanup, 0);
-            MemoryManager.EnforceMemoryLimits(deviceId, currentPlatformForCleanup, _decisionConfigJson);
-            CoreHelper.Log(TAG, "MemoryManager 清理完成");
+            CoreHelper.LogWarn(TAG,
+                "Legacy memory file and interaction projection blocked: verified receipt required");
             
             CoreHelper.Log(TAG, string.Format(
                 "会话结束 — 总尝试: {0}, 成功: {1}, 失败: {2}, 跳过: {3}",
@@ -1039,6 +1095,11 @@ public class SessionRunner
         try
         {
             CoreHelper.Init(projectObj, instanceObj);
+
+            if (!HasVerifiedModernExecutionBridge())
+            {
+                return StopUnverifiedLegacyExecution("InitSession", "ERROR: " + MODERN_BRIDGE_REQUIRED);
+            }
             
             // ========== T17: 兼容开关检测 ==========
             // sr_use_legacy_run = "true" 时，委托旧 Run() 整体式执行整个会话
@@ -1361,12 +1422,6 @@ public class SessionRunner
             CoreHelper.Log(TAG, string.Format("InitSession: 动作权重: browse={0:F2}, read={1:F2}, like={2:F2}, comment={3:F2}, post={4:F2}",
                 weights[0], weights[1], weights[2], weights[3], weights[4]));
             
-            // ========== 准备记忆文件路径 ==========
-            string today = CoreHelper.GetToday();
-            string memoryDir = projectRoot + "Memory\\" + deviceId;
-            CoreHelper.EnsureDir(memoryDir);
-            string memoryFile = memoryDir + "\\" + today + ".json";
-            
             // ========== 写入会话时间到 ZD 变量 ==========
             DateTime sessionStart = DateTime.Now;
             DateTime sessionEnd = sessionStart.AddMinutes(sessionDuration);
@@ -1382,8 +1437,8 @@ public class SessionRunner
             // ========== 写入动作权重 ==========
             CoreHelper.SetVar(VK.ActionWeightsJson, SerializeWeights(actionTypes, weights));
             
-            // ========== 写入记忆文件路径 ==========
-            CoreHelper.SetVar(VK.MemoryFile, memoryFile);
+            // Legacy runtime may not create memory storage or append interaction facts.
+            CoreHelper.SetVar(VK.MemoryFile, "");
             CoreHelper.SetVar(VK.MemoryEntries, "");
             
             // ========== 存储配置 key 到 ZD 变量 ==========
@@ -1451,16 +1506,16 @@ public class SessionRunner
             // -- Step DSL 状态变量: 初始化为安全空/零值 --
             // StepRunner 在接收到 DecideNextAction 的 DSL 输出后会重写这些值，
             // 此处仅保证变量存在，防止 ZD 原生块在 Loop 首次迭代时引用未定义变量。
-            // 注意: 如果外部已预设 zd_step_plan (如测试 DSL)，保留其值不覆盖
+            // 生产 SessionRunner 不接受外部预设 DSL。测试 DSL 必须留在专用
+            // TestRunner/RuntimeTestRunner 中，不能把可写 ZD 变量当执行授权。
             string presetPlan = CoreHelper.GetVar(VK.ZdStepPlan, "");
-            if (string.IsNullOrEmpty(presetPlan.Trim()))
+            if (!string.IsNullOrEmpty(presetPlan.Trim()))
             {
-                CoreHelper.SetVar(VK.ZdStepPlan, "");
+                return StopUnverifiedLegacyExecution(
+                    "InitSession external zd_step_plan rejected",
+                    "ERROR: untrusted zd_step_plan rejected");
             }
-            else
-            {
-                CoreHelper.Log(TAG, "InitSession: 检测到外部预设 zd_step_plan, 保留: " + presetPlan);
-            }
+            CoreHelper.SetVar(VK.ZdStepPlan, "");
             CoreHelper.SetVar(VK.ZdStepIndex, "0");
             CoreHelper.SetVar(VK.ZdStepCount, "0");
             CoreHelper.SetVar(VK.ZdStepType, "");
@@ -1521,6 +1576,11 @@ public class SessionRunner
         try
         {
             CoreHelper.Init(projectObj, instanceObj);
+
+            if (!HasVerifiedModernExecutionBridge())
+            {
+                return StopUnverifiedLegacyExecution("DecideNextAction", LEGACY_FAILURE_STEP);
+            }
             
             // T17: 兼容模式检测 — Run() 已整体执行完毕，跳过决策
             if (CoreHelper.GetVar(VK.LegacyRunCompleted, "") == "true")
@@ -1533,120 +1593,12 @@ public class SessionRunner
             int actionCount, successCount, failCount, skipCount;
             SessionState sessionState = RestoreState(out actionCount, out successCount, out failCount, out skipCount);
             
-            // ========== 检查外部预设的 Step DSL ==========
-            // 如果 zd_step_plan 已包含 DSL 步骤类型（L/T/S/W/B/V 开头），
-            // 说明是外部预设的测试 DSL，直接解析并路由，不走智能选择
+            // 生产入口不接受可写 ZD 变量中的测试 DSL。DSL 仅允许由独立
+            // TestRunner 使用；它不能绕过身份、审批、lease 或原生结果证明。
             string existingPlan = CoreHelper.GetVar(VK.ZdStepPlan, "");
-            if (!string.IsNullOrEmpty(existingPlan))
+            if (ContainsLegacyStepDsl(existingPlan))
             {
-                string firstToken = existingPlan.Split(new char[] { '|' })[0].Trim();
-                string typeChar = firstToken.Contains(":") ? firstToken.Split(new char[] { ':' })[0] : firstToken;
-                string[] dslTypes = new string[] { "L", "T", "T:long", "S", "W", "B", "V" };
-                bool isDsl = false;
-                for (int di = 0; di < dslTypes.Length; di++)
-                {
-                    if (typeChar == dslTypes[di]) { isDsl = true; break; }
-                }
-                if (isDsl)
-                {
-                    // 外部预设 DSL — 解析步骤并设置 zd_step_type/zd_step_param
-                    string[] steps = existingPlan.Split(new char[] { '|' });
-                    int stepIndex = CoreHelper.GetVarInt(VK.ZdStepIndex, 0);
-                    int stepCount = steps.Length;
-                    CoreHelper.SetVar(VK.ZdStepCount, stepCount.ToString());
-                    
-                    if (stepIndex >= stepCount)
-                    {
-                        CoreHelper.SetVar(VK.ZdStepType, "DONE");
-                        CoreHelper.SetVar(VK.ZdStepParam, "");
-                        CoreHelper.Log(TAG, string.Format("DecideNextAction: DSL 全部完成 ({0}/{1})", stepIndex, stepCount));
-                        return "DONE";
-                    }
-                    
-                    string currentStep = steps[stepIndex].Trim();
-                    string stepType;
-                    string stepParam;
-                    // 特殊处理 T:long — 前缀是 "T:long" 不是 "T"
-                    if (currentStep.StartsWith("T:long"))
-                    {
-                        stepType = "T:long";
-                        stepParam = currentStep.Length > 6 && currentStep[6] == ':'
-                            ? currentStep.Substring(7) : "";
-                    }
-                    else if (currentStep.Contains(":"))
-                    {
-                        int colonIdx = currentStep.IndexOf(':');
-                        stepType = currentStep.Substring(0, colonIdx);
-                        stepParam = currentStep.Substring(colonIdx + 1);
-                    }
-                    else
-                    {
-                        stepType = currentStep;
-                        stepParam = "";
-                    }
-                    
-                    CoreHelper.SetVar(VK.ZdStepType, stepType);
-                    CoreHelper.SetVar(VK.ZdStepParam, stepParam);
-                    
-                    // ========== 展开 DSL 参数到原生块变量 ==========
-                    if (stepType == "W" && !string.IsNullOrEmpty(stepParam))
-                    {
-                        // W:3 → Pause 3 秒
-                        CoreHelper.SetVar(VK.ZdWaitSec, stepParam);
-                    }
-                    else if (stepType == "L" && !string.IsNullOrEmpty(stepParam))
-                    {
-                        // L:post_unit → Locate selector_key
-                        CoreHelper.SetVar(VK.ZdSelectorKey, stepParam);
-                    }
-                    else if (stepType == "V" && !string.IsNullOrEmpty(stepParam))
-                    {
-                        // V:rule → Verify rule
-                        CoreHelper.SetVar(VK.ZdVerifyRule, stepParam);
-                    }
-                    else if (stepType == "S" && !string.IsNullOrEmpty(stepParam))
-                    {
-                        // S:down_900 → 解析方向+距离, 展开为 swipe 坐标
-                        int sw = CoreHelper.GetVarInt(VK.ZdScreenWidth, 1080);
-                        int sh = CoreHelper.GetVarInt(VK.ZdScreenHeight, 2400);
-                        int centerX = sw / 2;
-                        int centerY = sh / 2;
-                        
-                        // 解析方向和距离: down_900, up_500, left_300, right_300
-                        string direction = "down";
-                        int distance = 900;
-                        if (stepParam.Contains("_"))
-                        {
-                            int uIdx = stepParam.LastIndexOf('_');
-                            direction = stepParam.Substring(0, uIdx);
-                            int.TryParse(stepParam.Substring(uIdx + 1), out distance);
-                        }
-                        
-                        int x1 = centerX, y1 = centerY, x2 = centerX, y2 = centerY;
-                        if (direction == "down") { y1 = centerY - distance / 2; y2 = centerY + distance / 2; }
-                        else if (direction == "up") { y1 = centerY + distance / 2; y2 = centerY - distance / 2; }
-                        else if (direction == "left") { x1 = centerX + distance / 2; x2 = centerX - distance / 2; }
-                        else if (direction == "right") { x1 = centerX - distance / 2; x2 = centerX + distance / 2; }
-                        
-                        CoreHelper.SetVar(VK.ZdSwipeX1, x1.ToString());
-                        CoreHelper.SetVar(VK.ZdSwipeY1, y1.ToString());
-                        CoreHelper.SetVar(VK.ZdSwipeX2, x2.ToString());
-                        CoreHelper.SetVar(VK.ZdSwipeY2, y2.ToString());
-                    }
-                    else if (stepType == "B" && !string.IsNullOrEmpty(stepParam))
-                    {
-                        // B:BACK → 键盘键名(由 Keyboard Emulation 块消费)
-                        // 注意: ZD Keyboard Emulation 块本身配置 {AndroidKeys.BACK}，
-                        // stepParam 这里仅做日志记录，不需要额外设变量
-                    }
-                    
-                    CoreHelper.Log(TAG, string.Format(
-                        "DecideNextAction: DSL Step {0}/{1}: {2} (type={3}, param={4})",
-                        stepIndex + 1, stepCount, currentStep, stepType, stepParam));
-                    
-                    SaveDynamicState(sessionState, actionCount, successCount, failCount, skipCount);
-                    return stepType;
-                }
+                return StopUnverifiedLegacyExecution("DecideNextAction legacy DSL rejected", LEGACY_FAILURE_STEP);
             }
             
             // ========== 检查会话结束条件 ==========
@@ -1828,6 +1780,11 @@ public class SessionRunner
         try
         {
             CoreHelper.Init(projectObj, instanceObj);
+
+            if (!HasVerifiedModernExecutionBridge())
+            {
+                return StopUnverifiedLegacyExecution("EvaluateActionResult", LEGACY_FAILURE_STEP);
+            }
             
             // T17: 兼容模式检测 — Run() 已整体执行完毕，跳过评估
             if (CoreHelper.GetVar(VK.LegacyRunCompleted, "") == "true")
@@ -1840,29 +1797,13 @@ public class SessionRunner
             int actionCount, successCount, failCount, skipCount;
             SessionState sessionState = RestoreState(out actionCount, out successCount, out failCount, out skipCount);
             
-            // ========== DSL 模式检测: 提前返回，避免不必要的 GetLayout ==========
+            // 生产结果评估禁止测试 DSL 自动通过。没有原生结果与业务后置条件
+            // 的步骤必须保持 UNKNOWN/ERROR，不能增加成功计数。
             string completedStepIndex = CoreHelper.GetVar(VK.ZdStepIndex, "0");
             string existingDslPlan = CoreHelper.GetVar(VK.ZdStepPlan, "");
-            if (!string.IsNullOrEmpty(existingDslPlan))
+            if (ContainsLegacyStepDsl(existingDslPlan))
             {
-                string dslFirstToken = existingDslPlan.Split(new char[] { '|' })[0].Trim();
-                string dslTypeChar = dslFirstToken.Contains(":") ? dslFirstToken.Split(new char[] { ':' })[0] : dslFirstToken;
-                string[] knownDslTypes = new string[] { "L", "T", "S", "W", "B", "V" };
-                bool isDslMode = false;
-                for (int di = 0; di < knownDslTypes.Length; di++)
-                {
-                    if (dslTypeChar == knownDslTypes[di]) { isDslMode = true; break; }
-                }
-                if (isDslMode)
-                {
-                    successCount++;
-                    actionCount++;
-                    CoreHelper.Log(TAG, string.Format(
-                        "EvaluateActionResult: DSL 模式自动通过 (step_idx={0}, action={1}/{2})",
-                        completedStepIndex, actionCount, 50));
-                    SaveDynamicState(sessionState, actionCount, successCount, failCount, skipCount);
-                    return "CONTINUE";
-                }
+                return StopUnverifiedLegacyExecution("EvaluateActionResult legacy DSL rejected", LEGACY_FAILURE_STEP);
             }
             
             // 读取执行结果（通过 VK 常量，key 值与原硬编码 "zd_action_result" 一致）
@@ -1878,9 +1819,14 @@ public class SessionRunner
             string errorDetail = CoreHelper.GetVar(VK.ZdActionErrorDetail, "");
             // completedStepIndex 已在上方 DSL 检测中声明
             
-            // v4.7.0: 归一化 actionResult — 兼容 ZD 原生块带冒号后缀的格式（如 "SUCCESS:done"）
-            // 空值原样透传给编排器（编排器已有自己的空值处理）
+            // Fail closed: do not turn whitespace or suffix-bearing values into SUCCESS.
+            // SmartOrchestrator accepts only the exact raw SUCCESS token.
             actionResult = NormalizeActionResult(actionResult);
+            if (string.IsNullOrEmpty(actionResult) || actionResult == "UNKNOWN")
+            {
+                return StopUnverifiedLegacyExecution(
+                    "EvaluateActionResult missing native result", LEGACY_FAILURE_STEP);
+            }
             
             CoreHelper.Log(TAG, string.Format(
                 "EvaluateActionResult: op={0}, action={1}, result={2}, step_idx={3}, err=[{4}]",
@@ -1926,25 +1872,17 @@ public class SessionRunner
                     successCount++;
                     _consecutiveSkips = 0;
                     
-                    // 记录交互记忆（非 browse 动作）
+                    // Legacy SUCCESS text is not sufficient for a memory projection.
                     string currentPostId = CoreHelper.GetVar("current_post_id", "");
                     if (currentSessionAction != "browse" && !string.IsNullOrEmpty(currentPostId))
                     {
-                        MemoryManager.RecordInteraction(deviceId, platformName, currentPostId, currentSessionAction);
-                        CoreHelper.Log(TAG, string.Format("EvaluateActionResult: MemoryManager 已记录: {0} on {1}", currentSessionAction, currentPostId));
-                        
-                        // 清空帖子数据防止重复评估
-                        CoreHelper.SetVar("current_post_json", "");
-                        CoreHelper.SetVar("current_post_id", "");
+                        CoreHelper.LogWarn(TAG,
+                            "EvaluateActionResult memory projection blocked: verified receipt required");
                     }
                     
                     // 累加 actionCount（一个 sessionAction 完成算一次）
                     actionCount++;
                     
-                    // 追加记忆条目
-                    string timestamp = DateTime.Now.ToString("HH:mm:ss");
-                    string logEntry = "{\"time\":\"" + JsonHelper.Escape(timestamp) + "\",\"action_type\":\"" + JsonHelper.Escape(currentSessionAction) + "\",\"result\":\"SUCCESS\"}";
-                    AppendMemoryEntry(logEntry);
                 }
                 
                 returnValue = "CONTINUE";
@@ -1966,11 +1904,6 @@ public class SessionRunner
                 
                 actionCount++;
                 
-                // 追加记忆条目
-                string skipTimestamp = DateTime.Now.ToString("HH:mm:ss");
-                string skipLogEntry = "{\"time\":\"" + JsonHelper.Escape(skipTimestamp) + "\",\"action_type\":\"" + JsonHelper.Escape(currentSessionAction) + "\",\"result\":\"SKIP\"}";
-                AppendMemoryEntry(skipLogEntry);
-                
                 returnValue = "CONTINUE";
             }
             else
@@ -1983,113 +1916,18 @@ public class SessionRunner
                     "[ORCHESTRATOR] EvaluateActionResult: {0}: verdict={1}, recovery={2}, 诊断={3}, err_detail=[{4}]",
                     currentOpName, verdict, level, _orchestrator.GetLastDiagnostics(), errorDetail));
                 
-                if (level == SmartOrchestrator.RecoveryLevel.Retry)
-                {
-                    // 简单重试: 不推进队列索引
-                    CoreHelper.Log(TAG, string.Format("[ORCHESTRATOR] Retry {0}", currentOpName));
-                    returnValue = "RETRY";
-                }
-                else if (level == SmartOrchestrator.RecoveryLevel.LocalRecovery)
-                {
-                    // 局部恢复: back_to_feed 后重试
-                    CoreHelper.Log(TAG, string.Format("[ORCHESTRATOR] LocalRecovery: 先 back_to_feed 再重试 {0}", currentOpName));
-                    string backResult = ActionExecutor.Execute(_operationsJson, "back_to_feed", _platformConfig);
-                    if (backResult.StartsWith("SUCCESS"))
-                    {
-                        string recXml = CoreHelper.GetLayout();
-                        if (!string.IsNullOrEmpty(recXml))
-                        {
-                            string recSigJson = JsonHelper.ExtractObject(_platformConfig, "page_signatures");
-                            if (!string.IsNullOrEmpty(recSigJson))
-                            {
-                                _currentPage = PageDetector.Detect(recXml, recSigJson);
-                                CoreHelper.SetVar("current_page", _currentPage);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        // back_to_feed 失败，暴力 Back
-                        dynamic recInput = CoreHelper.GetInput();
-                        if (recInput != null)
-                        {
-                            recInput.SendKeyCode(4);
-                            System.Threading.Thread.Sleep(1500);
-                            recInput.SendKeyCode(4);
-                            System.Threading.Thread.Sleep(1500);
-                        }
-                    }
-                    returnValue = "RETRY";
-                }
-                else if (level == SmartOrchestrator.RecoveryLevel.VisionAssist)
-                {
-                    // AI 视觉验证
-                    CoreHelper.Log(TAG, string.Format("[ORCHESTRATOR] VisionAssist: AI 视觉验证 {0}", currentOpName));
-                    bool visionOverride = false;
-                    if (VisionCorrector.IsInitialized() && _visionRecoveryCount < MAX_VISION_RECOVERY_PER_SESSION)
-                    {
-                        string ssPath = VisionCorrector.CaptureScreenshot();
-                        if (!string.IsNullOrEmpty(ssPath))
-                        {
-                            _visionRecoveryCount++;
-                            string effectiveIntent = CoreHelper.GetVar("effective_intent", "");
-                            ZDResult errResult = ZDResult.FailedRetryable(actionResult);
-                            visionOverride = VisionCorrector.VerifyError(effectiveIntent, errResult, ssPath);
-                            if (visionOverride)
-                            {
-                                CoreHelper.Log(TAG, string.Format("[VISION] {0} 实际成功（ZD 误报）", currentOpName));
-                                _orchestrator.RecordSuccess();
-                                _currentPage = actualPage;
-                                CoreHelper.SetVar("current_page", _currentPage);
-                                UpdateCurrentPostContext();
-                                _operationQueueIndex++;
-                                
-                                // 队列耗尽时更新 sessionAction 计数
-                                if (_operationQueueIndex >= _operationQueue.Count)
-                                {
-                                    successCount++;
-                                    _consecutiveSkips = 0;
-                                    actionCount++;
-                                }
-                                
-                                returnValue = "CONTINUE";
-                            }
-                        }
-                    }
-                    
-                    // Vision 没有翻转结果，视为跳过当前操作
-                    if (!visionOverride)
-                    {
-                        returnValue = "CONTINUE";
-                    }
-                }
-                else if (level == SmartOrchestrator.RecoveryLevel.FallbackScript)
-                {
-                    // 备用剧本: 当前阶段记录并跳过
-                    CoreHelper.Log(TAG, string.Format("[ORCHESTRATOR] FallbackScript: {0} 无备用剧本，跳过", currentOpName));
-                    _operationQueue.Clear();
-                    _operationQueueIndex = 0;
-                    actionCount++;
-                    returnValue = "CONTINUE";
-                }
-                else if (level == SmartOrchestrator.RecoveryLevel.Abort)
-                {
-                    // 恢复预算耗尽
-                    CoreHelper.LogErr(TAG, string.Format(
-                        "[ORCHESTRATOR] Abort: {0} 恢复预算耗尽, {1}",
-                        currentOpName, _orchestrator.GetSessionSummary()));
-                    failCount++;
-                    _operationQueue.Clear();
-                    _operationQueueIndex = 0;
-                    actionCount++;
-                    
-                    // 追加记忆条目
-                    string failTimestamp = DateTime.Now.ToString("HH:mm:ss");
-                    string failLogEntry = "{\"time\":\"" + JsonHelper.Escape(failTimestamp) + "\",\"action_type\":\"" + JsonHelper.Escape(currentSessionAction) + "\",\"result\":\"ERROR\"}";
-                    AppendMemoryEntry(failLogEntry);
-                    
-                    returnValue = "CONTINUE";
-                }
+                // Retry, local recovery, fallback scripts, and Vision correction can all
+                // create device side effects. The legacy runtime may only emit a proposal;
+                // it may not execute or reinterpret failure without a new authorized lease.
+                CoreHelper.LogErr(TAG, string.Format(
+                    "[ORCHESTRATOR] recovery proposal blocked: op={0}, level={1}",
+                    currentOpName, level));
+                failCount++;
+                actionCount++;
+                _operationQueue.Clear();
+                _operationQueueIndex = 0;
+                return StopUnverifiedLegacyExecution(
+                    "EvaluateActionResult recovery proposal rejected", LEGACY_FAILURE_STEP);
             }
             
             // ========== 更新能量 ==========
@@ -2107,39 +1945,26 @@ public class SessionRunner
         }
         catch (Exception ex)
         {
-            CoreHelper.LogErr(TAG, "EvaluateActionResult 异常: " + ex.Message);
-            // 异常时尝试保存当前状态
-            try { SaveDynamicState(new SessionState(), 0, 0, 0, 0); } catch (Exception) { }
-            return "CONTINUE";
+            try
+            {
+                CoreHelper.LogErr(TAG, "EvaluateActionResult 异常: " + ex.Message);
+            }
+            catch (Exception)
+            {
+                // Logging is diagnostic only; the failure route remains mandatory.
+            }
+            return StopUnverifiedLegacyExecution(
+                "EvaluateActionResult exception", LEGACY_FAILURE_STEP);
         }
     }
     
     /// <summary>
-    /// 归一化 ZD 原生块执行结果字符串
-    /// 处理带冒号后缀的格式（如 "SUCCESS:done" → "SUCCESS"）
-    /// 空值原样返回（不做降级，交由编排器自身处理）
+    /// 保留 ZD 原生块执行结果的精确字节语义。
+    /// 任何空白、后缀或大小写差异都不能被改写成 SUCCESS。
     /// </summary>
     private static string NormalizeActionResult(string raw)
     {
-        if (string.IsNullOrEmpty(raw))
-        {
-            return raw;
-        }
-        
-        string trimmed = raw.Trim();
-        if (trimmed.Length == 0)
-        {
-            return "";
-        }
-        
-        // 取冒号前的前缀作为归一化结果（"SUCCESS:done" → "SUCCESS"）
-        int colonIdx = trimmed.IndexOf(':');
-        if (colonIdx > 0)
-        {
-            return trimmed.Substring(0, colonIdx);
-        }
-        
-        return trimmed;
+        return raw;
     }
     
     /// <summary>
@@ -2186,6 +2011,11 @@ public class SessionRunner
         try
         {
             CoreHelper.Init(projectObj, instanceObj);
+
+            if (!HasVerifiedModernExecutionBridge())
+            {
+                return StopUnverifiedLegacyExecution("FinalizeSession", "ERROR: " + MODERN_BRIDGE_REQUIRED);
+            }
             
             // T17: 兼容模式检测 — Run() 已整体执行完毕，跳过收尾
             if (CoreHelper.GetVar(VK.LegacyRunCompleted, "") == "true")
@@ -2199,50 +2029,12 @@ public class SessionRunner
             int actionCount, successCount, failCount, skipCount;
             SessionState sessionState = RestoreState(out actionCount, out successCount, out failCount, out skipCount);
             
-            string memoryFile = CoreHelper.GetVar(VK.MemoryFile, "");
-            string memoryEntriesStr = CoreHelper.GetVar(VK.MemoryEntries, "");
-            string sessionStartStr = CoreHelper.GetVar(VK.SessionStartTime, "");
-            string deviceId = CoreHelper.GetVar(VK.DeviceId, "");
-            string platformName = CoreHelper.GetVar(VK.PlatformName, "reddit");
             string behaviorConfigJson = CoreHelper.GetVar(VK.BehaviorConfigJson, "");
             
-            // ========== 构建并写入记忆 JSON ==========
-            if (!string.IsNullOrEmpty(memoryFile))
-            {
-                string today = CoreHelper.GetToday();
-                string sessionStartTime = "00:00:00";
-                if (!string.IsNullOrEmpty(sessionStartStr))
-                {
-                    try
-                    {
-                        DateTime startDt = DateTime.Parse(sessionStartStr);
-                        sessionStartTime = startDt.ToString("HH:mm:ss");
-                    }
-                    catch (Exception)
-                    {
-                        // 解析失败使用默认值
-                    }
-                }
-                
-                // memoryEntriesStr 是逗号分隔的 JSON 对象列表
-                string entriesJson = "[" + memoryEntriesStr + "]";
-                
-                string memoryJson = "{"
-                    + "\"device_id\":\"" + JsonHelper.Escape(deviceId) + "\","
-                    + "\"date\":\"" + today + "\","
-                    + "\"session_start\":\"" + sessionStartTime + "\","
-                    + "\"session_end\":\"" + DateTime.Now.ToString("HH:mm:ss") + "\","
-                    + "\"entries\":" + entriesJson
-                    + "}";
-                
-                CoreHelper.WriteFileAtomic(memoryFile, memoryJson);
-                CoreHelper.Log(TAG, "FinalizeSession: 记忆已保存: " + memoryFile);
-            }
-            
-            // ========== MemoryManager 清理 ==========
-            MemoryManager.CleanupOldInteractions(deviceId, platformName, 0);
-            MemoryManager.EnforceMemoryLimits(deviceId, platformName, _decisionConfigJson);
-            CoreHelper.Log(TAG, "FinalizeSession: MemoryManager 清理完成");
+            // Finalization cannot create or mutate memory without a verified receipt from
+            // the modern bridge. Legacy counters and writable variables are not evidence.
+            CoreHelper.LogWarn(TAG,
+                "FinalizeSession memory projection blocked: verified receipt required");
             
             // ========== 编排器统计 ==========
             CoreHelper.Log(TAG, string.Format("[ORCHESTRATOR] 会话统计: {0}", _orchestrator.GetSessionSummary()));
@@ -2254,18 +2046,11 @@ public class SessionRunner
             }
             
             // ========== 会话成功门控 ==========
-            // DSL 模式: 放宽门控条件（测试 DSL 步骤数可能少于 minSuccessfulActions）
+            // 任何测试 DSL 残留都证明生产会话边界已被污染；禁止放宽门控。
             string finalDslPlan = CoreHelper.GetVar(VK.ZdStepPlan, "");
-            bool isDslTestMode = false;
-            if (!string.IsNullOrEmpty(finalDslPlan))
+            if (ContainsLegacyStepDsl(finalDslPlan))
             {
-                string fToken = finalDslPlan.Split(new char[] { '|' })[0].Trim();
-                string fType = fToken.Contains(":") ? fToken.Split(new char[] { ':' })[0] : fToken;
-                string[] fDslTypes = new string[] { "L", "T", "S", "W", "B", "V" };
-                for (int fi = 0; fi < fDslTypes.Length; fi++)
-                {
-                    if (fType == fDslTypes[fi]) { isDslTestMode = true; break; }
-                }
+                return StopUnverifiedLegacyExecution("FinalizeSession legacy DSL rejected", "ERROR: untrusted zd_step_plan rejected");
             }
             
             int effectiveActions = successCount + failCount;
@@ -2276,14 +2061,6 @@ public class SessionRunner
             string sessionGateSection = JsonHelper.ExtractObject(behaviorConfigJson, "session_gate");
             double requiredSuccessRate = JsonHelper.GetDouble(sessionGateSection, "min_success_rate", 0.95);
             int minSuccessfulActions = JsonHelper.GetInt(sessionGateSection, "min_successful_actions", 6);
-            
-            // DSL 模式: 只要有成功步骤且无失败就算通过
-            if (isDslTestMode)
-            {
-                minSuccessfulActions = 1;
-                requiredSuccessRate = 0.5;
-                CoreHelper.Log(TAG, "FinalizeSession: DSL 测试模式 — 使用放宽门控");
-            }
             
             bool isSuccess = sessionSuccessRate >= requiredSuccessRate
                           && successCount >= minSuccessfulActions;
@@ -2327,22 +2104,6 @@ public class SessionRunner
             CoreHelper.SetVar("last_error", ex.Message);
             CoreHelper.SetVar("session_result", "ERROR");
             return "ERROR: " + ex.Message;
-        }
-    }
-    
-    /// <summary>
-    /// 追加一条记忆条目到 VK.MemoryEntries（逗号分隔的 JSON 对象列表）
-    /// </summary>
-    private static void AppendMemoryEntry(string jsonEntry)
-    {
-        string existing = CoreHelper.GetVar(VK.MemoryEntries, "");
-        if (string.IsNullOrEmpty(existing))
-        {
-            CoreHelper.SetVar(VK.MemoryEntries, jsonEntry);
-        }
-        else
-        {
-            CoreHelper.SetVar(VK.MemoryEntries, existing + "," + jsonEntry);
         }
     }
     
@@ -2623,269 +2384,20 @@ public class SessionRunner
     }
     
     /// <summary>
-    /// v4.5 统一引擎执行入口
-    /// 将 SessionRunner 动作名映射到 operations JSON 中的操作名，
-    /// 并处理页面状态转换逻辑（如 read_post 需要先 open_post）。
+    /// F5 P0 执行边界：只记录动作提案并失败关闭。
+    /// 未接入现代授权桥之前，不映射或执行任何设备操作。
     /// </summary>
     private static string ExecuteWithUnifiedEngine(string sessionAction, string sessionIntent, string platformName, string projectRoot)
     {
-        // 先检测当前页面状态
-        string xml = CoreHelper.GetLayout();
-        if (!string.IsNullOrEmpty(xml))
-        {
-            string signaturesJson = JsonHelper.ExtractObject(_platformConfig, "page_signatures");
-            if (!string.IsNullOrEmpty(signaturesJson))
-            {
-                _currentPage = PageDetector.Detect(xml, signaturesJson);
-                CoreHelper.Log(TAG, "当前页面: " + _currentPage);
-                CoreHelper.SetVar("current_page", _currentPage);
-            }
-        }
-        
-        string effectiveIntent = ResolveIntentWithFallback(sessionIntent);
-        CoreHelper.SetVar("effective_intent", effectiveIntent);
-        
-        // 优先按统一意图映射执行，找不到时回退到旧动作映射
-        string[] opSequence = GetOperationsByIntent(effectiveIntent, _currentPage);
-        if (opSequence.Length == 0)
-        {
-            // 映射 SessionRunner 动作名 → operations JSON 操作名序列
-            // 某些动作可能需要多步操作（如 read_post = open_post → read_post）
-            opSequence = MapActionToOperations(sessionAction, _currentPage);
-        }
-        
-        if (opSequence.Length == 0)
-        {
-            CoreHelper.Log(TAG, string.Format("动作 {0} 在页面 {1} 无对应操作，跳过", sessionAction, _currentPage));
-            return "SKIP";
-        }
-        
-        string lastResult = "SUCCESS";
-        
-        for (int i = 0; i < opSequence.Length; i++)
-        {
-            string opName = opSequence[i];
-            CoreHelper.Log(TAG, string.Format("统一引擎执行: {0} ({1}/{2})", opName, i + 1, opSequence.Length));
-            
-            // v4.6.0: 每个新操作重置编排器的操作级计数
-            _orchestrator.ResetForNewOperation();
-            
-            // 提取操作完成后预期页面（用于双层业务判定）
-            string opDef = JsonHelper.ExtractObject(_operationsJson, opName);
-            string expectedPage = SmartOrchestrator.ExtractExpectedPage(opDef);
-            
-            string result = "";
-            SmartOrchestrator.OperationVerdict verdict = SmartOrchestrator.OperationVerdict.ExecutionFailed;
-            
-            // v4.6.0: 分级恢复循环 — 失败时按编排器决策逐级升级
-            bool operationDone = false;
-            while (!operationDone)
-            {
-                result = ActionExecutor.Execute(_operationsJson, opName, _platformConfig);
-                
-                // v4.5.12: 操作后前台健康检查（三层恢复）
-                string opPackageName = JsonHelper.Get(_platformConfig, "package_name");
-                if (!string.IsNullOrEmpty(opPackageName) && !IsAppForeground(opPackageName))
-                {
-                    bool recovered = PostOperationHealthCheck(opPackageName, opName, _currentPage, projectRoot);
-                    if (!recovered)
-                    {
-                        CoreHelper.LogErr(TAG, string.Format("[RECOVERY] 恢复失败，中止操作序列: {0}", opName));
-                        result = "ERROR:app_not_foreground";
-                    }
-                    else
-                    {
-                        CoreHelper.Log(TAG, "[RECOVERY] 前台恢复成功，继续执行");
-                    }
-                }
-                
-                // 操作后获取实际页面状态
-                string postOpXml = CoreHelper.GetLayout();
-                string actualPage = _currentPage;
-                if (!string.IsNullOrEmpty(postOpXml))
-                {
-                    string sigJson = JsonHelper.ExtractObject(_platformConfig, "page_signatures");
-                    if (!string.IsNullOrEmpty(sigJson))
-                    {
-                        actualPage = PageDetector.Detect(postOpXml, sigJson);
-                    }
-                }
-                
-                // v4.6.0: 双层成功判定（ADR-015）
-                verdict = _orchestrator.EvaluateResult(result, opName, expectedPage, actualPage, _platformConfig);
-                
-                if (verdict == SmartOrchestrator.OperationVerdict.Success)
-                {
-                    _orchestrator.RecordSuccess();
-                    _currentPage = actualPage;
-                    CoreHelper.SetVar("current_page", _currentPage);
-                    operationDone = true;
-                }
-                else if (verdict == SmartOrchestrator.OperationVerdict.Skipped)
-                {
-                    operationDone = true;
-                }
-                else
-                {
-                    // 执行失败或业务失败 — 进入分级恢复决策
-                    _orchestrator.RecordFailure();
-                    SmartOrchestrator.RecoveryLevel level = _orchestrator.DecideRecovery();
-                    
-                    CoreHelper.Log(TAG, string.Format(
-                        "[ORCHESTRATOR] {0}: verdict={1}, recovery={2}, 诊断={3}",
-                        opName, verdict, level, _orchestrator.GetLastDiagnostics()));
-                    
-                    switch (level)
-                    {
-                        case SmartOrchestrator.RecoveryLevel.Retry:
-                            // 简单重试: 直接重新执行
-                            CoreHelper.Log(TAG, string.Format("[ORCHESTRATOR] Retry {0}", opName));
-                            break;
-                            
-                        case SmartOrchestrator.RecoveryLevel.LocalRecovery:
-                            // 局部恢复: 回退安全页后重试
-                            CoreHelper.Log(TAG, string.Format("[ORCHESTRATOR] LocalRecovery: 先 back_to_feed 再重试 {0}", opName));
-                            string backResult = ActionExecutor.Execute(_operationsJson, "back_to_feed", _platformConfig);
-                            if (backResult.StartsWith("SUCCESS"))
-                            {
-                                string recXml = CoreHelper.GetLayout();
-                                if (!string.IsNullOrEmpty(recXml))
-                                {
-                                    string recSigJson = JsonHelper.ExtractObject(_platformConfig, "page_signatures");
-                                    if (!string.IsNullOrEmpty(recSigJson))
-                                    {
-                                        _currentPage = PageDetector.Detect(recXml, recSigJson);
-                                        CoreHelper.SetVar("current_page", _currentPage);
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                // back_to_feed 失败，暴力 Back
-                                dynamic recInput = CoreHelper.GetInput();
-                                if (recInput != null)
-                                {
-                                    recInput.SendKeyCode(4);
-                                    System.Threading.Thread.Sleep(1500);
-                                    recInput.SendKeyCode(4);
-                                    System.Threading.Thread.Sleep(1500);
-                                }
-                            }
-                            break;
-                            
-                        case SmartOrchestrator.RecoveryLevel.VisionAssist:
-                            // AI 视觉识别 + 纠偏
-                            CoreHelper.Log(TAG, string.Format("[ORCHESTRATOR] VisionAssist: AI 视觉验证 {0}", opName));
-                            bool visionOverride = false;
-                            if (VisionCorrector.IsInitialized() && _visionRecoveryCount < MAX_VISION_RECOVERY_PER_SESSION)
-                            {
-                                string ssPath = VisionCorrector.CaptureScreenshot();
-                                if (!string.IsNullOrEmpty(ssPath))
-                                {
-                                    _visionRecoveryCount++;
-                                    ZDResult errResult = ZDResult.FailedRetryable(result);
-                                    visionOverride = VisionCorrector.VerifyError(effectiveIntent, errResult, ssPath);
-                                    if (visionOverride)
-                                    {
-                                        CoreHelper.Log(TAG, string.Format("[VISION] {0} 实际成功（ZD 误报）", opName));
-                                        verdict = SmartOrchestrator.OperationVerdict.Success;
-                                        _orchestrator.RecordSuccess();
-                                        operationDone = true;
-                                    }
-                                }
-                            }
-                            // 如果 Vision 没有翻转结果，继续下一级恢复循环
-                            break;
-                            
-                        case SmartOrchestrator.RecoveryLevel.FallbackScript:
-                            // 备用操作序列（当前阶段: 记录并跳过）
-                            CoreHelper.Log(TAG, string.Format("[ORCHESTRATOR] FallbackScript: {0} 无备用剧本，跳过", opName));
-                            // TODO: Phase 3 实现备用剧本查找与执行
-                            break;
-                            
-                        case SmartOrchestrator.RecoveryLevel.Abort:
-                            // 所有恢复预算耗尽，中止
-                            CoreHelper.LogErr(TAG, string.Format(
-                                "[ORCHESTRATOR] Abort: {0} 恢复预算耗尽, {1}",
-                                opName, _orchestrator.GetSessionSummary()));
-                            operationDone = true;
-                            break;
-                    }
-                }
-            }
-            
-            // 根据最终裁决设置操作结果
-            if (verdict == SmartOrchestrator.OperationVerdict.Success)
-            {
-                lastResult = "SUCCESS";
-                // v4.5.2: 提取帖子数据
-                UpdateCurrentPostContext();
-            }
-            else if (verdict == SmartOrchestrator.OperationVerdict.Skipped)
-            {
-                CoreHelper.Log(TAG, string.Format("操作 {0} 跳过: {1}", opName, result));
-                lastResult = "SKIP";
-                break;
-            }
-            else
-            {
-                // ExecutionFailed / BusinessFailed / Aborted
-                CoreHelper.LogErr(TAG, string.Format("操作 {0} 最终失败: {1}", opName, _orchestrator.GetLastDiagnostics()));
-                lastResult = "ERROR";
-                break;
-            }
-        }
-        
-        // v4.6.0: ERROR 后页面清理（保留原有 BUG-09 fix 逻辑，由编排器记录）
-        if (lastResult == "ERROR")
-        {
-            // 检测当前页面是否偏离了 feed
-            string cleanupXml = CoreHelper.GetLayout();
-            if (!string.IsNullOrEmpty(cleanupXml))
-            {
-                string cleanupSigJson = JsonHelper.ExtractObject(_platformConfig, "page_signatures");
-                if (!string.IsNullOrEmpty(cleanupSigJson))
-                {
-                    string currentPageNow = PageDetector.Detect(cleanupXml, cleanupSigJson);
-                    if (currentPageNow != "feed")
-                    {
-                        CoreHelper.Log(TAG, string.Format("[RECOVERY] 操作失败后页面偏离: {0}, 尝试 back_to_feed", currentPageNow));
-                        // 优先用 operations 中定义的 back_to_feed
-                        string backResult = ActionExecutor.Execute(_operationsJson, "back_to_feed", _platformConfig);
-                        if (backResult.StartsWith("SUCCESS"))
-                        {
-                            CoreHelper.Log(TAG, "[RECOVERY] back_to_feed 清理成功");
-                            // 更新页面状态
-                            string postCleanupXml = CoreHelper.GetLayout();
-                            if (!string.IsNullOrEmpty(postCleanupXml))
-                            {
-                                _currentPage = PageDetector.Detect(postCleanupXml, cleanupSigJson);
-                                CoreHelper.SetVar("current_page", _currentPage);
-                            }
-                        }
-                        else
-                        {
-                            // back_to_feed 失败时，暴力 Back 两次
-                            CoreHelper.Log(TAG, "[RECOVERY] back_to_feed 失败，暴力 Back");
-                            dynamic cleanupInput = CoreHelper.GetInput();
-                            if (cleanupInput != null)
-                            {
-                                cleanupInput.SendKeyCode(4);
-                                System.Threading.Thread.Sleep(1500);
-                                cleanupInput.SendKeyCode(4);
-                                System.Threading.Thread.Sleep(1500);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        // 设置结果变量
-        CoreHelper.SetVar("action_result", lastResult);
-        return lastResult;
+        // This adapter has no authenticated policy/approval/lease/receipt bridge.
+        // It may describe a proposed operation but must never execute one directly.
+        CoreHelper.LogErr(TAG, string.Format(
+            "Execution proposal blocked: action={0}, intent={1}, reason={2}",
+            sessionAction, sessionIntent, MODERN_BRIDGE_REQUIRED));
+        CoreHelper.SetVar("action_result", "ERROR");
+        CoreHelper.SetVar("execution_proposal", sessionAction + "|" + sessionIntent);
+        return "ERROR:authorized_execution_bridge_required";
     }
-    
     /// <summary>
     /// 加载全局用户策略配置（跨平台统一）
     /// </summary>
@@ -3610,267 +3122,48 @@ public class SessionRunner
     }
     
     /// <summary>
-    /// Layer 2: 关闭检测到的遮挡物
-    /// share_sheet/permission_dialog/system_dialog → Back 键
-    /// launcher → 重新启动 APP
-    /// unknown_overlay → Back 键 + 重启
+    /// F5 P0 遮挡恢复边界：只记录提案，不发送 Back、Home 或 Shell。
     /// </summary>
     private static bool DismissOverlay(string overlayType, string packageName)
     {
-        dynamic input = CoreHelper.GetInput();
-        if (input == null) return false;
-        
-        try
-        {
-            if (overlayType == "share_sheet" || overlayType == "permission_dialog"
-                || overlayType == "system_dialog")
-            {
-                CoreHelper.Log(TAG, string.Format("[RECOVERY L2] Back 关闭遮挡物: {0}", overlayType));
-                input.SendKeyCode(4); // KEYCODE_BACK
-                System.Threading.Thread.Sleep(1500);
-                return IsAppForeground(packageName);
-            }
-            
-            if (overlayType == "launcher")
-            {
-                CoreHelper.Log(TAG, "[RECOVERY L2] APP 掉到桌面，重新启动");
-                input.Shell("monkey -p " + packageName + " -c android.intent.category.LAUNCHER 1");
-                System.Threading.Thread.Sleep(5000);
-                return IsAppForeground(packageName);
-            }
-            
-            if (overlayType == "unknown_overlay")
-            {
-                CoreHelper.Log(TAG, "[RECOVERY L2] 未知遮挡物，尝试 Back");
-                input.SendKeyCode(4);
-                System.Threading.Thread.Sleep(1500);
-                if (IsAppForeground(packageName)) return true;
-                
-                CoreHelper.Log(TAG, "[RECOVERY L2] Back 无效，Home + 重启");
-                input.SendKeyCode(3); // KEYCODE_HOME
-                System.Threading.Thread.Sleep(1000);
-                input.Shell("monkey -p " + packageName + " -c android.intent.category.LAUNCHER 1");
-                System.Threading.Thread.Sleep(5000);
-                return IsAppForeground(packageName);
-            }
-            
-            return false;
-        }
-        catch (Exception ex)
-        {
-            CoreHelper.LogErr(TAG, "[RECOVERY L2] 关闭遮挡物异常: " + ex.Message);
-            return false;
-        }
+        CoreHelper.LogErr(TAG, string.Format(
+            "Recovery proposal blocked: overlay={0}, package={1}, reason={2}",
+            overlayType, packageName, MODERN_BRIDGE_REQUIRED));
+        CoreHelper.SetVar("recovery_proposal", "dismiss_overlay:" + overlayType);
+        return false;
     }
-    
     /// <summary>
-    /// v4.5.12: 操作后健康检查 — 三层恢复编排
-    ///   Layer 1: 前台检测 (App.Top)
-    ///   Layer 2: 遮挡物检测 + 自动 Back/重启 (DetectOverlayType + DismissOverlay)
-    ///   Layer 2.5: 暴力恢复 (多次 Back + force-stop + 重启)
-    ///   Layer 3: Vision 模型兜底 (VisionCorrector.CorrectWithRetry)
+    /// F5 P0: 操作后只允许只读前台检查。任何恢复动作仅形成提案，
+    /// 必须由现代 policy/approval/lease/receipt 桥重新授权后执行。
     /// </summary>
     /// <returns>true = APP 恢复到前台; false = 所有恢复层均失败</returns>
     private static bool PostOperationHealthCheck(string packageName, string operationName,
         string expectedPage, string projectRoot)
     {
-        // Layer 1: 前台检测
         if (IsAppForeground(packageName))
         {
-            return true; // 一切正常
+            return true;
         }
-        
-        CoreHelper.Log(TAG, string.Format("[RECOVERY] '{0}' -> APP 离开前台", operationName));
-        
-        // Layer 2: 检测并关闭遮挡物
-        for (int attempt = 0; attempt < 3; attempt++)
-        {
-            string overlayType = DetectOverlayType(packageName);
-            if (string.IsNullOrEmpty(overlayType))
-            {
-                // 无法确定遮挡物但 App 不在前台 — 可能延迟检测
-                System.Threading.Thread.Sleep(1000);
-                if (IsAppForeground(packageName)) return true;
-                overlayType = "unknown_overlay";
-            }
-            
-            CoreHelper.Log(TAG, string.Format(
-                "[RECOVERY L2] {0}/{1} | 遮挡物: {2}", attempt + 1, 3, overlayType));
-            
-            if (DismissOverlay(overlayType, packageName))
-            {
-                CoreHelper.Log(TAG, "[RECOVERY L2] 遮挡物已清除，恢复成功");
-                return true;
-            }
-        }
-        
-        // Layer 2.5: 暴力恢复 — 多次 Back + force-stop 重启
-        CoreHelper.Log(TAG, "[RECOVERY L2.5] 遮挡物清除失败，暴力恢复");
-        dynamic recoveryInput = CoreHelper.GetInput();
-        if (recoveryInput != null)
-        {
-            // 连续 Back
-            for (int i = 0; i < 5; i++)
-            {
-                recoveryInput.SendKeyCode(4);
-                System.Threading.Thread.Sleep(800);
-                if (IsAppForeground(packageName))
-                {
-                    CoreHelper.Log(TAG, string.Format("[RECOVERY L2.5] Back 第 {0} 次后恢复", i + 1));
-                    return true;
-                }
-            }
-            
-            // Home + 重启
-            recoveryInput.SendKeyCode(3);
-            System.Threading.Thread.Sleep(1000);
-            recoveryInput.Shell("monkey -p " + packageName + " -c android.intent.category.LAUNCHER 1");
-            System.Threading.Thread.Sleep(5000);
-            if (IsAppForeground(packageName))
-            {
-                CoreHelper.Log(TAG, "[RECOVERY L2.5] Home + 重启后恢复");
-                return true;
-            }
-            
-            // Force-stop + 重启
-            recoveryInput.Shell("am force-stop " + packageName);
-            System.Threading.Thread.Sleep(2000);
-            recoveryInput.Shell("monkey -p " + packageName + " -c android.intent.category.LAUNCHER 1");
-            System.Threading.Thread.Sleep(5000);
-            if (IsAppForeground(packageName))
-            {
-                CoreHelper.Log(TAG, "[RECOVERY L2.5] Force-stop + 重启后恢复");
-                return true;
-            }
-        }
-        
-        // Layer 3: Vision 模型兜底
-        if (VisionCorrector.IsInitialized() && _visionRecoveryCount < MAX_VISION_RECOVERY_PER_SESSION)
-        {
-            CoreHelper.Log(TAG, "[RECOVERY L3] 启动 Vision 模型分析");
-            _visionRecoveryCount++;
-            
-            string context = string.Format(
-                "操作 '{0}' 执行后 APP 离开前台。多次自动恢复均失败。需要分析当前屏幕并恢复到 APP 的 {1} 页面。",
-                operationName, expectedPage);
-            
-            bool visionRecovered = VisionCorrector.CorrectWithRetry(context, expectedPage, 3);
-            if (visionRecovered)
-            {
-                CoreHelper.Log(TAG, "[RECOVERY L3] Vision 模型恢复成功");
-                return true;
-            }
-        }
-        else if (_visionRecoveryCount >= MAX_VISION_RECOVERY_PER_SESSION)
-        {
-            CoreHelper.LogWarn(TAG, string.Format(
-                "[RECOVERY L3] Vision 调用次数已达上限 ({0})", MAX_VISION_RECOVERY_PER_SESSION));
-        }
-        
+
         CoreHelper.LogErr(TAG, string.Format(
-            "[RECOVERY] 所有恢复层均失败: {0} (Vision 调用: {1}/{2})",
-            operationName, _visionRecoveryCount, MAX_VISION_RECOVERY_PER_SESSION));
+            "Post-operation recovery blocked: op={0}, expected={1}, reason={2}",
+            operationName, expectedPage, MODERN_BRIDGE_REQUIRED));
+        CoreHelper.SetVar("recovery_proposal", "restore_foreground:" + operationName);
         return false;
     }
-    
     // ========== 初始页面检测与剧本规划方法 ==========
     
     /// <summary>
-    /// 强制导航回 feed 页面（导航恢复机制）
-    /// 当连续多次 SKIP 时触发，依次尝试：
-    ///   1. 点击 Reddit 返回按钮（fbp_back_button）
-    ///   2. Android 返回键（多次按压）
-    ///   3. 重启 APP（最后手段）
+    /// F5 P0 导航恢复边界：只记录返回 feed 的提案；不点击、
+    /// 不发送 Android 按键，也不重启 APP。
     /// </summary>
     private static void ForceNavigateToFeed(string platformName, string projectRoot)
     {
-        CoreHelper.Log(TAG, "导航恢复: 开始强制返回 feed");
-        
-        string sigJson = JsonHelper.ExtractObject(_platformConfig, "page_signatures");
-        string selectorsJson = JsonHelper.ExtractObject(_platformConfig, "ui_selectors");
-        
-        // 策略 1: 点击 Reddit 的 fbp_back_button（最可靠）
-        string xml = CoreHelper.GetLayout();
-        if (!string.IsNullOrEmpty(xml) && !string.IsNullOrEmpty(selectorsJson))
-        {
-            string backSelector = JsonHelper.ExtractObject(selectorsJson, "back_button");
-            if (!string.IsNullOrEmpty(backSelector))
-            {
-                int[] center = SelectorEngine.FindCenter(xml, backSelector);
-                if (center != null)
-                {
-                    CoreHelper.Log(TAG, "导航恢复: 找到返回按钮，点击");
-                    dynamic input = CoreHelper.GetInput();
-                    if (input != null)
-                    {
-                        input.Tap(center[0], center[1]);
-                        System.Threading.Thread.Sleep(3000);
-                        
-                        // 检查是否成功
-                        xml = CoreHelper.GetLayout();
-                        if (!string.IsNullOrEmpty(xml) && !string.IsNullOrEmpty(sigJson))
-                        {
-                            _currentPage = PageDetector.Detect(xml, sigJson);
-                            if (_currentPage == "feed")
-                            {
-                                CoreHelper.Log(TAG, "导航恢复成功: 已回到 feed");
-                                CoreHelper.SetVar("current_page", _currentPage);
-                                return;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        // 策略 2: 连续按 Android 返回键（最多 5 次）
-        dynamic backInput = CoreHelper.GetInput();
-        if (backInput != null)
-        {
-            for (int i = 0; i < 5; i++)
-            {
-                CoreHelper.Log(TAG, string.Format("导航恢复: 按返回键 ({0}/5)", i + 1));
-                backInput.Shell("input keyevent 4");
-                System.Threading.Thread.Sleep(2000);
-                
-                xml = CoreHelper.GetLayout();
-                if (!string.IsNullOrEmpty(xml) && !string.IsNullOrEmpty(sigJson))
-                {
-                    _currentPage = PageDetector.Detect(xml, sigJson);
-                    if (_currentPage == "feed")
-                    {
-                        CoreHelper.Log(TAG, "导航恢复成功: 按返回键回到 feed");
-                        CoreHelper.SetVar("current_page", _currentPage);
-                        return;
-                    }
-                }
-            }
-        }
-        
-        // 策略 3: 如果还没回到 feed，重启 APP
-        CoreHelper.Log(TAG, "导航恢复: 返回键无效，尝试重启 APP");
-        string packageName = JsonHelper.Get(_platformConfig, "package_name");
-        if (!string.IsNullOrEmpty(packageName) && backInput != null)
-        {
-            backInput.Shell("am force-stop " + packageName);
-            System.Threading.Thread.Sleep(2000);
-            backInput.Shell("monkey -p " + packageName + " -c android.intent.category.LAUNCHER 1");
-            System.Threading.Thread.Sleep(5000);
-            
-            xml = CoreHelper.GetLayout();
-            if (!string.IsNullOrEmpty(xml) && !string.IsNullOrEmpty(sigJson))
-            {
-                _currentPage = PageDetector.Detect(xml, sigJson);
-                CoreHelper.SetVar("current_page", _currentPage);
-                CoreHelper.Log(TAG, "导航恢复: APP 重启后页面: " + _currentPage);
-            }
-        }
-        else
-        {
-            CoreHelper.LogWarn(TAG, "导航恢复: 无法重启 APP（缺少 package_name 或 input）");
-        }
+        CoreHelper.LogErr(TAG, string.Format(
+            "Navigation recovery proposal blocked: platform={0}, reason={1}",
+            platformName, MODERN_BRIDGE_REQUIRED));
+        CoreHelper.SetVar("recovery_proposal", "navigate_to_feed:" + platformName);
     }
-    
     /// <summary>
     /// 检测 APP 启动时当前所处页面
     /// 调用 PageDetector.Detect() 识别页面类型（feed/post_detail/comment/profile/unknown）
@@ -3962,61 +3255,16 @@ public class SessionRunner
     }
     
     /// <summary>
-    /// 执行预设动作序列（初始剧本）
-    /// 在主循环前将 APP 导航到正确的页面状态
+    /// F5 P0 初始剧本边界：只记录动作数量，不执行动作序列。
     /// </summary>
     private static void ExecutePreSessionActions(List<string> actions, string platformName, string projectRoot)
     {
-        for (int i = 0; i < actions.Count; i++)
-        {
-            string opName = actions[i];
-            CoreHelper.Log(TAG, string.Format("执行初始剧本: {0} ({1}/{2})", opName, i + 1, actions.Count));
-            
-            // 确保操作在 operations JSON 中存在
-            string opDef = JsonHelper.ExtractObject(_operationsJson, opName);
-            if (string.IsNullOrEmpty(opDef))
-            {
-                CoreHelper.LogWarn(TAG, "初始剧本操作不存在，跳过: " + opName);
-                continue;
-            }
-            
-            try
-            {
-                string result = ActionExecutor.Execute(_operationsJson, opName, _platformConfig);
-                CoreHelper.Log(TAG, string.Format("初始剧本结果: {0} = {1}", opName, result));
-            }
-            catch (Exception ex)
-            {
-                CoreHelper.LogErr(TAG, string.Format("初始剧本执行异常: {0} - {1}", opName, ex.Message));
-            }
-            
-            // 执行后更新页面状态
-            try
-            {
-                string xml = CoreHelper.GetLayout();
-                if (!string.IsNullOrEmpty(xml))
-                {
-                    string sigJson = JsonHelper.ExtractObject(_platformConfig, "page_signatures");
-                    if (!string.IsNullOrEmpty(sigJson))
-                    {
-                        _currentPage = PageDetector.Detect(xml, sigJson);
-                        CoreHelper.SetVar("current_page", _currentPage);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                CoreHelper.LogWarn(TAG, "初始剧本页面检测失败: " + ex.Message);
-            }
-            
-            // 短暂延迟，模拟人类行为
-            System.Threading.Thread.Sleep(GetRandom().Next(800, 2000));
-        }
-        
-        // 更新帖子上下文（如果在 post_detail 页执行了阅读操作）
-        UpdateCurrentPostContext();
+        int proposalCount = actions == null ? 0 : actions.Count;
+        CoreHelper.LogErr(TAG, string.Format(
+            "Pre-session action proposals blocked: platform={0}, count={1}, reason={2}",
+            platformName, proposalCount, MODERN_BRIDGE_REQUIRED));
+        CoreHelper.SetVar("recovery_proposal", "pre_session_actions_blocked");
     }
-    
     // ========== 自动接入新平台 (v4.5.11) ==========
     
     /// <summary>
@@ -4097,143 +3345,15 @@ public class SessionRunner
     }
     
     /// <summary>
-    /// 调用 Python App Onboarder 自动探索并生成平台配置
-    /// 使用 System.Diagnostics.Process 运行 Python 脚本
-    /// 注意: 需要先释放 ZennoDroid 对 uiautomator 的占用
+    /// App Onboarder 仅形成提案。生产 SessionRunner 禁止启动外部进程、
+    /// 释放设备服务或自动生成可执行配置。
     /// </summary>
     private static bool RunAppOnboarder(string projectRoot, string packageName, string platformName)
     {
-        try
-        {
-            string toolPath = projectRoot + "Tools\\app_onboarder\\main.py";
-            if (!File.Exists(toolPath))
-            {
-                CoreHelper.LogErr(TAG, "App Onboarder 工具不存在: " + toolPath);
-                return false;
-            }
-            
-            // 释放 ZennoDroid 对 uiautomator 的占用
-            // ZennoDroid 的 Hierarchy.GetLayout() 会启动 uiautomator 守护进程
-            // 需要在调用 app_onboarder 前释放，否则 uiautomator dump 会被 kill
-            CoreHelper.Log(TAG, "释放 ZennoDroid Hierarchy 控制（允许 uiautomator dump）...");
-            try
-            {
-                dynamic input = CoreHelper.GetInput();
-                if (input != null)
-                {
-                    // 通过 Shell 命令 kill 掉 ZennoDroid 的 uiautomator 服务进程
-                    input.Shell("am force-stop com.github.nicoco007.cmdserver 2>/dev/null");
-                    input.Shell("killall -9 uiautomator 2>/dev/null");
-                    System.Threading.Thread.Sleep(2000);
-                }
-            }
-            catch (Exception ex)
-            {
-                CoreHelper.LogWarn(TAG, "释放 Hierarchy 控制失败（可能影响 dump）: " + ex.Message);
-            }
-            
-            // 获取设备 ADB serial（从 ZennoDroid 实例）
-            string adbDevice = "";
-            try
-            {
-                dynamic droid = CoreHelper.GetDroid();
-                if (droid != null)
-                {
-                    adbDevice = droid.Serial;
-                }
-            }
-            catch (Exception)
-            {
-                // Serial 不可用，app_onboarder 将使用默认设备
-            }
-            
-            // 构建命令行参数
-            // --yes: 非交互模式自动确认
-            // --skip-test: 跳过 E2E 测试（在 SessionRunner 环境中无需测试）
-            // --enable-vision: 启用 Vision AI 发现 APP 特有功能
-            string arguments = string.Format(
-                "\"{0}\" --package {1} --key {2} --skip-test -y --enable-vision",
-                toolPath, packageName, platformName
-            );
-            
-            // 如果有设备 serial，传给 app_onboarder
-            if (!string.IsNullOrEmpty(adbDevice))
-            {
-                arguments += " --device " + adbDevice;
-            }
-            
-            CoreHelper.Log(TAG, string.Format("启动 App Onboarder: python {0}", arguments));
-            
-            System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo();
-            psi.FileName = "python";
-            psi.Arguments = arguments;
-            psi.WorkingDirectory = projectRoot + "Tools\\app_onboarder";
-            psi.UseShellExecute = false;
-            psi.RedirectStandardOutput = true;
-            psi.RedirectStandardError = true;
-            psi.CreateNoWindow = true;
-            
-            // 设置 UTF-8 编码
-            psi.StandardOutputEncoding = System.Text.Encoding.UTF8;
-            psi.StandardErrorEncoding = System.Text.Encoding.UTF8;
-            
-            System.Diagnostics.Process proc = System.Diagnostics.Process.Start(psi);
-            
-            // 异步读取输出避免死锁
-            string stdout = proc.StandardOutput.ReadToEnd();
-            string stderr = proc.StandardError.ReadToEnd();
-            
-            // 等待进程完成（最多 5 分钟）
-            bool exited = proc.WaitForExit(300000);
-            
-            if (!exited)
-            {
-                CoreHelper.LogErr(TAG, "App Onboarder 超时（5分钟），强制终止");
-                try { proc.Kill(); } catch (Exception) { }
-                return false;
-            }
-            
-            int exitCode = proc.ExitCode;
-            
-            // 记录输出到日志（截取关键部分）
-            if (!string.IsNullOrEmpty(stdout))
-            {
-                // 只记录最后 2000 字符避免日志过长
-                string logOutput = stdout.Length > 2000
-                    ? "...(truncated)..." + stdout.Substring(stdout.Length - 2000)
-                    : stdout;
-                CoreHelper.Log(TAG, "App Onboarder 输出:\n" + logOutput);
-            }
-            if (!string.IsNullOrEmpty(stderr))
-            {
-                CoreHelper.LogWarn(TAG, "App Onboarder stderr:\n" + stderr);
-            }
-            
-            if (exitCode != 0)
-            {
-                CoreHelper.LogErr(TAG, string.Format("App Onboarder 退出码: {0}", exitCode));
-                return false;
-            }
-            
-            // 验证配置文件是否已生成
-            string opsPath = projectRoot + "Config\\Operations\\" + platformName + "_operations.json";
-            if (!File.Exists(opsPath))
-            {
-                CoreHelper.LogWarn(TAG, "App Onboarder 完成但操作文件未生成: " + opsPath);
-                // 配置文件可能已合并到 PlatformsConfig.json，不算失败
-            }
-            
-            CoreHelper.Log(TAG, "App Onboarder 自动接入完成: " + platformName);
-            
-            // 延迟 3 秒让 ZennoDroid 重新获取 Hierarchy 控制权
-            System.Threading.Thread.Sleep(3000);
-            
-            return true;
-        }
-        catch (Exception ex)
-        {
-            CoreHelper.LogErr(TAG, "App Onboarder 调用异常: " + ex.Message);
-            return false;
-        }
+        CoreHelper.LogErr(TAG, string.Format(
+            "App onboarding proposal blocked: package={0}, platform={1}, reason={2}",
+            packageName, platformName, MODERN_BRIDGE_REQUIRED));
+        CoreHelper.SetVar("onboarding_proposal", platformName + "|" + packageName);
+        return false;
     }
 }

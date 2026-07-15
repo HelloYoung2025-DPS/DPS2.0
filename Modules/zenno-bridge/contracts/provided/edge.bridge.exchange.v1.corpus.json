@@ -1,0 +1,41 @@
+{
+  "corpus_version": "dps.contract-corpus/v1",
+  "owner_module": "zenno-bridge",
+  "contract_id": "edge.bridge.exchange/v1",
+  "schema_file": "edge.bridge.exchange.v1.schema.json",
+  "base_instance": {
+    "schema_version": "1.0",
+    "contract_id": "edge.bridge.exchange/v1",
+    "producer_module": "zenno-bridge",
+    "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "device_binding_id": "db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "platform_account_id": "pa_cccccccccccccccccccccccccccccccc",
+    "trace_id": "trace_dddddddddddddddddddddddddddddddd",
+    "idempotency_key": "idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "occurred_at": "2026-07-14T00:00:00Z",
+    "privacy_class": "personal",
+    "auth_nonce": "2222222222222222222222222222222222222222222222222222222222222222",
+    "exchange_kind": "POLL",
+    "command_id": null,
+    "action_kind": null,
+    "step_kind": null,
+    "selector": null,
+    "text": null,
+    "wait_ms": null,
+    "expected_postcondition": null,
+    "native_status": null,
+    "native_detail": null,
+    "postcondition_verified": null
+  },
+  "cases": [
+    {"id": "canonical-poll", "expected": "PASS", "patch": {}},
+    {"id": "poll-with-command-field", "expected": "FAIL", "patch": {"command_id": "command-1"}},
+    {"id": "canonical-native-result", "expected": "PASS", "patch": {"exchange_kind": "NATIVE_RESULT", "command_id": "command-1", "action_kind": "VERIFY", "step_kind": "VERIFY_POSTCONDITION", "selector": "fixture:state", "expected_postcondition": "fixture changed", "native_status": "SUCCESS", "native_detail": "verified", "postcondition_verified": true}},
+    {"id": "native-success-without-postcondition", "expected": "FAIL", "patch": {"exchange_kind": "NATIVE_RESULT", "command_id": "command-1", "action_kind": "VERIFY", "step_kind": "VERIFY_POSTCONDITION", "selector": "fixture:state", "native_status": "SUCCESS", "native_detail": "verified", "postcondition_verified": null}},
+    {"id": "nonce-terminal-newline", "expected": "FAIL", "patch": {"auth_nonce": "2222222222222222222222222222222222222222222222222222222222222222\n"}},
+    {"id": "occurred-at-nonzero-offset", "expected": "FAIL", "patch": {"occurred_at": "2026-07-14T08:00:00+08:00"}},
+    {"id": "occurred-at-year-zero", "expected": "FAIL", "patch": {"occurred_at": "0000-07-14T00:00:00Z"}},
+    {"id": "occurred-at-leap-second", "expected": "FAIL", "patch": {"occurred_at": "2026-07-14T00:00:60Z"}},
+    {"id": "trace-terminal-newline", "expected": "FAIL", "patch": {"trace_id": "trace_dddddddddddddddddddddddddddddddd\n"}}
+  ]
+}

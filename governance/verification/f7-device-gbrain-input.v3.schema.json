@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/verification/f7-device-gbrain-input.v3.schema.json",
+  "title": "F7 two-device and live GBrain evidence with Windows prerequisite and raw semantic artifacts",
+  "$comment": "Active F7 input shape. The 2026-07-15 gbrain.projection/v2 and gbrain.source.binding/v1 hash binding is STALE after independent F2 audit and must be re-frozen before F7 conclusion; projection v1 and the legacy Soul-prefix Source mapping remain quarantine-only.",
+  "allOf": [
+    { "$ref": "external-evidence-envelope.v1.schema.json" },
+    {
+      "type": "object",
+      "required": ["schema_version", "environment", "payload"],
+      "properties": {
+        "schema_version": { "const": "dps.device-gbrain-verification-input/v3" },
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "environment_id",
+            "os_family",
+            "gbrain_deployment_id",
+            "parent_windows_environment_id",
+            "edge_installation_id",
+            "zenno_installation_id",
+            "runner_component",
+            "runner_version",
+            "runner_binary_sha256",
+            "runner_sbom_sha256"
+          ],
+          "properties": {
+            "environment_id": { "type": "string", "pattern": "^env_[a-z0-9][a-z0-9_-]{6,63}$" },
+            "os_family": { "const": "Windows+Android" },
+            "gbrain_deployment_id": { "type": "string", "pattern": "^gbrain_[a-z0-9][a-z0-9_-]{6,63}$" },
+            "parent_windows_environment_id": { "type": "string", "pattern": "^env_[a-z0-9][a-z0-9_-]{6,63}$" },
+            "edge_installation_id": { "type": "string", "pattern": "^edge_[a-z0-9][a-z0-9_-]{6,63}$" },
+            "zenno_installation_id": { "type": "string", "pattern": "^zenno_[a-z0-9][a-z0-9_-]{6,63}$" },
+            "runner_component": { "const": "dps-f7-external-runner" },
+            "runner_version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$" },
+            "runner_binary_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+            "runner_sbom_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" }
+          }
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository_id",
+            "f7_run_id",
+            "trace_id",
+            "release_bom_id",
+            "release_bom_sha256",
+            "devices",
+            "source_mappings",
+            "operation_sequence",
+            "operation_timeline",
+            "f6_prerequisite",
+            "projection_checks",
+            "search_readback_checks",
+            "semantic_artifacts"
+          ],
+          "properties": {
+            "repository_id": { "type": "string", "pattern": "^repo:[a-z0-9]+(?:[._/-][a-z0-9]+)*$" },
+            "f7_run_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+            "trace_id": { "type": "string", "pattern": "^trace_[a-f0-9]{32}$" },
+            "release_bom_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+            "release_bom_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+            "operation_sequence": {
+              "const": [
+                "OBSERVE",
+                "VERIFY",
+                "MEMORY_EVENT",
+                "INTEREST",
+                "GBRAIN_PROJECTION",
+                "EXACT_READBACK",
+                "DELETE_REBUILD"
+              ]
+            },
+            "operation_timeline": {
+              "type": "array",
+              "minItems": 7,
+              "maxItems": 7,
+              "prefixItems": [
+                { "$ref": "#/$defs/observePhase" },
+                { "$ref": "#/$defs/verifyPhase" },
+                { "$ref": "#/$defs/memoryEventPhase" },
+                { "$ref": "#/$defs/interestPhase" },
+                { "$ref": "#/$defs/gbrainProjectionPhase" },
+                { "$ref": "#/$defs/exactReadbackPhase" },
+                { "$ref": "#/$defs/deleteRebuildPhase" }
+              ],
+              "items": false
+            },
+            "devices": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": { "$ref": "#/$defs/deviceScope" }
+            },
+            "source_mappings": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": { "$ref": "#/$defs/sourceMapping" }
+            },
+            "f6_prerequisite": { "$ref": "#/$defs/prerequisiteBinding" },
+            "projection_checks": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": { "$ref": "#/$defs/artifactBinding" }
+            },
+            "search_readback_checks": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": { "$ref": "#/$defs/artifactBinding" }
+            },
+            "semantic_artifacts": {
+              "type": "array",
+              "minItems": 24,
+              "maxItems": 24,
+              "items": { "$ref": "#/$defs/semanticArtifactBinding" }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "phaseWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["phase", "started_at", "finished_at"],
+      "properties": {
+        "phase": { "type": "string" },
+        "started_at": { "type": "string", "format": "date-time" },
+        "finished_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "observePhase": { "allOf": [{ "$ref": "#/$defs/phaseWindow" }, { "properties": { "phase": { "const": "OBSERVE" } } }] },
+    "verifyPhase": { "allOf": [{ "$ref": "#/$defs/phaseWindow" }, { "properties": { "phase": { "const": "VERIFY" } } }] },
+    "memoryEventPhase": { "allOf": [{ "$ref": "#/$defs/phaseWindow" }, { "properties": { "phase": { "const": "MEMORY_EVENT" } } }] },
+    "interestPhase": { "allOf": [{ "$ref": "#/$defs/phaseWindow" }, { "properties": { "phase": { "const": "INTEREST" } } }] },
+    "gbrainProjectionPhase": { "allOf": [{ "$ref": "#/$defs/phaseWindow" }, { "properties": { "phase": { "const": "GBRAIN_PROJECTION" } } }] },
+    "exactReadbackPhase": { "allOf": [{ "$ref": "#/$defs/phaseWindow" }, { "properties": { "phase": { "const": "EXACT_READBACK" } } }] },
+    "deleteRebuildPhase": { "allOf": [{ "$ref": "#/$defs/phaseWindow" }, { "properties": { "phase": { "const": "DELETE_REBUILD" } } }] },
+    "deviceScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["soul_id", "device_binding_id", "platform_account_id"],
+      "properties": {
+        "soul_id": { "type": "string", "pattern": "^soul_[a-f0-9]{64}$" },
+        "device_binding_id": { "type": "string", "pattern": "^db_[a-f0-9]{32}$" },
+        "platform_account_id": { "type": "string", "pattern": "^pa_[a-f0-9]{32}$" }
+      }
+    },
+    "sourceMapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["soul_id", "logical_source_id", "external_source_alias", "source_binding_nonce"],
+      "properties": {
+        "soul_id": { "type": "string", "pattern": "^soul_[a-f0-9]{64}$" },
+        "logical_source_id": { "type": "string", "pattern": "^dps-[a-f0-9]{28}$" },
+        "external_source_alias": { "type": "string", "pattern": "^gs_[a-f0-9]{16}$" },
+        "source_binding_nonce": { "type": "integer", "minimum": 0, "maximum": 1023 }
+      }
+    },
+    "prerequisiteBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["receipt_id", "raw_artifact_id", "raw_artifact_sha256"],
+      "properties": {
+        "receipt_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+        "raw_artifact_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+        "raw_artifact_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" }
+      }
+    },
+    "artifactBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["soul_id", "raw_artifact_id", "raw_artifact_sha256"],
+      "properties": {
+        "soul_id": { "type": "string", "pattern": "^soul_[a-f0-9]{64}$" },
+        "raw_artifact_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+        "raw_artifact_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" }
+      }
+    },
+    "semanticArtifactBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_kind", "soul_id", "raw_artifact_id", "raw_artifact_sha256"],
+      "properties": {
+        "artifact_kind": {
+          "enum": [
+            "SOUL_DEVICE_SOURCE_OAUTH_BINDING",
+            "PERSONA_EXACT_CURRENT_READBACK",
+            "DELETE_REBUILD_PURGE",
+            "DATA_SUBJECT_EXPORT",
+            "DATA_SUBJECT_CORRECTION",
+            "DATA_SUBJECT_DELETION",
+            "FIXTURE_COMMAND_POSTCONDITION",
+            "CROSS_SOUL_ATTACK",
+            "CROSS_DEVICE_ATTACK",
+            "CROSS_ACCOUNT_ATTACK",
+            "DUPLICATE_DELIVERY",
+            "UNKNOWN_OUTCOME_RECONCILIATION"
+          ]
+        },
+        "soul_id": { "type": "string", "pattern": "^soul_[a-f0-9]{64}$" },
+        "raw_artifact_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+        "raw_artifact_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" }
+      }
+    }
+  }
+}

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.MemoryEventLedger</AssemblyName>
+    <RootNamespace>Dps.MemoryEventLedger</RootNamespace>
+    <PackageId>Dps.MemoryEventLedger</PackageId>
+    <Version>0.2.0</Version>
+    <DefaultItemExcludes>$(DefaultItemExcludes);Dps.MemoryEventLedger/**/bin/**;Dps.MemoryEventLedger/**/obj/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+    <InternalsVisibleTo Include="Dps.MemoryEventLedger.Tests" />
+    <ProjectReference Include="../contracts/Dps.MemoryEventLedger.Contracts.csproj" />
+    <ProjectReference Include="../../soul-registry/contracts/Dps.SoulRegistry.Contracts.csproj" />
+    <EmbeddedResource Include="../migrations/001_create_memory_event_ledger.sql" />
+    <EmbeddedResource Include="../migrations/002_create_memory_event_ledger_v2.sql" />
+  </ItemGroup>
+</Project>

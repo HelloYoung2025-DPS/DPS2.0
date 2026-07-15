@@ -154,30 +154,37 @@ public class SmartOrchestrator
             return OperationVerdict.ExecutionFailed;
         }
         
-        if (executionResult.StartsWith("ERROR") || executionResult.StartsWith("ABORT"))
-        {
-            _lastDiagnostics = string.Format("[{0}] 执行失败: {1}", operationName, executionResult);
-            return OperationVerdict.ExecutionFailed;
-        }
-        
-        if (executionResult.StartsWith("SKIP"))
+        if (executionResult == "SKIP" || executionResult.StartsWith("SKIP:"))
         {
             _lastDiagnostics = string.Format("[{0}] 操作跳过: {1}", operationName, executionResult);
             return OperationVerdict.Skipped;
         }
-        
-        // 第 2 层: 业务成功判定
-        // 只有当 expectedPage 非空时才检查页面状态
-        if (!string.IsNullOrEmpty(expectedPage) && !string.IsNullOrEmpty(actualPage))
+
+        // Fail closed: only the exact normalized SUCCESS token may enter the
+        // business postcondition path. FAILED, TIMEOUT, UNKNOWN, garbage, and
+        // success-like prefixes/suffixes are execution failures.
+        if (executionResult != "SUCCESS")
         {
-            if (actualPage != expectedPage && actualPage != "unknown")
-            {
-                _lastDiagnostics = string.Format(
-                    "[{0}] 假成功: 执行返回 SUCCESS 但页面状态不符, 预期={1}, 实际={2}",
-                    operationName, expectedPage, actualPage);
-                _totalFalseSuccesses++;
-                return OperationVerdict.BusinessFailed;
-            }
+            _lastDiagnostics = string.Format("[{0}] 非法或失败执行结果: {1}", operationName, executionResult);
+            return OperationVerdict.ExecutionFailed;
+        }
+        
+        // 第 2 层: 业务成功判定。缺少明确后置条件、实际页面缺失/未知，
+        // 或页面不匹配都不能形成成功回执。
+        if (string.IsNullOrEmpty(expectedPage))
+        {
+            _lastDiagnostics = string.Format(
+                "[{0}] 假成功: 执行返回 SUCCESS 但未声明业务后置条件", operationName);
+            _totalFalseSuccesses++;
+            return OperationVerdict.BusinessFailed;
+        }
+        if (string.IsNullOrEmpty(actualPage) || actualPage == "unknown" || actualPage != expectedPage)
+        {
+            _lastDiagnostics = string.Format(
+                "[{0}] 假成功: 执行返回 SUCCESS 但页面状态未被精确验证, 预期={1}, 实际={2}",
+                operationName, expectedPage, actualPage);
+            _totalFalseSuccesses++;
+            return OperationVerdict.BusinessFailed;
         }
         
         _lastDiagnostics = string.Format("[{0}] 双层判定通过", operationName);

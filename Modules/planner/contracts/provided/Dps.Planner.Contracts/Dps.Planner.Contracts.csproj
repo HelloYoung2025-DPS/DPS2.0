@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.Planner.Contracts</AssemblyName>
+    <RootNamespace>Dps.Planner.Contracts</RootNamespace>
+    <PackageId>Dps.Planner.Contracts</PackageId>
+    <Version>0.2.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="../action.proposal.v1.schema.json" Pack="true" PackagePath="contracts" />
+    <EmbeddedResource Include="../action.proposal.v1.schema.json" LogicalName="Dps.Planner.Contracts.action.proposal.v1.schema.json" />
+    <None Include="../action.proposal.v2.schema.json" Pack="true" PackagePath="contracts" />
+    <EmbeddedResource Include="../action.proposal.v2.schema.json" LogicalName="Dps.Planner.Contracts.action.proposal.v2.schema.json" />
+  </ItemGroup>
+</Project>

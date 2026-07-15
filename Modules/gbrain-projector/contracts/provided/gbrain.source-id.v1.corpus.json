@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "dps.contract-corpus/v1",
+  "contractId": "gbrain.source-id/v1",
+  "algorithm": "dps- plus the first 28 lowercase hexadecimal characters after soul_",
+  "sourcePattern": "^dps-[a-f0-9]{28}$(?![\\s\\S])",
+  "truncatedBits": 112,
+  "sourceIdAloneIsAuthoritative": false,
+  "requiredReadbackBindings": ["source_id", "soul_id", "projection_schema_version", "projection_revision", "projection_checksum"],
+  "cases": [
+    {
+      "id": "valid-a",
+      "valid": true,
+      "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_source_id": "dps-aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "collision_group": null
+    },
+    {
+      "id": "valid-b",
+      "valid": true,
+      "soul_id": "soul_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "expected_source_id": "dps-bbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "collision_group": null
+    },
+    {
+      "id": "collision-left",
+      "valid": true,
+      "soul_id": "soul_1234567890abcdef1234567890ab000000000000000000000000000000000000",
+      "expected_source_id": "dps-1234567890abcdef1234567890ab",
+      "collision_group": "same-prefix-112-bit"
+    },
+    {
+      "id": "collision-right",
+      "valid": true,
+      "soul_id": "soul_1234567890abcdef1234567890abffffffffffffffffffffffffffffffffffff",
+      "expected_source_id": "dps-1234567890abcdef1234567890ab",
+      "collision_group": "same-prefix-112-bit"
+    },
+    {
+      "id": "uppercase-soul",
+      "valid": false,
+      "soul_id": "soul_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "expected_source_id": null,
+      "collision_group": null
+    },
+    {
+      "id": "terminal-newline",
+      "valid": false,
+      "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n",
+      "expected_source_id": null,
+      "collision_group": null
+    },
+    {
+      "id": "short-soul",
+      "valid": false,
+      "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "expected_source_id": null,
+      "collision_group": null
+    }
+  ]
+}

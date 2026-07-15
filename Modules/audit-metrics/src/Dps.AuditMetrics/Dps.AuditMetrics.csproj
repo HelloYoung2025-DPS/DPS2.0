@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.AuditMetrics</AssemblyName>
+    <RootNamespace>Dps.AuditMetrics</RootNamespace>
+    <PackageId>Dps.AuditMetrics</PackageId>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+    <ProjectReference Include="../../contracts/provided/Dps.AuditMetrics.Contracts/Dps.AuditMetrics.Contracts.csproj" />
+    <ProjectReference Include="../../../command-orchestrator/contracts/provided/Dps.CommandOrchestrator.Contracts/Dps.CommandOrchestrator.Contracts.csproj" />
+    <EmbeddedResource Include="../../migrations/001_create_audit_metrics.sql" />
+    <EmbeddedResource Include="../../migrations/002_configure_audit_runtime_role.sql" />
+  </ItemGroup>
+</Project>

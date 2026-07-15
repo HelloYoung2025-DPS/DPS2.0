@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Dps.Binding</AssemblyName>
+    <RootNamespace>Dps.Binding</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+    <ProjectReference Include="../../contracts/Dps.Binding.Contracts/Dps.Binding.Contracts.csproj" />
+    <ProjectReference Include="../../../device-registry/contracts/Dps.DeviceRegistry.Contracts/Dps.DeviceRegistry.Contracts.csproj" />
+    <ProjectReference Include="../../../platform-account-registry/contracts/Dps.PlatformAccountRegistry.Contracts/Dps.PlatformAccountRegistry.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Dps.Binding.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../migrations/001_create_binding.sql"
+                      LogicalName="Dps.Binding.Migrations.001_create_binding.sql" />
+    <EmbeddedResource Include="../../migrations/002_upgrade_binding_saga.sql"
+                      LogicalName="Dps.Binding.Migrations.002_upgrade_binding_saga.sql" />
+    <EmbeddedResource Include="../../migrations/003_add_mutation_fences.sql"
+                      LogicalName="Dps.Binding.Migrations.003_add_mutation_fences.sql" />
+    <EmbeddedResource Include="../../migrations/004_add_composition_generation_fence.sql"
+                      LogicalName="Dps.Binding.Migrations.004_add_composition_generation_fence.sql" />
+    <EmbeddedResource Include="../../migrations/005_harden_canonical_identifiers.sql"
+                      LogicalName="Dps.Binding.Migrations.005_harden_canonical_identifiers.sql" />
+  </ItemGroup>
+</Project>

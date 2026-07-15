@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/verification/f9-load-run-artifact.v1.schema.json",
+  "title": "F9 raw load-run observation artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "run_id",
+    "profile",
+    "evidence_kind",
+    "environment_id",
+    "actor_kind",
+    "actor_scope_id",
+    "actor_digest_algorithm",
+    "actor_sets",
+    "windows",
+    "recovery_samples"
+  ],
+  "properties": {
+    "schema_version": { "const": "dps.f9-load-run-artifact/v1" },
+    "artifact_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+    "run_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+    "profile": { "enum": ["REAL_SUSTAINED", "REAL_BURST", "SIMULATED_CAPACITY"] },
+    "evidence_kind": { "enum": ["REAL_EXTERNAL", "SIMULATED"] },
+    "environment_id": { "type": "string", "pattern": "^env_[a-z0-9][a-z0-9_-]{6,63}$" },
+    "actor_kind": { "enum": ["REAL_DEVICE_BINDING", "SIMULATED_DEVICE"] },
+    "actor_scope_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+    "actor_digest_algorithm": { "const": "HMAC_SHA256_SCOPE_V1" },
+    "actor_sets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["actor_set_id", "actor_digests"],
+        "properties": {
+          "actor_set_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+          "actor_digests": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10000,
+            "uniqueItems": true,
+            "items": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" }
+          }
+        }
+      }
+    },
+    "windows": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence",
+          "started_at",
+          "finished_at",
+          "actor_set_id",
+          "maximum_backlog_depth",
+          "maximum_oldest_backlog_age_seconds",
+          "backlog_depth_at_finish",
+          "oldest_backlog_age_seconds_at_finish"
+        ],
+        "properties": {
+          "sequence": { "type": "integer", "minimum": 0 },
+          "started_at": { "type": "string", "format": "date-time" },
+          "finished_at": { "type": "string", "format": "date-time" },
+          "actor_set_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+          "maximum_backlog_depth": { "type": "integer", "minimum": 0 },
+          "maximum_oldest_backlog_age_seconds": { "type": "number", "minimum": 0, "maximum": 120 },
+          "backlog_depth_at_finish": { "type": "integer", "minimum": 0 },
+          "oldest_backlog_age_seconds_at_finish": { "type": "number", "minimum": 0, "maximum": 120 }
+        }
+      }
+    },
+    "recovery_samples": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sequence", "observed_at", "backlog_depth", "oldest_backlog_age_seconds"],
+        "properties": {
+          "sequence": { "type": "integer", "minimum": 0 },
+          "observed_at": { "type": "string", "format": "date-time" },
+          "backlog_depth": { "type": "integer", "minimum": 0 },
+          "oldest_backlog_age_seconds": { "type": "number", "minimum": 0, "maximum": 120 }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "profile": { "enum": ["REAL_SUSTAINED", "REAL_BURST"] } } },
+      "then": {
+        "properties": {
+          "evidence_kind": { "const": "REAL_EXTERNAL" },
+          "actor_kind": { "const": "REAL_DEVICE_BINDING" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "profile": { "const": "SIMULATED_CAPACITY" } } },
+      "then": {
+        "properties": {
+          "evidence_kind": { "const": "SIMULATED" },
+          "actor_kind": { "const": "SIMULATED_DEVICE" }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "dps.contract-corpus/v1",
+  "contractId": "control.plane.receipt/v1",
+  "base": {
+    "schema_version": "1.0.0",
+    "contract_id": "control.plane.receipt/v1",
+    "producer_module": "control-plane-host",
+    "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "device_binding_id": "db_11111111111111111111111111111111",
+    "platform_account_id": "pa_33333333333333333333333333333333",
+    "trace_id": "trace_55555555555555555555555555555555",
+    "idempotency_key": "idem_7777777777777777777777777777777777777777777777777777777777777777",
+    "occurred_at": "2026-07-14T00:00:00Z",
+    "privacy_class": "sensitive",
+    "receipt_id": "receipt_88888888888888888888888888888888",
+    "source_contract_id": "identity.binding/v1",
+    "source_producer_module": "binding",
+    "source_payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "decision": "accepted"
+  },
+  "cases": [
+    {"id": "valid", "schemaValid": true, "codecValid": true, "patch": {}, "remove": []},
+    {"id": "additional-field", "schemaValid": false, "codecValid": false, "patch": {"unexpected": true}, "remove": []},
+    {"id": "missing-occurred-at", "schemaValid": false, "codecValid": false, "patch": {}, "remove": ["occurred_at"]},
+    {"id": "unknown-major", "schemaValid": false, "codecValid": false, "patch": {"schema_version": "2.0.0"}, "remove": []},
+    {"id": "offset-not-zulu", "schemaValid": false, "codecValid": false, "patch": {"occurred_at": "2026-07-14T00:00:00+00:00"}, "remove": []},
+    {"id": "invalid-calendar-date", "schemaValid": false, "codecValid": false, "patch": {"occurred_at": "2026-02-30T00:00:00Z"}, "remove": []},
+    {"id": "fractional-trailing-zero", "schemaValid": false, "codecValid": false, "patch": {"occurred_at": "2026-07-14T00:00:00.1200Z"}, "remove": []},
+    {"id": "trailing-newline-id", "schemaValid": false, "codecValid": false, "patch": {"receipt_id": "receipt_88888888888888888888888888888888\n"}, "remove": []},
+    {"id": "wrong-owner-pair", "schemaValid": false, "codecValid": false, "patch": {"source_producer_module": "persona-store"}, "remove": []},
+    {"id": "uppercase-payload-hash", "schemaValid": false, "codecValid": false, "patch": {"source_payload_sha256": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}, "remove": []}
+  ]
+}

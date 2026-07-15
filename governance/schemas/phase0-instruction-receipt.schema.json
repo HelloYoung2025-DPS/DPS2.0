@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/schemas/phase0-instruction-receipt.schema.json",
+  "title": "DPS Phase 0 internal instruction binding receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "agent_identity",
+    "agent_role",
+    "baseline_commit",
+    "resolved_at",
+    "scope",
+    "instructions",
+    "manifests",
+    "contracts",
+    "diff_fingerprint",
+    "status"
+  ],
+  "properties": {
+    "schema_version": { "const": "dps.phase0-instruction-receipt/v1" },
+    "receipt_id": { "$ref": "#/$defs/id" },
+    "agent_identity": { "type": "string", "minLength": 1 },
+    "agent_role": { "type": "string", "minLength": 1 },
+    "baseline_commit": { "$ref": "#/$defs/gitObject" },
+    "resolved_at": { "type": "string", "format": "date-time" },
+    "scope": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "instructions": {
+      "type": "array",
+      "minItems": 2,
+      "items": { "$ref": "#/$defs/boundFile" }
+    },
+    "manifests": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/boundFile" }
+    },
+    "contracts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/boundFile" }
+    },
+    "diff_fingerprint": { "$ref": "#/$defs/sha256" },
+    "status": { "enum": ["BOUND", "STALE"] },
+    "invalidated_reason": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$" },
+    "gitObject": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "boundFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "order", "source_state", "git_blob", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "order": { "type": "integer", "minimum": 0 },
+        "source_state": { "enum": ["tracked", "modified", "untracked"] },
+        "git_blob": {
+          "oneOf": [
+            { "$ref": "#/$defs/gitObject" },
+            { "type": "null" }
+          ]
+        },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

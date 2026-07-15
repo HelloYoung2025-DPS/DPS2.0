@@ -1,0 +1,11 @@
+# Operations
+
+The module is proposed and performs deterministic request validation only. The feature flag is `factory_upgrade_intake_v2`; `factory_disable_new_upgrade_intake` rejects new work. A v1 payload is bounded and hash-bound only long enough to emit fixed routing/quarantine metadata. It must never reach the Resolver, Impact Analyzer, Release Controller, Host orchestration path, or approval path.
+
+For v2, operators must treat `contract_change_claims_status=UNVERIFIED_EXPECTATIONS` literally. The Resolver verifies baseline Manifest facts; the candidate gate later verifies candidate source digests. Raw intake may go to the Host only for orchestration and durable idempotency, and may never go directly to the Release Controller.
+
+The process composition root must inject trusted authentication and Manifest-verification ports and keep their credentials outside this module. The requester context digest binds the external auth receipt but not an approval collection. A selected human approval is separately bound by exact receipt, nonce, subject digest, intent, baseline, requested risk/stage, scope, and expiry. Authority-local registries prevent accidental cross-instance substitution; they are not a sandbox against hostile code in the same Python process.
+
+Runtime recovery and replay protection are `WAITING_EXTERNAL`. The Host must persist `(idempotency_key, requester_auth_nonce, approval_nonce, upgrade_intent_sha256)` in one PostgreSQL transaction. Repeating the exact digest returns the same result; reuse of a key or nonce with a different full digest fails closed. Without that durable guard, this module remains `releaseEligible=false` and no integration claim is allowed.
+
+Shadow records decisions without starting implementation. Monitor unknown fields/majors/modes/kinds, baseline or ownership-receipt mismatch, authority expiry, duplicate/conflicting contract majors, approval mismatch, source outside requested scope, and all digest mismatches as security events. Rollback routes to the previous signed Factory BOM within the higher-level release process and must never reactivate v1. Intake has no `rollout.command` declaration or direct Release Controller path; release transitions remain solely behind the Release Controller's own authority and evidence gates.

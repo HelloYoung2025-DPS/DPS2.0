@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/instruction.receipt.v1.schema.json",
+  "title": "instruction.receipt/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "contract_id", "producer_module", "soul_id", "device_binding_id",
+    "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class",
+    "receipt_id", "intent_id", "auth_context_id", "agent_identity", "agent_role",
+    "baseline_commit", "resolved_at", "scope", "instructions", "manifests", "contracts",
+    "governance", "tests", "operations", "diff_fingerprint", "status", "invalidated_reason"
+  ],
+  "properties": {
+    "schema_version": {"const": "dps.instruction-receipt/v1"},
+    "contract_id": {"const": "instruction.receipt/v1"},
+    "producer_module": {"const": "factory-instruction-resolver"},
+    "soul_id": {"type": ["string", "null"], "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": ["string", "null"], "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": ["string", "null"], "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "privacy_class": {"const": "internal"},
+    "receipt_id": {"type": "string", "pattern": "^instruction:[0-9a-f]{32}$(?![\\s\\S])"},
+    "intent_id": {"type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "auth_context_id": {"type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "agent_identity": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$(?![\\s\\S])"},
+    "agent_role": {"enum": ["impact-planner", "contract-architect", "module-implementer", "independent-test-agent", "security-privacy-adversary", "reliability-reviewer", "windows-zenno-reviewer", "evidence-auditor", "release-rollback-controller"]},
+    "baseline_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$(?![\\s\\S])"},
+    "resolved_at": {"type": "string", "format": "date-time"},
+    "scope": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$(?![\\s\\S])"}},
+    "instructions": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/bound_file"}},
+    "manifests": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/bound_file"}},
+    "contracts": {"type": "array", "items": {"$ref": "#/$defs/bound_file"}},
+    "governance": {"type": "array", "minItems": 3, "items": {"$ref": "#/$defs/bound_file"}},
+    "tests": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/bound_file"}},
+    "operations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/bound_file"}},
+    "diff_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "status": {"enum": ["BOUND", "STALE"]},
+    "invalidated_reason": {"type": ["string", "null"]}
+  },
+  "$defs": {
+    "bound_file": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "order", "source_state", "git_blob", "sha256"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^(?!/)(?!.*\\s$(?![\\s\\S]))(?!.*(?:^|/)\\.\\.(?:/|$)).+$(?![\\s\\S])"},
+        "order": {"type": "integer", "minimum": 0},
+        "source_state": {"enum": ["tracked", "modified", "untracked"]},
+        "git_blob": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$(?![\\s\\S])"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"}
+      }
+    }
+  }
+}

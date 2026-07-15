@@ -1,0 +1,51 @@
+{
+  "schema_version": "dps.gbrain.mcp-capabilities/v1",
+  "server": {
+    "name": "gbrain",
+    "version": "0.42.42.0",
+    "mcp_protocol": {
+      "client_preferred": "2025-11-25",
+      "explicit_allowlist": ["2025-11-25", "2025-06-18", "2025-03-26"],
+      "local_gbrain_negotiated": "2025-03-26"
+    },
+    "schema_pack": "gbrain-base-v2"
+  },
+  "diagnostic_baseline": {
+    "package_source": "github:garrytan/gbrain#4ee530f3c545b880cecc47c4f877e0ed014896b4",
+    "package_integrity": "sha512-3Jg1uokovaZpatjEp5xUFh7OKeWHsYf4jJV4V/LzNDnhw3sT+1xk7ZEHBxphHAosZt60NU08UJaDKvXUQS1e6g==",
+    "runtime": "Bun 1.3.14",
+    "status": "local-diagnostic-only-not-a-release-bom"
+  },
+  "tools": [
+    {
+      "name": "get_page",
+      "properties": {"slug": "string", "fuzzy": "boolean", "include_deleted": "boolean"},
+      "required": ["slug"]
+    },
+    {
+      "name": "put_page",
+      "properties": {"slug": "string", "content": "string", "source_kind": "string", "source_uri": "string", "ingested_via": "string"},
+      "required": ["slug", "content"]
+    },
+    {
+      "name": "delete_page",
+      "properties": {"slug": "string"},
+      "required": ["slug"]
+    },
+    {
+      "name": "restore_page",
+      "properties": {"slug": "string"},
+      "required": ["slug"]
+    },
+    {
+      "name": "search",
+      "properties": {"query": "string", "limit": "number", "offset": "number", "mode": "string"},
+      "required": ["query"]
+    },
+    {
+      "name": "whoami",
+      "properties": {},
+      "required": []
+    }
+  ]
+}

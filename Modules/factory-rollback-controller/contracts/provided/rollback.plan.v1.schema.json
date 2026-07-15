@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/rollback.plan.v1.schema.json",
+  "title": "rollback.plan/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "contract_id", "producer_module", "soul_id", "device_binding_id",
+    "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class",
+    "rollback_id", "upgrade_id", "rollback_unit", "target_bom_id", "target_bom_sha256",
+    "deadline_seconds", "ordered_steps", "compensation_plan", "request_sha256",
+    "stable_bom_verification_id"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "contract_id": {"const": "rollback.plan/v1"},
+    "producer_module": {"const": "factory-rollback-controller"},
+    "soul_id": {"type": ["string", "null"], "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": ["string", "null"], "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": ["string", "null"], "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "privacy_class": {"const": "internal"},
+    "rollback_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "upgrade_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "rollback_unit": {"enum": ["ROLLBACKABLE", "NON_ROLLBACKABLE"]},
+    "target_bom_id": {"type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "target_bom_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "deadline_seconds": {"type": "integer", "minimum": 1, "maximum": 300},
+    "ordered_steps": {
+      "type": "array", "minItems": 5, "maxItems": 5, "uniqueItems": true,
+      "items": {"enum": ["STOP_ROUTING", "DRAIN", "RECONCILE", "SWITCH_BOM", "COMPENSATE", "VERIFY"]}
+    },
+    "compensation_plan": {"type": ["string", "null"], "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "request_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "stable_bom_verification_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"rollback_unit": {"const": "ROLLBACKABLE"}}, "required": ["rollback_unit"]},
+      "then": {
+        "properties": {
+          "ordered_steps": {
+            "prefixItems": [
+              {"const": "STOP_ROUTING"}, {"const": "DRAIN"}, {"const": "RECONCILE"},
+              {"const": "SWITCH_BOM"}, {"const": "VERIFY"}
+            ],
+            "items": false
+          },
+          "compensation_plan": {"const": null}
+        }
+      },
+      "else": {
+        "properties": {
+          "ordered_steps": {
+            "prefixItems": [
+              {"const": "STOP_ROUTING"}, {"const": "DRAIN"}, {"const": "RECONCILE"},
+              {"const": "COMPENSATE"}, {"const": "VERIFY"}
+            ],
+            "items": false
+          },
+          "compensation_plan": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"}
+        }
+      }
+    }
+  ]
+}

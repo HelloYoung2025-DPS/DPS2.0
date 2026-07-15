@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/rollback.result.v1.schema.json",
+  "title": "rollback.result/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "contract_id", "producer_module", "soul_id", "device_binding_id",
+    "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class",
+    "rollback_id", "upgrade_id", "rollback_unit", "outcome", "completed_steps",
+    "duration_seconds", "target_bom_sha256", "active_bom_sha256", "verified_postconditions",
+    "compensation_evidence_ids", "reason", "request_sha256", "plan_sha256",
+    "authorization_id", "stable_bom_verification_id"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "contract_id": {"const": "rollback.result/v1"},
+    "producer_module": {"const": "factory-rollback-controller"},
+    "soul_id": {"type": ["string", "null"], "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": ["string", "null"], "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": ["string", "null"], "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "privacy_class": {"const": "internal"},
+    "rollback_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "upgrade_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "rollback_unit": {"enum": ["ROLLBACKABLE", "NON_ROLLBACKABLE"]},
+    "outcome": {"enum": ["ROLLED_BACK", "COMPENSATION_REQUIRED", "COMPENSATED", "FAILED", "DEADLINE_EXCEEDED"]},
+    "completed_steps": {
+      "type": "array", "maxItems": 5, "uniqueItems": true,
+      "items": {"enum": ["STOP_ROUTING", "DRAIN", "RECONCILE", "SWITCH_BOM", "COMPENSATE", "VERIFY"]}
+    },
+    "duration_seconds": {"type": "number", "minimum": 0},
+    "target_bom_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "active_bom_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "verified_postconditions": {"type": "boolean"},
+    "compensation_evidence_ids": {
+      "type": "array", "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"}
+    },
+    "reason": {"type": ["string", "null"], "pattern": "^[A-Z][A-Z0-9_:-]{2,127}$(?![\\s\\S])"},
+    "request_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "plan_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "authorization_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "stable_bom_verification_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"outcome": {"const": "ROLLED_BACK"}}, "required": ["outcome"]},
+      "then": {
+        "properties": {
+          "rollback_unit": {"const": "ROLLBACKABLE"},
+          "verified_postconditions": {"const": true},
+          "active_bom_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+          "reason": {"const": null},
+          "completed_steps": {
+            "prefixItems": [
+              {"const": "STOP_ROUTING"}, {"const": "DRAIN"}, {"const": "RECONCILE"},
+              {"const": "SWITCH_BOM"}, {"const": "VERIFY"}
+            ],
+            "items": false, "minItems": 5, "maxItems": 5
+          },
+          "compensation_evidence_ids": {"maxItems": 0}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"outcome": {"const": "COMPENSATED"}}, "required": ["outcome"]},
+      "then": {
+        "properties": {
+          "rollback_unit": {"const": "NON_ROLLBACKABLE"},
+          "verified_postconditions": {"const": true},
+          "active_bom_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+          "reason": {"const": "EXTERNAL_EFFECTS_COMPENSATED_NOT_ROLLED_BACK"},
+          "completed_steps": {
+            "prefixItems": [
+              {"const": "STOP_ROUTING"}, {"const": "DRAIN"}, {"const": "RECONCILE"},
+              {"const": "COMPENSATE"}, {"const": "VERIFY"}
+            ],
+            "items": false, "minItems": 5, "maxItems": 5
+          },
+          "compensation_evidence_ids": {"minItems": 1}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"outcome": {"const": "COMPENSATION_REQUIRED"}}, "required": ["outcome"]},
+      "then": {
+        "properties": {
+          "rollback_unit": {"const": "NON_ROLLBACKABLE"},
+          "verified_postconditions": {"const": false},
+          "reason": {"type": "string"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {"outcome": {"enum": ["FAILED", "DEADLINE_EXCEEDED"]}},
+        "required": ["outcome"]
+      },
+      "then": {
+        "properties": {
+          "verified_postconditions": {"const": false},
+          "reason": {"type": "string"}
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/memory.outbox.v2.schema.json",
+  "title": "memory.outbox/v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_id", "producer_module", "outbox_id", "event_id", "soul_id", "device_binding_id", "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class", "topic", "payload_sha256", "soul_sequence", "previous_chain_sha256", "chain_sha256"],
+  "properties": {
+    "schema_version": {"const": "2.0.0"}, "contract_id": {"const": "memory.outbox/v2"}, "producer_module": {"const": "memory-event-ledger"},
+    "outbox_id": {"type": "string", "format": "uuid"}, "event_id": {"type": "string", "format": "uuid"},
+    "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"}, "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"}, "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"}, "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time", "pattern": "Z$(?![\\s\\S])"}, "privacy_class": {"const": "personal"}, "topic": {"const": "memory.event/v2"},
+    "payload_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"}, "soul_sequence": {"type": "integer", "minimum": 1},
+    "previous_chain_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"}, "chain_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"}
+  }
+}

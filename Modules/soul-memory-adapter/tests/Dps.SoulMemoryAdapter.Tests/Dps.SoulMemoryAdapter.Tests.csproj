@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/Dps.SoulMemoryAdapter/Dps.SoulMemoryAdapter.csproj" />
+    <ProjectReference Include="../../contracts/Dps.SoulMemoryAdapter.Contracts/Dps.SoulMemoryAdapter.Contracts.csproj" />
+    <ProjectReference Include="../../../gbrain-projector/src/Dps.GBrainProjector.csproj" />
+    <ProjectReference Include="../../../gbrain-projector/contracts/Dps.GBrainProjector.Contracts.csproj" />
+    <ProjectReference Include="../../../interest-reducer/src/Dps.InterestReducer.csproj" />
+    <ProjectReference Include="../../../interest-reducer/contracts/Dps.InterestReducer.Contracts.csproj" />
+    <ProjectReference Include="../../../memory-event-ledger/src/Dps.MemoryEventLedger.csproj" />
+    <ProjectReference Include="../../../memory-event-ledger/contracts/Dps.MemoryEventLedger.Contracts.csproj" />
+    <ProjectReference Include="../../../soul-registry/contracts/Dps.SoulRegistry.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="../../contracts/consumed/gbrain-0.42.42.0.mcp-capabilities.fixture.json" />
+  </ItemGroup>
+</Project>

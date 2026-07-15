@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/module.change.plan.v1.schema.json",
+  "title": "module.change.plan/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "contract_id", "producer_module", "soul_id", "device_binding_id",
+    "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class",
+    "plan_id", "intent_id", "instruction_receipt_id", "baseline_commit", "risk_tier",
+    "affected_modules", "requested_paths", "public_contract_changes", "dependency_edges",
+    "parallel_waves", "required_checks", "role_assignments", "trusted_policy_sha256"
+  ],
+  "properties": {
+    "schema_version": {"const": "dps.module-change-plan/v1"},
+    "contract_id": {"const": "module.change.plan/v1"},
+    "producer_module": {"const": "factory-impact-analyzer"},
+    "soul_id": {"type": ["string", "null"], "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": ["string", "null"], "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": ["string", "null"], "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "privacy_class": {"const": "internal"},
+    "plan_id": {"type": "string", "pattern": "^change:[0-9a-f]{32}$(?![\\s\\S])"},
+    "intent_id": {"type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "instruction_receipt_id": {"type": "string", "pattern": "^instruction:[0-9a-f]{32}$(?![\\s\\S])"},
+    "baseline_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$(?![\\s\\S])"},
+    "risk_tier": {"enum": ["R0", "R1", "R2", "R3"]},
+    "affected_modules": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/module_id"}},
+    "requested_paths": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/repo_path"}},
+    "public_contract_changes": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z0-9]+)+$(?![\\s\\S])"}},
+    "dependency_edges": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["consumer", "provider"], "properties": {"consumer": {"$ref": "#/$defs/module_id"}, "provider": {"$ref": "#/$defs/module_id"}}}},
+    "parallel_waves": {"type": "array", "minItems": 1, "items": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/module_id"}}},
+    "required_checks": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$(?![\\s\\S])"}},
+    "role_assignments": {"type": "object", "additionalProperties": false, "required": ["impact_planner", "contract_architect", "module_implementer", "independent_test_agent", "evidence_auditor", "release_approver"], "properties": {
+      "impact_planner": {"$ref": "#/$defs/identities"},
+      "contract_architect": {"$ref": "#/$defs/identities"},
+      "module_implementer": {"$ref": "#/$defs/identities"},
+      "independent_test_agent": {"$ref": "#/$defs/identities"},
+      "evidence_auditor": {"$ref": "#/$defs/identities"},
+      "release_approver": {"$ref": "#/$defs/identities"}
+    }},
+    "trusted_policy_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"}
+  },
+  "$defs": {
+    "module_id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$(?![\\s\\S])"},
+    "repo_path": {"type": "string", "pattern": "^(?!/)(?!.*\\s$(?![\\s\\S]))(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.[^/]+(?:/|$)).+$(?![\\s\\S])"},
+    "identities": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$(?![\\s\\S])"}}
+  }
+}

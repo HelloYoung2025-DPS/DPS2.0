@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Dps.PlatformAuthorizationAuthority.Contracts</AssemblyName>
+    <RootNamespace>Dps.PlatformAuthorizationAuthority.Contracts</RootNamespace>
+  </PropertyGroup>
+</Project>

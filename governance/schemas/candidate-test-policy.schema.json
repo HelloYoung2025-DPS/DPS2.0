@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/schemas/candidate-test-policy.schema.json",
+  "title": "DPS candidate Contract and Integration test policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "contractSuites", "integrationSuites"],
+  "properties": {
+    "schemaVersion": { "const": "dps.candidate-test-policy/v1" },
+    "contractSuites": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "moduleId",
+          "suiteId",
+          "testTarget",
+          "testCategory",
+          "minimumExecutedTests"
+        ],
+        "properties": {
+          "moduleId": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "suiteId": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+          },
+          "testTarget": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+          },
+          "testCategory": {
+            "const": "Contract"
+          },
+          "minimumExecutedTests": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "integrationSuites": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "moduleId",
+          "suiteId",
+          "evidenceKind",
+          "testTarget",
+          "testCategory",
+          "minimumExecutedTests",
+          "requiredEnvironment"
+        ],
+        "properties": {
+          "moduleId": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          },
+          "suiteId": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$"
+          },
+          "evidenceKind": {
+            "enum": ["REAL_POSTGRESQL", "REAL_LOCAL_PROCESS", "SIMULATION"]
+          },
+          "testTarget": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+          },
+          "testCategory": {
+            "enum": ["Integration", "SecuritySimulation"]
+          },
+          "minimumExecutedTests": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "requiredEnvironment": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "DPS_TEST_POSTGRES",
+                "DPS_TEST_POSTGRES_ADMIN_URI",
+                "DPS_TEST_POSTGRES_RUNTIME_URI",
+                "DPS_TEST_POSTGRES_URI",
+                "DPS_TEST_PLATFORM_AUTHORITY_PKCS8_FILE",
+                "DPS_PSQL"
+              ]
+            }
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "evidenceKind": { "const": "REAL_POSTGRESQL" }
+              },
+              "required": ["evidenceKind"]
+            },
+            "then": {
+              "properties": {
+                "testCategory": { "const": "Integration" },
+                "requiredEnvironment": {
+                  "minItems": 1,
+                  "contains": {
+                    "enum": [
+                      "DPS_TEST_POSTGRES",
+                      "DPS_TEST_POSTGRES_ADMIN_URI",
+                      "DPS_TEST_POSTGRES_RUNTIME_URI",
+                      "DPS_TEST_POSTGRES_URI"
+                    ]
+                  },
+                  "minContains": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "evidenceKind": { "const": "REAL_LOCAL_PROCESS" }
+              },
+              "required": ["evidenceKind"]
+            },
+            "then": {
+              "properties": {
+                "testCategory": { "const": "Integration" },
+                "requiredEnvironment": { "maxItems": 0 }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "evidenceKind": { "const": "SIMULATION" }
+              },
+              "required": ["evidenceKind"]
+            },
+            "then": {
+              "properties": {
+                "requiredEnvironment": { "maxItems": 0 }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "testCategory": { "const": "SecuritySimulation" }
+              },
+              "required": ["testCategory"]
+            },
+            "then": {
+              "properties": {
+                "evidenceKind": { "const": "SIMULATION" },
+                "requiredEnvironment": { "maxItems": 0 }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

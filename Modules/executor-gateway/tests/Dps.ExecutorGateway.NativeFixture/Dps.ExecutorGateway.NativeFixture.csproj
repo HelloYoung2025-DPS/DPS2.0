@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Dps.ExecutorGateway.NativeFixture</AssemblyName>
+    <RootNamespace>Dps.ExecutorGateway.NativeFixture</RootNamespace>
+    <UseAppHost>false</UseAppHost>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>

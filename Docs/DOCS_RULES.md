@@ -1,61 +1,65 @@
-# Docs 目录约束规则
-# 创建日期: 2026-03-05
-# 用途: 控制 Docs/ 目录的文件变更权限
+# Docs 目录规则
 
-## 规则
+## 目标
 
-### 1. 禁止新增文件
+文档必须帮助开发者判断三件事:
 
-Docs/ 根目录下**不允许新建任何 .md 文件**。所有文档更新必须在现有文件中进行。
+1. 当前代码真实支持什么.
+2. 目标架构准备变成什么.
+3. 一项能力经过了哪一级验证.
 
-当前允许的文件（完整清单）:
+不再通过固定文件白名单或隐藏工作流目录限制文档演进.
 
-```
+## 目录职责
+
+```text
 Docs/
-├── ConfigGuide_配置指南.md
-├── TechManual_技术手册.md
+├── Architecture/                 # 目标架构和长期技术决策
+├── Platforms/                    # 平台特定行为和验证证据
+├── ConfigGuide_配置指南.md        # 当前配置和部署指南
+├── EngineeringStandards_工程标准.md
 ├── GitWorkflow_Git工作流.md
 ├── PlatformTemplate_平台模块模板.md
-├── README.md
-├── DOCS_RULES.md                ← 本文件
-└── Platforms/
-    ├── BabyCenter_APP_Guide_平台指南.md
-    └── Reddit_TestGuide_Reddit测试指南.md
+├── TechManual_技术手册.md         # 当前实现参考
+└── README.md                      # 文档索引
 ```
 
-### 2. 允许的操作
+后续可按需要新增 `Testing/`, `Operations/`, `Security/` 等主题目录. 新文档必须是长期有价值的工程资料, 不能只是一次任务过程记录.
 
-| 操作 | 是否允许 | 条件 |
-|------|---------|------|
-| 修改现有文件内容 | 允许 | 无需审批 |
-| 在 Docs/ 根目录新建文件 | **禁止** | 必须经用户明确批准 |
-| 在 Platforms/ 子目录新增平台指南 | 允许 | 新平台接入时，文件名须遵循 `{AppName}_APP_Guide_平台指南.md` 格式 |
-| 删除现有文件 | **禁止** | 必须经用户明确批准 |
-| 新建子目录 | **禁止** | 必须经用户明确批准 |
+## 状态标签
 
-### 3. 文件命名规范
+架构和平台文档必须分开标注“文档状态”和“证据状态”. 文档状态使用以下之一:
 
-所有 .md 文件必须使用 `English_中文.md` 的命名格式。例如:
-- `ConfigGuide_配置指南.md`
-- `TechManual_技术手册.md`
+- `Current`: 已在当前源码中实现并通过相应验证.
+- `Proposed`: 目标设计, 尚未进入生产主链.
+- `Experimental`: 已有代码或试验, 但未通过完整门禁.
+- `Deprecated`: 仍可见但不应继续扩展.
+- `Removed`: 已从当前版本移除, 只在 Git 历史中保留.
 
-唯一例外: `README.md`（标准约定文件名）
+证据状态只能是 `NONE`, `NOT_VERIFIED`, `REPOSITORY_STATIC_VERIFIED`, `CONTRACT_VERIFIED`, `INTEGRATION_VERIFIED`, `WINDOWS_VERIFIED`, `DEVICE_VERIFIED`, `CANARY_VERIFIED` 或 `SCALE_VERIFIED`, 并且必须指向当前可读的原始证据. `Current` 只描述文档覆盖的实现面, 不会自动升级证据等级. 历史报告可保留当时的输出, 但原始证据缺失、`SKIP/PARTIAL` 或现行门禁不满足时必须标为 `NOT_VERIFIED`.
 
-### 4. Platforms/ 子目录规则
+设计文档不能使用未来时能力冒充当前已支持能力.
 
-`Platforms/` 是唯一允许按需新增文件的子目录，专门用于存放各平台的 APP 指南。
+## 写作要求
 
-新增条件:
-- 仅在接入新平台时创建
-- 命名格式: `{AppName}_APP_Guide_平台指南.md`
-- 每个平台最多一个指南文件
+- 优先使用简体中文, 专有名词保留英文.
+- 路径, 字段, API 和命令必须与仓库真实内容一致.
+- 代码示例必须注明是生产代码, 伪代码还是提案.
+- 性能数字必须注明测量环境和证据. 未测量时不得写具体提升百分比.
+- 外部产品事实要链接官方资料并记录核验日期.
+- 涉及 ZennoDroid 的结论必须区分静态审计和 Windows 真机验证.
+- 涉及 GBrain 的结论必须区分 health, write, read-back, search, embedding 和 source isolation.
 
-### 5. 执行约束
+## 文件命名
 
-AI 助手在操作 Docs/ 目录时**必须**:
-1. 先读取本文件确认规则
-2. 不主动在 Docs/ 根目录创建新文件
-3. 如果认为需要新建文件，必须先向用户提出请求并等待批准
-4. 所有文档更新优先合并到现有文件中
-5. `Docs/README.md` 与本文件中的文档清单必须和仓库实际存在的文档保持一致
-6. 新人施工文档中的路径、变量名、返回值、流程图必须与当前代码真实行为一致
+- 面向用户的文档可以使用 `English_中文.md`.
+- 标准约定文件可以使用 `README.md`, `SECURITY.md` 等通用名称.
+- 文件名应稳定, 避免加入临时日期或版本号. 版本变化写在正文和 Git 历史中.
+
+## 变更规则
+
+- 架构变化同步更新 `Docs/Architecture/` 和 `CHANGELOG.md`.
+- 运行行为变化同步更新 `TechManual_技术手册.md` 或对应平台指南.
+- 新文档加入 `Docs/README.md` 索引.
+- 删除文档前先修复所有活动链接. 历史 `CHANGELOG.md` 引用不必改写.
+- 一次性审计和临时计划保留在任务或 Pull Request 中, 不写入仓库隐藏目录.

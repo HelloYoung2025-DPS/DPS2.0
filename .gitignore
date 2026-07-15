@@ -35,16 +35,13 @@ DPS_V4-opencode/
 __pycache__/
 *.pyc
 *.pyo
+.venv/
 
 # Build / temp
 bin/
 obj/
+node_modules/
+TestResults/
+artifacts/
 *.tmp
 *.bak
-
-# .omo 2.0 runtime (not for git)
-.omo/sessions/
-.omo/locks/
-.omo/changes/
-.omo/validations/
-.omo/current-task/

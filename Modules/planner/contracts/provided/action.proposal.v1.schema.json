@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/action.proposal.v1.schema.json",
+  "title": "action.proposal/v1",
+  "x-dps-max-wire-bytes": 32768,
+  "x-dps-adversarial-corpus-sha256": "003c036e693ce4481231977c9c022e53c1405876b9a0971150bdd3ce78d64a31",
+  "x-dps-proposal-id": {
+    "domain": "dps.planner.proposal-id/v1",
+    "digest": "SHA-256",
+    "encoding": "uint32-big-endian-length-prefixed-strict-utf8",
+    "uuidVersion": 8,
+    "fields": ["domain", "soul_id", "device_binding_id", "platform_account_id", "idempotency_key"]
+  },
+  "x-dps-canonical-sha256": {
+    "domain": "dps.planner.action-proposal-sha256/v1",
+    "digest": "SHA-256",
+    "encoding": "uint32-big-endian-length-prefixed-strict-utf8",
+    "collectionOrder": "ordinal",
+    "fields": [
+      "domain",
+      "schema_version",
+      "contract_id",
+      "producer_module",
+      "proposal_id:N",
+      "soul_id",
+      "device_binding_id",
+      "platform_account_id",
+      "trace_id",
+      "idempotency_key",
+      "occurred_at:O",
+      "privacy_class",
+      "action_kind",
+      "is_side_effect",
+      "shadow_only",
+      "parameters.count",
+      "parameters[].key",
+      "parameters[].value",
+      "evidence_refs.count",
+      "evidence_refs[]"
+    ]
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "producer_module",
+    "proposal_id",
+    "soul_id",
+    "device_binding_id",
+    "platform_account_id",
+    "trace_id",
+    "idempotency_key",
+    "occurred_at",
+    "privacy_class",
+    "action_kind",
+    "is_side_effect",
+    "shadow_only",
+    "parameters",
+    "evidence_refs"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "contract_id": {"const": "action.proposal/v1"},
+    "producer_module": {"const": "planner"},
+    "proposal_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$(?![\\s\\S])",
+      "not": {"const": "00000000-0000-0000-0000-000000000000"}
+    },
+    "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {
+      "type": "string",
+      "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "platform_account_id": {
+      "type": "string",
+      "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "trace_id": {
+      "type": "string",
+      "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,7})?(?:Z|\\+00:00)$(?![\\s\\S])"
+    },
+    "privacy_class": {"const": "internal"},
+    "action_kind": {
+      "enum": ["observe", "locate", "verify", "wait", "fixture.tap", "fixture.type"]
+    },
+    "is_side_effect": {"type": "boolean"},
+    "shadow_only": {"const": true},
+    "parameters": {"type": "object", "maxProperties": 2},
+    "evidence_refs": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/evidence_ref"}
+    }
+  },
+  "allOf": [
+    {
+      "oneOf": [
+        {
+          "properties": {
+            "action_kind": {"const": "observe"},
+            "is_side_effect": {"const": false},
+            "parameters": {"type": "object", "maxProperties": 0, "additionalProperties": false}
+          }
+        },
+        {
+          "properties": {
+            "action_kind": {"const": "locate"},
+            "is_side_effect": {"const": false},
+            "parameters": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["selector_ref"],
+              "properties": {"selector_ref": {"$ref": "#/$defs/opaque_ref"}}
+            }
+          }
+        },
+        {
+          "properties": {
+            "action_kind": {"const": "verify"},
+            "is_side_effect": {"const": false},
+            "parameters": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["selector_ref"],
+              "properties": {"selector_ref": {"$ref": "#/$defs/opaque_ref"}}
+            }
+          }
+        },
+        {
+          "properties": {
+            "action_kind": {"const": "wait"},
+            "is_side_effect": {"const": false},
+            "parameters": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["duration_ms"],
+              "properties": {
+                "duration_ms": {
+                  "type": "string",
+                  "pattern": "^(?:[1-9][0-9]{0,4}|[1-5][0-9]{5}|600000)$(?![\\s\\S])"
+                }
+              }
+            }
+          }
+        },
+        {
+          "properties": {
+            "action_kind": {"const": "fixture.tap"},
+            "is_side_effect": {"const": true},
+            "parameters": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["selector_ref"],
+              "properties": {"selector_ref": {"$ref": "#/$defs/opaque_ref"}}
+            }
+          }
+        },
+        {
+          "properties": {
+            "action_kind": {"const": "fixture.type"},
+            "is_side_effect": {"const": true},
+            "parameters": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["selector_ref", "value_ref"],
+              "properties": {
+                "selector_ref": {"$ref": "#/$defs/opaque_ref"},
+                "value_ref": {"$ref": "#/$defs/opaque_ref"}
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "$defs": {
+    "opaque_ref": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:,=-]{0,127}$(?![\\s\\S])"
+    },
+    "evidence_ref": {
+      "type": "string",
+      "pattern": "^evidence:[A-Za-z0-9][A-Za-z0-9._:,=-]{0,246}$(?![\\s\\S])"
+    }
+  }
+}

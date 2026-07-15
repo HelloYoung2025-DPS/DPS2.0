@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/approval.decision.v1.schema.json",
+  "title": "approval.decision/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_id", "producer_module", "approval_id", "proposal_id", "soul_id", "device_binding_id", "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class", "action_kind", "is_side_effect", "shadow_only", "parameters", "decision", "authority", "policy_version", "evaluated_policy_ids", "platform_authorization_id", "denial_reasons"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "contract_id": {"const": "approval.decision/v1"},
+    "producer_module": {"const": "policy-approval"},
+    "approval_id": {"type": "string", "format": "uuid", "pattern": "^(?!00000000-0000-0000-0000-000000000000$)[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$(?![\\s\\S])"},
+    "proposal_id": {"type": "string", "format": "uuid", "pattern": "^(?!00000000-0000-0000-0000-000000000000$)[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$(?![\\s\\S])"},
+    "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time", "pattern": "^(?!0000-)[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{0,6}[1-9])?Z$(?![\\s\\S])"},
+    "privacy_class": {"const": "internal"},
+    "action_kind": {"enum": ["observe", "locate", "verify", "wait", "fixture.tap", "fixture.type"]},
+    "is_side_effect": {"type": "boolean"},
+    "shadow_only": {"type": "boolean"},
+    "parameters": {"type": "object", "maxProperties": 16},
+    "decision": {"enum": ["APPROVED", "DENIED"]},
+    "authority": {"const": "deterministic-policy-engine"},
+    "policy_version": {"type": "string", "maxLength": 32, "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$(?![\\s\\S])"},
+    "evaluated_policy_ids": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "maxLength": 64, "pattern": "^[A-Z]+(?:-[A-Z]+)*-[0-9]{3}$(?![\\s\\S])"}},
+    "platform_authorization_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 256, "pattern": "\\S"},
+    "denial_reasons": {"type": "array", "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "\\S"}}
+  },
+  "allOf": [
+    {
+      "oneOf": [
+        {"properties": {"action_kind": {"const": "observe"}, "is_side_effect": {"const": false}, "parameters": {"maxProperties": 0}}},
+        {"properties": {"action_kind": {"const": "locate"}, "is_side_effect": {"const": false}, "parameters": {"required": ["selector_ref"], "additionalProperties": false, "properties": {"selector_ref": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S"}}}}},
+        {"properties": {"action_kind": {"const": "verify"}, "is_side_effect": {"const": false}, "parameters": {"required": ["selector_ref"], "additionalProperties": false, "properties": {"selector_ref": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S"}}}}},
+        {"properties": {"action_kind": {"const": "wait"}, "is_side_effect": {"const": false}, "parameters": {"required": ["duration_ms"], "additionalProperties": false, "properties": {"duration_ms": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S"}}}}},
+        {"properties": {"action_kind": {"const": "fixture.tap"}, "is_side_effect": {"const": true}, "parameters": {"required": ["selector_ref"], "additionalProperties": false, "properties": {"selector_ref": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S"}}}}},
+        {"properties": {"action_kind": {"const": "fixture.type"}, "is_side_effect": {"const": true}, "parameters": {"required": ["selector_ref", "value_ref"], "additionalProperties": false, "properties": {"selector_ref": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S"}, "value_ref": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S"}}}}}
+      ]
+    },
+    {
+      "oneOf": [
+        {
+          "properties": {"decision": {"const": "APPROVED"}, "shadow_only": {"const": false}, "denial_reasons": {"maxItems": 0}},
+          "allOf": [
+            {
+              "if": {"properties": {"is_side_effect": {"const": true}}},
+              "then": {"required": ["platform_authorization_id"], "properties": {"platform_authorization_id": {"type": "string", "minLength": 1, "maxLength": 256, "pattern": "\\S"}}}
+            }
+          ]
+        },
+        {"properties": {"decision": {"const": "DENIED"}, "denial_reasons": {"minItems": 1}}}
+      ]
+    }
+  ]
+}

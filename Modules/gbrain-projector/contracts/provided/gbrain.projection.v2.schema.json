@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/gbrain.projection.v2.schema.json",
+  "title": "gbrain.projection/v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "producer_module",
+    "soul_id",
+    "device_binding_id",
+    "platform_account_id",
+    "trace_id",
+    "idempotency_key",
+    "occurred_at",
+    "privacy_class",
+    "source_id",
+    "source_binding_algorithm",
+    "source_binding_nonce",
+    "source_binding_soul_hash",
+    "source_binding_allocated_at",
+    "source_binding_revision",
+    "source_binding_checksum",
+    "projection_revision",
+    "projection_checksum",
+    "render_status",
+    "source_event_count",
+    "events",
+    "interests"
+  ],
+  "properties": {
+    "schema_version": { "const": "2.0.0" },
+    "contract_id": { "const": "gbrain.projection/v2" },
+    "producer_module": { "const": "gbrain-projector" },
+    "soul_id": { "type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])" },
+    "device_binding_id": { "type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])" },
+    "platform_account_id": { "type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])" },
+    "trace_id": { "type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])" },
+    "idempotency_key": { "type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])" },
+    "occurred_at": { "type": "string", "maxLength": 32, "format": "date-time", "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{0,6}[1-9])?Z$(?![\\s\\S])" },
+    "privacy_class": { "const": "personal" },
+    "source_id": { "type": "string", "minLength": 32, "maxLength": 32, "pattern": "^dps-[a-f0-9]{28}$(?![\\s\\S])" },
+    "source_binding_algorithm": { "const": "dps.gbrain-source-binding.sha256-nonce/v1" },
+    "source_binding_nonce": { "type": "integer", "minimum": 0, "maximum": 1023 },
+    "source_binding_soul_hash": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])" },
+    "source_binding_allocated_at": { "type": "string", "maxLength": 32, "format": "date-time", "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{0,6}[1-9])?Z$(?![\\s\\S])" },
+    "source_binding_revision": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])" },
+    "source_binding_checksum": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])" },
+    "projection_revision": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])" },
+    "projection_checksum": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])" },
+    "render_status": { "const": "dto-rendered-not-written" },
+    "source_event_count": { "type": "integer", "minimum": 0 },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["event_id", "event_hash", "content_digest", "occurred_at"],
+        "properties": {
+          "event_id": { "type": "string", "format": "uuid" },
+          "event_hash": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])" },
+          "content_digest": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])" },
+          "occurred_at": { "type": "string", "maxLength": 32, "format": "date-time", "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{0,6}[1-9])?Z$(?![\\s\\S])" }
+        }
+      }
+    },
+    "interests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["topic", "original_confidence", "decayed_confidence", "half_life_seconds", "algorithm_version", "evidence"],
+        "properties": {
+          "topic": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "original_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "decayed_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "half_life_seconds": { "type": "number", "exclusiveMinimum": 0 },
+          "algorithm_version": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["event_id", "event_hash", "occurred_at", "original_confidence", "decayed_confidence"],
+              "properties": {
+                "event_id": { "type": "string", "format": "uuid" },
+                "event_hash": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])" },
+                "occurred_at": { "type": "string", "maxLength": 32, "format": "date-time", "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{0,6}[1-9])?Z$(?![\\s\\S])" },
+                "original_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+                "decayed_confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

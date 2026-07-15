@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/verification/f9-compatibility-matrix.v1.schema.json",
+  "title": "F9 canonical compatibility matrix",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatedFrom",
+    "policyRef",
+    "unknownMajorBehavior",
+    "contracts",
+    "requiredCombinations",
+    "unknownNPlus1"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "dps.compatibility-matrix/v1" },
+    "generatedFrom": { "const": "Modules/*/module.yaml" },
+    "policyRef": { "const": "governance/policies/compatibility-policy.yaml" },
+    "unknownMajorBehavior": { "const": "reject" },
+    "contracts": {
+      "type": "array",
+      "maxItems": 65536,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["contractId", "owner", "currentMajor", "consumers"],
+        "properties": {
+          "contractId": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "owner": { "$ref": "#/$defs/moduleId" },
+          "currentMajor": { "type": "integer", "minimum": 1 },
+          "consumers": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "$ref": "#/$defs/moduleId" }
+          }
+        }
+      }
+    },
+    "requiredCombinations": {
+      "const": ["N/N", "N/N-1", "N-1/N", "N-1/N-1"]
+    },
+    "unknownNPlus1": { "const": "REJECT" }
+  },
+  "$defs": {
+    "moduleId": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" }
+  }
+}

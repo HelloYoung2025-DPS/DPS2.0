@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.Planner</AssemblyName>
+    <RootNamespace>Dps.Planner</RootNamespace>
+    <PackageId>Dps.Planner</PackageId>
+    <Version>0.2.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../contracts/provided/Dps.Planner.Contracts/Dps.Planner.Contracts.csproj" />
+  </ItemGroup>
+</Project>

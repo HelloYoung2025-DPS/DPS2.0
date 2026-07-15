@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.InterestReducer</AssemblyName>
+    <RootNamespace>Dps.InterestReducer</RootNamespace>
+    <Version>0.1.0</Version>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/bin/**;**/obj/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../contracts/Dps.InterestReducer.Contracts.csproj" />
+    <ProjectReference Include="../../memory-event-ledger/contracts/Dps.MemoryEventLedger.Contracts.csproj" />
+  </ItemGroup>
+</Project>

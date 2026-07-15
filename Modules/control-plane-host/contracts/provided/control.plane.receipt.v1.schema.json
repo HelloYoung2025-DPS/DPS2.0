@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/control.plane.receipt.v1.schema.json",
+  "title": "control.plane.receipt/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_id", "producer_module", "soul_id", "device_binding_id", "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class", "receipt_id", "source_contract_id", "source_producer_module", "source_payload_sha256", "decision"],
+  "properties": {
+    "schema_version": {"type": "string", "maxLength": 32, "pattern": "^1(?:\\.[0-9]+){0,2}$(?![\\s\\S])"},
+    "contract_id": {"const": "control.plane.receipt/v1"},
+    "producer_module": {"const": "control-plane-host"},
+    "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "maxLength": 32, "format": "date-time", "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{0,6}[1-9])?Z$(?![\\s\\S])"},
+    "privacy_class": {"const": "sensitive"},
+    "receipt_id": {"type": "string", "pattern": "^receipt_[a-f0-9]{32}$(?![\\s\\S])"},
+    "source_contract_id": {"enum": ["device.registered/v1", "platform.account.authorized/v1", "identity.binding/v1", "persona.revision/v1", "soul.memory.readback/v1"]},
+    "source_producer_module": {"enum": ["device-registry", "platform-account-registry", "binding", "persona-store", "soul-memory-adapter"]},
+    "source_payload_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+    "decision": {"const": "accepted"}
+  },
+  "oneOf": [
+    {"properties": {"source_contract_id": {"const": "device.registered/v1"}, "source_producer_module": {"const": "device-registry"}}},
+    {"properties": {"source_contract_id": {"const": "platform.account.authorized/v1"}, "source_producer_module": {"const": "platform-account-registry"}}},
+    {"properties": {"source_contract_id": {"const": "identity.binding/v1"}, "source_producer_module": {"const": "binding"}}},
+    {"properties": {"source_contract_id": {"const": "persona.revision/v1"}, "source_producer_module": {"const": "persona-store"}}},
+    {"properties": {"source_contract_id": {"const": "soul.memory.readback/v1"}, "source_producer_module": {"const": "soul-memory-adapter"}}}
+  ]
+}

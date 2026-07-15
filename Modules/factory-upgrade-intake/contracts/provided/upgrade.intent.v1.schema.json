@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/upgrade.intent.v1.schema.json",
+  "title": "DPS Factory upgrade intent v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "contract_id", "producer_module", "soul_id", "device_binding_id",
+    "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class",
+    "intent_id", "auth_context_id", "baseline_commit", "target_modules", "requested_paths",
+    "public_contract_changes", "risk_tier", "requested_stage", "requester", "authorization"
+  ],
+  "properties": {
+    "schema_version": {"const": "dps.upgrade-intent/v1"},
+    "contract_id": {"const": "upgrade.intent/v1"},
+    "producer_module": {"const": "factory-upgrade-intake"},
+    "soul_id": {"type": ["string", "null"], "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": ["string", "null"], "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": ["string", "null"], "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "privacy_class": {"const": "internal"},
+    "intent_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "auth_context_id": {"type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "baseline_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$(?![\\s\\S])"},
+    "target_modules": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$(?![\\s\\S])"}
+    },
+    "requested_paths": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^(?!/)(?!.*\\s$(?![\\s\\S]))(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.[^/]+(?:/|$)).+$(?![\\s\\S])"}
+    },
+    "public_contract_changes": {
+      "type": "array", "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z0-9]+)+$(?![\\s\\S])"}
+    },
+    "risk_tier": {"enum": ["R0", "R1", "R2", "R3", "R4"]},
+    "requested_stage": {"enum": ["development", "shadow", "canary", "rolling", "soaking"]},
+    "requester": {
+      "type": "object", "additionalProperties": false,
+      "required": ["identity", "role"],
+      "properties": {
+        "identity": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$(?![\\s\\S])"},
+        "role": {"enum": ["human-requester", "impact-planner", "contract-architect", "module-implementer"]}
+      }
+    },
+    "authorization": {
+      "type": "object", "additionalProperties": false,
+      "required": ["status", "approved_by", "approver_role", "approval_scope"],
+      "properties": {
+        "status": {"enum": ["not-required", "pending", "approved", "rejected"]},
+        "approved_by": {"type": ["string", "null"], "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$(?![\\s\\S])"},
+        "approver_role": {"enum": ["human-release-approver", "not-applicable"]},
+        "approval_scope": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

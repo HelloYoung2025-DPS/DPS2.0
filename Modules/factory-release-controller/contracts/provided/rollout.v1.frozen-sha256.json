@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "dps.contract-byte-freeze/v1",
+  "contractFamily": "rollout",
+  "major": 1,
+  "status": "deprecated",
+  "mode": "quarantine-only",
+  "files": [
+    {
+      "path": "Modules/factory-release-controller/contracts/provided/rollout.command.v1.schema.json",
+      "sha256": "2f3a3e9a872c9626e095be9187c06ac8cfedcb61e66448d1aa12c84a5ac93736"
+    },
+    {
+      "path": "Modules/factory-release-controller/contracts/provided/rollout.event.v1.schema.json",
+      "sha256": "469acfbc43c76b7d97b78c51fe1bf4db20a919aa7a1a5f9a6371400c8bf41298"
+    }
+  ]
+}

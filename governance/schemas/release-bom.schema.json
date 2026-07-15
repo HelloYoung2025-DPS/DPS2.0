@@ -1,0 +1,328 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/schemas/release-bom.schema.json",
+  "title": "DPS Release BOM",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "bom_id",
+    "status",
+    "integration_commit",
+    "created_at",
+    "release_bom_generation",
+    "activation_token_sha256",
+    "modules",
+    "instruction_hashes",
+    "contracts",
+    "database_versions",
+    "dependency_dag_sha256",
+    "compatibility_matrix_sha256",
+    "feature_flags",
+    "kill_switches",
+    "ai_toolchain",
+    "evidence",
+    "risk",
+    "release_approval",
+    "rollout",
+    "rollback",
+    "previous_stable_bom",
+    "previous_stable_bom_sha256",
+    "native_stop_authorities",
+    "device_route_assignment_authorities",
+    "native_stop_challenge_authorities",
+    "signature"
+  ],
+  "properties": {
+    "schema_version": { "const": "dps.release-bom/v1" },
+    "bom_id": { "$ref": "#/$defs/id" },
+    "status": { "enum": ["CANDIDATE", "SIGNED", "DEPLOYING", "STABLE", "ROLLED_BACK", "REVOKED"] },
+    "integration_commit": { "$ref": "#/$defs/gitObject" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "release_bom_generation": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+    "activation_token_sha256": { "$ref": "#/$defs/sha256" },
+    "modules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["module_id", "version", "artifact_uri", "sha256", "signature", "descriptor_uri", "descriptor_sha256", "sbom_uri", "sbom_sha256", "provenance_uri", "provenance_sha256", "agents_sha256", "manifest_sha256"],
+        "properties": {
+          "module_id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+          "version": { "$ref": "#/$defs/semver" },
+          "artifact_uri": { "$ref": "#/$defs/safeRelativePath" },
+          "sha256": { "$ref": "#/$defs/sha256" },
+          "signature": { "$ref": "#/$defs/signature" },
+          "descriptor_uri": { "$ref": "#/$defs/safeRelativePath" },
+          "descriptor_sha256": { "$ref": "#/$defs/sha256" },
+          "sbom_uri": { "$ref": "#/$defs/safeRelativePath" },
+          "sbom_sha256": { "$ref": "#/$defs/sha256" },
+          "provenance_uri": { "$ref": "#/$defs/safeRelativePath" },
+          "provenance_sha256": { "$ref": "#/$defs/sha256" },
+          "agents_sha256": { "$ref": "#/$defs/sha256" },
+          "manifest_sha256": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    "instruction_hashes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    "contracts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["contract_id", "major", "schema_sha256", "owner_module"],
+        "properties": {
+          "contract_id": { "type": "string", "minLength": 1 },
+          "major": { "type": "integer", "minimum": 1 },
+          "schema_sha256": { "$ref": "#/$defs/sha256" },
+          "owner_module": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "database_versions": { "type": "object", "additionalProperties": { "type": "string" } },
+    "dependency_dag_sha256": { "$ref": "#/$defs/sha256" },
+    "compatibility_matrix_sha256": { "$ref": "#/$defs/sha256" },
+    "feature_flags": { "type": "object", "additionalProperties": { "type": ["string", "number", "boolean", "null"] } },
+    "kill_switches": { "type": "object", "additionalProperties": { "type": ["string", "boolean"] } },
+    "ai_toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["models", "prompts", "tools"],
+      "properties": {
+        "models": { "$ref": "#/$defs/versionMap" },
+        "prompts": { "$ref": "#/$defs/versionMap" },
+        "tools": { "$ref": "#/$defs/versionMap" }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["evidence_id", "artifact_uri", "sha256", "result", "required", "kind", "tested_commit", "verification_level", "issuer_identity", "signature"],
+        "properties": {
+          "evidence_id": { "$ref": "#/$defs/id" },
+          "artifact_uri": { "$ref": "#/$defs/safeRelativePath" },
+          "sha256": { "$ref": "#/$defs/sha256" },
+          "result": { "enum": ["PASS", "FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"] },
+          "required": { "type": "boolean" },
+          "kind": { "enum": ["REPOSITORY", "CONTRACT", "INTEGRATION", "SIMULATION", "WINDOWS", "DEVICE", "CANARY", "SCALE"] },
+          "tested_commit": { "$ref": "#/$defs/gitObject" },
+          "verification_level": {
+            "enum": ["REPOSITORY_STATIC_VERIFIED", "CONTRACT_VERIFIED", "INTEGRATION_VERIFIED", "WINDOWS_VERIFIED", "DEVICE_VERIFIED", "CANARY_VERIFIED", "SCALE_VERIFIED"]
+          },
+          "issuer_identity": { "type": "string", "minLength": 1 },
+          "signature": { "$ref": "#/$defs/signature" }
+        }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tier", "scope_sha256", "requested_by"],
+      "properties": {
+        "tier": { "enum": ["R0", "R1", "R2", "R3", "R4"] },
+        "scope_sha256": { "$ref": "#/$defs/sha256" },
+        "requested_by": { "type": "string", "minLength": 1 }
+      }
+    },
+    "release_approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "receipt_uri", "sha256", "approver_identity", "approver_role", "signature"],
+      "properties": {
+        "required": { "type": "boolean" },
+        "receipt_uri": { "oneOf": [{ "$ref": "#/$defs/safeRelativePath" }, { "type": "null" }] },
+        "sha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "approver_identity": { "type": ["string", "null"] },
+        "approver_role": { "enum": ["human-release-approver", "not-applicable"] },
+        "signature": { "oneOf": [{ "$ref": "#/$defs/signature" }, { "type": "null" }] }
+      }
+    },
+    "rollout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["waves", "shadow_artifact_sha256", "current_wave"],
+      "properties": {
+        "waves": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "shadow_artifact_sha256": { "$ref": "#/$defs/sha256" },
+        "current_wave": { "type": "string", "minLength": 1 }
+      }
+    },
+    "rollback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unit", "target_minutes", "procedure", "compensation_required"],
+      "properties": {
+        "unit": { "type": "string", "minLength": 1 },
+        "target_minutes": { "type": "integer", "minimum": 1 },
+        "procedure": { "type": "string", "minLength": 1 },
+        "compensation_required": { "type": "boolean" }
+      }
+    },
+    "previous_stable_bom": { "oneOf": [{ "$ref": "#/$defs/id" }, { "type": "null" }] },
+    "previous_stable_bom_sha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+    "native_stop_authorities": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": { "$ref": "#/$defs/nativeStopAuthority" }
+    },
+    "device_route_assignment_authorities": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": { "$ref": "#/$defs/deviceRouteAssignmentAuthority" }
+    },
+    "native_stop_challenge_authorities": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 512,
+      "items": { "$ref": "#/$defs/nativeStopChallengeAuthority" }
+    },
+    "signature": { "$ref": "#/$defs/signature" }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$" },
+    "gitObject": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "semver": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$" },
+    "safeRelativePath": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$" },
+    "versionMap": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } },
+    "nativeStopAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_id", "producer_module", "worker_module_id", "worker_artifact_id",
+        "worker_artifact_sha256", "worker_version", "worker_slot", "worker_instance_id",
+        "worker_generation", "key_id", "p256_spki_sha256", "signature_algorithm",
+        "signature_format", "auth_scope", "native_stop_contract_id", "policy_id", "release_bom_generation",
+        "activation_token_sha256", "rotation_epoch", "valid_from", "valid_until",
+        "revoked", "worker_authority_sha256"
+      ],
+      "properties": {
+        "authority_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{7,127}$" },
+        "producer_module": { "const": "windows-edge-worker" },
+        "worker_module_id": { "const": "windows-edge-worker" },
+        "worker_artifact_id": { "const": "dps.windows-edge-worker" },
+        "worker_artifact_sha256": { "$ref": "#/$defs/sha256" },
+        "worker_version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$" },
+        "worker_slot": { "enum": ["A", "B"] },
+        "worker_instance_id": { "type": "string", "pattern": "^wi_[0-9a-f]{32}$" },
+        "worker_generation": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+        "key_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$" },
+        "p256_spki_sha256": { "$ref": "#/$defs/sha256" },
+        "signature_algorithm": { "const": "ECDSA_P256_SHA256" },
+        "signature_format": { "const": "IEEE_P1363_FIXED_FIELD" },
+        "auth_scope": { "const": "policy-approval:native-stop-proof:v2:commit-unknown" },
+        "native_stop_contract_id": { "const": "native.stop.proof/v2" },
+        "policy_id": { "const": "RESULT-VERIFY-001" },
+        "release_bom_generation": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+        "activation_token_sha256": { "$ref": "#/$defs/sha256" },
+        "rotation_epoch": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+        "valid_from": { "$ref": "#/$defs/canonicalRuntimeUtc" },
+        "valid_until": { "$ref": "#/$defs/canonicalRuntimeUtc" },
+        "revoked": { "const": false },
+        "worker_authority_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "deviceRouteAssignmentAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "route_authority_id", "producer_module", "supervisor_module_id",
+        "supervisor_artifact_id", "supervisor_artifact_sha256", "supervisor_version",
+        "supervisor_instance_id", "supervisor_generation", "route_signer_key_id",
+        "route_signer_p256_spki_sha256", "signature_algorithm", "signature_format",
+        "auth_scope", "policy_id", "release_bom_generation", "activation_token_sha256",
+        "rotation_epoch", "valid_from", "valid_until", "revoked", "route_authority_sha256"
+      ],
+      "properties": {
+        "route_authority_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{7,127}$" },
+        "producer_module": { "const": "factory-release-controller" },
+        "supervisor_module_id": { "const": "windows-edge-supervisor" },
+        "supervisor_artifact_id": { "const": "dps.windows-edge-supervisor" },
+        "supervisor_artifact_sha256": { "$ref": "#/$defs/sha256" },
+        "supervisor_version": { "$ref": "#/$defs/strictSemver" },
+        "supervisor_instance_id": { "type": "string", "pattern": "^si_[0-9a-f]{32}$" },
+        "supervisor_generation": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+        "route_signer_key_id": { "type": "string", "pattern": "^p256_spki_[0-9a-f]{64}$" },
+        "route_signer_p256_spki_sha256": { "$ref": "#/$defs/sha256" },
+        "signature_algorithm": { "const": "ECDSA_P256_SHA256" },
+        "signature_format": { "const": "IEEE_P1363_FIXED_FIELD_LOW_S" },
+        "auth_scope": { "const": "windows-edge-supervisor:device-route-assignment:issue" },
+        "policy_id": { "const": "SOUL-ISO-001" },
+        "release_bom_generation": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+        "activation_token_sha256": { "$ref": "#/$defs/sha256" },
+        "rotation_epoch": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+        "valid_from": { "$ref": "#/$defs/canonicalRuntimeUtc" },
+        "valid_until": { "$ref": "#/$defs/canonicalRuntimeUtc" },
+        "revoked": { "const": false },
+        "route_authority_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "nativeStopChallengeAuthority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authority_id", "producer_module", "policy_module_id", "policy_artifact_id",
+        "policy_artifact_sha256", "policy_version", "policy_instance_id",
+        "policy_generation", "key_id", "p256_spki_sha256", "signature_algorithm",
+        "signature_format", "auth_scope", "native_stop_challenge_contract_id",
+        "policy_id", "release_bom_generation", "activation_token_sha256",
+        "rotation_epoch", "valid_from", "valid_until", "revoked",
+        "challenge_authority_sha256"
+      ],
+      "properties": {
+        "authority_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{7,127}$" },
+        "producer_module": { "const": "policy-approval" },
+        "policy_module_id": { "const": "policy-approval" },
+        "policy_artifact_id": { "const": "dps.policy-approval" },
+        "policy_artifact_sha256": { "$ref": "#/$defs/sha256" },
+        "policy_version": { "$ref": "#/$defs/strictSemver" },
+        "policy_instance_id": { "type": "string", "pattern": "^pi_[0-9a-f]{32}$" },
+        "policy_generation": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+        "key_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$" },
+        "p256_spki_sha256": { "$ref": "#/$defs/sha256" },
+        "signature_algorithm": { "const": "ECDSA_P256_SHA256" },
+        "signature_format": { "const": "IEEE_P1363_FIXED_FIELD_LOW_S" },
+        "auth_scope": { "const": "policy-approval:native-stop-challenge:v1:issue" },
+        "native_stop_challenge_contract_id": { "const": "native.stop.challenge/v1" },
+        "policy_id": { "const": "NATIVE-STOP-CHALLENGE-001" },
+        "release_bom_generation": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+        "activation_token_sha256": { "$ref": "#/$defs/sha256" },
+        "rotation_epoch": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 },
+        "valid_from": { "$ref": "#/$defs/canonicalRuntimeUtc" },
+        "valid_until": { "$ref": "#/$defs/canonicalRuntimeUtc" },
+        "revoked": { "const": false },
+        "challenge_authority_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "strictSemver": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-((?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(?:\\.(?:0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\\+([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$" },
+    "canonicalRuntimeUtc": { "type": "string", "format": "date-time", "pattern": "^(?:20(?:2[0-9]|[3-9][0-9])|2[1-9][0-9]{2}|[3-9][0-9]{3})-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\\.[0-9]{7}Z$" },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "key_id", "value"],
+      "properties": {
+        "algorithm": { "enum": ["ed25519", "rsa-pss-sha256", "ecdsa-p256-sha256"] },
+        "key_id": { "type": "string", "minLength": 1 },
+        "value": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

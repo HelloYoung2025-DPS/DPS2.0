@@ -1,0 +1,71 @@
+{
+  "schema_version": "dps.trusted-runner-policy/v1",
+  "policy_id": "factory-runner-default-2026-07-14",
+  "status": "non-production-template",
+  "runner_identity": "factory-trusted-runner-service",
+  "allowed_executables": ["python3.12"],
+  "allowed_environment": ["HOME", "PATH", "PYTHONUTF8", "TMPDIR"],
+  "maximum_output_bytes": 1048576,
+  "roles": {
+    "implementers": [
+      "factory-module-implementer-1",
+      "factory-module-implementer-2",
+      "factory-module-implementer-3",
+      "factory-module-implementer-4"
+    ],
+    "evidence_issuers": ["factory-trusted-runner-service"],
+    "release_approvers": ["human-release-approver-1"]
+  },
+  "checks": [
+    {
+      "check_id": "factory-upgrade-intake.unit",
+      "module_id": "factory-upgrade-intake",
+      "argv": ["python3.12", "-m", "unittest", "discover", "-s", "Modules/factory-upgrade-intake/tests", "-p", "test_*.py"],
+      "cwd": ".",
+      "timeout_seconds": 120,
+      "required": true,
+      "success_marker": "OK",
+      "forbidden_output_markers": ["FAILED", "SKIP", "skipped=", "PARTIAL", "NOT_RUN", "INFRA_ERROR"]
+    },
+    {
+      "check_id": "factory-instruction-resolver.unit",
+      "module_id": "factory-instruction-resolver",
+      "argv": ["python3.12", "-m", "unittest", "discover", "-s", "Modules/factory-instruction-resolver/tests", "-p", "test_*.py"],
+      "cwd": ".",
+      "timeout_seconds": 120,
+      "required": true,
+      "success_marker": "OK",
+      "forbidden_output_markers": ["FAILED", "SKIP", "skipped=", "PARTIAL", "NOT_RUN", "INFRA_ERROR"]
+    },
+    {
+      "check_id": "factory-impact-analyzer.unit",
+      "module_id": "factory-impact-analyzer",
+      "argv": ["python3.12", "-m", "unittest", "discover", "-s", "Modules/factory-impact-analyzer/tests", "-p", "test_*.py"],
+      "cwd": ".",
+      "timeout_seconds": 120,
+      "required": true,
+      "success_marker": "OK",
+      "forbidden_output_markers": ["FAILED", "SKIP", "skipped=", "PARTIAL", "NOT_RUN", "INFRA_ERROR"]
+    },
+    {
+      "check_id": "factory-worktree-manager.unit",
+      "module_id": "factory-worktree-manager",
+      "argv": ["python3.12", "-m", "unittest", "discover", "-s", "Modules/factory-worktree-manager/tests", "-p", "test_*.py"],
+      "cwd": ".",
+      "timeout_seconds": 120,
+      "required": true,
+      "success_marker": "OK",
+      "forbidden_output_markers": ["FAILED", "SKIP", "skipped=", "PARTIAL", "NOT_RUN", "INFRA_ERROR"]
+    },
+    {
+      "check_id": "factory-trusted-runner.unit",
+      "module_id": "factory-trusted-runner",
+      "argv": ["python3.12", "-m", "unittest", "discover", "-s", "Modules/factory-trusted-runner/tests", "-p", "test_*.py"],
+      "cwd": ".",
+      "timeout_seconds": 120,
+      "required": true,
+      "success_marker": "OK",
+      "forbidden_output_markers": ["FAILED", "SKIP", "skipped=", "PARTIAL", "NOT_RUN", "INFRA_ERROR"]
+    }
+  ]
+}

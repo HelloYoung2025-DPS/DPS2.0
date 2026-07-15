@@ -1,0 +1,234 @@
+<Solution>
+  <Folder Name="/Modules/" />
+  <Folder Name="/Modules/audit-metrics/" />
+  <Folder Name="/Modules/audit-metrics/contracts/" />
+  <Folder Name="/Modules/audit-metrics/contracts/provided/">
+    <Project Path="Modules/audit-metrics/contracts/provided/Dps.AuditMetrics.Contracts/Dps.AuditMetrics.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/audit-metrics/src/">
+    <Project Path="Modules/audit-metrics/src/Dps.AuditMetrics/Dps.AuditMetrics.csproj" />
+  </Folder>
+  <Folder Name="/Modules/audit-metrics/tests/">
+    <Project Path="Modules/audit-metrics/tests/Dps.AuditMetrics.Tests/Dps.AuditMetrics.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/binding/" />
+  <Folder Name="/Modules/binding/contracts/">
+    <Project Path="Modules/binding/contracts/Dps.Binding.Contracts/Dps.Binding.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/binding/src/">
+    <Project Path="Modules/binding/src/Dps.Binding/Dps.Binding.csproj" />
+  </Folder>
+  <Folder Name="/Modules/binding/tests/">
+    <Project Path="Modules/binding/tests/Dps.Binding.Tests/Dps.Binding.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/command-orchestrator/" />
+  <Folder Name="/Modules/command-orchestrator/contracts/" />
+  <Folder Name="/Modules/command-orchestrator/contracts/provided/">
+    <Project Path="Modules/command-orchestrator/contracts/provided/Dps.CommandOrchestrator.Contracts/Dps.CommandOrchestrator.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/command-orchestrator/src/">
+    <Project Path="Modules/command-orchestrator/src/Dps.CommandOrchestrator/Dps.CommandOrchestrator.csproj" />
+  </Folder>
+  <Folder Name="/Modules/command-orchestrator/tests/">
+    <Project Path="Modules/command-orchestrator/tests/Dps.CommandOrchestrator.Tests/Dps.CommandOrchestrator.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/control-plane-host/" />
+  <Folder Name="/Modules/control-plane-host/contracts/">
+    <Project Path="Modules/control-plane-host/contracts/Dps.ControlPlaneHost.Contracts/Dps.ControlPlaneHost.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/control-plane-host/src/">
+    <Project Path="Modules/control-plane-host/src/Dps.ControlPlaneHost/Dps.ControlPlaneHost.csproj" />
+  </Folder>
+  <Folder Name="/Modules/control-plane-host/tests/">
+    <Project Path="Modules/control-plane-host/tests/Dps.ControlPlaneHost.Tests/Dps.ControlPlaneHost.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/device-registry/" />
+  <Folder Name="/Modules/device-registry/contracts/">
+    <Project Path="Modules/device-registry/contracts/Dps.DeviceRegistry.Contracts/Dps.DeviceRegistry.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/device-registry/src/">
+    <Project Path="Modules/device-registry/src/Dps.DeviceRegistry/Dps.DeviceRegistry.csproj" />
+  </Folder>
+  <Folder Name="/Modules/device-registry/tests/">
+    <Project Path="Modules/device-registry/tests/Dps.DeviceRegistry.Tests/Dps.DeviceRegistry.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/edge-local-journal/" />
+  <Folder Name="/Modules/edge-local-journal/contracts/" />
+  <Folder Name="/Modules/edge-local-journal/contracts/provided/">
+    <Project Path="Modules/edge-local-journal/contracts/provided/Dps.EdgeLocalJournal.Contracts/Dps.EdgeLocalJournal.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/edge-local-journal/src/">
+    <Project Path="Modules/edge-local-journal/src/Dps.EdgeLocalJournal.csproj" />
+  </Folder>
+  <Folder Name="/Modules/edge-local-journal/tests/">
+    <Project Path="Modules/edge-local-journal/tests/Dps.EdgeLocalJournal.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/edge-local-journal/tests/process-probe/">
+    <Project Path="Modules/edge-local-journal/tests/process-probe/Dps.EdgeLocalJournal.ProcessProbe.csproj" />
+  </Folder>
+  <Folder Name="/Modules/evidence-service/" />
+  <Folder Name="/Modules/evidence-service/contracts/">
+    <Project Path="Modules/evidence-service/contracts/Dps.EvidenceService.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/evidence-service/src/">
+    <Project Path="Modules/evidence-service/src/Dps.EvidenceService.csproj" />
+  </Folder>
+  <Folder Name="/Modules/evidence-service/tests/">
+    <Project Path="Modules/evidence-service/tests/Dps.EvidenceService.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/executor-gateway/" />
+  <Folder Name="/Modules/executor-gateway/contracts/" />
+  <Folder Name="/Modules/executor-gateway/contracts/provided/">
+    <Project Path="Modules/executor-gateway/contracts/provided/Dps.ExecutorGateway.Contracts/Dps.ExecutorGateway.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/executor-gateway/src/">
+    <Project Path="Modules/executor-gateway/src/Dps.ExecutorGateway/Dps.ExecutorGateway.csproj" />
+  </Folder>
+  <Folder Name="/Modules/executor-gateway/tests/">
+    <Project Path="Modules/executor-gateway/tests/Dps.ExecutorGateway.Tests/Dps.ExecutorGateway.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/executor-gateway/tests/Dps.ExecutorGateway.NativeFixture/">
+    <Project Path="Modules/executor-gateway/tests/Dps.ExecutorGateway.NativeFixture/Dps.ExecutorGateway.NativeFixture.csproj" />
+  </Folder>
+  <Folder Name="/Modules/gbrain-projector/" />
+  <Folder Name="/Modules/gbrain-projector/contracts/">
+    <Project Path="Modules/gbrain-projector/contracts/Dps.GBrainProjector.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/gbrain-projector/src/">
+    <Project Path="Modules/gbrain-projector/src/Dps.GBrainProjector.csproj" />
+  </Folder>
+  <Folder Name="/Modules/gbrain-projector/tests/">
+    <Project Path="Modules/gbrain-projector/tests/Dps.GBrainProjector.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/interest-reducer/" />
+  <Folder Name="/Modules/interest-reducer/contracts/">
+    <Project Path="Modules/interest-reducer/contracts/Dps.InterestReducer.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/interest-reducer/src/">
+    <Project Path="Modules/interest-reducer/src/Dps.InterestReducer.csproj" />
+  </Folder>
+  <Folder Name="/Modules/interest-reducer/tests/">
+    <Project Path="Modules/interest-reducer/tests/Dps.InterestReducer.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/memory-event-ledger/" />
+  <Folder Name="/Modules/memory-event-ledger/contracts/">
+    <Project Path="Modules/memory-event-ledger/contracts/Dps.MemoryEventLedger.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/memory-event-ledger/src/">
+    <Project Path="Modules/memory-event-ledger/src/Dps.MemoryEventLedger.csproj" />
+  </Folder>
+  <Folder Name="/Modules/memory-event-ledger/tests/">
+    <Project Path="Modules/memory-event-ledger/tests/Dps.MemoryEventLedger.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/operation-compiler/" />
+  <Folder Name="/Modules/operation-compiler/contracts/" />
+  <Folder Name="/Modules/operation-compiler/contracts/provided/">
+    <Project Path="Modules/operation-compiler/contracts/provided/Dps.OperationCompiler.Contracts/Dps.OperationCompiler.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/operation-compiler/src/">
+    <Project Path="Modules/operation-compiler/src/Dps.OperationCompiler/Dps.OperationCompiler.csproj" />
+  </Folder>
+  <Folder Name="/Modules/operation-compiler/tests/">
+    <Project Path="Modules/operation-compiler/tests/Dps.OperationCompiler.Tests/Dps.OperationCompiler.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/persona-store/" />
+  <Folder Name="/Modules/persona-store/contracts/">
+    <Project Path="Modules/persona-store/contracts/Dps.PersonaStore.Contracts/Dps.PersonaStore.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/persona-store/src/">
+    <Project Path="Modules/persona-store/src/Dps.PersonaStore/Dps.PersonaStore.csproj" />
+  </Folder>
+  <Folder Name="/Modules/persona-store/tests/">
+    <Project Path="Modules/persona-store/tests/Dps.PersonaStore.Tests/Dps.PersonaStore.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/planner/" />
+  <Folder Name="/Modules/planner/contracts/" />
+  <Folder Name="/Modules/planner/contracts/provided/">
+    <Project Path="Modules/planner/contracts/provided/Dps.Planner.Contracts/Dps.Planner.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/planner/src/">
+    <Project Path="Modules/planner/src/Dps.Planner/Dps.Planner.csproj" />
+  </Folder>
+  <Folder Name="/Modules/planner/tests/">
+    <Project Path="Modules/planner/tests/Dps.Planner.Tests/Dps.Planner.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/platform-account-registry/" />
+  <Folder Name="/Modules/platform-account-registry/contracts/">
+    <Project Path="Modules/platform-account-registry/contracts/Dps.PlatformAccountRegistry.Contracts/Dps.PlatformAccountRegistry.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/platform-account-registry/src/">
+    <Project Path="Modules/platform-account-registry/src/Dps.PlatformAccountRegistry/Dps.PlatformAccountRegistry.csproj" />
+  </Folder>
+  <Folder Name="/Modules/platform-account-registry/tests/">
+    <Project Path="Modules/platform-account-registry/tests/Dps.PlatformAccountRegistry.Tests/Dps.PlatformAccountRegistry.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/platform-authorization-authority/" />
+  <Folder Name="/Modules/platform-authorization-authority/contracts/">
+    <Project Path="Modules/platform-authorization-authority/contracts/Dps.PlatformAuthorizationAuthority.Contracts/Dps.PlatformAuthorizationAuthority.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/platform-authorization-authority/src/">
+    <Project Path="Modules/platform-authorization-authority/src/Dps.PlatformAuthorizationAuthority/Dps.PlatformAuthorizationAuthority.csproj" />
+  </Folder>
+  <Folder Name="/Modules/platform-authorization-authority/tests/">
+    <Project Path="Modules/platform-authorization-authority/tests/Dps.PlatformAuthorizationAuthority.Tests/Dps.PlatformAuthorizationAuthority.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/policy-approval/" />
+  <Folder Name="/Modules/policy-approval/contracts/" />
+  <Folder Name="/Modules/policy-approval/contracts/provided/">
+    <Project Path="Modules/policy-approval/contracts/provided/Dps.PolicyApproval.Contracts/Dps.PolicyApproval.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/policy-approval/src/">
+    <Project Path="Modules/policy-approval/src/Dps.PolicyApproval/Dps.PolicyApproval.csproj" />
+  </Folder>
+  <Folder Name="/Modules/policy-approval/tests/">
+    <Project Path="Modules/policy-approval/tests/Dps.PolicyApproval.Tests/Dps.PolicyApproval.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/soul-memory-adapter/" />
+  <Folder Name="/Modules/soul-memory-adapter/contracts/">
+    <Project Path="Modules/soul-memory-adapter/contracts/Dps.SoulMemoryAdapter.Contracts/Dps.SoulMemoryAdapter.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/soul-memory-adapter/src/">
+    <Project Path="Modules/soul-memory-adapter/src/Dps.SoulMemoryAdapter/Dps.SoulMemoryAdapter.csproj" />
+  </Folder>
+  <Folder Name="/Modules/soul-memory-adapter/tests/">
+    <Project Path="Modules/soul-memory-adapter/tests/Dps.SoulMemoryAdapter.Tests/Dps.SoulMemoryAdapter.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/soul-registry/" />
+  <Folder Name="/Modules/soul-registry/contracts/">
+    <Project Path="Modules/soul-registry/contracts/Dps.SoulRegistry.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/soul-registry/src/">
+    <Project Path="Modules/soul-registry/src/Dps.SoulRegistry.csproj" />
+  </Folder>
+  <Folder Name="/Modules/soul-registry/tests/">
+    <Project Path="Modules/soul-registry/tests/Dps.SoulRegistry.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/windows-edge-supervisor/" />
+  <Folder Name="/Modules/windows-edge-supervisor/contracts/" />
+  <Folder Name="/Modules/windows-edge-supervisor/contracts/provided/">
+    <Project Path="Modules/windows-edge-supervisor/contracts/provided/Dps.WindowsEdgeSupervisor.Contracts/Dps.WindowsEdgeSupervisor.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/windows-edge-supervisor/src/">
+    <Project Path="Modules/windows-edge-supervisor/src/Dps.WindowsEdgeSupervisor.csproj" />
+  </Folder>
+  <Folder Name="/Modules/windows-edge-supervisor/tests/">
+    <Project Path="Modules/windows-edge-supervisor/tests/Dps.WindowsEdgeSupervisor.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/windows-edge-worker/" />
+  <Folder Name="/Modules/windows-edge-worker/src/">
+    <Project Path="Modules/windows-edge-worker/src/Dps.WindowsEdgeWorker.csproj" />
+  </Folder>
+  <Folder Name="/Modules/windows-edge-worker/tests/">
+    <Project Path="Modules/windows-edge-worker/tests/Dps.WindowsEdgeWorker.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Modules/windows-edge-worker/tests/process-harness/">
+    <Project Path="Modules/windows-edge-worker/tests/process-harness/Dps.WindowsEdgeWorker.ProcessHarness.csproj" />
+  </Folder>
+  <Folder Name="/Modules/zenno-bridge/" />
+  <Folder Name="/Modules/zenno-bridge/src/">
+    <Project Path="Modules/zenno-bridge/src/Dps.ZennoBridge.csproj" />
+  </Folder>
+  <Folder Name="/Modules/zenno-bridge/tests/">
+    <Project Path="Modules/zenno-bridge/tests/Dps.ZennoBridge.AuthSimulation.Tests.csproj" />
+  </Folder>
+</Solution>

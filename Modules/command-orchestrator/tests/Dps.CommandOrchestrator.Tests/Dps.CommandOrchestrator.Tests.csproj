@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.CommandOrchestrator.Tests</AssemblyName>
+    <RootNamespace>Dps.CommandOrchestrator.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="xunit.v3" />
+    <ProjectReference Include="../../src/Dps.CommandOrchestrator/Dps.CommandOrchestrator.csproj" />
+    <EmbeddedResource Include="../required-security-tests.v1.json" LogicalName="Dps.CommandOrchestrator.Tests.required-security-tests.v1.json" />
+  </ItemGroup>
+</Project>

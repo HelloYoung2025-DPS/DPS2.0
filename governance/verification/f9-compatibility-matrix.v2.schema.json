@@ -1,0 +1,647 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/verification/f9-compatibility-matrix.v2.schema.json",
+  "title": "F9 canonical compatibility matrix v2",
+  "description": "Static contract-major and reciprocal runtime-role inventory. It never substitutes for signed candidate execution evidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "generatedFrom",
+    "policyRef",
+    "policySha256",
+    "unknownMajorBehavior",
+    "missingMajorBehavior",
+    "unknownModeBehavior",
+    "missingModeBehavior",
+    "majorDeclarations",
+    "declarationMatrix",
+    "axisMeaning",
+    "executionCombinations",
+    "independentDeployable",
+    "compatibilityGroupRequired",
+    "candidateGreenEligible"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "dps.compatibility-matrix/v2" },
+    "generatedFrom": { "const": "Modules/*/module.yaml" },
+    "policyRef": { "const": "governance/policies/compatibility-policy.yaml" },
+    "policySha256": { "$ref": "#/$defs/sha256" },
+    "unknownMajorBehavior": { "const": "reject" },
+    "missingMajorBehavior": { "const": "reject" },
+    "unknownModeBehavior": { "const": "reject" },
+    "missingModeBehavior": { "const": "reject" },
+    "majorDeclarations": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 131072,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/majorDeclaration" }
+    },
+    "declarationMatrix": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 262144,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/declarationMatrixRow" }
+    },
+    "axisMeaning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["producerAxis", "consumerAxis", "N", "NMinus1"],
+      "properties": {
+        "producerAxis": { "const": "producer-module-version-from-signed-release-bom" },
+        "consumerAxis": { "const": "consumer-module-version-from-signed-release-bom" },
+        "N": { "const": "candidate-module-version" },
+        "NMinus1": { "const": "previous-stable-module-version" }
+      }
+    },
+    "executionCombinations": {
+      "const": [
+        {
+          "combinationId": "N/N",
+          "producerAxisValue": "N",
+          "consumerAxisValue": "N",
+          "required": true,
+          "evidenceStatus": "NOT_RUN",
+          "evidenceClass": "candidate-artifact-required",
+          "candidateGreenEligible": false
+        },
+        {
+          "combinationId": "N/N-1",
+          "producerAxisValue": "N",
+          "consumerAxisValue": "N-1",
+          "required": true,
+          "evidenceStatus": "NOT_RUN",
+          "evidenceClass": "candidate-artifact-required",
+          "candidateGreenEligible": false
+        },
+        {
+          "combinationId": "N-1/N",
+          "producerAxisValue": "N-1",
+          "consumerAxisValue": "N",
+          "required": true,
+          "evidenceStatus": "NOT_RUN",
+          "evidenceClass": "candidate-artifact-required",
+          "candidateGreenEligible": false
+        },
+        {
+          "combinationId": "N-1/N-1",
+          "producerAxisValue": "N-1",
+          "consumerAxisValue": "N-1",
+          "required": true,
+          "evidenceStatus": "NOT_RUN",
+          "evidenceClass": "candidate-artifact-required",
+          "candidateGreenEligible": false
+        }
+      ]
+    },
+    "independentDeployable": { "type": "boolean" },
+    "compatibilityGroupRequired": { "type": "boolean" },
+    "candidateGreenEligible": {
+      "type": "boolean",
+      "description": "Structural precondition only; never PASS execution evidence."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "candidateGreenEligible": { "const": true } },
+        "required": ["candidateGreenEligible"]
+      },
+      "then": {
+        "properties": {
+          "independentDeployable": { "const": true },
+          "compatibilityGroupRequired": { "const": false },
+          "declarationMatrix": {
+            "minItems": 1,
+            "items": {
+              "properties": { "candidateGreenEligible": { "const": true } },
+              "required": ["candidateGreenEligible"]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "independentDeployable": { "const": true } },
+        "required": ["independentDeployable"]
+      },
+      "then": {
+        "properties": {
+          "compatibilityGroupRequired": { "const": false },
+          "declarationMatrix": {
+            "minItems": 1,
+            "items": {
+              "properties": { "independentDeployable": { "const": true } },
+              "required": ["independentDeployable"]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "compatibilityGroupRequired": { "const": true } },
+        "required": ["compatibilityGroupRequired"]
+      },
+      "then": {
+        "properties": {
+          "independentDeployable": { "const": false },
+          "candidateGreenEligible": { "const": false },
+          "declarationMatrix": {
+            "contains": {
+              "properties": { "compatibilityGroupRequired": { "const": true } },
+              "required": ["compatibilityGroupRequired"]
+            },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "compatibilityGroupRequired": { "const": false } },
+        "required": ["compatibilityGroupRequired"]
+      },
+      "then": {
+        "properties": {
+          "declarationMatrix": {
+            "not": {
+              "contains": {
+                "properties": { "compatibilityGroupRequired": { "const": true } },
+                "required": ["compatibilityGroupRequired"]
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "moduleId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?![\\s\\S])"
+    },
+    "runtimePartyId": {
+      "oneOf": [
+        { "$ref": "#/$defs/moduleId" },
+        {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 256,
+          "pattern": "^external:[a-z0-9][a-z0-9._-]*(?![\\s\\S])"
+        }
+      ]
+    },
+    "contractId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 256,
+      "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z0-9]+)+(?![\\s\\S])"
+    },
+    "repoPath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1024,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+(?![\\r\\n])"
+    },
+    "declarationKind": { "enum": ["provided", "consumed"] },
+    "runtimeDeclarationKind": {
+      "oneOf": [
+        { "enum": ["provided", "consumed", "external"] },
+        { "type": "null" }
+      ]
+    },
+    "contractStatus": { "enum": ["proposed", "active", "deprecated", "retired"] },
+    "contractMajorMode": { "enum": ["active", "compat-read", "quarantine-only", "retired"] },
+    "nullableContractMajorMode": {
+      "oneOf": [
+        { "$ref": "#/$defs/contractMajorMode" },
+        { "type": "null" }
+      ]
+    },
+    "majorDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "moduleId",
+        "declarationKind",
+        "contractId",
+        "major",
+        "source",
+        "status",
+        "mode",
+        "ownerModule",
+        "schemaProducers",
+        "candidateGreenEligible"
+      ],
+      "properties": {
+        "moduleId": { "$ref": "#/$defs/moduleId" },
+        "declarationKind": { "$ref": "#/$defs/declarationKind" },
+        "contractId": { "$ref": "#/$defs/contractId" },
+        "major": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "source": { "$ref": "#/$defs/repoPath" },
+        "status": { "$ref": "#/$defs/contractStatus" },
+        "mode": { "$ref": "#/$defs/contractMajorMode" },
+        "ownerModule": { "$ref": "#/$defs/moduleId" },
+        "schemaProducers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/runtimePartyId" }
+        },
+        "candidateGreenEligible": { "type": "boolean" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "declarationKind": { "const": "provided" } },
+            "required": ["declarationKind"]
+          },
+          "then": {
+            "properties": { "mode": { "enum": ["active", "quarantine-only", "retired"] } }
+          }
+        },
+        {
+          "if": {
+            "properties": { "status": { "const": "retired" } },
+            "required": ["status"]
+          },
+          "then": { "properties": { "mode": { "const": "retired" } } }
+        },
+        {
+          "if": {
+            "properties": { "mode": { "const": "retired" } },
+            "required": ["mode"]
+          },
+          "then": { "properties": { "status": { "const": "retired" } } }
+        },
+        {
+          "if": {
+            "properties": { "mode": { "const": "active" } },
+            "required": ["mode"]
+          },
+          "then": { "properties": { "candidateGreenEligible": { "const": true } } }
+        },
+        {
+          "if": {
+            "properties": { "mode": { "enum": ["compat-read", "quarantine-only", "retired"] } },
+            "required": ["mode"]
+          },
+          "then": { "properties": { "candidateGreenEligible": { "const": false } } }
+        }
+      ]
+    },
+    "declarationMatrixRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contractId",
+        "major",
+        "ownerModule",
+        "ownerMode",
+        "producerModule",
+        "producerDeclarationKind",
+        "producerMode",
+        "transportSenderModule",
+        "transportSenderMode",
+        "transportSenderDeclarationKind",
+        "transportReceiverModule",
+        "transportPreservesProducer",
+        "consumerModule",
+        "consumerDeclarationKind",
+        "consumerMode",
+        "producerResolution",
+        "communicationPairSha256",
+        "reciprocalResolved",
+        "direction",
+        "executionClass",
+        "readCompatible",
+        "runnable",
+        "deployable",
+        "independentDeployable",
+        "compatibilityGroupRequired",
+        "activeProducerConsumer",
+        "candidateGreenEligible"
+      ],
+      "properties": {
+        "contractId": { "$ref": "#/$defs/contractId" },
+        "major": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "ownerModule": { "$ref": "#/$defs/moduleId" },
+        "ownerMode": { "$ref": "#/$defs/nullableContractMajorMode" },
+        "producerModule": { "$ref": "#/$defs/runtimePartyId" },
+        "producerDeclarationKind": { "$ref": "#/$defs/runtimeDeclarationKind" },
+        "producerMode": { "$ref": "#/$defs/nullableContractMajorMode" },
+        "transportSenderModule": { "$ref": "#/$defs/runtimePartyId" },
+        "transportSenderMode": { "$ref": "#/$defs/nullableContractMajorMode" },
+        "transportSenderDeclarationKind": { "$ref": "#/$defs/runtimeDeclarationKind" },
+        "transportReceiverModule": { "$ref": "#/$defs/moduleId" },
+        "transportPreservesProducer": { "type": "boolean" },
+        "consumerModule": { "$ref": "#/$defs/moduleId" },
+        "consumerDeclarationKind": { "$ref": "#/$defs/runtimeDeclarationKind" },
+        "consumerMode": { "$ref": "#/$defs/nullableContractMajorMode" },
+        "producerResolution": {
+          "enum": [
+            "schema-producer-is-transport-sender",
+            "schema-producer-preserved-by-relay",
+            "unresolved"
+          ]
+        },
+        "communicationPairSha256": {
+          "oneOf": [
+            { "$ref": "#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        },
+        "reciprocalResolved": { "type": "boolean" },
+        "direction": {
+          "enum": [
+            "current-producer-to-current-consumer",
+            "previous-producer-to-current-consumer"
+          ]
+        },
+        "executionClass": {
+          "enum": [
+            "active-runtime",
+            "compat-read-only",
+            "quarantine-only",
+            "retired",
+            "missing-declaration",
+            "unresolved-communication"
+          ]
+        },
+        "readCompatible": { "type": "boolean" },
+        "runnable": { "type": "boolean" },
+        "deployable": { "type": "boolean" },
+        "independentDeployable": { "type": "boolean" },
+        "compatibilityGroupRequired": { "type": "boolean" },
+        "activeProducerConsumer": { "type": "boolean" },
+        "candidateGreenEligible": { "type": "boolean" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "producerResolution": { "const": "schema-producer-is-transport-sender" } },
+            "required": ["producerResolution"]
+          },
+          "then": {
+            "properties": {
+              "transportPreservesProducer": { "const": false },
+              "reciprocalResolved": { "const": true },
+              "communicationPairSha256": { "$ref": "#/$defs/sha256" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "producerResolution": { "const": "schema-producer-preserved-by-relay" } },
+            "required": ["producerResolution"]
+          },
+          "then": {
+            "properties": {
+              "transportPreservesProducer": { "const": true },
+              "reciprocalResolved": { "const": true },
+              "communicationPairSha256": { "$ref": "#/$defs/sha256" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "producerResolution": { "const": "unresolved" } },
+            "required": ["producerResolution"]
+          },
+          "then": {
+            "properties": {
+              "reciprocalResolved": { "const": false },
+              "communicationPairSha256": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "independentDeployable": { "const": true } },
+            "required": ["independentDeployable"]
+          },
+          "then": {
+            "properties": {
+              "compatibilityGroupRequired": { "const": false },
+              "candidateGreenEligible": { "const": true },
+              "runnable": { "const": true }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "compatibilityGroupRequired": { "const": true } },
+            "required": ["compatibilityGroupRequired"]
+          },
+          "then": {
+            "properties": {
+              "independentDeployable": { "const": false },
+              "candidateGreenEligible": { "const": false }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "candidateGreenEligible": { "const": true } },
+            "required": ["candidateGreenEligible"]
+          },
+          "then": {
+            "properties": {
+              "independentDeployable": { "const": true },
+              "runnable": { "const": true }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "readCompatible": { "const": true } },
+            "required": ["readCompatible"]
+          },
+          "then": {
+            "properties": {
+              "ownerMode": { "const": "active" },
+              "producerMode": { "const": "active" },
+              "transportSenderMode": { "const": "active" },
+              "consumerMode": { "const": "compat-read" },
+              "reciprocalResolved": { "const": true },
+              "executionClass": { "const": "compat-read-only" },
+              "runnable": { "const": false },
+              "deployable": { "const": false },
+              "activeProducerConsumer": { "const": false },
+              "candidateGreenEligible": { "const": false }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "reciprocalResolved": { "const": false } },
+            "required": ["reciprocalResolved"]
+          },
+          "then": {
+            "properties": { "readCompatible": { "const": false } }
+          }
+        }
+      ],
+      "oneOf": [
+        {
+          "properties": {
+            "ownerMode": { "const": "active" },
+            "producerMode": { "const": "active" },
+            "transportSenderMode": { "const": "active" },
+            "consumerMode": { "const": "active" },
+            "reciprocalResolved": { "const": true },
+            "executionClass": { "const": "active-runtime" },
+            "readCompatible": { "const": false },
+            "runnable": { "const": true },
+            "deployable": { "const": true },
+            "activeProducerConsumer": { "const": true }
+          }
+        },
+        {
+          "properties": {
+            "ownerMode": { "const": "active" },
+            "producerMode": { "const": "active" },
+            "transportSenderMode": { "const": "active" },
+            "consumerMode": { "const": "active" },
+            "reciprocalResolved": { "const": false },
+            "executionClass": { "const": "unresolved-communication" },
+            "readCompatible": { "const": false },
+            "runnable": { "const": false },
+            "deployable": { "const": false },
+            "independentDeployable": { "const": false },
+            "activeProducerConsumer": { "const": false },
+            "candidateGreenEligible": { "const": false }
+          }
+        },
+        {
+          "allOf": [
+            {
+              "anyOf": [
+                { "properties": { "ownerMode": { "const": "compat-read" } } },
+                { "properties": { "producerMode": { "const": "compat-read" } } },
+                { "properties": { "transportSenderMode": { "const": "compat-read" } } },
+                { "properties": { "consumerMode": { "const": "compat-read" } } }
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  { "properties": { "ownerMode": { "enum": ["quarantine-only", "retired"] } } },
+                  { "properties": { "producerMode": { "enum": ["quarantine-only", "retired"] } } },
+                  { "properties": { "transportSenderMode": { "enum": ["quarantine-only", "retired"] } } },
+                  { "properties": { "consumerMode": { "enum": ["quarantine-only", "retired"] } } },
+                  { "properties": { "ownerMode": { "type": "null" } } },
+                  { "properties": { "producerMode": { "type": "null" } } },
+                  { "properties": { "transportSenderMode": { "type": "null" } } },
+                  { "properties": { "consumerMode": { "type": "null" } } }
+                ]
+              }
+            }
+          ],
+          "properties": {
+            "executionClass": { "const": "compat-read-only" },
+            "runnable": { "const": false },
+            "deployable": { "const": false },
+            "independentDeployable": { "const": false },
+            "activeProducerConsumer": { "const": false },
+            "candidateGreenEligible": { "const": false }
+          }
+        },
+        {
+          "allOf": [
+            {
+              "anyOf": [
+                { "properties": { "ownerMode": { "const": "quarantine-only" } } },
+                { "properties": { "producerMode": { "const": "quarantine-only" } } },
+                { "properties": { "transportSenderMode": { "const": "quarantine-only" } } },
+                { "properties": { "consumerMode": { "const": "quarantine-only" } } }
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  { "properties": { "ownerMode": { "const": "retired" } } },
+                  { "properties": { "producerMode": { "const": "retired" } } },
+                  { "properties": { "transportSenderMode": { "const": "retired" } } },
+                  { "properties": { "consumerMode": { "const": "retired" } } },
+                  { "properties": { "ownerMode": { "type": "null" } } },
+                  { "properties": { "producerMode": { "type": "null" } } },
+                  { "properties": { "transportSenderMode": { "type": "null" } } },
+                  { "properties": { "consumerMode": { "type": "null" } } }
+                ]
+              }
+            }
+          ],
+          "properties": {
+            "executionClass": { "const": "quarantine-only" },
+            "readCompatible": { "const": false },
+            "runnable": { "const": false },
+            "deployable": { "const": false },
+            "independentDeployable": { "const": false },
+            "activeProducerConsumer": { "const": false },
+            "candidateGreenEligible": { "const": false }
+          }
+        },
+        {
+          "allOf": [
+            {
+              "anyOf": [
+                { "properties": { "ownerMode": { "const": "retired" } } },
+                { "properties": { "producerMode": { "const": "retired" } } },
+                { "properties": { "transportSenderMode": { "const": "retired" } } },
+                { "properties": { "consumerMode": { "const": "retired" } } }
+              ]
+            },
+            {
+              "not": {
+                "anyOf": [
+                  { "properties": { "ownerMode": { "type": "null" } } },
+                  { "properties": { "producerMode": { "type": "null" } } },
+                  { "properties": { "transportSenderMode": { "type": "null" } } },
+                  { "properties": { "consumerMode": { "type": "null" } } }
+                ]
+              }
+            }
+          ],
+          "properties": {
+            "executionClass": { "const": "retired" },
+            "readCompatible": { "const": false },
+            "runnable": { "const": false },
+            "deployable": { "const": false },
+            "independentDeployable": { "const": false },
+            "activeProducerConsumer": { "const": false },
+            "candidateGreenEligible": { "const": false }
+          }
+        },
+        {
+          "anyOf": [
+            { "properties": { "ownerMode": { "type": "null" } } },
+            { "properties": { "producerMode": { "type": "null" } } },
+            { "properties": { "transportSenderMode": { "type": "null" } } },
+            { "properties": { "consumerMode": { "type": "null" } } }
+          ],
+          "properties": {
+            "executionClass": { "const": "missing-declaration" },
+            "readCompatible": { "const": false },
+            "runnable": { "const": false },
+            "deployable": { "const": false },
+            "independentDeployable": { "const": false },
+            "activeProducerConsumer": { "const": false },
+            "candidateGreenEligible": { "const": false }
+          }
+        }
+      ]
+    }
+  }
+}

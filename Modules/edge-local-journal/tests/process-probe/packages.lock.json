@@ -1,0 +1,16 @@
+{
+  "version": 2,
+  "dependencies": {
+    "net10.0": {
+      "dps.edgelocaljournal": {
+        "type": "Project",
+        "dependencies": {
+          "Dps.EdgeLocalJournal.Contracts": "[0.2.0, )"
+        }
+      },
+      "dps.edgelocaljournal.contracts": {
+        "type": "Project"
+      }
+    }
+  }
+}

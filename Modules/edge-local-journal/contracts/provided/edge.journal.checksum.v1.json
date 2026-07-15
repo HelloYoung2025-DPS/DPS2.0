@@ -1,0 +1,64 @@
+{
+  "profile_id": "edge.journal.checksum/v1",
+  "owner_module": "edge-local-journal",
+  "encoding": "dps.length-prefixed-utf8/v1",
+  "text_encoding": "strict-utf8-without-bom",
+  "integer_encoding": "invariant-decimal-text",
+  "byte_order": "big-endian",
+  "layout": [
+    "domain_byte_length:u32",
+    "domain:utf8",
+    "field_count:u32",
+    "repeat(field_byte_length:u32,field:utf8)"
+  ],
+  "domains": {
+    "identity_sha256": {
+      "domain": "dps.edge-local-journal.identity-sha256/v1",
+      "fields": [
+        "schema_version",
+        "contract_id",
+        "producer_module",
+        "command_id",
+        "entry_id",
+        "entry_type",
+        "trace_id",
+        "idempotency_key",
+        "privacy_class",
+        "soul_id",
+        "device_binding_id",
+        "platform_account_id",
+        "occurred_at",
+        "payload_sha256",
+        "canonical_payload_json"
+      ]
+    },
+    "entry_checksum": {
+      "domain": "dps.edge-local-journal.entry-sha256/v1",
+      "fields": [
+        "sequence",
+        "previous_checksum",
+        "schema_version",
+        "contract_id",
+        "producer_module",
+        "command_id",
+        "entry_id",
+        "entry_type",
+        "trace_id",
+        "idempotency_key",
+        "privacy_class",
+        "soul_id",
+        "device_binding_id",
+        "platform_account_id",
+        "occurred_at",
+        "payload_sha256",
+        "checksum_encoding",
+        "identity_sha256"
+      ]
+    }
+  },
+  "journal_line_discriminator": {
+    "field": "checksum_encoding",
+    "value": "dps.length-prefixed-utf8/v1",
+    "missing_or_unknown": "reject"
+  }
+}

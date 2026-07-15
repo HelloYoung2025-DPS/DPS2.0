@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/test.evidence.v1.schema.json",
+  "title": "test.evidence/v1",
+  "description": "Immutable verification receipt containing only scoped metadata and cryptographic digests.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "producer_module",
+    "soul_id",
+    "device_binding_id",
+    "platform_account_id",
+    "trace_id",
+    "idempotency_key",
+    "occurred_at",
+    "privacy_class",
+    "evidence_id",
+    "test_id",
+    "module_id",
+    "test_type",
+    "execution_environment",
+    "required",
+    "status",
+    "verification_level",
+    "baseline_commit",
+    "instruction_receipt_id",
+    "instruction_receipt_sha256",
+    "implementer_identity",
+    "evidence_issuer_identity",
+    "release_approver_identity",
+    "command_sha256",
+    "started_at",
+    "finished_at",
+    "exit_code",
+    "artifacts",
+    "source_receipts",
+    "reason_code"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0.0" },
+    "contract_id": { "const": "test.evidence/v1" },
+    "producer_module": { "const": "evidence-service" },
+    "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "privacy_class": { "enum": ["internal", "personal", "pseudonymous"] },
+    "evidence_id": { "type": "string", "format": "uuid" },
+    "test_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{1,127}$" },
+    "module_id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "test_type": {
+      "enum": ["static", "unit", "contract", "integration", "simulated", "windows", "device", "canary", "scale"]
+    },
+    "execution_environment": {
+      "enum": ["local", "hosted", "mock", "simulated", "windows", "device", "canary", "scale"]
+    },
+    "required": { "type": "boolean" },
+    "status": {
+      "enum": ["PASS", "FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"]
+    },
+    "verification_level": {
+      "enum": [
+        "REPOSITORY_STATIC_VERIFIED",
+        "CONTRACT_VERIFIED",
+        "INTEGRATION_VERIFIED",
+        "WINDOWS_VERIFIED",
+        "DEVICE_VERIFIED",
+        "CANARY_VERIFIED",
+        "SCALE_VERIFIED"
+      ]
+    },
+    "baseline_commit": { "$ref": "#/$defs/git_object" },
+    "instruction_receipt_id": { "$ref": "#/$defs/text_id" },
+    "instruction_receipt_sha256": { "$ref": "#/$defs/sha256" },
+    "implementer_identity": { "$ref": "#/$defs/identity" },
+    "evidence_issuer_identity": { "$ref": "#/$defs/identity" },
+    "release_approver_identity": {
+      "anyOf": [{ "$ref": "#/$defs/identity" }, { "type": "null" }]
+    },
+    "command_sha256": { "$ref": "#/$defs/sha256" },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "exit_code": { "type": ["integer", "null"] },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["artifact_id", "sha256", "size_bytes", "media_type"],
+        "properties": {
+          "artifact_id": { "$ref": "#/$defs/text_id" },
+          "sha256": { "$ref": "#/$defs/sha256" },
+          "size_bytes": { "type": "integer", "minimum": 0 },
+          "media_type": { "type": "string", "minLength": 1, "maxLength": 128 }
+        }
+      }
+    },
+    "source_receipts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["contract_id", "producer_module", "sha256"],
+        "properties": {
+          "contract_id": { "type": "string", "pattern": "^[a-z][a-z0-9.-]*/v[1-9][0-9]*$", "maxLength": 128 },
+          "producer_module": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+          "sha256": { "$ref": "#/$defs/sha256" }
+        }
+      }
+    },
+    "reason_code": {
+      "type": ["string", "null"],
+      "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$",
+      "maxLength": 128
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "const": "PASS" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "exit_code": { "const": 0 },
+          "artifacts": { "minItems": 1 }
+        }
+      },
+      "else": {
+        "properties": {
+          "reason_code": { "type": "string" }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "git_object": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "text_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{1,127}$" },
+    "identity": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:@/-]{1,127}$" }
+  }
+}

@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/schemas/legacy-csharp-bytes.v1.schema.json",
+  "title": "DPS legacy C# byte preservation baseline",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "baseline_commit",
+    "inventory_scope",
+    "entry_count",
+    "entries",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {"const": "dps.legacy-csharp-bytes/v1"},
+    "baseline_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "inventory_scope": {"const": "TRACKED_LEGACY_CSHARP_PLUS_APPROVED_REPAIRS"},
+    "entry_count": {"type": "integer", "minimum": 1},
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "baseline_git_blob",
+          "baseline_sha256",
+          "baseline_byte_length",
+          "working_sha256",
+          "working_byte_length",
+          "disposition",
+          "approval_ref"
+        ],
+        "properties": {
+          "path": {"type": "string", "pattern": "^(Core|Extensions|Modules|ZDProjects)/.+\\.cs$"},
+          "baseline_git_blob": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+          "baseline_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "baseline_byte_length": {"type": "integer", "minimum": 1},
+          "working_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "working_byte_length": {"type": "integer", "minimum": 1},
+          "disposition": {
+            "enum": [
+              "BYTE_IDENTICAL",
+              "APPROVED_F1_FALSE_GREEN_REPAIR",
+              "APPROVED_F5_P0_FAIL_CLOSED_REPAIR",
+              "APPROVED_F5_WRAPPER_FAIL_CLOSED_REPAIR",
+              "APPROVED_F5_ORCHESTRATOR_FAIL_CLOSED_REPAIR"
+            ]
+          },
+          "approval_ref": {
+            "oneOf": [
+              {"type": "null"},
+              {
+                "enum": [
+                  "F1_FALSE_GREEN_REPAIR",
+                  "F5_P0_FAIL_CLOSED_REPAIR",
+                  "F5_WRAPPER_FAIL_CLOSED_REPAIR",
+                  "F5_ORCHESTRATOR_FAIL_CLOSED_REPAIR"
+                ]
+              }
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"disposition": {"const": "BYTE_IDENTICAL"}}},
+            "then": {"properties": {"approval_ref": {"type": "null"}}}
+          },
+          {
+            "if": {"properties": {"disposition": {"const": "APPROVED_F1_FALSE_GREEN_REPAIR"}}},
+            "then": {"properties": {"approval_ref": {"const": "F1_FALSE_GREEN_REPAIR"}}}
+          },
+          {
+            "if": {"properties": {"disposition": {"const": "APPROVED_F5_P0_FAIL_CLOSED_REPAIR"}}},
+            "then": {"properties": {"approval_ref": {"const": "F5_P0_FAIL_CLOSED_REPAIR"}}}
+          },
+          {
+            "if": {"properties": {"disposition": {"const": "APPROVED_F5_WRAPPER_FAIL_CLOSED_REPAIR"}}},
+            "then": {"properties": {"approval_ref": {"const": "F5_WRAPPER_FAIL_CLOSED_REPAIR"}}}
+          },
+          {
+            "if": {"properties": {"disposition": {"const": "APPROVED_F5_ORCHESTRATOR_FAIL_CLOSED_REPAIR"}}},
+            "then": {"properties": {"approval_ref": {"const": "F5_ORCHESTRATOR_FAIL_CLOSED_REPAIR"}}}
+          }
+        ]
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 2,
+      "items": {"type": "string", "minLength": 1}
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/audit.event.v1.schema.json",
+  "title": "audit.event/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_id", "producer_module", "audit_event_id", "subject_id", "soul_id", "device_binding_id", "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class", "event_type", "outcome", "source_contract_id", "evidence_digest", "labels"],
+  "properties": {
+    "schema_version": {"type": "string", "pattern": "^1(?:\\.[0-9]+){0,2}$"}, "contract_id": {"const": "audit.event/v1"}, "producer_module": {"const": "audit-metrics"},
+    "audit_event_id": {"type": "string", "format": "uuid"}, "subject_id": {"type": "string", "format": "uuid"},
+    "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"}, "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"}, "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"}, "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"}, "occurred_at": {"type": "string", "format": "date-time"}, "privacy_class": {"const": "internal"},
+    "event_type": {"const": "command.completed"}, "outcome": {"enum": ["SUCCESS", "FAILED", "UNKNOWN_OUTCOME"]}, "source_contract_id": {"const": "command.receipt/v1"}, "evidence_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "labels": {"type": "object", "additionalProperties": false, "properties": {"result_code": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9._:-]+$"}, "verification_class": {"enum": ["verified", "failed", "unknown"]}}, "required": ["result_code", "verification_class"]}
+  }
+}

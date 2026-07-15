@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/verification/f7-raw-evidence-artifact.v1.schema.json",
+  "title": "F7 canonical redacted raw evidence artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "artifact_kind",
+    "producer",
+    "environment",
+    "captured_at",
+    "scope",
+    "content_summary",
+    "content_sha256",
+    "content"
+  ],
+  "properties": {
+    "schema_version": { "const": "dps.f7-raw-evidence-artifact/v1" },
+    "artifact_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+    "artifact_kind": { "$ref": "#/$defs/artifactKind" },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["identity", "component", "version"],
+      "properties": {
+        "identity": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/identity" },
+        "component": { "const": "dps-f7-external-runner" },
+        "version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$" }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["environment_id", "os_family", "gbrain_deployment_id", "parent_windows_environment_id", "edge_installation_id", "zenno_installation_id", "runner_component", "runner_version", "runner_binary_sha256", "runner_sbom_sha256"],
+      "properties": {
+        "environment_id": { "type": "string", "pattern": "^env_[a-z0-9][a-z0-9_-]{6,63}$" },
+        "os_family": { "const": "Windows+Android" },
+        "gbrain_deployment_id": { "type": "string", "pattern": "^gbrain_[a-z0-9][a-z0-9_-]{6,63}$" },
+        "parent_windows_environment_id": { "type": "string", "pattern": "^env_[a-z0-9][a-z0-9_-]{6,63}$" },
+        "edge_installation_id": { "type": "string", "pattern": "^edge_[a-z0-9][a-z0-9_-]{6,63}$" },
+        "zenno_installation_id": { "type": "string", "pattern": "^zenno_[a-z0-9][a-z0-9_-]{6,63}$" },
+        "runner_component": { "const": "dps-f7-external-runner" },
+        "runner_version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$" },
+        "runner_binary_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+        "runner_sbom_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" }
+      }
+    },
+    "captured_at": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/datedWindow" },
+    "scope": { "$ref": "#/$defs/scope" },
+    "content_summary": { "type": "string", "minLength": 16, "maxLength": 128 },
+    "content_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+    "content": { "type": "object" }
+  },
+  "oneOf": [
+    { "properties": { "artifact_kind": { "const": "GBRAIN_PROJECTION_EXACT_READBACK" }, "content": { "$ref": "#/$defs/projectionContent" } } },
+    { "properties": { "artifact_kind": { "const": "GBRAIN_SEARCH_REVALIDATION" }, "content": { "$ref": "#/$defs/searchContent" } } },
+    { "properties": { "artifact_kind": { "const": "SOUL_DEVICE_SOURCE_OAUTH_BINDING" }, "content": { "$ref": "#/$defs/semanticObservationContent" } } },
+    { "properties": { "artifact_kind": { "const": "PERSONA_EXACT_CURRENT_READBACK" }, "content": { "$ref": "#/$defs/semanticObservationContent" } } },
+    { "properties": { "artifact_kind": { "const": "DELETE_REBUILD_PURGE" }, "content": { "$ref": "#/$defs/semanticObservationContent" } } },
+    { "properties": { "artifact_kind": { "const": "DATA_SUBJECT_EXPORT" }, "content": { "$ref": "#/$defs/semanticObservationContent" } } },
+    { "properties": { "artifact_kind": { "const": "DATA_SUBJECT_CORRECTION" }, "content": { "$ref": "#/$defs/semanticObservationContent" } } },
+    { "properties": { "artifact_kind": { "const": "DATA_SUBJECT_DELETION" }, "content": { "$ref": "#/$defs/semanticObservationContent" } } },
+    { "properties": { "artifact_kind": { "const": "FIXTURE_COMMAND_POSTCONDITION" }, "content": { "$ref": "#/$defs/semanticObservationContent" } } },
+    { "properties": { "artifact_kind": { "enum": ["CROSS_SOUL_ATTACK", "CROSS_DEVICE_ATTACK", "CROSS_ACCOUNT_ATTACK"] }, "content": { "$ref": "#/$defs/semanticObservationContent" } } },
+    { "properties": { "artifact_kind": { "const": "DUPLICATE_DELIVERY" }, "content": { "$ref": "#/$defs/semanticObservationContent" } } },
+    { "properties": { "artifact_kind": { "const": "UNKNOWN_OUTCOME_RECONCILIATION" }, "content": { "$ref": "#/$defs/semanticObservationContent" } } }
+  ],
+  "$defs": {
+    "artifactKind": {
+      "enum": [
+        "GBRAIN_PROJECTION_EXACT_READBACK",
+        "GBRAIN_SEARCH_REVALIDATION",
+        "SOUL_DEVICE_SOURCE_OAUTH_BINDING",
+        "PERSONA_EXACT_CURRENT_READBACK",
+        "DELETE_REBUILD_PURGE",
+        "DATA_SUBJECT_EXPORT",
+        "DATA_SUBJECT_CORRECTION",
+        "DATA_SUBJECT_DELETION",
+        "FIXTURE_COMMAND_POSTCONDITION",
+        "CROSS_SOUL_ATTACK",
+        "CROSS_DEVICE_ATTACK",
+        "CROSS_ACCOUNT_ATTACK",
+        "DUPLICATE_DELIVERY",
+        "UNKNOWN_OUTCOME_RECONCILIATION"
+      ]
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["soul_id", "device_binding_id", "platform_account_id", "logical_source_id", "external_source_alias"],
+      "properties": {
+        "soul_id": { "type": "string", "pattern": "^soul_[a-f0-9]{64}$" },
+        "device_binding_id": { "type": "string", "pattern": "^db_[a-f0-9]{32}$" },
+        "platform_account_id": { "type": "string", "pattern": "^pa_[a-f0-9]{32}$" },
+        "logical_source_id": { "type": "string", "pattern": "^dps-[a-f0-9]{28}$" },
+        "external_source_alias": { "type": "string", "pattern": "^gs_[a-f0-9]{16}$" }
+      }
+    },
+    "digest": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+    "externalId": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+    "base64": { "type": "string", "minLength": 4, "maxLength": 11184812, "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$" },
+    "semanticObservationContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observation_schema_version", "observation_sha256", "observation_base64"],
+      "properties": {
+        "observation_schema_version": { "type": "string", "pattern": "^dps\\.f7-observation/[a-z0-9-]+/v1$" },
+        "observation_sha256": { "$ref": "#/$defs/digest" },
+        "observation_base64": { "$ref": "#/$defs/base64" }
+      }
+    },
+    "projectionContent": {
+      "type": "object",
+      "description": "Active F7 v3 projection evidence shape. After independent F2 repair and re-freeze, the bound bytes must be gbrain.projection/v2 and include separately bound canonical gbrain.source.binding/v1 proof; the executable gate rejects projection v1.",
+      "additionalProperties": false,
+      "required": ["f7_run_id", "trace_id", "release_bom_id", "release_bom_sha256", "phase", "observed_at", "scope_sha256", "projection_revision", "written_checksum", "read_checksum", "source_binding_sha256", "source_binding_base64", "written_projection_base64", "readback_projection_base64"],
+      "properties": {
+        "f7_run_id": { "$ref": "#/$defs/externalId" },
+        "trace_id": { "type": "string", "pattern": "^trace_[a-f0-9]{32}$" },
+        "release_bom_id": { "$ref": "#/$defs/externalId" },
+        "release_bom_sha256": { "$ref": "#/$defs/digest" },
+        "phase": { "const": "GBRAIN_PROJECTION" },
+        "observed_at": { "type": "string", "format": "date-time" },
+        "scope_sha256": { "$ref": "#/$defs/digest" },
+        "projection_revision": { "$ref": "#/$defs/digest" },
+        "external_revision": { "oneOf": [{ "type": "integer", "minimum": 1 }, { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$" }] },
+        "written_checksum": { "$ref": "#/$defs/digest" },
+        "read_checksum": { "$ref": "#/$defs/digest" },
+        "source_binding_sha256": { "$ref": "#/$defs/digest" },
+        "source_binding_base64": { "$ref": "#/$defs/base64" },
+        "written_projection_base64": { "$ref": "#/$defs/base64" },
+        "readback_projection_base64": { "$ref": "#/$defs/base64" }
+      }
+    },
+    "searchContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["f7_run_id", "trace_id", "release_bom_id", "release_bom_sha256", "phase", "observed_at", "scope_sha256", "result_schema_version", "provenance", "freshness_seconds", "query_sha256", "response_sha256", "query_base64", "response_base64", "matched_result_count"],
+      "properties": {
+        "f7_run_id": { "$ref": "#/$defs/externalId" },
+        "trace_id": { "type": "string", "pattern": "^trace_[a-f0-9]{32}$" },
+        "release_bom_id": { "$ref": "#/$defs/externalId" },
+        "release_bom_sha256": { "$ref": "#/$defs/digest" },
+        "phase": { "const": "EXACT_READBACK" },
+        "scope_sha256": { "$ref": "#/$defs/digest" },
+        "result_schema_version": { "const": "gbrain.search-result/v1" },
+        "provenance": { "const": "SOURCE_SCOPED_EXTERNAL_READBACK" },
+        "observed_at": { "type": "string", "format": "date-time" },
+        "freshness_seconds": { "type": "integer", "minimum": 0, "maximum": 300 },
+        "query_sha256": { "$ref": "#/$defs/digest" },
+        "response_sha256": { "$ref": "#/$defs/digest" },
+        "query_base64": { "$ref": "#/$defs/base64" },
+        "response_base64": { "$ref": "#/$defs/base64" },
+        "matched_result_count": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "sourceOauthContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["device_transport", "adb_serial_hmac_sha256", "device_attestation_sha256", "ownership_authorization_sha256", "inventory_class", "oauth_client_id_sha256", "oauth_credential_lease_id", "oauth_token_fingerprint_sha256", "expected_full_soul_metadata_sha256", "observed_full_soul_metadata_sha256", "oauth_write_source_alias", "oauth_read_source_aliases", "oauth_whoami_source_alias", "oauth_readable_source_count", "oauth_write_source_count"],
+      "properties": {
+        "device_transport": { "const": "PHYSICAL_ADB" },
+        "adb_serial_hmac_sha256": { "$ref": "#/$defs/digest" },
+        "device_attestation_sha256": { "$ref": "#/$defs/digest" },
+        "ownership_authorization_sha256": { "$ref": "#/$defs/digest" },
+        "inventory_class": { "const": "NON_PRODUCTION" },
+        "oauth_client_id_sha256": { "$ref": "#/$defs/digest" },
+        "oauth_credential_lease_id": { "$ref": "#/$defs/externalId" },
+        "oauth_token_fingerprint_sha256": { "$ref": "#/$defs/digest" },
+        "expected_full_soul_metadata_sha256": { "$ref": "#/$defs/digest" },
+        "observed_full_soul_metadata_sha256": { "$ref": "#/$defs/digest" },
+        "oauth_write_source_alias": { "type": "string", "pattern": "^gs_[a-f0-9]{16}$" },
+        "oauth_read_source_aliases": { "type": "array", "minItems": 1, "maxItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^gs_[a-f0-9]{16}$" } },
+        "oauth_whoami_source_alias": { "type": "string", "pattern": "^gs_[a-f0-9]{16}$" },
+        "oauth_readable_source_count": { "const": 1 },
+        "oauth_write_source_count": { "const": 1 }
+      }
+    },
+    "personaContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["read_mode", "fixed_slug", "semantic_search_invocation_count", "persona_schema_version", "expected_revision", "read_revision", "expected_checksum", "read_checksum", "expected_content_sha256", "read_content_sha256"],
+      "properties": {
+        "read_mode": { "const": "EXACT_FIXED_SLUG" },
+        "fixed_slug": { "const": "persona-current" },
+        "semantic_search_invocation_count": { "const": 0 },
+        "persona_schema_version": { "const": "dps.persona-current/v1" },
+        "expected_revision": { "$ref": "#/$defs/digest" },
+        "read_revision": { "$ref": "#/$defs/digest" },
+        "expected_checksum": { "$ref": "#/$defs/digest" },
+        "read_checksum": { "$ref": "#/$defs/digest" },
+        "expected_content_sha256": { "$ref": "#/$defs/digest" },
+        "read_content_sha256": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "lifecycleContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["delete_request_id", "pre_delete_projection_checksum", "delete_observed_revision", "page_count_after_delete", "chunk_count_after_delete", "embedding_count_after_delete", "cache_entry_count_after_delete", "backup_reference_count_after_delete", "backup_policy_id", "rebuild_request_id", "expected_rebuild_revision", "readback_rebuild_revision", "expected_rebuild_checksum", "readback_rebuild_checksum", "rebuild_page_count"],
+      "properties": {
+        "delete_request_id": { "$ref": "#/$defs/externalId" },
+        "pre_delete_projection_checksum": { "$ref": "#/$defs/digest" },
+        "delete_observed_revision": { "$ref": "#/$defs/digest" },
+        "page_count_after_delete": { "const": 0 },
+        "chunk_count_after_delete": { "const": 0 },
+        "embedding_count_after_delete": { "const": 0 },
+        "cache_entry_count_after_delete": { "const": 0 },
+        "backup_reference_count_after_delete": { "const": 0 },
+        "backup_policy_id": { "$ref": "#/$defs/externalId" },
+        "rebuild_request_id": { "$ref": "#/$defs/externalId" },
+        "expected_rebuild_revision": { "$ref": "#/$defs/digest" },
+        "readback_rebuild_revision": { "$ref": "#/$defs/digest" },
+        "expected_rebuild_checksum": { "$ref": "#/$defs/digest" },
+        "readback_rebuild_checksum": { "$ref": "#/$defs/digest" },
+        "rebuild_page_count": { "const": 1 }
+      }
+    },
+    "exportContent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["request_id", "expected_scope_sha256", "exported_scope_sha256", "exported_record_count", "foreign_scope_record_count"],
+      "properties": { "request_id": { "$ref": "#/$defs/externalId" }, "expected_scope_sha256": { "$ref": "#/$defs/digest" }, "exported_scope_sha256": { "$ref": "#/$defs/digest" }, "exported_record_count": { "type": "integer", "minimum": 1 }, "foreign_scope_record_count": { "const": 0 } }
+    },
+    "correctionContent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["request_id", "correction_event_id", "before_revision", "expected_after_revision", "observed_after_revision", "stale_live_record_count", "foreign_scope_write_count"],
+      "properties": { "request_id": { "$ref": "#/$defs/externalId" }, "correction_event_id": { "$ref": "#/$defs/externalId" }, "before_revision": { "$ref": "#/$defs/digest" }, "expected_after_revision": { "$ref": "#/$defs/digest" }, "observed_after_revision": { "$ref": "#/$defs/digest" }, "stale_live_record_count": { "const": 0 }, "foreign_scope_write_count": { "const": 0 } }
+    },
+    "deletionContent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["request_id", "target_scope_sha256", "deleted_scope_sha256", "live_primary_count_after", "page_count_after", "chunk_count_after", "embedding_count_after", "cache_count_after", "backup_reference_count_after", "foreign_scope_delete_count"],
+      "properties": { "request_id": { "$ref": "#/$defs/externalId" }, "target_scope_sha256": { "$ref": "#/$defs/digest" }, "deleted_scope_sha256": { "$ref": "#/$defs/digest" }, "live_primary_count_after": { "const": 0 }, "page_count_after": { "const": 0 }, "chunk_count_after": { "const": 0 }, "embedding_count_after": { "const": 0 }, "cache_count_after": { "const": 0 }, "backup_reference_count_after": { "const": 0 }, "foreign_scope_delete_count": { "const": 0 } }
+    },
+    "fixtureContent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["command_id", "trace_id", "approval_id", "lease_id", "idempotency_key", "native_result", "postcondition_result", "side_effect_count", "duplicate_side_effect_count", "postcondition_verified_at", "spoken_recorded_at", "owned_fixture_package_sha256", "platform_authorization_id"],
+      "properties": { "command_id": { "$ref": "#/$defs/externalId" }, "trace_id": { "type": "string", "pattern": "^trace_[a-f0-9]{32}$" }, "approval_id": { "$ref": "#/$defs/externalId" }, "lease_id": { "$ref": "#/$defs/externalId" }, "idempotency_key": { "type": "string", "pattern": "^idem_[a-f0-9]{64}$" }, "native_result": { "const": "SUCCEEDED" }, "postcondition_result": { "const": "VERIFIED" }, "side_effect_count": { "const": 1 }, "duplicate_side_effect_count": { "const": 0 }, "postcondition_verified_at": { "type": "string", "format": "date-time" }, "spoken_recorded_at": { "type": "string", "format": "date-time" }, "owned_fixture_package_sha256": { "$ref": "#/$defs/digest" }, "platform_authorization_id": { "$ref": "#/$defs/externalId" } }
+    },
+    "attackContent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["attack_id", "axis", "target_scope", "request_count", "authorization_decision", "native_execution_count", "returned_record_count", "side_effect_count", "audit_event_count"],
+      "properties": { "attack_id": { "$ref": "#/$defs/externalId" }, "axis": { "enum": ["SOUL", "DEVICE", "ACCOUNT"] }, "target_scope": { "$ref": "#/$defs/scope" }, "request_count": { "type": "integer", "minimum": 1 }, "authorization_decision": { "const": "DENY" }, "native_execution_count": { "const": 0 }, "returned_record_count": { "const": 0 }, "side_effect_count": { "const": 0 }, "audit_event_count": { "type": "integer", "minimum": 1 } }
+    },
+    "duplicateContent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["command_id", "idempotency_key", "delivery_count", "native_execution_count", "side_effect_count", "verified_receipt_count", "distinct_result_count", "duplicate_side_effect_count"],
+      "properties": { "command_id": { "$ref": "#/$defs/externalId" }, "idempotency_key": { "type": "string", "pattern": "^idem_[a-f0-9]{64}$" }, "delivery_count": { "type": "integer", "minimum": 2 }, "native_execution_count": { "const": 1 }, "side_effect_count": { "const": 1 }, "verified_receipt_count": { "const": 1 }, "distinct_result_count": { "const": 1 }, "duplicate_side_effect_count": { "const": 0 } }
+    },
+    "unknownOutcomeContent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["command_id", "idempotency_key", "unknown_outcome_code", "automatic_retry_count", "reconciliation_read_count", "reconciliation_mode", "final_verified_outcome", "native_execution_upper_bound", "duplicate_side_effect_count"],
+      "properties": { "command_id": { "$ref": "#/$defs/externalId" }, "idempotency_key": { "type": "string", "pattern": "^idem_[a-f0-9]{64}$" }, "unknown_outcome_code": { "const": "UNKNOWN_OUTCOME" }, "automatic_retry_count": { "const": 0 }, "reconciliation_read_count": { "type": "integer", "minimum": 1 }, "reconciliation_mode": { "const": "EXACT_POSTCONDITION_READBACK" }, "final_verified_outcome": { "enum": ["VERIFIED_SUCCEEDED", "VERIFIED_FAILED"] }, "native_execution_upper_bound": { "const": 1 }, "duplicate_side_effect_count": { "const": 0 } }
+    }
+  }
+}

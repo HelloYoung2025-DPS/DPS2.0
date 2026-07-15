@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/schemas/legacy-sessionrunner-signature-snapshot.v1.schema.json",
+  "title": "Legacy SessionRunner stable signature snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "snapshot_id",
+    "baseline_commit",
+    "captured_from",
+    "canonicalization",
+    "evidence_scope",
+    "methods",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "dps.legacy-sessionrunner-signatures/v1"
+    },
+    "snapshot_id": {
+      "type": "string",
+      "pattern": "^legacy-sessionrunner:[0-9a-f]{64}$"
+    },
+    "baseline_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "captured_from": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "git_blob", "sha256", "byte_length"],
+      "properties": {
+        "path": {
+          "const": "Modules/SessionRunner.cs"
+        },
+        "git_blob": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "canonicalization": {
+      "const": "collapse-ascii-whitespace-v1"
+    },
+    "evidence_scope": {
+      "const": "REPOSITORY_STATIC_ONLY"
+    },
+    "methods": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "qualified_name",
+          "declaration",
+          "start_line",
+          "signature_sha256"
+        ],
+        "properties": {
+          "name": {
+            "enum": [
+              "Run",
+              "InitSession",
+              "DecideNextAction",
+              "EvaluateActionResult",
+              "FinalizeSession"
+            ]
+          },
+          "qualified_name": {
+            "type": "string",
+            "pattern": "^SessionRunner\\.(Run|InitSession|DecideNextAction|EvaluateActionResult|FinalizeSession)$"
+          },
+          "declaration": {
+            "type": "string",
+            "minLength": 1
+          },
+          "start_line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "signature_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

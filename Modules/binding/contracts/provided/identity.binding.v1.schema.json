@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/identity.binding.v1.schema.json",
+  "title": "identity.binding/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_id", "producer_module", "soul_id", "device_binding_id", "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class", "device_id", "binding_revision", "status", "device_registration_revision", "account_authorization_revision"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "contract_id": {"const": "identity.binding/v1"},
+    "producer_module": {"const": "binding"},
+    "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time", "pattern": "^(?!0000-)\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])T(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d{1,7})?(?:Z|\\+00:00)$(?![\\s\\S])"},
+    "privacy_class": {"const": "sensitive"},
+    "device_id": {"type": "string", "pattern": "^device_[a-f0-9]{32}$(?![\\s\\S])"},
+    "binding_revision": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+    "status": {"enum": ["active", "revoked"]},
+    "device_registration_revision": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+    "account_authorization_revision": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807}
+  }
+}

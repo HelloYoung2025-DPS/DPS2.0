@@ -1,0 +1,5 @@
+# memory-event-ledger contracts
+
+Provided contract schemas have one owner: this module. Consumed schemas are referenced from their owner and are not copied or modified here. Every cross-module payload rejects unknown major versions and includes the identity, trace, idempotency, time, and privacy fields required by the root policy where applicable.
+
+`memory.event/v1` and `memory.outbox/v1` are byte-frozen and quarantine-only because v1 accepted a caller-set verification boolean and a publicly constructible Soul DTO. `memory.append.request/v2` is the bounded, versioned, untrusted inbound request; it carries exact signed-receipt bytes and bounded signals but grants no authority. `memory.event/v2` removes the boolean as authority, requires `event_id` to equal the signed `command_id`, binds canonical Soul-resolution and signed-result hashes, and is the only proposed output path. One signed command can therefore produce at most one accepted v2 event identity. The v2 path remains non-release-eligible until its upstream fixed authorities and reciprocal consumers exist.

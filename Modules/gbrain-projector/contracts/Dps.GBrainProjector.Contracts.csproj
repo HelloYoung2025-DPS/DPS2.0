@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.GBrainProjector.Contracts</AssemblyName>
+    <RootNamespace>Dps.GBrainProjector.Contracts</RootNamespace>
+    <PackageId>Dps.GBrainProjector.Contracts</PackageId>
+    <Version>0.3.0</Version>
+    <DefaultItemExcludes>$(DefaultItemExcludes);provided/**/bin/**;provided/**/obj/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="provided/gbrain.projection.v1.schema.json" Pack="true" PackagePath="contracts" />
+    <None Include="provided/gbrain.projection.v2.schema.json" Pack="true" PackagePath="contracts" />
+    <None Include="provided/gbrain.source-binding.v1.schema.json" Pack="true" PackagePath="contracts" />
+    <None Include="provided/gbrain.source-id.v1.corpus.json" Pack="true" PackagePath="contracts" />
+    <None Include="provided/gbrain.source-id.v2.corpus.json" Pack="true" PackagePath="contracts" />
+    <EmbeddedResource Include="provided/gbrain.source-id.v1.corpus.json"
+                      LogicalName="Dps.GBrainProjector.Contracts.gbrain.source-id.v1.corpus.json" />
+    <EmbeddedResource Include="provided/gbrain.source-id.v2.corpus.json"
+                      LogicalName="Dps.GBrainProjector.Contracts.gbrain.source-id.v2.corpus.json" />
+  </ItemGroup>
+</Project>

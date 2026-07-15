@@ -1,0 +1,72 @@
+{
+  "spec_version": "1.0",
+  "spec_id": "edge.worker.drain.receipt/auth/v1",
+  "contract_id": "edge.worker.drain.receipt/v1",
+  "owner_module": "windows-edge-supervisor",
+  "producer_module": "windows-edge-worker",
+  "signature_algorithm": "RSA_PSS_SHA256",
+  "rsa_pss_parameters": {
+    "message_hash": "SHA-256",
+    "mask_generation_function": "MGF1",
+    "mgf1_hash": "SHA-256",
+    "salt_length_bytes": 32,
+    "trailer_field": 1
+  },
+  "minimum_rsa_modulus_bits": 2048,
+  "key_id": "sha256_<SHA-256 of DER SubjectPublicKeyInfo>",
+  "framing": "UTF-8 domain + LF, then each field as UTF-8-byte-length + ':' + exact-value + ';'",
+  "worker_statement": {
+    "domain": "dps.windows-edge-worker.durable-drain-receipt/v1",
+    "fields": [
+      "schema_version",
+      "contract_id",
+      "producer_module",
+      "soul_id",
+      "device_binding_id",
+      "platform_account_id",
+      "trace_id",
+      "idempotency_key",
+      "occurred_at",
+      "privacy_class",
+      "drain_id",
+      "slot",
+      "worker_version",
+      "worker_artifact_sha256",
+      "journal_artifact_sha256",
+      "release_bom_sha256",
+      "protected_policy_sha256",
+      "routing_epoch",
+      "intake_stopped",
+      "worker_drained",
+      "remaining_in_flight",
+      "issued_at",
+      "not_before",
+      "expires_at"
+    ],
+    "worker_statement_sha256": "lowercase SHA-256 of the exact worker statement"
+  },
+  "worker_receipt_wire": {
+    "rule": "serialize once after RSA-PSS signing, persist exact UTF-8 bytes, and return the same bytes for every retry",
+    "worker_receipt_wire_sha256": "lowercase SHA-256 of the exact persisted signed Worker receipt bytes; this digest is not a field of the Worker receipt"
+  },
+  "journal_payload": {
+    "canonicalization": "strict UTF-8 JSON object with properties ordered by ordinal name, no insignificant whitespace",
+    "fields_in_exact_wire_order": [
+      "drain_id",
+      "intake_stopped",
+      "journal_artifact_sha256",
+      "protected_policy_sha256",
+      "release_bom_sha256",
+      "remaining_in_flight",
+      "routing_epoch",
+      "schema_version",
+      "slot",
+      "worker_artifact_sha256",
+      "worker_drained",
+      "worker_receipt_wire_sha256",
+      "worker_version"
+    ],
+    "rule": "the Worker appends the exact persisted wire digest; Journal treats it as opaque durable data and signs it in the independent rich attestation"
+  },
+  "verification_rule": "verify the Worker signature, exact active drain and scope, exact worker and Journal artifacts, Release BOM, protected policy, routing epoch, bounded freshness and zero in-flight work; then independently verify and correlate the raw edge.journal.drain.attestation/v1 wire by exact worker_receipt_wire_sha256 before cutover or rollback"
+}

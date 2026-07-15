@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/persona.history.export.v1.schema.json",
+  "title": "persona.history.export/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "x-dps-history-export": "exact-envelope-scope-contiguous-from-one-current-tail",
+  "required": ["schema_version", "contract_id", "producer_module", "soul_id", "device_binding_id", "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class", "live_primary_payload_state", "snapshot_persona_revision", "snapshot_cursor_hmac_sha256", "export_request_hmac_sha256", "export_payload_sha256", "export_receipt_hmac_sha256", "export_receipt_id", "revisions"],
+  "properties": {
+    "schema_version": {"type": "string", "minLength": 1, "maxLength": 32, "pattern": "^1(?:\\.[0-9]+){0,2}$(?![\\s\\S])"},
+    "contract_id": {"const": "persona.history.export/v1"},
+    "producer_module": {"const": "persona-store"},
+    "soul_id": {"type": "string", "minLength": 69, "maxLength": 69, "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": "string", "minLength": 35, "maxLength": 35, "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": "string", "minLength": 35, "maxLength": 35, "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "minLength": 38, "maxLength": 38, "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "minLength": 69, "maxLength": 69, "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time", "minLength": 20, "maxLength": 33, "pattern": "^(?:20[2-9][0-9]|21[0-9]{2})-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{1,7})?(?:Z|\\+00:00)$(?![\\s\\S])"},
+    "privacy_class": {"const": "sensitive"},
+    "live_primary_payload_state": {"enum": ["retained", "live-primary-logically-deleted"]},
+    "snapshot_persona_revision": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+    "snapshot_cursor_hmac_sha256": {"type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+    "export_request_hmac_sha256": {"type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+    "export_payload_sha256": {"type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+    "export_receipt_hmac_sha256": {"type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+    "export_receipt_id": {"type": "string", "minLength": 72, "maxLength": 72, "pattern": "^pexport_[a-f0-9]{64}$(?![\\s\\S])"},
+    "revisions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {"$ref": "#/$defs/history_item"}
+    }
+  },
+  "$defs": {
+    "traits": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "maxProperties": 5,
+      "properties": {
+        "curiosity": {"enum": ["low", "medium", "high"]},
+        "humor": {"enum": ["low", "subtle", "playful"]},
+        "pace": {"enum": ["slow", "balanced", "fast"]},
+        "sociality": {"enum": ["reserved", "balanced", "outgoing"]},
+        "tone": {"enum": ["calm", "warm", "direct", "playful", "formal"]}
+      }
+    },
+    "history_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "live_primary_payload_state", "traits"],
+      "properties": {
+        "revision": {"$ref": "https://dps.local/contracts/persona.revision.v1.schema.json"},
+        "live_primary_payload_state": {"enum": ["retained", "live-primary-logically-deleted"]},
+        "traits": {"oneOf": [{"$ref": "#/$defs/traits"}, {"type": "null"}]}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"live_primary_payload_state": {"const": "retained"}}, "required": ["live_primary_payload_state"]},
+      "then": {
+        "properties": {
+          "revisions": {
+            "items": {
+              "allOf": [
+                {"properties": {"revision": {"properties": {"status": {"const": "active"}}, "required": ["status"]}}},
+                {"properties": {"live_primary_payload_state": {"const": "retained"}, "traits": {"$ref": "#/$defs/traits"}}}
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"live_primary_payload_state": {"const": "live-primary-logically-deleted"}}, "required": ["live_primary_payload_state"]},
+      "then": {
+        "properties": {
+          "revisions": {
+            "items": {
+              "properties": {
+                "live_primary_payload_state": {"const": "live-primary-logically-deleted"},
+                "traits": {"type": "null"}
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

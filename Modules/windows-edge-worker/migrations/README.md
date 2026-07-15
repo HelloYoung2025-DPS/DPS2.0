@@ -1,0 +1,3 @@
+# Migrations
+
+No worker-owned database schema exists in v0.1. The proposed reconcile-only host owns an internal checksum-chained `command-state.jsonl` format with explicit `schema_version`. No production state has been released, so there is no legacy migration in this revision. Pre-release `native.stop.proof/v1` artifacts are never migrated into v2: the bounded internal store may report quarantine metadata only, and a separately authorized cleanup must remove them after retention. Once a worker state format is released, unknown or incompatible versions must fail closed and require a separately tested offline migration; they must never be silently reinterpreted. Public contract changes follow additive N/N-1 compatibility and a separate later removal release.

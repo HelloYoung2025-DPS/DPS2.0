@@ -7,6 +7,90 @@
 // ⚠️ 规范: 仅包含模块加载器，业务逻辑在外部 .cs 文件
 // =====================================================
 
+// F5 P0 trusted wrapper gate. This value is compiled into the wrapper and is
+// never read from project variables, paths, configuration, or model output.
+const bool LEGACY_DISABLE_NEW_COMMANDS = true;
+const string LEGACY_BAD_END_TOKEN = "ERROR_BRIDGE_REQUIRED";
+if (LEGACY_DISABLE_NEW_COMMANDS)
+{
+    System.Action<string, string> SetGateVariable = (name, value) =>
+    {
+        try
+        {
+            project.Variables[name].Value = value;
+        }
+        catch (System.Exception)
+        {
+            // Missing optional variables must not skip the remaining cleanup.
+        }
+    };
+    SetGateVariable("zd_step_type", LEGACY_BAD_END_TOKEN);
+    SetGateVariable("zd_step_plan", "");
+    SetGateVariable("zd_step_index", "0");
+    SetGateVariable("zd_step_count", "0");
+    SetGateVariable("zd_step_param", "");
+    SetGateVariable("zd_selector_key", "");
+    SetGateVariable("zd_tap_x1", "");
+    SetGateVariable("zd_tap_x2", "");
+    SetGateVariable("zd_tap_y1", "");
+    SetGateVariable("zd_tap_y2", "");
+    SetGateVariable("zd_swipe_x1", "");
+    SetGateVariable("zd_swipe_y1", "");
+    SetGateVariable("zd_swipe_x2", "");
+    SetGateVariable("zd_swipe_y2", "");
+    SetGateVariable("zd_swipe_duration", "0");
+    SetGateVariable("zd_wait_sec", "0");
+    SetGateVariable("zd_found", "false");
+    SetGateVariable("zd_verify_rule", "");
+    SetGateVariable("zd_safety", "100");
+    SetGateVariable("zd_action_result", "UNKNOWN");
+    SetGateVariable("zd_action_duration", "0");
+    SetGateVariable("zd_action_error_detail", "modern authorization bridge unavailable");
+    SetGateVariable("sr_action_count", "0");
+    SetGateVariable("sr_success_count", "0");
+    SetGateVariable("sr_fail_count", "0");
+    SetGateVariable("sr_skip_count", "0");
+    SetGateVariable("sr_consecutive_skips", "0");
+    SetGateVariable("sr_vision_recovery_count", "0");
+    SetGateVariable("sr_orchestrator_state", "");
+    SetGateVariable("sr_op_queue", "");
+    SetGateVariable("sr_op_queue_index", "0");
+    SetGateVariable("sr_current_session_action", "");
+    SetGateVariable("sr_current_op_name", "");
+    SetGateVariable("sr_memory_entries", "");
+    SetGateVariable("sr_memory_file", "");
+    SetGateVariable("sr_use_legacy_run", "false");
+    SetGateVariable("action_count", "0");
+    SetGateVariable("action_attempt_count", "0");
+    SetGateVariable("session_successful_actions", "0");
+    SetGateVariable("session_failed_actions", "0");
+    SetGateVariable("session_skipped_actions", "0");
+    SetGateVariable("session_success_rate", "0.0000");
+    SetGateVariable("action_result", "ERROR");
+    SetGateVariable("current_action", "");
+    SetGateVariable("current_intent", "");
+    SetGateVariable("execution_proposal", "");
+    SetGateVariable("recovery_proposal", "");
+    SetGateVariable("onboarding_proposal", "");
+    SetGateVariable("ai_direct_execution", "false");
+    SetGateVariable("ai_notify_human", "false");
+    SetGateVariable("vision_verified", "error_preserved");
+    SetGateVariable("sr_legacy_run_completed", "false");
+    SetGateVariable("sr_legacy_run_result", "ERROR: modern authorization bridge unavailable");
+    SetGateVariable("run_result", "ERROR");
+    SetGateVariable("session_result", "ERROR");
+    SetGateVariable("last_error", "modern authorization bridge unavailable");
+    SetGateVariable("zd_step_type", LEGACY_BAD_END_TOKEN);
+    try
+    {
+        project.SendErrorToLog("[DPS P0] legacy_disable_new_commands is compiled ON; fixed signed ABI/BOM bridge is not installed");
+    }
+    catch (System.Exception)
+    {
+        // Logging failure must not bypass the hard return.
+    }
+    return LEGACY_BAD_END_TOKEN;
+}
 // ========== 模块加载器（完整依赖加载） ==========
 Func<string, string, object[], object> RunModule = (filePath, methodName, args) => {
     if (!System.IO.File.Exists(filePath)) {

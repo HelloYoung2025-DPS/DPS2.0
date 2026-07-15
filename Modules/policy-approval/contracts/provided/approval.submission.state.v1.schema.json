@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/approval.submission.state.v1.schema.json",
+  "title": "approval.submission.state/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_id", "producer_module", "state_event_id", "submission_attempt_id", "approval_id", "proposal_id", "command_id", "lease_id", "attempt", "soul_id", "device_binding_id", "platform_account_id", "trace_id", "idempotency_key", "release_bom_sha256", "release_bom_generation", "native_request_binding_sha256", "submission_intent_sha256", "state", "predecessor_state_sha256", "evidence_sha256", "occurred_at", "privacy_class", "state_sha256", "signature_base64"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "contract_id": {"const": "approval.submission.state/v1"},
+    "producer_module": {"const": "policy-approval"},
+    "state_event_id": {"$ref": "#/$defs/uuid"},
+    "submission_attempt_id": {"$ref": "#/$defs/uuid"},
+    "approval_id": {"$ref": "#/$defs/uuid"},
+    "proposal_id": {"$ref": "#/$defs/uuid"},
+    "command_id": {"$ref": "#/$defs/uuid"},
+    "lease_id": {"$ref": "#/$defs/uuid"},
+    "attempt": {"type": "integer", "minimum": 1, "maximum": 3},
+    "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "release_bom_sha256": {"$ref": "#/$defs/sha256"},
+    "release_bom_generation": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+    "native_request_binding_sha256": {"$ref": "#/$defs/sha256"},
+    "submission_intent_sha256": {"$ref": "#/$defs/sha256"},
+    "state": {"enum": ["SUBMISSION_PENDING", "UNKNOWN_SUBMISSION", "SUBMISSION_ACKNOWLEDGED", "RECONCILED_NOT_SUBMITTED", "RECONCILED_SUBMITTED", "RECOVERY_AUTHORIZED"]},
+    "predecessor_state_sha256": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/sha256"}]},
+    "evidence_sha256": {"$ref": "#/$defs/sha256"},
+    "occurred_at": {"$ref": "#/$defs/time"},
+    "privacy_class": {"const": "internal"},
+    "state_sha256": {"$ref": "#/$defs/sha256"},
+    "signature_base64": {"$ref": "#/$defs/signature"}
+  },
+  "allOf": [
+    {"if": {"properties": {"state": {"const": "SUBMISSION_PENDING"}}}, "then": {"properties": {"predecessor_state_sha256": {"type": "null"}}}},
+    {"if": {"not": {"properties": {"state": {"const": "SUBMISSION_PENDING"}}}}, "then": {"properties": {"predecessor_state_sha256": {"$ref": "#/$defs/sha256"}}}}
+  ],
+  "$defs": {
+    "uuid": {"type": "string", "format": "uuid", "pattern": "^(?!00000000-0000-0000-0000-000000000000$)[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$(?![\\s\\S])"},
+    "sha256": {"type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+    "time": {"type": "string", "format": "date-time", "pattern": "^(?!0000-)[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{0,6}[1-9])?Z$(?![\\s\\S])"},
+    "signature": {"type": "string", "minLength": 88, "maxLength": 88, "pattern": "^[A-Za-z0-9+/]{85}[AQgw]==$(?![\\s\\S])"}
+  }
+}

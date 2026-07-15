@@ -1,0 +1,17 @@
+{
+  "name": "dps-governance-tests",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pinned Node tooling for DPS repository and explicit device tests.",
+  "engines": {
+    "node": "24.18.0",
+    "npm": "11.16.0"
+  },
+  "scripts": {
+    "test:config": "node Tests/playwright_dps_test.js --mode config",
+    "test:device": "node Tests/playwright_dps_test.js --mode device"
+  },
+  "devDependencies": {
+    "playwright": "1.61.1"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/platform.account.authorization.evidence.v1.schema.json",
+  "title": "platform.account.authorization.evidence/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "contract_id", "producer_module", "soul_id", "device_binding_id",
+    "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class",
+    "authorization_evidence_id", "platform", "alias_digest", "alias_key_id", "alias_key_epoch",
+    "target_status", "authorization_revision", "issuer_id", "issuer_key_id", "release_bom_sha256",
+    "release_generation", "issued_at", "expires_at", "signature_base64"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "contract_id": {"const": "platform.account.authorization.evidence/v1"},
+    "producer_module": {"const": "platform-authorization-authority"},
+    "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time", "pattern": "^(?!0000)\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])T(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d{1,7})?(?:Z|\\+00:00)$(?![\\s\\S])"},
+    "privacy_class": {"const": "sensitive"},
+    "authorization_evidence_id": {"type": "string", "pattern": "^approval_[a-z0-9_-]{1,119}$(?![\\s\\S])"},
+    "platform": {"type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$(?![\\s\\S])", "maxLength": 64},
+    "alias_digest": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+    "alias_key_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$(?![\\s\\S])"},
+    "alias_key_epoch": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+    "target_status": {"enum": ["authorized", "revoked", "suspended"]},
+    "authorization_revision": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+    "issuer_id": {"const": "dps-platform-authorization-authority"},
+    "issuer_key_id": {"const": "dps-platform-authorization-root-2026-07"},
+    "release_bom_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+    "release_generation": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+    "issued_at": {"type": "string", "format": "date-time", "pattern": "^(?!0000)\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])T(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d{1,7})?(?:Z|\\+00:00)$(?![\\s\\S])"},
+    "expires_at": {"type": "string", "format": "date-time", "pattern": "^(?!0000)\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])T(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d{1,7})?(?:Z|\\+00:00)$(?![\\s\\S])"},
+    "signature_base64": {"type": "string", "pattern": "^[A-Za-z0-9+/]{86}==$(?![\\s\\S])"}
+  }
+}

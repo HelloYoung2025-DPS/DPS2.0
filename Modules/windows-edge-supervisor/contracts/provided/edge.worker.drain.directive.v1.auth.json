@@ -1,0 +1,47 @@
+{
+  "spec_version": "1.0",
+  "spec_id": "edge.worker.drain.directive/auth/v1",
+  "contract_id": "edge.worker.drain.directive/v1",
+  "owner_module": "windows-edge-supervisor",
+  "producer_module": "windows-edge-supervisor",
+  "signature_algorithm": "RSA_PSS_SHA256",
+  "rsa_pss_parameters": {
+    "message_hash": "SHA-256",
+    "mask_generation_function": "MGF1",
+    "mgf1_hash": "SHA-256",
+    "salt_length_bytes": 32,
+    "trailer_field": 1
+  },
+  "minimum_rsa_modulus_bits": 2048,
+  "key_id": "sha256_<SHA-256 of DER SubjectPublicKeyInfo>",
+  "framing": "UTF-8 domain + LF, then each field as UTF-8-byte-length + ':' + exact-value + ';'",
+  "statement": {
+    "domain": "dps.windows-edge-supervisor.drain-directive/v1",
+    "fields": [
+      "schema_version",
+      "contract_id",
+      "producer_module",
+      "soul_id",
+      "device_binding_id",
+      "platform_account_id",
+      "trace_id",
+      "idempotency_key",
+      "occurred_at",
+      "privacy_class",
+      "drain_id",
+      "slot",
+      "worker_version",
+      "worker_artifact_sha256",
+      "journal_artifact_sha256",
+      "release_bom_sha256",
+      "protected_policy_sha256",
+      "routing_epoch",
+      "issued_at",
+      "not_before",
+      "expires_at",
+      "supervisor_key_id",
+      "signature_algorithm"
+    ]
+  },
+  "verification_rule": "Worker must verify the pinned Supervisor RSA-PSS identity, exact signed validity window and its own slot/version/artifact plus Journal artifact, Release BOM, protected policy, routing epoch and identity scope before stopping intake; free-text edge.worker.exchange DRAIN is rejected"
+}

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/verification/f7-gbrain-search-readback-artifact.v1.schema.json",
+  "title": "F7 normalized GBrain search readback evidence",
+  "$comment": "Historical F7 v2 artifact retained only for audit and migration review. The F7 v3 gate consumes f7-raw-evidence-artifact.v1.schema.json.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "soul_id",
+    "device_binding_id",
+    "platform_account_id",
+    "logical_source_id",
+    "external_source_alias",
+    "result_schema_version",
+    "provenance",
+    "observed_at",
+    "freshness_seconds",
+    "query_sha256",
+    "response_sha256",
+    "query_base64",
+    "response_base64",
+    "matched_result_count"
+  ],
+  "properties": {
+    "schema_version": { "const": "dps.gbrain-search-readback-artifact/v1" },
+    "artifact_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+    "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "logical_source_id": { "type": "string", "pattern": "^dps-[a-f0-9]{28}$(?![\\s\\S])" },
+    "external_source_alias": { "type": "string", "pattern": "^gs_[0-9a-f]{16}$" },
+    "result_schema_version": { "const": "gbrain.search-result/v1" },
+    "provenance": { "const": "SOURCE_SCOPED_EXTERNAL_READBACK" },
+    "observed_at": { "type": "string", "format": "date-time" },
+    "freshness_seconds": { "type": "integer", "minimum": 0, "maximum": 300 },
+    "query_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+    "response_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+    "query_base64": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 11184812,
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+      "description": "Exact canonical source-scoped query JSON bytes, Base64 encoded."
+    },
+    "response_base64": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 11184812,
+      "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$",
+      "description": "Exact canonical gbrain.search-result/v1 response JSON bytes, Base64 encoded."
+    },
+    "matched_result_count": { "type": "integer", "minimum": 1 }
+  }
+}

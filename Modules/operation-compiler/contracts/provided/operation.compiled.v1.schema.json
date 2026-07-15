@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/operation.compiled.v1.schema.json",
+  "title": "operation.compiled/v1",
+  "x-dps-canonical-spec": {
+    "resource": "operation.compiled.v1.canonical.json",
+    "sha256": "477dbbb5c06365f45b5e369f7df903ec7ac3a50fb3411633123fb701052ca8bb"
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_id", "producer_module", "operation_id", "approval_id", "proposal_id", "approval_sha256", "soul_id", "device_binding_id", "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class", "action_kind", "is_side_effect", "shadow_only", "steps"],
+  "properties": {
+    "schema_version": {"type": "string", "pattern": "^1(?:\\.[0-9]+){0,2}$"},
+    "contract_id": {"const": "operation.compiled/v1"},
+    "producer_module": {"const": "operation-compiler"},
+    "operation_id": {"type": "string", "format": "uuid"},
+    "approval_id": {"type": "string", "format": "uuid"},
+    "proposal_id": {"type": "string", "format": "uuid"},
+    "approval_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "privacy_class": {"const": "internal"},
+    "action_kind": {"enum": ["observe", "locate", "verify", "wait", "fixture.tap", "fixture.type"]},
+    "is_side_effect": {"type": "boolean"},
+    "shadow_only": {"const": false},
+    "platform_authorization_id": {"type": ["string", "null"], "maxLength": 256},
+    "steps": {"type": "array", "minItems": 1, "maxItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["step_id", "step_kind", "arguments", "retry_safe", "postcondition_kind"], "properties": {
+      "step_id": {"type": "string", "format": "uuid"},
+      "step_kind": {"enum": ["ui.observe", "ui.locate", "ui.verify", "control.wait", "fixture.tap", "fixture.type"]},
+      "arguments": {"type": "object", "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 256}},
+      "retry_safe": {"type": "boolean"},
+      "postcondition_kind": {"enum": ["native-read-complete", "selector-resolved", "assertion-satisfied", "timer-elapsed", "fixture-state-changed", "fixture-value-matched"]}
+    }}}
+  }
+}

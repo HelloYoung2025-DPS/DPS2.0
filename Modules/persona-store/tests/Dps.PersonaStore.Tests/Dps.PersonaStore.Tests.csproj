@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Dps.PersonaStore/Dps.PersonaStore.csproj" />
+    <ProjectReference Include="../../contracts/Dps.PersonaStore.Contracts/Dps.PersonaStore.Contracts.csproj" />
+    <ProjectReference Include="../../../binding/src/Dps.Binding/Dps.Binding.csproj" />
+    <ProjectReference Include="../../../binding/contracts/Dps.Binding.Contracts/Dps.Binding.Contracts.csproj" />
+    <ProjectReference Include="../../../device-registry/contracts/Dps.DeviceRegistry.Contracts/Dps.DeviceRegistry.Contracts.csproj" />
+    <ProjectReference Include="../../../platform-account-registry/contracts/Dps.PlatformAccountRegistry.Contracts/Dps.PlatformAccountRegistry.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../../contracts/provided/corpus/persona.revision.v1.corpus.json"
+          Link="corpus/persona.revision.v1.corpus.json"
+          CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../contracts/provided/corpus/persona.history.export.v1.corpus.json"
+          Link="corpus/persona.history.export.v1.corpus.json"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

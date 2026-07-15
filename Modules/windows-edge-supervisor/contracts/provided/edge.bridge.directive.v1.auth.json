@@ -1,0 +1,66 @@
+{
+  "spec_version": "1.0",
+  "spec_id": "edge.bridge.directive/auth/v1",
+  "contract_id": "edge.bridge.directive/v1",
+  "owner_module": "windows-edge-supervisor",
+  "consumer_modules": ["zenno-bridge"],
+  "key_id": {
+    "input": "DER-encoded X.509 SubjectPublicKeyInfo",
+    "hash_algorithm": "SHA-256",
+    "encoding": "sha256_<64 lowercase hex characters>"
+  },
+  "signature": {
+    "algorithm": "RSA_PKCS1_SHA256",
+    "rsa_padding": "PKCS#1 v1.5",
+    "hash_algorithm": "SHA-256",
+    "encoding": "canonical Base64"
+  },
+  "body_hash": {
+    "algorithm": "SHA-256",
+    "encoding": "lowercase hex",
+    "scalar_encoding": "UTF-8 after field framing",
+    "field_framing": {
+      "present": "UTF-16-code-unit-length + ':' + exact-value + ';'",
+      "null": "-1:;",
+      "integer": "invariant base-10 string",
+      "unicode_normalization": "NONE",
+      "invalid_unicode": "REJECT"
+    },
+    "fields": [
+      "schema_version",
+      "contract_id",
+      "producer_module",
+      "soul_id",
+      "device_binding_id",
+      "platform_account_id",
+      "trace_id",
+      "idempotency_key",
+      "occurred_at",
+      "privacy_class",
+      "directive_kind",
+      "command_id",
+      "action_kind",
+      "step_kind",
+      "selector",
+      "text",
+      "wait_ms",
+      "expected_postcondition"
+    ]
+  },
+  "signing_statement": {
+    "encoding": "UTF-8",
+    "format": "dps.edge.bridge.directive-auth/v1\\n{auth_key_id}\\n{auth_nonce}\\n{auth_issued_at}\\n{auth_body_sha256}",
+    "trailing_newline": false
+  },
+  "golden_vectors": [
+    {
+      "vector_id": "pkcs1-sha256-spki-command-unicode-v1",
+      "wire_file": "edge.bridge.directive.v1.golden.json",
+      "public_key_spki_base64": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA2E9eroO3HmhfP1l65zVWw9qhdTe0VBYCt1CLEJfUKJ1n8Cwwcdv1+1VkemWpVFg/xLWgVwDOnvXWJVNPf6CxP38xyyrVwRJjEZL1Lb9VzlSYxJ1+9pNTtFKypZ2okzMrR8kovXO+XNj/1KwHvXji6oMnsVADUyxc1tcOzqme1ZTXaD6DtHqrn5NEOahtAyxsPfXANFCdygpZqLlHCO02s3MYDVUGtU194dk9GQueHLVHd4q7ldJQ4cRZo2GpdAsCvBEDouqTV7FfJRVZ2MUSe6/UwEsH0wlfsXRdGsFgtCvncHiDaiQHNfE1oz8zGvkKxwGstQ+Y1qcWi2Qy7+4/7wIDAQAB",
+      "auth_key_id": "sha256_f40bc385ddac10a5ebadf4bb4cebb902897a5b631590fdf8fbfac35d31ea8394",
+      "auth_body_sha256": "4d1777ba494fcbb41fd0830348cf021bfc399db002a4dcc7cf0b3383bfb2167b",
+      "signing_statement_hex": "6470732e656467652e6272696467652e6469726563746976652d617574682f76310a7368613235365f663430626333383564646163313061356562616466346262346365626239303238393761356236333135393066646638666266616333356433316561383339340a313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131313131310a323032362d30372d31355430303a30303a30315a0a34643137373762613439346663626234316664303833303334386366303231626663333939646230303261346463633763663062333338336266623231363762",
+      "auth_proof": "TGoaSuKzV1o0VkYtbkvj/0pym0aUSOTyuTs9EmCJM4VJqx95USirGV68r1Cm/1eUwOuwcdlV2CLhxBfljPHADo90iEhdcJTGa/XnGzEuJoJAoHPU6FJt7xfEP+bSxmwds0VcKBR72aO1I+nrHm5VrOWr9UAVeOJqYjk9yxzdO4P6xgchAMJAu4/wyp/ebyZmPeKBilAXgIXv51dVYKrLORxi/bkEaNQgCPW7Q2kUj/DG0jbxGVd8TputTGckN98dclCwsthUQODxojWZIzyijl3bWm+BrbkTvCuq7gkqGDZTa9SF81bP22CMKOnpUvyPk1Yhwo73JvWNJrzA5nUlvQ=="
+    }
+  ]
+}

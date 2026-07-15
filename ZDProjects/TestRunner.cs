@@ -168,14 +168,14 @@ Func<bool> Test1_ProjectInitialization = () => {
         string resultStr = result.ToString();
         
         // 验证返回值
-        if (!resultStr.StartsWith("SUCCESS") && !resultStr.StartsWith("WARNING")) {
+        if (resultStr != "SUCCESS" && !resultStr.StartsWith("SUCCESS:")) {
             RecordTestResult("测试 1", false, "返回值异常: " + resultStr);
             return false;
         }
         
         // 验证 ZD 变量
         string initResult = GetVar("initializer_result", "");
-        if (initResult != "SUCCESS" && initResult != "WARNING") {
+        if (initResult != "SUCCESS") {
             RecordTestResult("测试 1", false, "initializer_result 变量值异常: " + initResult);
             return false;
         }
@@ -426,24 +426,32 @@ try {
     SetVar("test_skipped", skippedTests.ToString());
     SetVar("test_pass_rate", passRate.ToString("F2"));
     
-    // 判断整体结果
-    if (failedTests == 0) {
+    // 判断整体结果。必需测试只有 PASS 才能放行；零测试和 SKIP 都是失败。
+    if (totalTests == 0) {
+        Log("========================================");
+        LogErr("  ✗ NOT_RUN: 没有执行任何测试");
+        Log("========================================");
+        SetVar("test_result", "NOT_RUN");
+        return "FAILED: NOT_RUN - 没有执行任何测试";
+    }
+    else if (passedTests == totalTests && failedTests == 0 && skippedTests == 0) {
         Log("========================================");
         Log("  ✓ 所有测试通过！");
         Log("========================================");
         SetVar("test_result", "SUCCESS");
         return "SUCCESS: 所有测试通过 (" + passedTests + "/" + totalTests + ")";
     } else {
+        string evidenceResult = passedTests > 0 ? "PARTIAL" : (failedTests > 0 ? "FAIL" : "SKIP");
         Log("========================================");
-        Log("  ✗ 部分测试失败");
+        LogErr("  ✗ 必需测试未全部 PASS: " + evidenceResult);
         Log("========================================");
-        SetVar("test_result", "FAILED");
-        return "FAILED: " + failedTests + " 个测试失败";
+        SetVar("test_result", evidenceResult);
+        return "FAILED: " + evidenceResult + " - PASS=" + passedTests + ", FAIL=" + failedTests + ", SKIP=" + skippedTests;
     }
 }
 catch (System.Exception ex) {
     LogErr("测试运行异常: " + ex.Message);
-    SetVar("test_result", "ERROR");
+    SetVar("test_result", "INFRA_ERROR");
     SetVar("last_error", ex.Message);
-    return "ERROR: " + ex.Message;
+    return "FAILED: INFRA_ERROR - " + ex.Message;
 }

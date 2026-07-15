@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/execution.authorization.v1.schema.json",
+  "title": "execution.authorization/v1",
+  "x-dps-canonical-spec": {
+    "resource": "execution.authorization.v1.canonical.json",
+    "sha256": "f3c841627c3904e30148157fea4207b770b0465e0ca950ca726bdc36d54ef2b8"
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "contract_id", "producer_module",
+    "signature_domain", "canonical_encoding", "command_digest_algorithm",
+    "signature_algorithm", "signature_format", "signature_encoding",
+    "caller_module", "auth_scope", "command_id", "lease_id", "attempt",
+    "soul_id", "device_binding_id", "platform_account_id", "trace_id",
+    "idempotency_key", "occurred_at", "privacy_class", "command_sha256",
+    "release_bom_sha256", "active_release_bom_generation",
+    "active_release_bom_token_sha256", "valid_until", "shadow_mode", "signature_base64"
+  ],
+  "properties": {
+    "schema_version": {"type": "string", "pattern": "^1(?:\\.[0-9]+){0,2}$(?![\\s\\S])"},
+    "contract_id": {"const": "execution.authorization/v1"},
+    "producer_module": {"const": "command-orchestrator"},
+    "signature_domain": {"const": "dps.command-orchestrator.execution-authorization/v1"},
+    "canonical_encoding": {"const": "dps.canonical.uint32be-length-prefixed-utf8/v1"},
+    "command_digest_algorithm": {"const": "sha256:dps.command-orchestrator.command-dispatch/v1"},
+    "signature_algorithm": {"const": "ecdsa-p256-sha256"},
+    "signature_format": {"const": "ieee-p1363-fixed-field-concatenation"},
+    "signature_encoding": {"const": "base64"},
+    "caller_module": {"const": "command-orchestrator"},
+    "auth_scope": {"const": "executor:dispatch"},
+    "command_id": {"type": "string", "format": "uuid"},
+    "lease_id": {"type": "string", "format": "uuid"},
+    "attempt": {"type": "integer", "minimum": 1, "maximum": 3},
+    "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time", "pattern": "(?:Z|\\+00:00)$(?![\\s\\S])"},
+    "privacy_class": {"const": "internal"},
+    "command_sha256": {"type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+    "release_bom_sha256": {"type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+    "active_release_bom_generation": {"type": "integer", "minimum": 1},
+    "active_release_bom_token_sha256": {"type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+    "valid_until": {"type": "string", "format": "date-time", "pattern": "(?:Z|\\+00:00)$(?![\\s\\S])"},
+    "shadow_mode": {"type": "boolean"},
+    "signature_base64": {"type": "string", "minLength": 88, "maxLength": 88, "pattern": "^[A-Za-z0-9+/]{86}==$(?![\\s\\S])", "contentEncoding": "base64"}
+  }
+}

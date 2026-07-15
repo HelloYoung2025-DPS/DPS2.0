@@ -1,0 +1,288 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {
+    "id": "windows-edge-worker",
+    "name": "Windows Edge Worker",
+    "version": "0.1.1",
+    "description": "Lease-bound idempotent command processing with native-result truth and recovery.",
+    "lifecycle": "proposed",
+    "runtimeState": "proposed",
+    "releaseEligible": false,
+    "riskTier": "R3",
+    "ownerId": "dps-edge"
+  },
+  "paths": {
+    "actualRoot": "Modules/windows-edge-worker",
+    "canonicalRoot": "modules/windows-edge-worker",
+    "owned": ["Modules/windows-edge-worker/**"],
+    "excluded": [],
+    "runtimeData": [
+      "edge-worker/runtime-*/command-state.jsonl",
+      "edge-worker/runtime-*/command-state.writer.lock",
+      "edge-worker/runtime-*/command-state.jsonl.*.crash-tail",
+      "edge-worker/runtime-*/drain-receipts.jsonl",
+      "edge-worker/runtime-*/drain-receipts.writer.lock",
+      "edge-worker/runtime-*/drain-receipts.jsonl.*.crash-tail",
+      "edge-worker/runtime-*/native-stop-proofs.writer.lock",
+      "edge-worker/runtime-*/native-stop-proof-*.json",
+      "edge-worker/runtime-*/native-stop-proof-*.json.quarantine"
+    ]
+  },
+  "artifacts": [
+    {
+      "id": "dps.windows-edge-worker",
+      "kind": "service",
+      "status": "buildable",
+      "build": "bash Modules/windows-edge-worker/operations/build.sh",
+      "versioning": "semver"
+    }
+  ],
+  "runtime": {
+    "track": "modern-service",
+    "language": "C# 14",
+    "target": "net10.0",
+    "processBoundary": "out-of-process",
+    "entrypoints": ["Modules/windows-edge-worker/src/Dps.WindowsEdgeWorker.csproj"],
+    "toolchainStatus": "verified"
+  },
+  "contracts": {
+    "provided": [],
+    "consumed": [
+      {
+        "contractId": "edge.worker.exchange",
+        "major": 1,
+        "source": "Modules/windows-edge-supervisor/contracts/provided/edge.worker.exchange.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "windows-edge-supervisor"
+      },
+      {
+        "contractId": "edge.worker.drain.directive",
+        "major": 1,
+        "source": "Modules/windows-edge-supervisor/contracts/provided/edge.worker.drain.directive.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "windows-edge-supervisor"
+      },
+      {
+        "contractId": "edge.worker.drain.receipt",
+        "major": 1,
+        "source": "Modules/windows-edge-supervisor/contracts/provided/edge.worker.drain.receipt.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "windows-edge-supervisor"
+      },
+      {
+        "contractId": "edge.journal.append",
+        "major": 1,
+        "source": "Modules/edge-local-journal/contracts/provided/edge.journal.append.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "edge-local-journal"
+      },
+      {
+        "contractId": "edge.journal.receipt",
+        "major": 1,
+        "source": "Modules/edge-local-journal/contracts/provided/edge.journal.receipt.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "edge-local-journal"
+      },
+      {
+        "contractId": "native.stop.proof",
+        "major": 1,
+        "source": "Modules/executor-gateway/contracts/provided/native.stop.proof.v1.schema.json",
+        "status": "deprecated",
+        "mode": "quarantine-only",
+        "ownerModule": "executor-gateway"
+      }
+    ]
+  },
+  "communication": {
+    "inbound": [
+      {
+        "peerModule": "windows-edge-supervisor",
+        "contractId": "edge.worker.drain.directive",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "command",
+        "timeoutMs": 30000,
+        "retryPolicy": "exact signed directive redelivery; durable continuation re-verifies signature and scope without reopening freshness",
+        "idempotencyKey": "drain_id:routing_epoch",
+        "authScope": "externally pinned Supervisor RSA-PSS identity plus exact active expectation",
+        "failureMode": "reject before StopIntake unless matching durable PREPARED or COMMITTED continuation exists"
+      },
+      {
+        "peerModule": "windows-edge-supervisor",
+        "contractId": "edge.worker.exchange",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "command",
+        "timeoutMs": 30000,
+        "retryPolicy": "bounded-only-before-dispatch-acknowledgement",
+        "idempotencyKey": "idempotency_key",
+        "authScope": "module:windows-edge-supervisor",
+        "failureMode": "unknown-outcome-and-reconcile"
+      },
+      {
+        "peerModule": "edge-local-journal",
+        "contractId": "edge.journal.receipt",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "receipt",
+        "timeoutMs": 5000,
+        "retryPolicy": "none; receipt follows durable append",
+        "idempotencyKey": "entry_id",
+        "authScope": "module:edge-local-journal",
+        "failureMode": "stop-before-dispatch-or-mark-unknown-outcome"
+      }
+    ],
+    "outbound": [
+      {
+        "peerModule": "windows-edge-supervisor",
+        "contractId": "edge.worker.drain.receipt",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "receipt",
+        "timeoutMs": 30000,
+        "retryPolicy": "same exact persisted Worker receipt wire and deterministic Journal locator until Supervisor records cutover",
+        "idempotencyKey": "drain_id",
+        "authScope": "Release-BOM-bound Worker RSA-PSS identity; Journal rich attestation is fetched directly by Supervisor",
+        "failureMode": "fail-closed before durable Journal receipt; retain exact PREPARED wire for bounded retry"
+      },
+      {
+        "peerModule": "windows-edge-supervisor",
+        "contractId": "edge.worker.exchange",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "command",
+        "timeoutMs": 30000,
+        "retryPolicy": "same-command-id-and-original-request-sha256",
+        "idempotencyKey": "idempotency_key:exchange_kind",
+        "authScope": "module:windows-edge-supervisor",
+        "failureMode": "retain-command-state-and-reconcile"
+      },
+      {
+        "peerModule": "edge-local-journal",
+        "contractId": "edge.journal.append",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "command",
+        "timeoutMs": 5000,
+        "retryPolicy": "retry-same-entry-id-until-durable-receipt",
+        "idempotencyKey": "entry_id",
+        "authScope": "module:edge-local-journal",
+        "failureMode": "stop-before-dispatch-or-mark-unknown-outcome"
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "moduleId": "windows-edge-supervisor",
+      "versionRange": ">=0.1.0 <1.0.0",
+      "required": true,
+      "reason": "edge.worker.exchange/v1 command protocol plus Supervisor-owned signed drain directive and Worker-only receipt contracts"
+    },
+    {
+      "moduleId": "edge-local-journal",
+      "versionRange": ">=0.1.0 <1.0.0",
+      "required": true,
+      "reason": "durable lease and idempotency lifecycle"
+    },
+    {
+      "moduleId": "executor-gateway",
+      "versionRange": ">=0.1.0 <1.0.0",
+      "required": true,
+      "reason": "owner of the byte-frozen legacy native.stop.proof/v1 Schema and strict codec used only for bounded quarantine classification; no runtime issuance edge exists"
+    }
+  ],
+  "permissions": {
+    "allowed": ["loopback:supervisor", "loopback:zenno-native-transport", "journal:append-over-authenticated-ipc", "journal:readiness", "filesystem:command-state", "filesystem:drain-receipt-state", "filesystem:legacy-native-stop-proof-quarantine", "worker:drain-receipt-sign", "checksum:sha256"],
+    "denied": ["Journal rich-attestation provider", "Journal quarantine administration", "Journal public or private signing keys", "Journal runtime-file access", "raw Worker private signing-key ownership", "caller-supplied no-later-write boolean", "native.stop.proof/v1 emission or business success", "gbrain access", "persona storage", "interest evolution", "AI planning", "production approval", "arbitrary shell"],
+    "productionApproval": "human-required"
+  },
+  "data": {
+    "ownedStores": ["filesystem:command-state", "filesystem:drain-receipt-state", "filesystem:legacy-native-stop-proof-quarantine"],
+    "readModels": ["command-idempotency-view", "lease-view"],
+    "privacyClasses": ["internal", "personal"],
+    "retention": "command state follows the local journal recovery window",
+    "export": "redacted command receipts by trace, command, and binding",
+    "correction": "append reconciliation receipt; never rewrite native outcome",
+    "deletion": "expire payloads after retention while preserving non-identifying idempotency proof"
+  },
+  "security": {
+    "trustBoundaries": ["Supervisor command and signed-drain-directive boundary", "native transport boundary", "bounded legacy native.stop.proof/v1 quarantine classifier", "external narrow Journal IPC boundary", "externally injected Worker drain-receipt signing authority"],
+    "secretScopes": ["local process authentication", "externally injected Worker drain-receipt signing authority; raw private key is not owned by the module"],
+    "untrustedInputs": ["command JSON", "signed drain directive before canonical expectation key and freshness verification", "legacy native.stop.proof/v1 wire for bounded quarantine classification only", "selectors", "native results", "postcondition evidence", "Journal receipt before exact scope validation"],
+    "failClosedOn": ["unknown contract major", "unknown exchange kind including free-text DRAIN", "duplicate or unknown wire property", "inconsistent receipt truth", "unknown action or step", "identity mismatch", "invalid lease", "conflicting duplicate", "exhausted persistent retry budget", "unverified success", "invalid stale mismatched or unpinned signed drain directive", "Worker clock rollback or non-UTC clock", "attempt to emit reuse or treat native.stop.proof/v1 as business evidence", "missing frozen Policy-owned native.stop.challenge/v1 and native.stop.proof/v2 Worker API", "missing frozen Supervisor route assignment and authenticated live Worker IPC", "Supervisor zero-argument launch incompatible with Worker production-reconcile state-directory arguments until one fixed Release-BOM-protected launch ABI is frozen", "conflicting insecure replaced or oversized legacy proof quarantine state", "missing or mismatched durable terminal Journal receipt", "unfinished persistent drain state", "changed drain scope deployment policy epoch or signing identity", "simulation adapter requested in production mode", "relative insecure foreign-owner non-regular symbolic-link hard-link replaced quarantined or oversized Worker-owned runtime state", "Journal client exposing attestation or quarantine-administration authority", "missing Windows identity ACL native ABI Job Object or production no-later-write evidence"],
+    "policyIds": ["SOUL-ISO-001", "CMD-IDEMP-001", "RESULT-VERIFY-001", "EDGE-NORESTART-001"]
+  },
+  "tests": {
+    "requiredOutcome": "PASS",
+    "failureOutcomes": ["FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"],
+    "suites": [
+      {
+        "id": "windows-edge-worker.unit",
+        "type": "unit",
+        "required": true,
+        "command": "bash Modules/windows-edge-worker/operations/test.sh Unit",
+        "environment": "macos or Windows with .NET 10",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "windows-edge-worker.contract",
+        "type": "contract",
+        "required": true,
+        "command": "bash Modules/windows-edge-worker/operations/test.sh Contract",
+        "environment": "macos or Windows with .NET 10; audited wrapper floor is 1 and the candidate policy injects the higher Contract test-count floor",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "windows-edge-worker.provider-contracts",
+        "type": "contract",
+        "required": true,
+        "command": "python3.12 -m unittest discover -s Modules/windows-edge-worker/tests -p test_provider_contracts.py",
+        "environment": "repository-pinned Python 3.12.13 with locked jsonschema; exact 55-case Supervisor and Journal owner corpora, both drain auth profiles, final Journal checksum profile, and Executor-owned native.stop.proof/v1 bounded quarantine vectors with no local schema fork or runtime emission edge",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "windows-edge-worker.failure-simulation",
+        "type": "integration",
+        "required": true,
+        "command": "bash Modules/windows-edge-worker/operations/test.sh Integration",
+        "environment": "deterministic transport plus real local-process crash/restart, fencing, file-integrity, effective-user ownership, non-regular-file rejection, permissions, resource limits, and legacy native.stop.proof/v1 zero-call zero-wire quarantine/restart diagnostics without Windows, ZennoDroid, production keys, or devices; audited wrapper floor is 1 and the candidate policy injects the higher Integration test-count floor",
+        "evidenceLevel": "INTEGRATION_VERIFIED"
+      }
+    ]
+  },
+  "compatibility": {
+    "policyRef": "governance/policies/compatibility-policy.yaml",
+    "track": "modern",
+    "moduleMajor": 0,
+    "supportedContractMajors": {"edge.worker.exchange": [1], "edge.worker.drain.directive": [1], "edge.worker.drain.receipt": [1], "edge.journal.append": [1], "edge.journal.receipt": [1], "native.stop.proof": [1]},
+    "unknownMajorBehavior": "reject",
+    "missingMajorBehavior": "reject",
+    "unknownModeBehavior": "reject",
+    "missingModeBehavior": "reject"
+  },
+  "rollout": {
+    "featureFlag": "windows_edge_worker_v1",
+    "canary": "shadow then bounded device_binding_id cohort selected by the supervisor",
+    "rollback": "stop intake, drain, reconcile, and atomically route bindings to the previous exact worker artifact",
+    "killSwitch": "kill_edge_command_intake"
+  },
+  "deviceGates": {
+    "requiresWindows": true,
+    "requiresZennoDroid": true,
+    "requiresAdb": true,
+    "minimumVerification": "WINDOWS_VERIFIED"
+  },
+  "agents": {
+    "spec": "dps.agents/v1",
+    "policyVersion": "1.0.0",
+    "instructionsFile": "AGENTS.md",
+    "manifestFile": "module.yaml",
+    "receiptRequired": true,
+    "resolver": "factory-instruction-resolver"
+  }
+}

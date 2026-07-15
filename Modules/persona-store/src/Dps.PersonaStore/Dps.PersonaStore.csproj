@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><TargetFramework>net10.0</TargetFramework><AssemblyName>Dps.PersonaStore</AssemblyName><RootNamespace>Dps.PersonaStore</RootNamespace></PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+    <ProjectReference Include="../../contracts/Dps.PersonaStore.Contracts/Dps.PersonaStore.Contracts.csproj" />
+    <ProjectReference Include="../../../binding/contracts/Dps.Binding.Contracts/Dps.Binding.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../migrations/001_create_persona_store.sql"
+                      LogicalName="Dps.PersonaStore.Migrations.001_create_persona_store.sql" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Dps.PersonaStore.Tests" />
+  </ItemGroup>
+</Project>

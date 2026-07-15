@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {"id": "factory-trusted-runner", "name": "Factory Trusted Runner", "version": "0.1.0", "description": "Runs exact trusted argv without a shell, verifies fencing, and emits fail-closed hashed test evidence.", "lifecycle": "proposed", "runtimeState": "proposed", "releaseEligible": false, "riskTier": "R3", "ownerId": "dps-ai-factory"},
+  "paths": {"actualRoot": "Modules/factory-trusted-runner", "canonicalRoot": "modules/factory-trusted-runner", "owned": ["Modules/factory-trusted-runner/**"], "excluded": [], "runtimeData": ["external isolated runner workspace and evidence store"]},
+  "artifacts": [
+    {"id": "dps.factory-trusted-runner", "kind": "service", "status": "proposed", "build": "python3.12 -m unittest discover -s Modules/factory-trusted-runner/tests -p 'test_*.py'", "versioning": "semver"},
+    {"id": "dps.factory-trusted-runner.contracts", "kind": "contract-pack", "status": "proposed", "build": "python3.12 -m unittest Modules/factory-trusted-runner/tests/test_contracts.py", "versioning": "semver"}
+  ],
+  "runtime": {"track": "modern-service", "language": "Python 3.12", "target": "CPython 3.12.13", "processBoundary": "out-of-process", "entrypoints": ["Modules/factory-trusted-runner/src/cli.py", "Modules/factory-trusted-runner/src/trusted_runner.py"], "toolchainStatus": "proposed"},
+  "contracts": {
+    "provided": [{"contractId": "trusted.test.result", "major": 1, "source": "Modules/factory-trusted-runner/contracts/provided/trusted.test.result.v1.schema.json", "status": "proposed", "mode": "active", "ownerModule": "factory-trusted-runner"}],
+    "consumed": [
+      {"contractId": "instruction.receipt", "major": 1, "source": "Modules/factory-instruction-resolver/contracts/provided/instruction.receipt.v1.schema.json", "status": "proposed", "mode": "active", "ownerModule": "factory-instruction-resolver"},
+      {"contractId": "worktree.plan", "major": 1, "source": "Modules/factory-worktree-manager/contracts/provided/worktree.plan.v1.schema.json", "status": "proposed", "mode": "active", "ownerModule": "factory-worktree-manager"},
+      {"contractId": "worktree.lease", "major": 1, "source": "Modules/factory-worktree-manager/contracts/provided/worktree.lease.v1.schema.json", "status": "proposed", "mode": "active", "ownerModule": "factory-worktree-manager"},
+      {"contractId": "merge.request", "major": 1, "source": "Modules/factory-merge-controller/contracts/provided/merge.request.v1.schema.json", "status": "proposed", "mode": "active", "ownerModule": "factory-merge-controller"}
+    ]
+  },
+  "communication": {
+    "inbound": [
+      {"peerModule": "factory-instruction-resolver", "contractId": "instruction.receipt", "major": 1, "direction": "inbound", "transport": "receipt", "timeoutMs": 5000, "retryPolicy": "at-least-once-by-receipt-id", "idempotencyKey": "receipt_id", "authScope": "factory:instruction-receipt:read", "failureMode": "reject-stale-receipt"},
+      {"peerModule": "factory-worktree-manager", "contractId": "worktree.plan", "major": 1, "direction": "inbound", "transport": "command", "timeoutMs": 5000, "retryPolicy": "same-plan-id", "idempotencyKey": "plan_id", "authScope": "factory:trusted-runner:plan", "failureMode": "refuse-unknown-plan"},
+      {"peerModule": "factory-worktree-manager", "contractId": "worktree.lease", "major": 1, "direction": "inbound", "transport": "receipt", "timeoutMs": 5000, "retryPolicy": "same-lease-id-and-fencing-token", "idempotencyKey": "lease_id:fencing_token", "authScope": "factory:trusted-runner:lease", "failureMode": "refuse-stale-or-revoked-lease"}
+    ],
+    "outbound": [
+      {"peerModule": "factory-merge-controller", "contractId": "merge.request", "major": 1, "direction": "outbound", "transport": "command", "timeoutMs": 30000, "retryPolicy": "caller-retries-same-idempotency-key", "idempotencyKey": "merge_request_id:merge_commit", "authScope": "factory:merge-request", "failureMode": "retain-evidence-and-stop-merge"},
+      {"peerModule": "factory-control-plane-host", "contractId": "trusted.test.result", "major": 1, "direction": "outbound", "transport": "receipt", "timeoutMs": 300000, "retryPolicy": "same-request-id-and-payload-sha256", "idempotencyKey": "workflow_id:request_id", "authScope": "factory:host:evidence", "failureMode": "required-non-pass-stops"}
+    ]
+  },
+  "dependencies": [
+    {"moduleId": "factory-instruction-resolver", "versionRange": ">=0.1.0 <1.0.0", "required": true, "reason": "fresh instruction receipt"},
+    {"moduleId": "factory-worktree-manager", "versionRange": ">=0.1.0 <1.0.0", "required": true, "reason": "owned plan and active fenced lease"}
+  ],
+  "permissions": {"allowed": ["run exact trusted argv with shell disabled", "hash bounded output and emit evidence"], "denied": ["request-authored command", "shell interpreter", "untrusted environment", "role self-assignment", "production secret", "release approval"], "productionApproval": "human-required"},
+  "data": {"ownedStores": [], "readModels": ["trusted runner policy", "active lease fence"], "privacyClasses": ["internal"], "retention": "evidence hashes are written to the external Factory evidence ledger", "export": "export command metadata and hashes, never raw secret-bearing output", "correction": "rerun under a new request and evidence id", "deletion": "raw bounded process output is discarded after hashing"},
+  "security": {"trustBoundaries": ["trusted policy digest", "isolated subprocess", "active fencing verifier"], "secretScopes": [], "untrustedInputs": ["run request", "worktree content", "process output", "environment"], "failClosedOn": ["unknown template", "argv mismatch", "shell token", "stale fence", "symlink", "timeout", "skip or partial", "role overlap"], "policyIds": ["SOUL-ISO-001", "CMD-IDEMP-001", "RESULT-VERIFY-001", "GBRAIN-READBACK-001", "EDGE-NORESTART-001"]},
+  "tests": {"requiredOutcome": "PASS", "failureOutcomes": ["FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"], "suites": [{"id": "factory-trusted-runner.unit", "type": "unit", "required": true, "command": "python3.12 -m unittest Modules/factory-trusted-runner/tests/test_trusted_runner.py", "environment": "CPython 3.12 standard library and synthetic subprocess fixtures", "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"}, {"id": "factory-trusted-runner.contract", "type": "contract", "required": true, "command": "python3.12 -m unittest Modules/factory-trusted-runner/tests/test_contracts.py", "environment": "CPython 3.12 with hash-locked jsonschema; Draft 2020-12 positive and fail-closed negative instances", "evidenceLevel": "CONTRACT_VERIFIED"}]},
+  "compatibility": {"policyRef": "governance/policies/compatibility-policy.yaml", "track": "factory", "moduleMajor": 0, "supportedContractMajors": {"instruction.receipt": [1], "worktree.plan": [1], "worktree.lease": [1], "merge.request": [1], "trusted.test.result": [1]}, "unknownMajorBehavior": "reject", "missingMajorBehavior": "reject", "unknownModeBehavior": "reject", "missingModeBehavior": "reject"},
+  "rollout": {"featureFlag": "factory_trusted_runner_v1", "canary": "synthetic fixture execution only before separately approved isolated shadow", "rollback": "disable new execution and route to the previous signed runner while retaining evidence hashes", "killSwitch": "factory_disable_trusted_execution"},
+  "deviceGates": {"requiresWindows": false, "requiresZennoDroid": false, "requiresAdb": false, "minimumVerification": "CONTRACT_VERIFIED"},
+  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true, "resolver": "factory-instruction-resolver"}
+}

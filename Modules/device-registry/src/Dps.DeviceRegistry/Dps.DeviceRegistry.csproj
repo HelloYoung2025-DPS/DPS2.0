@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Dps.DeviceRegistry</AssemblyName>
+    <RootNamespace>Dps.DeviceRegistry</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+    <ProjectReference Include="../../contracts/Dps.DeviceRegistry.Contracts/Dps.DeviceRegistry.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Dps.DeviceRegistry.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../migrations/001_create_device_registry.sql"
+                      LogicalName="Dps.DeviceRegistry.Migrations.001_create_device_registry.sql" />
+    <EmbeddedResource Include="../../migrations/002_add_binding_reservations.sql"
+                      LogicalName="Dps.DeviceRegistry.Migrations.002_add_binding_reservations.sql" />
+    <EmbeddedResource Include="../../migrations/003_require_keyed_fingerprint_contract.sql"
+                      LogicalName="Dps.DeviceRegistry.Migrations.003_require_keyed_fingerprint_contract.sql" />
+  </ItemGroup>
+</Project>

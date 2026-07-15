@@ -29,13 +29,23 @@ public class RuntimeTestRunner
     {
         _project = projectObj;
         _instance = instanceObj;
-        
-        CoreHelper.Init(projectObj);
-        
+        _testResults.Clear();
+
+        try
+        {
+            CoreHelper.Init(projectObj);
+        }
+        catch (Exception ex)
+        {
+            return "FAILED: INFRA_ERROR - CoreHelper 初始化失败: " + ex.Message;
+        }
+
         string projectRoot = CoreHelper.GetVar("project_root", "");
         if (string.IsNullOrEmpty(projectRoot))
         {
-            return "ERROR: project_root 未设置";
+            CoreHelper.SetVar("test_result", "NOT_RUN");
+            CoreHelper.SetVar("test_evidence_result", "NOT_RUN");
+            return "FAILED: NOT_RUN - project_root 未设置";
         }
         
         CoreHelper.Log(TAG, "========================================");
@@ -134,19 +144,34 @@ public class RuntimeTestRunner
         CoreHelper.Log(TAG, string.Format("总计: {0} 通过, {1} 失败", passed, failed));
         CoreHelper.Log(TAG, "========================================");
         
-        // 保存测试报告
-        SaveTestReport(projectRoot, passed, failed);
-        
-        if (failed == 0)
+        // 保存测试报告。报告缺失属于基础设施失败，不能由日志中的 PASS 覆盖。
+        bool reportSaved = SaveTestReport(projectRoot, passed, failed);
+
+        if (!reportSaved)
+        {
+            CoreHelper.SetVar("test_result", "INFRA_ERROR");
+            CoreHelper.SetVar("test_evidence_result", "INFRA_ERROR");
+            return "FAILED: INFRA_ERROR - 运行时测试报告未保存";
+        }
+
+        if (passed + failed == 0)
+        {
+            CoreHelper.SetVar("test_result", "NOT_RUN");
+            CoreHelper.SetVar("test_evidence_result", "NOT_RUN");
+            return "FAILED: NOT_RUN - 没有执行任何测试";
+        }
+
+        if (failed == 0 && passed > 0)
         {
             CoreHelper.SetVar("test_result", "ALL_PASS");
+            CoreHelper.SetVar("test_evidence_result", "PASS");
             return "SUCCESS: 所有测试通过";
         }
-        else
-        {
-            CoreHelper.SetVar("test_result", "SOME_FAIL");
-            return string.Format("PARTIAL: {0} 通过, {1} 失败", passed, failed);
-        }
+
+        string evidenceResult = passed > 0 ? "PARTIAL" : "FAIL";
+        CoreHelper.SetVar("test_result", evidenceResult);
+        CoreHelper.SetVar("test_evidence_result", evidenceResult);
+        return string.Format("FAILED: {0} - {1} 通过, {2} 失败", evidenceResult, passed, failed);
     }
     
     /// <summary>
@@ -217,7 +242,7 @@ public class RuntimeTestRunner
             string visionStatus = CoreHelper.GetVar("vision_corrector_status", "");
             CoreHelper.Log(TAG, "[测试2] VisionCorrector 状态: " + visionStatus);
             
-            if (initResult.Contains("SUCCESS"))
+            if (initResult == "SUCCESS" || initResult.StartsWith("SUCCESS:"))
             {
                 CoreHelper.Log(TAG, "[测试2] ✓ 项目初始化成功");
                 return true;
@@ -255,6 +280,13 @@ public class RuntimeTestRunner
             string result = AppExplorer.Explore(_project, _instance, "com.instagram.android", manifestPath);
             
             CoreHelper.Log(TAG, "[测试3] AppExplorer 结果: " + result);
+
+            if (string.IsNullOrEmpty(result) ||
+                (result != "SUCCESS" && !result.StartsWith("SUCCESS:")))
+            {
+                CoreHelper.LogErr(TAG, "[测试3] AppExplorer 未返回明确 SUCCESS");
+                return false;
+            }
             
             // 验证生成的 manifest 文件
             if (File.Exists(manifestPath))
@@ -417,8 +449,8 @@ public class RuntimeTestRunner
             
             CoreHelper.Log(TAG, "[测试6] VisionCorrector 结果: " + result);
             
-            // 验证结果不是错误
-            if (!result.StartsWith("ERROR:"))
+            // 只有明确 SUCCESS 才能放行；未知、PARTIAL 或其他状态全部失败关闭。
+            if (result == "SUCCESS" || result.StartsWith("SUCCESS:"))
             {
                 CoreHelper.Log(TAG, "[测试6] ✓ VisionCorrector 视觉分析成功");
                 return true;
@@ -447,7 +479,7 @@ public class RuntimeTestRunner
     /// <summary>
     /// 保存测试报告
     /// </summary>
-    private static void SaveTestReport(string projectRoot, int passed, int failed)
+    private static bool SaveTestReport(string projectRoot, int passed, int failed)
     {
         try
         {
@@ -473,10 +505,12 @@ public class RuntimeTestRunner
             
             File.WriteAllText(reportPath, report);
             CoreHelper.Log(TAG, "测试报告已保存: " + reportPath);
+            return true;
         }
         catch (Exception ex)
         {
             CoreHelper.LogErr(TAG, "保存测试报告失败: " + ex.Message);
+            return false;
         }
     }
 }

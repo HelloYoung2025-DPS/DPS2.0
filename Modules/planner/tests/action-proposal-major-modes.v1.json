@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "dps.contract-major-modes/v1",
+  "contractId": "action.proposal",
+  "ownerModule": "planner",
+  "unknownMajorMode": "reject",
+  "majors": [
+    {
+      "major": 1,
+      "mode": "quarantine-only",
+      "plannerMayProduce": false,
+      "proposalCarriesExecutionAuthority": false,
+      "downstreamPromotionEligible": false
+    },
+    {
+      "major": 2,
+      "mode": "active",
+      "plannerMayProduce": true,
+      "proposalCarriesExecutionAuthority": false,
+      "downstreamPromotionEligible": true
+    }
+  ]
+}

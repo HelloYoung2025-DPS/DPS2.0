@@ -1,0 +1,173 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {
+    "id": "planner",
+    "name": "Planner",
+    "version": "0.2.0",
+    "description": "Shadow-only deterministic boundary whose current path emits strict action.proposal/v2 typed-digest proposals; v1 is deprecated shadow/quarantine read compatibility only.",
+    "lifecycle": "proposed",
+    "runtimeState": "proposed",
+    "releaseEligible": false,
+    "riskTier": "R3",
+    "ownerId": "dps-control-plane"
+  },
+  "paths": {
+    "actualRoot": "Modules/planner",
+    "canonicalRoot": "modules/planner",
+    "owned": ["Modules/planner/**"],
+    "excluded": [],
+    "runtimeData": []
+  },
+  "artifacts": [
+    {
+      "id": "dps.planner",
+      "kind": "assembly",
+      "status": "proposed",
+      "build": "scripts/dotnet-pinned.sh restore Modules/planner/src/Dps.Planner/Dps.Planner.csproj --locked-mode && scripts/dotnet-pinned.sh build Modules/planner/src/Dps.Planner/Dps.Planner.csproj --configuration Release --no-restore",
+      "versioning": "semver"
+    },
+    {
+      "id": "dps.planner.contracts",
+      "kind": "contract-pack",
+      "status": "proposed",
+      "build": "scripts/dotnet-pinned.sh restore Modules/planner/contracts/provided/Dps.Planner.Contracts/Dps.Planner.Contracts.csproj --locked-mode && scripts/dotnet-pinned.sh build Modules/planner/contracts/provided/Dps.Planner.Contracts/Dps.Planner.Contracts.csproj --configuration Release --no-restore",
+      "versioning": "semver"
+    }
+  ],
+  "runtime": {
+    "track": "modern-service",
+    "language": "C# 14",
+    "target": "net10.0",
+    "processBoundary": "modular-monolith",
+    "entrypoints": ["Modules/planner/src/Dps.Planner/ShadowActionPlanner.cs"],
+    "toolchainStatus": "proposed"
+  },
+  "contracts": {
+    "provided": [
+      {
+        "contractId": "action.proposal",
+        "major": 1,
+        "source": "Modules/planner/contracts/provided/action.proposal.v1.schema.json",
+        "status": "deprecated",
+        "mode": "quarantine-only",
+        "ownerModule": "planner"
+      },
+      {
+        "contractId": "action.proposal",
+        "major": 2,
+        "source": "Modules/planner/contracts/provided/action.proposal.v2.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "planner"
+      }
+    ],
+    "consumed": []
+  },
+  "communication": {
+    "inbound": [],
+    "outbound": [
+      {
+        "peerModule": "policy-approval",
+        "contractId": "action.proposal",
+        "major": 2,
+        "direction": "outbound",
+        "transport": "in-process-api",
+        "timeoutMs": 2000,
+        "retryPolicy": "none-shadow-recompute-is-deterministic",
+        "idempotencyKey": "soul_id:device_binding_id:platform_account_id:idempotency_key",
+        "authScope": "module:policy-approval",
+        "failureMode": "fail-closed-no-proposal"
+      }
+    ]
+  },
+  "dependencies": [],
+  "permissions": {
+    "allowed": ["pure-computation:shadow-action-proposal"],
+    "denied": ["action approval", "device command", "external side effect", "GBrain network", "production shell"],
+    "productionApproval": "human-required"
+  },
+  "data": {
+    "ownedStores": [],
+    "readModels": [],
+    "privacyClasses": ["internal", "personal"],
+    "retention": "no durable storage in the initial slice",
+    "export": "proposal DTO may be exported through its versioned contract",
+    "correction": "submit a new scoped proposal; prior proposals remain auditable",
+    "deletion": "no owned durable data; downstream owner performs scoped erasure"
+  },
+  "security": {
+    "trustBoundaries": ["untrusted model suggestion to deterministic proposal boundary"],
+    "secretScopes": [],
+    "untrustedInputs": ["model suggestion", "action parameters", "identity context", "timestamps"],
+    "failClosedOn": ["unknown action", "unknown or missing parameter", "unknown contract version", "invalid or PII-shaped identity", "invalid UTF-8 or prompt-shaped reference", "non-shadow request"],
+    "policyIds": ["SOUL-ISO-001", "CMD-IDEMP-001", "RESULT-VERIFY-001", "GBRAIN-READBACK-001", "EDGE-NORESTART-001"]
+  },
+  "tests": {
+    "requiredOutcome": "PASS",
+    "failureOutcomes": ["FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"],
+    "suites": [
+      {
+        "id": "planner.unit",
+        "type": "unit",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/planner/tests/Dps.Planner.Tests/Dps.Planner.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/planner/tests/Dps.Planner.Tests/Dps.Planner.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Unit --minimum-expected-tests 13 --fail-skips on",
+        "environment": "macos-or-hosted deterministic in-memory shadow-only tests",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "planner.contract",
+        "type": "contract",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/planner/tests/Dps.Planner.Tests/Dps.Planner.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/planner/tests/Dps.Planner.Tests/Dps.Planner.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Contract --minimum-expected-tests 7 --fail-skips on",
+        "environment": "macos-or-hosted strict action.proposal/v2 C# wire codec against the shared typed-reference adversarial corpus plus v1 deprecated shadow-read separation",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "planner.contract-schema",
+        "type": "contract",
+        "required": true,
+        "command": "python3.12 -m unittest Modules/planner/tests/test_action_proposal_schema.py",
+        "environment": "pinned Python 3.12.13 with locked jsonschema; six Draft 2020-12 schema and wire cases over the v2 typed-reference corpus plus v1 separation",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "planner.real-local-process",
+        "type": "integration",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/planner/tests/Dps.Planner.Tests/Dps.Planner.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/planner/tests/Dps.Planner.Tests/Dps.Planner.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Integration --minimum-expected-tests 7 --fail-skips on",
+        "environment": "REAL_LOCAL_PROCESS checked-in explicit xUnit child-process fixture over the production ShadowActionPlanner and strict action.proposal/v2 codec; all seven required cases start independent child processes and cover typed-reference attacks, serialized file IPC, forced kill after an atomically published PID-bound ready proof but before proposal publication, restart replay, proposal scope/identity/shadow tampering, v1 production-boundary rejection, prompt/role attacks, and fail-closed unknown major/action cases; no mock planner, SQL, GBrain, network, device, execution, approval, Windows, ZennoDroid, ADB, canary, or production claim; exact cases bound by Modules/planner/tests/required-real-local-process-tests.v1.json",
+        "evidenceLevel": "INTEGRATION_VERIFIED"
+      }
+    ]
+  },
+  "compatibility": {
+    "policyRef": "governance/policies/compatibility-policy.yaml",
+    "track": "modern",
+    "moduleMajor": 0,
+    "supportedContractMajors": {"action.proposal": [1, 2]},
+    "unknownMajorBehavior": "reject",
+    "missingMajorBehavior": "reject",
+    "unknownModeBehavior": "reject",
+    "missingModeBehavior": "reject"
+  },
+  "rollout": {
+    "featureFlag": "planner_shadow_v2",
+    "canary": "shadow comparison only, then separately approved bounded Soul cohort",
+    "rollback": "disable planner_shadow_v2 and route to the previous signed Release BOM; v1 remains quarantine-only and cannot become an execution fallback",
+    "killSwitch": "kill_planner"
+  },
+  "deviceGates": {
+    "requiresWindows": false,
+    "requiresZennoDroid": false,
+    "requiresAdb": false,
+    "minimumVerification": "INTEGRATION_VERIFIED"
+  },
+  "agents": {
+    "spec": "dps.agents/v1",
+    "policyVersion": "1.0.0",
+    "instructionsFile": "AGENTS.md",
+    "manifestFile": "module.yaml",
+    "receiptRequired": true,
+    "resolver": "factory-instruction-resolver"
+  }
+}

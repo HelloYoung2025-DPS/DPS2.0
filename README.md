@@ -1,53 +1,72 @@
-# DPS v4.5 "Universal Framework" - 通用 APP 自动化框架
+# DPS - ZennoDroid Device Agent Platform
 
-> **版本**: v4.5.10  
-> **更新**: 2026-03-04  
-> **平台**: ZennoDroid 7.x+  
-> **架构**: 意图驱动 + JSON 操作编排 + 按需视觉验证
+> **当前状态**: Legacy modernization in progress
+>
+> **代码基线**: 现有 v4.x 研究原型
+>
+> **目标平台**: DPS Control Plane + GBrain Company + ZennoDroid Thin Executor
+>
+> **当前正式签发证据级别**: `NONE`（未提交工作区不能通过 clean-checkout 正式 Phase 0；workspace diagnostic 不签发等级）
+>
+> **尚未取得**: `REPOSITORY_STATIC_VERIFIED`, `CONTRACT_VERIFIED`, `INTEGRATION_VERIFIED`, `WINDOWS_VERIFIED`, `DEVICE_VERIFIED`, `CANARY_VERIFIED`, `SCALE_VERIFIED`
+
+重要: 目前已有定向静态、合同和单元诊断通过；需要 PostgreSQL 的必需套件在本机未提供受信测试实例时按设计失败关闭，不得被记为集成通过。未提交工作区也不能形成可归属到精确提交的正式证据；workspace diagnostic 即使通过也不签发仓库级验证称号。即使未来静态门通过，它也不证明 Windows ZennoDroid 可装载、手机动作成功、灰度安全或 200 台规模能力. 现有 v4.x 运行代码是待迁移的 legacy baseline; 新模块除非其 `module.yaml`, 源码, 自动测试和证据共同证明, 一律视为 `proposed`, 不能因目录或文档存在而视为已实现. 目标架构见 [TargetArchitecture_目标架构.md](Docs/Architecture/TargetArchitecture_目标架构.md), 工程验收规则见 [EngineeringStandards_工程标准.md](Docs/EngineeringStandards_工程标准.md).
 
 ---
 
 ## 🎯 项目简介
 
-DPS v4.5 是一个**通用 APP 自动化框架**，通过 **意图驱动**、**ActionExecutor + operations.json** 和 **Manifest 配置**实现多平台自动化操作。
+DPS 当前是一个正在重构的 ZennoDroid 设备自动化研究项目. 现有代码保留意图, operation 和原生动作实验; 这些能力尚未获得现代化生产验收. 新架构计划由 Control Plane 管理身份与命令, GBrain Company 保存每个 Soul 的长期 Persona, Interests 和记忆, ZennoDroid 只执行经过授权的确定性步骤.
 
-### 核心特性
+### 当前代码与目标方向
 
-- ✅ **意图驱动架构** - 清晰的"大脑-手"分层
-- ✅ **统一操作编排** - 多 APP 复用同一套 ActionExecutor + operations.json 能力
-- ✅ **通用 APP 支持** - 通过 YAML 配置添加新 APP
-- ✅ **自动探索能力** - 自动分析 APP 结构生成 Manifest
-- ✅ **按需视觉纠错** - 仅在异常时触发 AI 验证（性能优化 90%+）
-- ✅ **拟人化执行** - 随机延迟、贝塞尔曲线滑动
-- ✅ **多设备并发** - 同时控制多部手机
-- ✅ **会话成功门控** - v4.5.8 起要求有效成功率 `>=95%` 且最少成功动作数达标
+| 能力 | 当前事实 | 验证边界 |
+|---|---|---|
+| Intent, operation, ActionExecutor | Legacy 源码和配置存在 | 尚未完成 contract 和 real-device 证明 |
+| Manifest 和 App Onboarder | Legacy 工具与样例存在 | 尚未证明任意 APP 可安全接入 |
+| Vision 和 humanization | Legacy 实验代码存在 | 历史性能数字未在当前基线复验 |
+| 多设备与会话门控 | 迁移对象 | 尚未达到跨 Soul, 设备和账号隔离门 |
+| GBrain Soul memory | 离线 candidate 已实现; Company 实连仍为 Proposed | 需 GBrain Source 隔离, 精确读回, checksum, 删除/重建和两部非生产手机证明 |
+| Thin ZennoDroid executor | Proposed | 需 Windows 探测, A/B 和 Zenno 不重启证明 |
 
-### 架构亮点
+### 目标边界, Proposed
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│ DPS (大脑) - 决策层                                       │
-│                                                         │
-│ 1. 感知（Gemini Flash 视觉分析）                            │
-│ 2. 记忆（历史行为、兴趣偏好）                                 │
-│ 3. 决策（规则引擎 + 人格模型）                               │
-│ 4. 验证（执行结果视觉检查）                                   │
-└────────────────────────┬────────────────────────────────┘
-                         │ Intent (意图)
-                         ▼
-┌─────────────────────────────────────────────────────────┐
-│ ZennoDroid (手) - 执行层                                     │
-│                                                         │
-│ • 接收命令（坐标、滑动参数）                                │
-│ • 元素定位（XML 路径、resource-id）                         │
-│ • 拟人化执行（曲线、随机延迟）                                 │
-│ • 异常处理（超时、弹窗、网络错误）                             │
-└─────────────────────────────────────────────────────────┘
+DPS AI Factory --upgrade artifacts and evidence--> DPS Control Plane
+                                                       |
+                                     +-----------------+-----------------+
+                                     |                                   |
+                             GBrain Company                       Windows Edge
+                          Persona and memory                 queue and A/B worker
+                                                                         |
+                                                                   ZennoDroid
+                                                            deterministic executor
 ```
+
+### 当前现代化工作区事实
+
+下表描述未提交工作区中已能运行的 candidate/foundation, 不是正式签发等级:
+
+| 范围 | 当前可执行事实 | 仍缺的出口证据 |
+|---|---|---|
+| F0-F1 Governance | 所有注册模块的 Manifest、AGENTS、公共合同、套件、DAG 和兼容关系均由唯一门禁现场重建；文档不另存易漂移的数量副本 | 当前工作区非干净; 受保护提交和 clean-checkout 正式 Phase 0 尚未形成 |
+| Contract candidate | 唯一候选 Runner 必须精确匹配当前 Manifest 清单、受信策略、收据、测试树和证据摘要；任一漂移均失败 | Runner 固定为 unsigned；`candidate_verification_level` 和 `verification_level` 均为 `null`，不构成 `CONTRACT_VERIFIED` |
+| Integration candidate | 套件明确区分真实 PostgreSQL、真实本地子进程、确定性模拟与外部设备；门禁从当前 Manifest 计算覆盖缺口 | 本机未配置受信 PostgreSQL；缺基础设施、覆盖缺口或任一必需套件非 `PASS` 时必须失败 |
+| F2 Soul vertical slice | 已有 Soul resolve、append-only event/outbox、interest decay、离线 GBrain projection 和 evidence bundle 的 PostgreSQL 实现与必需测试 | 本轮环境无法执行真实 PostgreSQL 套件；独立证据签发及生产数据库权限也未配置 |
+| F3-F4 AI Factory | 已实现外部 PostgreSQL lease/evidence、monotonic fence、真实临时 Git worktree 并行/依赖排序/合并头重测、受限 Runner、artifact/SBOM/provenance、BOM、发布与回滚状态机及故障注入模拟 | 当前模拟不是 100 台持续或 200 台突发真实并发；外部 signer、默认分支保护、两人审批和已部署上一稳定 Factory 尚未证明 |
+| F5 Product modules | identity、device/account/binding、persona、planner/policy/compiler/orchestrator/executor/audit 等模块已有独立源码、合同、锁文件和分类测试 | Legacy SessionRunner 仅完成字节/签名/Golden Trace 静态冻结，尚未真实绞杀接线；需要 Integration 但没有套件的模块由门禁动态列为阻断；Bridge/Edge ABI 与后续迁移还需目标 Windows 探测 |
+| F6 Edge foundation | .NET 10 A/B Supervisor/Worker/Journal 与 `net40`/C# 5 Bridge 已有分层源码、合同与失败关闭测试；仍属候选基础 | 生产 Host/ABI 组合必须在目标 Windows 能力探测后定稿；真实 Windows、ZennoDroid、ADB、100 次切换、PID/启动时间不变和 24 小时证据为 `WAITING_EXTERNAL` |
+| F7-F9 External gates | GBrain/双非生产手机/30 台/200 台输入 Schema, 固定信任策略和失败关闭验证器已存在 | 实际 GBrain 读回, 真机, 灰度, 回滚演练, 72 小时和规模证据均为 `WAITING_EXTERNAL` |
+
+当前正式等级仍为 `NONE`. 本地 Phase 0 diagnostic 或 Contract/Integration candidate 即使通过，也不签名、不归属正式提交、不签发任何验证等级。正式升级还需要受保护提交、clean-checkout 重测、外部受信 Runner、独立证据签发者和独立发布批准者。详细的仓库外权限条件见 [RepositoryProtection_仓库保护.md](Docs/Operations/RepositoryProtection_仓库保护.md), 本地 GBrain 运维边界见 [GBrainCompany_LocalNonProduction_本地非生产.md](Docs/Operations/GBrainCompany_LocalNonProduction_本地非生产.md), F6-F9 输入边界见 [ExternalVerification_F6-F9_外部验收.md](Docs/Platforms/ExternalVerification_F6-F9_外部验收.md).
+
+本地 Phase 0 和 Candidate 默认每次写入唯一 run-id 目录，不覆盖已提交证据。Hosted CI 虽显式使用一次性 canonical 目录，artifact 仍必须上传整个目录；如果其中存在 `.publication.lock`，下载后的 reader 仍拒绝该证据。
 
 ---
 
-## 🚀 快速开始
+## 🚀 Legacy 研究入口, 非生产验收
+
+以下步骤只用于理解和复现现有 v4.x 研究代码. 它们不构成新 Control Plane, GBrain, Windows Edge 或真机门禁的安装说明, 也不得用于未授权账号或平台行为.
 
 ### 方式1: 现有项目升级
 
@@ -60,7 +79,7 @@ DPS v4.5 是一个**通用 APP 自动化框架**，通过 **意图驱动**、**A
 **必需**:
 - ZennoDroid 7.x+ 已安装
 - Android 模拟器或真机已连接
-- 项目路径设置：`project_root = /path/to/DPS_v4.5/`
+- 项目路径设置：`project_root = /absolute/path/to/DSP_ZD/`
 
 **可选**（如需视觉纠错）:
 - Gemini API 密钥（配置在 `Config/AIConfig.json`）
@@ -71,7 +90,7 @@ DPS v4.5 是一个**通用 APP 自动化框架**，通过 **意图驱动**、**A
 
 在 ZennoDroid 中设置：
 ```
-project_root = /Users/hofishvn/openCode_Projects/DPS_v4.5/
+project_root = /absolute/path/to/DSP_ZD/
 ```
 
 ##### 配置 AI（可选）
@@ -108,6 +127,24 @@ project.SendInfoToLog("执行结果: " + result.Status);
 ---
 
 ## 📁 目录结构
+
+所有新模块使用唯一治理目录. 逻辑规范记作 `modules/<module-id>`, 但当前 macOS/Windows 大小写不敏感且已存在 legacy `Modules/`, 所以迁移期的真实物理目录使用 `Modules/<module-id>`. 不得尝试同时创建第二个 lowercase 目录. 模块状态以 `module.yaml` 和可执行证据为准:
+
+```text
+Modules/<module-id>/
+├── AGENTS.md
+├── module.yaml
+├── src/
+├── contracts/
+│   ├── provided/
+│   └── consumed/
+├── tests/
+├── migrations/
+├── operations/
+└── CHANGELOG.md
+```
+
+现有 `Core/`, loose `Modules/*.cs`, `Modules/Core/`, `ZDProjects/` 和 `Extensions/` 在迁移期作为 byte-preserved legacy runtime, 由 `legacy-runtime-adapter` 临时声明所有权, 不代表它们已经满足新模块标准. 下列目录树只是 legacy 快照:
 
 ```
 DPS_v4.5/
@@ -225,8 +262,9 @@ manifest:
 
 | 文档 | 用途 |
 |------|------|
+| **[Docs/ProjectTechnicalBook_项目技术书.md](Docs/ProjectTechnicalBook_项目技术书.md)** | 换电脑、换 AI 的完整事实基线、架构、环境、边界、F0–F9 与接手协议 |
 | **[Docs/ConfigGuide_配置指南.md](Docs/ConfigGuide_配置指南.md)** | 项目简介、核心概念、配置步骤 |
-| **[Docs/TechManual_技术手册.md](Docs/TechManual_技术手册.md)** | 系统架构、核心模块、测试方案、术语表 |
+| **[Docs/TechManual_技术手册.md](Docs/TechManual_技术手册.md)** | Legacy 历史参考；不得据此绕过当前 fail-closed Bridge 边界 |
 | **[Docs/GitWorkflow_Git工作流.md](Docs/GitWorkflow_Git工作流.md)** | Git 工作流规范 |
 | **[Docs/PlatformTemplate_平台模块模板.md](Docs/PlatformTemplate_平台模块模板.md)** | 新平台模块开发模板 |
 
@@ -248,7 +286,8 @@ manifest:
 
 | 文档 | 用途 |
 |------|------|
-| **[.omo/conventions_代码规范.md](.omo/conventions_代码规范.md)** | C# 语法约束、命名规范、代码模式 |
+| **[Docs/EngineeringStandards_工程标准.md](Docs/EngineeringStandards_工程标准.md)** | 构建、测试、契约、安全和发布标准 |
+| **[Docs/Architecture/TargetArchitecture_目标架构.md](Docs/Architecture/TargetArchitecture_目标架构.md)** | GBrain Soul memory 与 ZennoDroid 目标架构 |
 | **[Docs/Platforms/](Docs/Platforms/)** | 各平台指南（BabyCenter、Reddit 等） |
 
 ---
@@ -325,13 +364,15 @@ python Tools/app_onboarder/main.py --package com.example.app --key example
 
 ---
 
-## ⚡ 性能特性
+## ⚡ 历史性能声明, 当前未复验
+
+以下数字来自旧版本说明, 不属于当前 `REPOSITORY_STATIC_VERIFIED` 证据. 在可复现 benchmark, 原始结果和环境矩阵齐备前, 不得把这些数字用于发布或容量承诺.
 
 ### 快速模式（默认开启）
 
 - **正常操作**: 0ms 额外开销（仅 ZennoDroid 执行时间）
 - **失败操作**: ~2-5s（截图 + Gemini Flash 验证）
-- **性能提升**: 90%+ 相比每次验证版本
+- **历史声明**: 旧文档记录为 90%+; 当前未复验
 
 ### 智能缓存
 
@@ -427,7 +468,7 @@ python Tools/app_onboarder/main.py --package com.example.app --key example
 
 ## 🤝 贡献
 
-欢迎贡献和改进！请查看 **[GIT_WORKFLOW.md](Docs/GIT_WORKFLOW.md)** 了解协作流程。
+欢迎贡献和改进！请查看 **[GitWorkflow_Git工作流.md](Docs/GitWorkflow_Git工作流.md)** 了解协作流程。
 
 ---
 
@@ -441,4 +482,4 @@ python Tools/app_onboarder/main.py --package com.example.app --key example
 
 如有问题或建议，请提交 Issue 或 Pull Request。
 
-**DPS v4.5 - 让 APP 自动化更简单** 🚀
+**DPS - modernization and verification in progress**

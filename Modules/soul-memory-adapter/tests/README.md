@@ -1,0 +1,12 @@
+# Soul Memory Adapter tests
+
+The test layers are intentionally separate and may not substitute for one another.
+
+- `Unit` (minimum 5) checks deterministic preparation, exact verification, idempotency conflict, and unknown-major behavior without network.
+- `Contract` (minimum 5) checks the public schemas/codecs and the checked-in GBrain `0.42.42.0` MCP capability fixture.
+- `SecuritySimulation` (minimum 23) uses an in-process `HttpMessageHandler` protocol simulator. It opens no socket and cannot reach a real host. It covers OAuth protected-resource/authorization-server discovery, resource audience, per-Soul credentials, MCP preferred/negotiated versions and tools capability, initialized notification, session propagation/close, paginated capability verification, exact write/read-back, duplicate no-op, malformed/connection-loss/cancellation UNKNOWN reconciliation, active-vs-deleted enforcement, durable mutation-journal behavior, unresolved dispatch blocking a newer write until exact replay reconciliation, mutation-lease loss quarantine, stale delete replay after a newer rebuild, per-Soul serialized forward-only writes, cross-Source rejection, mandatory search Source and exact re-read, deterministic Persona current, soft-delete/rebuild, redirect denial, response-size limits, and malformed tool-result flags. It is labelled `SIMULATION` integration evidence and cannot satisfy a real-GBrain or device gate.
+- `Integration` (minimum 9 including theory rows) requires PostgreSQL 18.4 through `DPS_TEST_POSTGRES`. It runs the production event/outbox, reducer, projector, adapter, randomized offline fixture, duplicate/conflict, replay, and failure-recovery paths. Missing `DPS_TEST_POSTGRES` is a failure, never a skip; its evidence kind is `REAL_POSTGRESQL`.
+
+The PostgreSQL fixture enforces `verification_target=local-postgresql-offline-projection-fixture` and `live_gbrain=false`. It does not call or simulate GBrain Company. The loopback suite does not prove a real database or real GBrain. Neither suite proves Windows, ZennoDroid, a phone, F7, canary, scale, or `DEVICE_VERIFIED`.
+
+A future real-GBrain gate must use a separately provisioned non-production deployment and two isolated Souls, verify exact Source/revision/checksum read-back, search revalidation, Persona current, soft-delete/rebuild, credential isolation, export/correction/deletion evidence, and produce redacted raw evidence. It must never read secrets from repository files or print them.

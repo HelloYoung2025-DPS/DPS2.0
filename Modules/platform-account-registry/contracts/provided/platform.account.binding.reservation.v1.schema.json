@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/platform.account.binding.reservation.v1.schema.json",
+  "title": "platform.account.binding.reservation/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "contract_id", "producer_module", "soul_id", "device_binding_id", "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class", "reservation_id", "account_authorization_revision", "state", "lease_expires_at"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "contract_id": {"const": "platform.account.binding.reservation/v1"},
+    "producer_module": {"const": "platform-account-registry"},
+    "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time", "pattern": "^(?!0000-)\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])T(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d{1,7})?(?:Z|\\+00:00)$(?![\\s\\S])"},
+    "privacy_class": {"const": "sensitive"},
+    "reservation_id": {"type": "string", "pattern": "^bres_[a-f0-9]{64}$(?![\\s\\S])"},
+    "account_authorization_revision": {"type": "integer", "minimum": 1, "maximum": 9223372036854775807},
+    "state": {"enum": ["held", "active", "released"]},
+    "lease_expires_at": {"oneOf": [{"type": "string", "format": "date-time", "pattern": "^(?!0000-)\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])T(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d{1,7})?(?:Z|\\+00:00)$(?![\\s\\S])"}, {"type": "null"}]}
+  },
+  "allOf": [
+    {"if": {"properties": {"state": {"const": "held"}}}, "then": {"properties": {"lease_expires_at": {"type": "string", "format": "date-time", "pattern": "^(?!0000-)\\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\\d|3[01])T(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d{1,7})?(?:Z|\\+00:00)$(?![\\s\\S])"}}}},
+    {"if": {"properties": {"state": {"enum": ["active", "released"]}}}, "then": {"properties": {"lease_expires_at": {"type": "null"}}}}
+  ]
+}

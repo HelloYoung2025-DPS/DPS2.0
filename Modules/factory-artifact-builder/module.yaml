@@ -1,0 +1,218 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {
+    "id": "factory-artifact-builder",
+    "name": "Factory Artifact Builder",
+    "version": "0.1.0",
+    "description": "Builds digest-addressed artifact descriptors, SPDX JSON SBOMs, and unsigned provenance bundles.",
+    "lifecycle": "proposed",
+    "runtimeState": "proposed",
+    "releaseEligible": false,
+    "riskTier": "R2",
+    "ownerId": "dps-ai-factory"
+  },
+  "paths": {
+    "actualRoot": "Modules/factory-artifact-builder",
+    "canonicalRoot": "modules/factory-artifact-builder",
+    "owned": ["Modules/factory-artifact-builder/**"],
+    "excluded": [],
+    "runtimeData": []
+  },
+  "artifacts": [
+    {
+      "id": "dps.factory-artifact-builder",
+      "kind": "service",
+      "status": "proposed",
+      "build": "python3.12 -m compileall -q Modules/factory-artifact-builder/src",
+      "versioning": "semver"
+    },
+    {
+      "id": "dps.factory-artifact-builder.contracts",
+      "kind": "contract-pack",
+      "status": "proposed",
+      "build": null,
+      "versioning": "semver"
+    }
+  ],
+  "runtime": {
+    "track": "modern-service",
+    "language": "Python 3.12",
+    "target": "cpython-3.12-posix-macos-linux",
+    "processBoundary": "out-of-process",
+    "entrypoints": ["Modules/factory-artifact-builder/src/artifact_builder.py"],
+    "toolchainStatus": "proposed"
+  },
+  "contracts": {
+    "provided": [
+      {
+        "contractId": "artifact.build.request",
+        "major": 1,
+        "source": "Modules/factory-artifact-builder/contracts/provided/artifact.build.request.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "factory-artifact-builder"
+      },
+      {
+        "contractId": "artifact.descriptor",
+        "major": 1,
+        "source": "Modules/factory-artifact-builder/contracts/provided/artifact.descriptor.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "factory-artifact-builder"
+      }
+    ],
+    "consumed": [
+      {
+        "contractId": "merge.decision",
+        "major": 1,
+        "source": "Modules/factory-merge-controller/contracts/provided/merge.decision.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "factory-merge-controller"
+      }
+    ]
+  },
+  "communication": {
+    "inbound": [
+      {
+        "peerModule": "factory-release-controller",
+        "contractId": "artifact.build.request",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "command",
+        "timeoutMs": 5000,
+        "retryPolicy": "at-least-once-by-build-id",
+        "idempotencyKey": "build_id",
+        "authScope": "factory:artifact:build",
+        "failureMode": "reject-unapproved-or-mismatched-merge"
+      },
+      {
+        "peerModule": "factory-merge-controller",
+        "contractId": "merge.decision",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "receipt",
+        "timeoutMs": 5000,
+        "retryPolicy": "at-least-once-idempotent-receipt",
+        "idempotencyKey": "decision_id",
+        "authScope": "factory:artifact:build",
+        "failureMode": "reject-unapproved-or-mismatched-merge"
+      }
+    ],
+    "outbound": [
+      {
+        "peerModule": "factory-release-controller",
+        "contractId": "artifact.descriptor",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "receipt",
+        "timeoutMs": 5000,
+        "retryPolicy": "at-least-once-by-artifact-sha256",
+        "idempotencyKey": "artifact_sha256",
+        "authScope": "factory:artifact:read",
+        "failureMode": "retain-immutable-descriptor-and-retry"
+      },
+      {
+        "peerModule": "factory-control-plane-host",
+        "contractId": "artifact.descriptor",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "receipt",
+        "timeoutMs": 300000,
+        "retryPolicy": "same-request-id-and-payload-sha256",
+        "idempotencyKey": "workflow_id:request_id",
+        "authScope": "factory:host:artifact",
+        "failureMode": "reject-digest-drift"
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "moduleId": "factory-merge-controller",
+      "versionRange": ">=0.1.0 <1.0.0",
+      "required": true,
+      "reason": "approved merge-head decision"
+    }
+  ],
+  "permissions": {
+    "allowed": ["read declared build inputs", "claim exact build identity through module-owned PostgreSQL function", "write isolated artifact output", "compute hashes and metadata"],
+    "denied": ["directly read or mutate build identity tables", "reuse a build_id for divergent inputs", "sign descriptor", "publish mutable latest tag", "use production secrets", "deploy artifact", "production shell"],
+    "productionApproval": "human-required"
+  },
+  "data": {
+    "ownedStores": ["PostgreSQL append-only build identity claims", "content-addressed local artifact output; external WORM retention required for production"],
+    "readModels": ["approved merge decision"],
+    "privacyClasses": ["internal"],
+    "retention": "artifacts and append-only build identity claims retained for the signed BOM support window",
+    "export": "artifact plus descriptor, SPDX JSON, provenance JSON, and admin-audited build identity claim",
+    "correction": "use a new build_id and build a new digest-addressed artifact; never mutate an existing claim or digest",
+    "deletion": "artifact garbage collection only after no retained BOM references the digest; build identity claims are append-only and require a later reviewed retention migration"
+  },
+  "security": {
+    "trustBoundaries": ["isolated build input", "external signer boundary", "immutable artifact store"],
+    "secretScopes": [],
+    "untrustedInputs": ["artifact bytes", "source names", "merge decisions", "module metadata"],
+    "failClosedOn": ["unapproved merge", "invalid signed merge-decision shape", "cross-scope merge decision", "request-before-decision", "Manifest version mismatch", "digest drift", "mutable artifact identity", "conflicting build_id reuse", "unavailable durable build identity registry", "missing source", "signature request", "path namespace drift", "symbolic link", "resource limit", "duplicate Git path", "unsafe output link count or mode"],
+    "policyIds": ["SOUL-ISO-001", "CMD-IDEMP-001", "RESULT-VERIFY-001", "GBRAIN-READBACK-001", "EDGE-NORESTART-001"]
+  },
+  "tests": {
+    "requiredOutcome": "PASS",
+    "failureOutcomes": ["FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"],
+    "suites": [
+      {
+        "id": "factory-artifact-builder.unit",
+        "type": "unit",
+        "required": true,
+        "command": "PYTHONPATH=Modules/factory-artifact-builder/src python3.12 -m unittest discover -s Modules/factory-artifact-builder/tests -p 'test_artifact_builder.py'",
+        "environment": "Python 3.12 POSIX stdlib on macOS/Linux with openat dir_fd, O_NOFOLLOW, directory fsync, flock, fork crash-window tests, and temporary filesystem",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "factory-artifact-builder.contract",
+        "type": "contract",
+        "required": true,
+        "command": "PYTHONPATH=Modules/factory-artifact-builder/src python3.12 -m unittest discover -s Modules/factory-artifact-builder/tests -p 'test_contracts.py'",
+        "environment": "Python 3.12 and jsonschema from root requirements-ci.txt hash lock; positive and adversarial contract instances",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "factory-artifact-builder.postgresql18",
+        "type": "integration",
+        "required": true,
+        "command": "PYTHONPATH=Modules/factory-artifact-builder/src python3.12 -m unittest Modules/factory-artifact-builder/tests/test_postgres_integration.py",
+        "environment": "Exact PostgreSQL 18.4 with distinct DPS_ARTIFACT_BUILDER_ADMIN_DATABASE_URL and DPS_ARTIFACT_BUILDER_RUNTIME_DATABASE_URL identities in one dedicated empty database, plus hash-locked psycopg 3.3.4",
+        "evidenceLevel": "INTEGRATION_VERIFIED"
+      }
+    ]
+  },
+  "compatibility": {
+    "policyRef": "governance/policies/compatibility-policy.yaml",
+    "track": "factory",
+    "moduleMajor": 0,
+    "supportedContractMajors": {"artifact.build.request": [1], "artifact.descriptor": [1], "merge.decision": [1]},
+    "unknownMajorBehavior": "reject",
+    "missingMajorBehavior": "reject",
+    "unknownModeBehavior": "reject",
+    "missingModeBehavior": "reject"
+  },
+  "rollout": {
+    "featureFlag": "factory_artifact_builder_v1",
+    "canary": "shadow-build identical merge heads and compare digests without publishing",
+    "rollback": "route builds to previous signed builder and preserve content-addressed outputs",
+    "killSwitch": "kill_factory_artifact_builder"
+  },
+  "deviceGates": {
+    "requiresWindows": false,
+    "requiresZennoDroid": false,
+    "requiresAdb": false,
+    "minimumVerification": "CONTRACT_VERIFIED"
+  },
+  "agents": {
+    "spec": "dps.agents/v1",
+    "policyVersion": "1.0.0",
+    "instructionsFile": "AGENTS.md",
+    "manifestFile": "module.yaml",
+    "receiptRequired": true,
+    "resolver": "factory-instruction-resolver"
+  }
+}

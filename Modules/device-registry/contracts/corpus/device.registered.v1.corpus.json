@@ -1,0 +1,60 @@
+{
+  "contract_id": "device.registered/v1",
+  "corpus_version": "1.0.0",
+  "valid": [
+    {
+      "id": "valid-minimum-long-and-zulu",
+      "payload": {
+        "schema_version": "1.0.0",
+        "contract_id": "device.registered/v1",
+        "producer_module": "device-registry",
+        "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "device_binding_id": "db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "platform_account_id": "pa_cccccccccccccccccccccccccccccccc",
+        "trace_id": "trace_dddddddddddddddddddddddddddddddd",
+        "idempotency_key": "idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "occurred_at": "2026-07-14T01:02:03Z",
+        "privacy_class": "sensitive",
+        "device_id": "device_11111111111111111111111111111111",
+        "fingerprint_hmac_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fingerprint_key_id": "fpkey_33333333333333333333333333333333",
+        "fingerprint_key_epoch": 1,
+        "capability_revision": 1,
+        "capabilities": ["observe", "verify"],
+        "status": "registered"
+      }
+    },
+    {
+      "id": "valid-int64-max-seven-fractions-zero-offset",
+      "payload": {
+        "schema_version": "1.0.0",
+        "contract_id": "device.registered/v1",
+        "producer_module": "device-registry",
+        "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "device_binding_id": "db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "platform_account_id": "pa_cccccccccccccccccccccccccccccccc",
+        "trace_id": "trace_dddddddddddddddddddddddddddddddd",
+        "idempotency_key": "idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "occurred_at": "2026-07-14T01:02:03.1234567+00:00",
+        "privacy_class": "sensitive",
+        "device_id": "device_11111111111111111111111111111111",
+        "fingerprint_hmac_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+        "fingerprint_key_id": "fpkey_33333333333333333333333333333333",
+        "fingerprint_key_epoch": 9223372036854775807,
+        "capability_revision": 9223372036854775807,
+        "capabilities": [],
+        "status": "retired"
+      }
+    }
+  ],
+  "invalid": [
+    {"id": "invalid-version-termination", "payload": {"schema_version": "1.0.0\n", "contract_id": "device.registered/v1", "producer_module": "device-registry", "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "device_binding_id": "db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "platform_account_id": "pa_cccccccccccccccccccccccccccccccc", "trace_id": "trace_dddddddddddddddddddddddddddddddd", "idempotency_key": "idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "occurred_at": "2026-07-14T01:02:03Z", "privacy_class": "sensitive", "device_id": "device_11111111111111111111111111111111", "fingerprint_hmac_sha256": "2222222222222222222222222222222222222222222222222222222222222222", "fingerprint_key_id": "fpkey_33333333333333333333333333333333", "fingerprint_key_epoch": 1, "capability_revision": 1, "capabilities": [], "status": "registered"}},
+    {"id": "invalid-id-trailing-newline", "payload": {"schema_version": "1.0.0", "contract_id": "device.registered/v1", "producer_module": "device-registry", "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "device_binding_id": "db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n", "platform_account_id": "pa_cccccccccccccccccccccccccccccccc", "trace_id": "trace_dddddddddddddddddddddddddddddddd", "idempotency_key": "idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "occurred_at": "2026-07-14T01:02:03Z", "privacy_class": "sensitive", "device_id": "device_11111111111111111111111111111111", "fingerprint_hmac_sha256": "2222222222222222222222222222222222222222222222222222222222222222", "fingerprint_key_id": "fpkey_33333333333333333333333333333333", "fingerprint_key_epoch": 1, "capability_revision": 1, "capabilities": [], "status": "registered"}},
+    {"id": "invalid-nonzero-offset", "payload": {"schema_version": "1.0.0", "contract_id": "device.registered/v1", "producer_module": "device-registry", "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "device_binding_id": "db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "platform_account_id": "pa_cccccccccccccccccccccccccccccccc", "trace_id": "trace_dddddddddddddddddddddddddddddddd", "idempotency_key": "idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "occurred_at": "2026-07-14T02:02:03+01:00", "privacy_class": "sensitive", "device_id": "device_11111111111111111111111111111111", "fingerprint_hmac_sha256": "2222222222222222222222222222222222222222222222222222222222222222", "fingerprint_key_id": "fpkey_33333333333333333333333333333333", "fingerprint_key_epoch": 1, "capability_revision": 1, "capabilities": [], "status": "registered"}},
+    {"id": "invalid-eight-fractional-digits", "payload": {"schema_version": "1.0.0", "contract_id": "device.registered/v1", "producer_module": "device-registry", "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "device_binding_id": "db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "platform_account_id": "pa_cccccccccccccccccccccccccccccccc", "trace_id": "trace_dddddddddddddddddddddddddddddddd", "idempotency_key": "idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "occurred_at": "2026-07-14T01:02:03.12345678Z", "privacy_class": "sensitive", "device_id": "device_11111111111111111111111111111111", "fingerprint_hmac_sha256": "2222222222222222222222222222222222222222222222222222222222222222", "fingerprint_key_id": "fpkey_33333333333333333333333333333333", "fingerprint_key_epoch": 1, "capability_revision": 1, "capabilities": [], "status": "registered"}},
+    {"id": "invalid-int64-overflow", "payload": {"schema_version": "1.0.0", "contract_id": "device.registered/v1", "producer_module": "device-registry", "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "device_binding_id": "db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "platform_account_id": "pa_cccccccccccccccccccccccccccccccc", "trace_id": "trace_dddddddddddddddddddddddddddddddd", "idempotency_key": "idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "occurred_at": "2026-07-14T01:02:03Z", "privacy_class": "sensitive", "device_id": "device_11111111111111111111111111111111", "fingerprint_hmac_sha256": "2222222222222222222222222222222222222222222222222222222222222222", "fingerprint_key_id": "fpkey_33333333333333333333333333333333", "fingerprint_key_epoch": 9223372036854775808, "capability_revision": 1, "capabilities": [], "status": "registered"}},
+    {"id":"invalid-year-zero","payload":{"schema_version":"1.0.0","soul_id":"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","device_binding_id":"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","platform_account_id":"pa_cccccccccccccccccccccccccccccccc","trace_id":"trace_dddddddddddddddddddddddddddddddd","idempotency_key":"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","privacy_class":"sensitive","contract_id":"device.registered/v1","producer_module":"device-registry","occurred_at":"0000-07-14T01:02:03Z","device_id":"device_11111111111111111111111111111111","fingerprint_hmac_sha256":"2222222222222222222222222222222222222222222222222222222222222222","fingerprint_key_id":"fpkey_33333333333333333333333333333333","fingerprint_key_epoch":1,"capability_revision":1,"capabilities":[],"status":"registered"}},
+    {"id":"invalid-leap-second","payload":{"schema_version":"1.0.0","soul_id":"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","device_binding_id":"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","platform_account_id":"pa_cccccccccccccccccccccccccccccccc","trace_id":"trace_dddddddddddddddddddddddddddddddd","idempotency_key":"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","privacy_class":"sensitive","contract_id":"device.registered/v1","producer_module":"device-registry","occurred_at":"2026-07-14T23:59:60Z","device_id":"device_11111111111111111111111111111111","fingerprint_hmac_sha256":"2222222222222222222222222222222222222222222222222222222222222222","fingerprint_key_id":"fpkey_33333333333333333333333333333333","fingerprint_key_epoch":1,"capability_revision":1,"capabilities":[],"status":"registered"}},
+    {"id":"invalid-int64-quoted-number","payload":{"schema_version":"1.0.0","soul_id":"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","device_binding_id":"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","platform_account_id":"pa_cccccccccccccccccccccccccccccccc","trace_id":"trace_dddddddddddddddddddddddddddddddd","idempotency_key":"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","privacy_class":"sensitive","contract_id":"device.registered/v1","producer_module":"device-registry","occurred_at":"2026-07-14T01:02:03Z","device_id":"device_11111111111111111111111111111111","fingerprint_hmac_sha256":"2222222222222222222222222222222222222222222222222222222222222222","fingerprint_key_id":"fpkey_33333333333333333333333333333333","fingerprint_key_epoch":"1","capability_revision":1,"capabilities":[],"status":"registered"}}
+  ]
+}

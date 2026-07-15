@@ -1,0 +1,109 @@
+{
+  "spec_version": "1.0",
+  "spec_id": "edge.worker.exchange/request-sha256/v1",
+  "contract_id": "edge.worker.exchange/v1",
+  "owner_module": "windows-edge-supervisor",
+  "consumer_modules": ["windows-edge-worker"],
+  "applies_to_exchange_kind": "COMMAND",
+  "target_property": "request_sha256",
+  "exchange_kind_semantics": {
+    "COMMAND": {"value": "COMPUTED_BY_THIS_SPEC", "canonicalization": "REQUIRED"},
+    "RECEIPT": {"value": "ORIGINAL_COMMAND_REQUEST_SHA256", "canonicalization": "NOT_RECOMPUTED"},
+    "HEALTH": {"value": null, "canonicalization": "NOT_APPLICABLE"},
+    "DRAIN": {"value": null, "canonicalization": "NOT_APPLICABLE"}
+  },
+  "hash_algorithm": "SHA-256",
+  "domain": "dps.windows-edge-worker.command-request-sha256/v1",
+  "framing": {
+    "domain": "uint32-big-endian-byte-length-then-strict-utf8",
+    "field_count": "uint32-big-endian",
+    "field_count_value": 19,
+    "null_marker_hex": "00",
+    "present_marker_hex": "01",
+    "present_value": "uint32-big-endian-byte-length-then-strict-utf8"
+  },
+  "scalar_encoding": {
+    "string": {
+      "encoding": "UTF-8",
+      "invalid_unicode": "REJECT",
+      "unicode_normalization": "NONE"
+    },
+    "integer": {
+      "radix": 10,
+      "culture": "invariant",
+      "leading_zeroes": "FORBIDDEN_EXCEPT_ZERO"
+    },
+    "boolean": {
+      "false": "0",
+      "true": "1"
+    },
+    "utc_datetime": {
+      "normalize_offset": "+00:00",
+      "wire_requirement": "input must already use Z or +00:00; nonzero offsets are rejected before hashing",
+      "format": "yyyy-MM-dd'T'HH:mm:ss.fffffffzzz",
+      "culture": "invariant"
+    }
+  },
+  "fields": [
+    {"ordinal": 1, "contract_property": "contract_id", "worker_property": "ContractId", "scalar": "string", "nullable": false},
+    {"ordinal": 2, "contract_property": "producer_module", "worker_property": "ProducerModule", "scalar": "string", "nullable": false},
+    {"ordinal": 3, "contract_property": "soul_id", "worker_property": "SoulId", "scalar": "string", "nullable": false},
+    {"ordinal": 4, "contract_property": "device_binding_id", "worker_property": "DeviceBindingId", "scalar": "string", "nullable": false},
+    {"ordinal": 5, "contract_property": "platform_account_id", "worker_property": "PlatformAccountId", "scalar": "string", "nullable": false},
+    {"ordinal": 6, "contract_property": "command_id", "worker_property": "CommandId", "scalar": "string", "nullable": false},
+    {"ordinal": 7, "contract_property": "trace_id", "worker_property": "TraceId", "scalar": "string", "nullable": false},
+    {"ordinal": 8, "contract_property": "idempotency_key", "worker_property": "IdempotencyKey", "scalar": "string", "nullable": false},
+    {"ordinal": 9, "contract_property": "occurred_at", "worker_property": "OccurredAt", "scalar": "utc_datetime", "nullable": false},
+    {"ordinal": 10, "contract_property": "privacy_class", "worker_property": "PrivacyClass", "scalar": "string", "nullable": false},
+    {"ordinal": 11, "contract_property": "lease_id", "worker_property": "LeaseId", "scalar": "string", "nullable": false},
+    {"ordinal": 12, "contract_property": "lease_expires_at", "worker_property": "LeaseExpiresAt", "scalar": "utc_datetime", "nullable": false},
+    {"ordinal": 13, "contract_property": "action_kind", "worker_property": "ActionKind", "scalar": "string", "nullable": false},
+    {"ordinal": 14, "contract_property": "step_kind", "worker_property": "StepKind", "scalar": "string", "nullable": false},
+    {"ordinal": 15, "contract_property": "selector", "worker_property": "Selector", "scalar": "string", "nullable": true},
+    {"ordinal": 16, "contract_property": "text", "worker_property": "Text", "scalar": "string", "nullable": true},
+    {"ordinal": 17, "contract_property": "wait_ms", "worker_property": "WaitMs", "scalar": "integer", "nullable": true},
+    {"ordinal": 18, "contract_property": "expected_postcondition", "worker_property": "ExpectedPostcondition", "scalar": "string", "nullable": true},
+    {"ordinal": 19, "contract_property": "shadow", "worker_property": "Shadow", "scalar": "boolean", "nullable": false}
+  ],
+  "excluded_contract_properties": [
+    "schema_version",
+    "exchange_kind",
+    "request_sha256",
+    "dispatch_acknowledged",
+    "native_status",
+    "postcondition_verified",
+    "result_status",
+    "duplicate",
+    "retry_allowed",
+    "detail"
+  ],
+  "golden_vectors": [
+    {
+      "vector_id": "command-v1-canonical-utc-unicode-null",
+      "input": {
+        "contract_id": "edge.worker.exchange/v1",
+        "producer_module": "windows-edge-supervisor",
+        "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "device_binding_id": "db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "platform_account_id": "pa_cccccccccccccccccccccccccccccccc",
+        "command_id": "command-vector-1",
+        "trace_id": "trace_dddddddddddddddddddddddddddddddd",
+        "idempotency_key": "idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "occurred_at": "2026-07-14T00:00:00+00:00",
+        "privacy_class": "personal",
+        "lease_id": "lease-vector-1",
+        "lease_expires_at": "2026-07-14T00:05:00+00:00",
+        "action_kind": "TYPE",
+        "step_kind": "TYPE_TEXT",
+        "selector": "fixture:input",
+        "text": "hello\n世界",
+        "wait_ms": null,
+        "expected_postcondition": "fixture contains text",
+        "shadow": true
+      },
+      "canonical_byte_length": 604,
+      "canonical_bytes_hex": "000000316470732e77696e646f77732d656467652d776f726b65722e636f6d6d616e642d726571756573742d7368613235362f7631000000130100000017656467652e776f726b65722e65786368616e67652f7631010000001777696e646f77732d656467652d73757065727669736f720100000045736f756c5f61616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161616161010000002364625f6262626262626262626262626262626262626262626262626262626262626262010000002370615f63636363636363636363636363636363636363636363636363636363636363630100000010636f6d6d616e642d766563746f722d31010000002674726163655f646464646464646464646464646464646464646464646464646464646464646401000000456964656d5f656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565656565650100000021323032362d30372d31345430303a30303a30302e303030303030302b30303a30300100000008706572736f6e616c010000000e6c656173652d766563746f722d310100000021323032362d30372d31345430303a30353a30302e303030303030302b30303a30300100000004545950450100000009545950455f54455854010000000d666978747572653a696e707574010000000c68656c6c6f0ae4b896e7958c0001000000156669787475726520636f6e7461696e732074657874010000000131",
+      "request_sha256": "d7a8f4901c7d56f833b2ff24ea169bff565984a6417f165a4f25a5ff233d8d1e"
+    }
+  ]
+}

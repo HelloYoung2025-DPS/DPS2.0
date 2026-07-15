@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/trusted.test.result.v1.schema.json",
+  "title": "trusted.test.result/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "contract_id", "producer_module", "soul_id", "device_binding_id",
+    "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class",
+    "result_id", "request_id", "worktree_plan_id", "module_id", "check_id", "suite_id", "evidence_level", "template_id",
+    "tested_commit", "required", "status", "release_allowed", "runner_identity",
+    "auth_context_id", "instruction_receipt_id", "manifest_sha256", "workspace_sha256", "required_checks_sha256",
+    "trusted_policy_sha256", "lease_id", "fencing_token",
+    "command_argv", "timeout_seconds", "started_at", "finished_at", "exit_code",
+    "stdout_sha256", "stderr_sha256", "log_sha256", "raw_artifact_sha256",
+    "runner_attestation"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "contract_id": {"const": "trusted.test.result/v1"},
+    "producer_module": {"const": "factory-trusted-runner"},
+    "soul_id": {"type": ["string", "null"], "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": ["string", "null"], "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": ["string", "null"], "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "privacy_class": {"const": "internal"},
+    "result_id": {"type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "request_id": {"type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "worktree_plan_id": {"type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "module_id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$(?![\\s\\S])"},
+    "check_id": {"type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)+$(?![\\s\\S])"},
+    "suite_id": {"type": "string", "pattern": "^[a-z0-9]+(?:[.-][a-z0-9]+)+$(?![\\s\\S])"},
+    "evidence_level": {"enum": ["REPOSITORY_STATIC_VERIFIED", "CONTRACT_VERIFIED", "INTEGRATION_VERIFIED", "WINDOWS_VERIFIED", "DEVICE_VERIFIED", "CANARY_VERIFIED", "SCALE_VERIFIED"]},
+    "template_id": {"enum": ["python.unit", "python.compile"]},
+    "tested_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$(?![\\s\\S])"},
+    "required": {"type": "boolean"},
+    "status": {"enum": ["PASS", "FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"]},
+    "release_allowed": {"type": "boolean"},
+    "runner_identity": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$(?![\\s\\S])"},
+    "auth_context_id": {"type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "instruction_receipt_id": {"type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "workspace_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "required_checks_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "trusted_policy_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "lease_id": {"type": "string", "pattern": "^lease:[0-9a-f]{32}$(?![\\s\\S])"},
+    "fencing_token": {"type": "integer", "minimum": 1},
+    "command_argv": {"type": "array", "minItems": 3, "items": {"type": "string", "minLength": 1}},
+    "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 1800},
+    "started_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "exit_code": {"type": ["integer", "null"]},
+    "stdout_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "stderr_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "log_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "raw_artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "runner_attestation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["algorithm", "key_id", "signer_identity", "payload_sha256", "signature_value"],
+      "properties": {
+        "algorithm": {"const": "rsa-pss-sha256"},
+        "key_id": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$(?![\\s\\S])"},
+        "signer_identity": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$(?![\\s\\S])"},
+        "payload_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+        "signature_value": {"type": "string", "minLength": 64, "maxLength": 16384}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"release_allowed": {"const": true}}, "required": ["release_allowed"]},
+      "then": {"properties": {"status": {"const": "PASS"}, "exit_code": {"const": 0}}}
+    }
+  ]
+}

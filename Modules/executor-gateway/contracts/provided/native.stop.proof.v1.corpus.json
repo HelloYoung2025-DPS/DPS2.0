@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "dps.quarantine-corpus/v1",
+  "contractId": "native.stop.proof/v1",
+  "major": 1,
+  "mode": "quarantine-only",
+  "ownerModule": "executor-gateway",
+  "maximumWireBytes": 16384,
+  "issuanceAllowed": false,
+  "verificationMayAuthorizeDomainState": false,
+  "businessSuccessAllowed": false,
+  "base": {
+    "schema_version": "1.0.0",
+    "contract_id": "native.stop.proof/v1",
+    "producer_module": "windows-edge-worker",
+    "stopped": true,
+    "submission_attempt_id": "11111111-1111-1111-1111-111111111111",
+    "command_id": "22222222-2222-2222-2222-222222222222",
+    "lease_id": "33333333-3333-3333-3333-333333333333",
+    "attempt": 1,
+    "native_request_binding_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "submitted_request_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "device_binding_id": "db_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "platform_account_id": "pa_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "trace_id": "trace_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "idempotency_key": "idem_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "active_release_bom_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "active_release_bom_generation": 1,
+    "active_release_bom_token_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "worker_instance_id": "wi_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "worker_generation": 1,
+    "stop_kind": "NATIVE_NOT_STARTED",
+    "evidence_sha256": "2085cb0458d212fc68fedbf0e575bde7e71472256b6ed55955b29f76c871f5c3",
+    "occurred_at": "2026-07-15T00:00:00.0000000Z",
+    "privacy_class": "internal",
+    "auth_scope": "executor-gateway.native-stop-proof",
+    "key_id": "legacy-quarantine-key.01",
+    "signature_base64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+  },
+  "cases": [
+    {
+      "id": "canonical-shape-is-still-quarantined",
+      "transform": "none",
+      "strictCodecValid": true,
+      "expectedDisposition": "QUARANTINE",
+      "domainEligible": false
+    },
+    {
+      "id": "duplicate-contract-id",
+      "transform": "duplicate-property:contract_id",
+      "strictCodecValid": false,
+      "expectedDisposition": "REJECT",
+      "domainEligible": false
+    },
+    {
+      "id": "unknown-field",
+      "transform": "add-property:unknown=true",
+      "strictCodecValid": false,
+      "expectedDisposition": "REJECT",
+      "domainEligible": false
+    },
+    {
+      "id": "oversized-wire",
+      "transform": "append-ascii-space-past-maximumWireBytes",
+      "strictCodecValid": false,
+      "expectedDisposition": "REJECT",
+      "domainEligible": false
+    },
+    {
+      "id": "invalid-utf8",
+      "transform": "append-byte:ff",
+      "strictCodecValid": false,
+      "expectedDisposition": "REJECT",
+      "domainEligible": false
+    },
+    {
+      "id": "attempt-zero",
+      "transform": "replace:attempt=0",
+      "strictCodecValid": false,
+      "expectedDisposition": "REJECT",
+      "domainEligible": false
+    },
+    {
+      "id": "identity-shape-attack",
+      "transform": "replace:soul_id=person@example.com",
+      "strictCodecValid": false,
+      "expectedDisposition": "REJECT",
+      "domainEligible": false
+    },
+    {
+      "id": "unknown-major",
+      "transform": "replace:contract_id=native.stop.proof/v2",
+      "strictCodecValid": false,
+      "expectedDisposition": "REJECT",
+      "domainEligible": false
+    },
+    {
+      "id": "noncanonical-version",
+      "transform": "replace:schema_version=1",
+      "strictCodecValid": false,
+      "expectedDisposition": "REJECT",
+      "domainEligible": false
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/rollout.event.v1.schema.json",
+  "title": "rollout.event/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "contract_id", "producer_module", "soul_id", "device_binding_id",
+    "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class",
+    "rollout_event_id", "upgrade_id", "previous_state", "current_state", "risk_tier",
+    "actor_identity", "actor_role", "bom_sha256", "artifact_sha256", "evidence_kind",
+    "verification_level", "simulation_only", "side_effect_count", "kill_switch_armed",
+    "transition_request_sha256", "trusted_facts_sha256", "candidate_validation_sha256",
+    "evidence_refs"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "contract_id": {"const": "rollout.event/v1"},
+    "producer_module": {"const": "factory-release-controller"},
+    "soul_id": {"type": ["string", "null"], "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": ["string", "null"], "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": ["string", "null"], "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "privacy_class": {"const": "internal"},
+    "rollout_event_id": {"type": "string", "pattern": "^rollout-[0-9a-f]{32}$(?![\\s\\S])"},
+    "upgrade_id": {"type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "previous_state": {"type": "string", "minLength": 3},
+    "current_state": {"type": "string", "minLength": 3},
+    "risk_tier": {"enum": ["R0", "R1", "R2", "R3"]},
+    "actor_identity": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$(?![\\s\\S])"},
+    "actor_role": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$(?![\\s\\S])"},
+    "bom_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "artifact_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "evidence_kind": {"enum": ["REPOSITORY", "CONTRACT", "INTEGRATION", "SIMULATION", "WINDOWS", "DEVICE", "CANARY", "SCALE"]},
+    "verification_level": {"enum": ["REPOSITORY_STATIC_VERIFIED", "CONTRACT_VERIFIED", "INTEGRATION_VERIFIED", "WINDOWS_VERIFIED", "DEVICE_VERIFIED", "CANARY_VERIFIED", "SCALE_VERIFIED"]},
+    "simulation_only": {"type": "boolean"},
+    "side_effect_count": {"type": "integer", "minimum": 0},
+    "kill_switch_armed": {"type": "boolean"},
+    "transition_request_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "trusted_facts_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "candidate_validation_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "evidence_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 256}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"evidence_kind": {"const": "SIMULATION"}}, "required": ["evidence_kind"]},
+      "then": {
+        "properties": {
+          "verification_level": {"const": "INTEGRATION_VERIFIED"},
+          "simulation_only": {"const": true},
+          "side_effect_count": {"const": 0}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"simulation_only": {"const": true}}, "required": ["simulation_only"]},
+      "then": {
+        "properties": {
+          "evidence_kind": {"const": "SIMULATION"},
+          "verification_level": {"const": "INTEGRATION_VERIFIED"},
+          "side_effect_count": {"const": 0}
+        }
+      }
+    }
+  ]
+}

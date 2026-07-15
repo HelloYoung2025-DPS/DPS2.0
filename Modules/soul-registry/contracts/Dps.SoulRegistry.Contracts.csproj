@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.SoulRegistry.Contracts</AssemblyName>
+    <RootNamespace>Dps.SoulRegistry.Contracts</RootNamespace>
+    <PackageId>Dps.SoulRegistry.Contracts</PackageId>
+    <Version>0.1.0</Version>
+    <Description>Versioned public contracts owned by the DPS Soul Registry module.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="provided/soul.resolved.v1.schema.json" Pack="true" PackagePath="contracts" />
+  </ItemGroup>
+</Project>

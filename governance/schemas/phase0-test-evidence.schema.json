@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/schemas/phase0-test-evidence.schema.json",
+  "title": "DPS Phase 0 gate evidence record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evidence_id",
+    "test_id",
+    "module_id",
+    "test_type",
+    "required",
+    "status",
+    "verification_level",
+    "baseline_commit",
+    "instruction_receipt_id",
+    "runner_identity",
+    "command",
+    "started_at",
+    "finished_at",
+    "exit_code",
+    "environment",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": { "const": "dps.phase0-test-evidence/v1" },
+    "evidence_id": { "$ref": "#/$defs/id" },
+    "test_id": { "$ref": "#/$defs/id" },
+    "module_id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+    "test_type": { "enum": ["static", "unit", "contract", "integration", "windows", "device", "canary", "scale"] },
+    "required": { "type": "boolean" },
+    "status": { "enum": ["PASS", "FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"] },
+    "verification_level": {
+      "enum": [
+        "REPOSITORY_STATIC_VERIFIED",
+        "CONTRACT_VERIFIED",
+        "INTEGRATION_VERIFIED",
+        "WINDOWS_VERIFIED",
+        "DEVICE_VERIFIED",
+        "CANARY_VERIFIED",
+        "SCALE_VERIFIED"
+      ]
+    },
+    "baseline_commit": { "$ref": "#/$defs/gitObject" },
+    "instruction_receipt_id": { "$ref": "#/$defs/id" },
+    "runner_identity": { "type": "string", "minLength": 1 },
+    "command": { "type": "string", "minLength": 1 },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": "string", "format": "date-time" },
+    "exit_code": { "type": ["integer", "null"] },
+    "environment": {
+      "type": "object",
+      "additionalProperties": { "type": ["string", "number", "boolean", "null"] }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "media_type"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "sha256": { "$ref": "#/$defs/sha256" },
+          "media_type": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "reason": { "type": ["string", "null"] }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "const": "PASS" } },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": { "exit_code": { "const": 0 } }
+      }
+    }
+  ],
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$" },
+    "gitObject": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

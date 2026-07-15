@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "dps.canonical-id-spec/v1",
+  "contractId": "operation.compiled/v1",
+  "fieldEncoding": {
+    "string": "strict-utf8",
+    "framing": "uint32-big-endian-byte-length-then-bytes",
+    "guid": "lowercase-N-text",
+    "integer": "invariant-decimal-text",
+    "dateTimeOffset": "invariant-O-text",
+    "boolean": ["false", "true"],
+    "nullable": "presence-boolean-then-value-when-present"
+  },
+  "digest": "SHA-256",
+  "idExtraction": "first-16-digest-bytes-constructed-as-dotnet-guid-byte-array",
+  "approvalSnapshotDigest": {
+    "domain": "dps.operation-compiler.approval-snapshot-sha256/v1",
+    "fieldOrder": [
+      "domain", "schema_version", "contract_id", "producer_module", "approval_id", "proposal_id",
+      "soul_id", "device_binding_id", "platform_account_id", "trace_id", "idempotency_key", "occurred_at",
+      "privacy_class", "action_kind", "is_side_effect", "shadow_only", "parameters_count",
+      "parameters_sorted_by_ordinal_key_as_repeated_key_then_value", "decision", "authority", "policy_version",
+      "evaluated_policy_ids_count", "evaluated_policy_ids_sorted_ordinal", "platform_authorization_id_nullable",
+      "denial_reasons_count", "denial_reasons_sorted_ordinal"
+    ],
+    "goldenSha256": "f6e98fdde92a0c68efae6f8f17a3ce3dfcc7c6c2b0a3fba5d9ec5b4c50b6106f"
+  },
+  "idKinds": {
+    "operation_id": {
+      "domain": "dps.operation-compiler.operation-id/v1",
+      "fieldOrder": [
+        "domain", "schema_version", "contract_id", "producer_module", "approval_id", "proposal_id",
+        "approval_sha256", "soul_id", "device_binding_id", "platform_account_id", "trace_id", "idempotency_key",
+        "occurred_at", "privacy_class", "action_kind", "is_side_effect", "shadow_only", "platform_authorization_id_nullable"
+      ],
+      "goldenVector": {
+        "schema_version": "1.0.0",
+        "contract_id": "operation.compiled/v1",
+        "producer_module": "operation-compiler",
+        "approval_id": "51000000-0000-0000-0000-000000000001",
+        "proposal_id": "52000000-0000-0000-0000-000000000002",
+        "approval_sha256": "f6e98fdde92a0c68efae6f8f17a3ce3dfcc7c6c2b0a3fba5d9ec5b4c50b6106f",
+        "soul_id": "soul_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "device_binding_id": "db_11111111111111111111111111111111",
+        "platform_account_id": "pa_22222222222222222222222222222222",
+        "trace_id": "trace_33333333333333333333333333333333",
+        "idempotency_key": "idem_4444444444444444444444444444444444444444444444444444444444444444",
+        "occurred_at": "2026-01-01T00:00:00Z",
+        "privacy_class": "internal",
+        "action_kind": "fixture.type",
+        "is_side_effect": true,
+        "shadow_only": false,
+        "platform_authorization_id": "platform-auth:test",
+        "operation_id": "557bfb87-3601-9155-8bd1-717f0779d7b8"
+      }
+    },
+    "step_id": {
+      "domain": "dps.operation-compiler.step-id/v1",
+      "fieldOrder": [
+        "domain", "operation_id", "step_kind", "arguments_count",
+        "arguments_sorted_by_ordinal_key_as_repeated_key_then_value", "retry_safe", "postcondition_kind"
+      ],
+      "goldenVector": {
+        "operation_id": "557bfb87-3601-9155-8bd1-717f0779d7b8",
+        "step_kind": "fixture.type",
+        "arguments": {
+          "selector_ref": "fixture.input",
+          "value_ref": "value"
+        },
+        "retry_safe": false,
+        "postcondition_kind": "fixture-value-matched",
+        "step_id": "40a1d3f8-cf08-ffe4-d3c3-aa9655234c79"
+      }
+    }
+  }
+}

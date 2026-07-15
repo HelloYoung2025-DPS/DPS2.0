@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "dps.risk-policy/v1",
+  "tiers": {
+    "R0": {
+      "scope": "documentation and synthetic test data",
+      "productionApproval": "automatic-after-deterministic-gates"
+    },
+    "R1": {
+      "scope": "module-internal pure computation",
+      "productionApproval": "automatic-after-independent-evidence"
+    },
+    "R2": {
+      "scope": "compatible contracts additive migrations and memory algorithms",
+      "productionApproval": "human-required-for-initial-production-canary"
+    },
+    "R3": {
+      "scope": "identity approval commands secrets external side effects Edge and ZennoDroid",
+      "productionApproval": "human-required"
+    },
+    "R4": {
+      "scope": "security bypass irreversible data damage unauthorized platform behavior",
+      "productionApproval": "reject"
+    }
+  },
+  "separationOfDuties": [
+    "implementer",
+    "evidence-issuer",
+    "release-approver"
+  ],
+  "aiProductionSecrets": false,
+  "arbitraryProductionShell": false
+}

@@ -1,0 +1,19 @@
+{
+  "schema_version": "dps.windows-edge-supervisor-host/v1",
+  "host_id": "host_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "listen_host": "127.0.0.1",
+  "listen_port": 28741,
+  "exchange_path": "/dps/edge/v1/exchange",
+  "request_timeout_ms": 15000,
+  "maximum_request_bytes": 65536,
+  "allowed_client_sids": [
+    "S-1-5-21-1111111111-2222222222-3333333333-1001"
+  ],
+  "server_certificate_thumbprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "expected_server_key_id": "sha256_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "approved_runtime_root": "C:\\ProgramData\\DPS\\edge-runtime",
+  "approved_worker_root": "C:\\ProgramData\\DPS\\edge-runtime\\slots",
+  "evidence_log_path": "C:\\ProgramData\\DPS\\edge-runtime\\evidence\\supervisor-evidence.jsonl",
+  "release_bom_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "protected_policy_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+}

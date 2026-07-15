@@ -1,0 +1,58 @@
+{
+  "spec_version": "1.0",
+  "spec_id": "edge.journal.drain.attestation/auth/v1",
+  "contract_id": "edge.journal.drain.attestation/v1",
+  "owner_module": "edge-local-journal",
+  "signature_algorithm": "RSA_PSS_SHA256",
+  "rsa_pss_parameters": {
+    "message_hash": "SHA-256",
+    "mask_generation_function": "MGF1",
+    "mgf1_hash": "SHA-256",
+    "salt_length_bytes": 32,
+    "trailer_field": 1
+  },
+  "key_id": "sha256_<lowercase SHA-256 of DER SubjectPublicKeyInfo>",
+  "private_key_boundary": "externally injected private key held only by the Journal attestation authority; never persisted by this module",
+  "framing": "strict UTF-8 domain + LF, then each field as UTF-8-byte-length decimal + ':' + exact bytes + ';'; no Unicode normalization and no null fields",
+  "rich_owner_statement": {
+    "domain": "dps.edge-local-journal.drain-attestation-envelope/v1",
+    "fields": [
+      "schema_version", "contract_id", "producer_module", "request_producer_module",
+      "soul_id", "device_binding_id", "platform_account_id", "trace_id",
+      "idempotency_key", "occurred_at", "privacy_class", "request_id", "drain_id",
+      "command_id", "entry_id", "entry_type", "entry_sequence", "entry_checksum",
+      "entry_payload_sha256", "journal_id", "journal_file_sha256",
+      "journal_file_identity_sha256", "journal_head_sequence", "journal_head_checksum",
+      "checksum_encoding", "range_start_sequence", "range_end_sequence", "range_entry_count",
+      "entry_set_sha256", "quarantine_state", "recovery_state", "state_artifact_set_sha256",
+      "worker_artifact_sha256", "worker_version", "worker_slot", "journal_artifact_sha256",
+      "release_bom_sha256", "protected_policy_sha256", "routing_epoch", "intake_stopped",
+      "worker_drained", "remaining_in_flight", "worker_receipt_wire_sha256",
+      "journal_receipt_sha256", "issued_at", "expires_at", "canonicalization",
+      "signature_key_id", "signature_algorithm"
+    ],
+    "proof_fields_outside_statement": ["statement_sha256", "signature"],
+    "nested_receipt_rule": "the Journal-owned owner-receipt framing SHA-256 is signed as journal_receipt_sha256"
+  },
+  "independent_worker_wire_correlation": {
+    "worker_contract_owner": "windows-edge-supervisor",
+    "worker_contract_id": "edge.worker.drain.receipt/v1",
+    "opaque_field": "worker_receipt_wire_sha256",
+    "journal_rule": "Journal never parses, reconstructs, signs, or imports the Worker wire contract; it binds only the lowercase SHA-256 of the exact persisted Worker receipt UTF-8 bytes found in the durable WORKER_DRAINED payload",
+    "supervisor_rule": "Supervisor independently verifies the raw Worker wire, hashes those exact bytes, verifies this Journal rich wire, and requires the two scopes, deployment facts, drain identity, and worker_receipt_wire_sha256 to match",
+    "key_separation_rule": "after both independent proofs verify, Supervisor rejects equal normalized Worker and Journal SPKI SHA-256 identities"
+  },
+  "issuance_invariants": [
+    "caller cannot supply journal head, checksum, file identity, entry range, entry-set digest, quarantine state, recovery state, owner receipt or Journal signatures",
+    "Journal reloads and recomputes the selected command entry set and complete head from the held durable journal file descriptor",
+    "the same OS-level writer lease used by append is held throughout issuance",
+    "device/inode or volume/file-index identity, length, bytes, head and state-artifact set must be identical before and after signing",
+    "any quarantine, stale append intent, concurrent append, link/reparse path, replacement, corruption, missing key, state change or expiry fails closed"
+  ],
+  "golden_framing_vector": {
+    "domain": "dps.test.frame/v1",
+    "fields": ["A", "é", ""],
+    "encoded_utf8_hex": "6470732e746573742e6672616d652f76310a313a413b323ac3a93b303a3b",
+    "sha256": "6b4569f04ae4dc2405097eeabd9c6c90a55da42d4ca87c5fdb3cb42c6c655131"
+  }
+}

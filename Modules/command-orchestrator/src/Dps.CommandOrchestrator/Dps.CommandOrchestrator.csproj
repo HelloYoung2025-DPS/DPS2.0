@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.CommandOrchestrator</AssemblyName>
+    <RootNamespace>Dps.CommandOrchestrator</RootNamespace>
+    <PackageId>Dps.CommandOrchestrator</PackageId>
+    <Version>0.2.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+    <ProjectReference Include="../../contracts/provided/Dps.CommandOrchestrator.Contracts/Dps.CommandOrchestrator.Contracts.csproj" />
+    <ProjectReference Include="../../../operation-compiler/contracts/provided/Dps.OperationCompiler.Contracts/Dps.OperationCompiler.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="../../migrations/001_create_command_orchestrator.sql"
+                      LogicalName="Dps.CommandOrchestrator.Migrations.001_create_command_orchestrator.sql" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Dps.CommandOrchestrator.Tests" />
+  </ItemGroup>
+</Project>

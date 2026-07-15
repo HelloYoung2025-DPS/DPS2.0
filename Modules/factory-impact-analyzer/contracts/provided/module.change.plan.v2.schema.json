@@ -1,0 +1,236 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/module.change.plan.v2.schema.json",
+  "title": "module.change.plan/v2",
+  "description": "A deterministic read/write-scope-separated impact plan. It is non-authorizing while portable_trust_status is WAITING_EXTERNAL.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "contract_id", "producer_module", "soul_id",
+    "device_binding_id", "platform_account_id", "trace_id", "idempotency_key",
+    "occurred_at", "privacy_class", "plan_id", "plan_sha256", "intent_id",
+    "instruction_receipt_id", "instruction_receipt_sha256",
+    "source_upgrade_intent_sha256", "source_intake_payload_sha256",
+    "baseline_commit", "diff_fingerprint", "instruction_scope",
+    "instruction_scope_sha256", "write_modules", "authorized_write_paths",
+    "authorized_write_paths_sha256", "write_scope_sha256",
+    "source_contract_change_claims_status",
+    "source_contract_change_claims_sha256", "bound_contract_change_expectations",
+    "verified_baseline_contract_facts_sha256",
+    "changeset_contract_verification_required", "dependency_edges",
+    "parallel_waves", "requested_risk_tier", "effective_risk_tier",
+    "requested_stage", "planned_stage", "required_checks", "role_assignments",
+    "trusted_policy_id", "trusted_policy_sha256", "trusted_policy_status",
+    "portable_trust_status", "release_eligible", "side_effects_authorized",
+    "shadow_side_effect_count"
+  ],
+  "properties": {
+    "schema_version": {"const": "dps.module-change-plan/v2"},
+    "contract_id": {"const": "module.change.plan/v2"},
+    "producer_module": {"const": "factory-impact-analyzer"},
+    "soul_id": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"}]},
+    "device_binding_id": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"}]},
+    "platform_account_id": {"oneOf": [{"type": "null"}, {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"}]},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"$ref": "#/$defs/canonical_utc"},
+    "privacy_class": {"const": "internal"},
+    "plan_id": {"type": "string", "pattern": "^change:[0-9a-f]{32}$(?![\\s\\S])"},
+    "plan_sha256": {"$ref": "#/$defs/sha256"},
+    "intent_id": {"$ref": "#/$defs/request_id"},
+    "instruction_receipt_id": {"type": "string", "pattern": "^instruction:[0-9a-f]{32}$(?![\\s\\S])"},
+    "instruction_receipt_sha256": {"$ref": "#/$defs/sha256"},
+    "source_upgrade_intent_sha256": {"$ref": "#/$defs/sha256"},
+    "source_intake_payload_sha256": {"$ref": "#/$defs/sha256"},
+    "baseline_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$(?![\\s\\S])"},
+    "diff_fingerprint": {"$ref": "#/$defs/sha256"},
+    "instruction_scope": {"$ref": "#/$defs/module_list"},
+    "instruction_scope_sha256": {"$ref": "#/$defs/sha256"},
+    "write_modules": {"$ref": "#/$defs/module_list"},
+    "authorized_write_paths": {
+      "type": "array", "minItems": 1, "maxItems": 512, "uniqueItems": true,
+      "items": {"$ref": "#/$defs/repo_path"}
+    },
+    "authorized_write_paths_sha256": {"$ref": "#/$defs/sha256"},
+    "write_scope_sha256": {"$ref": "#/$defs/sha256"},
+    "source_contract_change_claims_status": {"const": "UNVERIFIED_EXPECTATIONS"},
+    "source_contract_change_claims_sha256": {"$ref": "#/$defs/sha256"},
+    "bound_contract_change_expectations": {
+      "type": "array", "maxItems": 128, "uniqueItems": true,
+      "items": {"$ref": "#/$defs/expectation"}
+    },
+    "verified_baseline_contract_facts_sha256": {"$ref": "#/$defs/sha256"},
+    "changeset_contract_verification_required": {"const": true},
+    "dependency_edges": {
+      "type": "array", "uniqueItems": true,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["consumer", "provider"],
+        "properties": {
+          "consumer": {"$ref": "#/$defs/module_id"},
+          "provider": {"$ref": "#/$defs/module_id"}
+        }
+      }
+    },
+    "parallel_waves": {
+      "type": "array", "minItems": 1,
+      "items": {"$ref": "#/$defs/module_list"}
+    },
+    "requested_risk_tier": {"$ref": "#/$defs/risk"},
+    "effective_risk_tier": {"$ref": "#/$defs/risk"},
+    "requested_stage": {"enum": ["development", "shadow"]},
+    "planned_stage": {"enum": ["development", "shadow"]},
+    "required_checks": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$(?![\\s\\S])"}
+    },
+    "role_assignments": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "impact_planner", "contract_architect", "module_implementer",
+        "independent_test_agent", "security_privacy_adversary",
+        "reliability_reviewer", "windows_zenno_reviewer", "evidence_auditor",
+        "release_approver"
+      ],
+      "properties": {
+        "impact_planner": {"$ref": "#/$defs/actor_list"},
+        "contract_architect": {"$ref": "#/$defs/actor_list"},
+        "module_implementer": {"$ref": "#/$defs/actor_list"},
+        "independent_test_agent": {"$ref": "#/$defs/actor_list"},
+        "security_privacy_adversary": {"$ref": "#/$defs/actor_list"},
+        "reliability_reviewer": {"$ref": "#/$defs/actor_list"},
+        "windows_zenno_reviewer": {"$ref": "#/$defs/actor_list"},
+        "evidence_auditor": {"$ref": "#/$defs/actor_list"},
+        "release_approver": {"$ref": "#/$defs/actor_list"}
+      }
+    },
+    "trusted_policy_id": {"$ref": "#/$defs/request_id"},
+    "trusted_policy_sha256": {"$ref": "#/$defs/sha256"},
+    "trusted_policy_status": {"const": "non-production-template"},
+    "portable_trust_status": {"const": "WAITING_EXTERNAL"},
+    "release_eligible": {"const": false},
+    "side_effects_authorized": {"const": false},
+    "shadow_side_effect_count": {"const": 0}
+  },
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "canonical_utc": {
+      "type": "string", "format": "date-time",
+      "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$(?![\\s\\S])"
+    },
+    "request_id": {
+      "type": "string", "minLength": 8, "maxLength": 128,
+      "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"
+    },
+    "module_id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$(?![\\s\\S])"},
+    "module_list": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {"$ref": "#/$defs/module_id"}
+    },
+    "repo_path": {
+      "type": "string", "minLength": 1, "maxLength": 512,
+      "pattern": "^(?!/)(?!\\.)(?!.*\\/\\.)(?!.*\\\\)(?!.*//)(?!.*[\\u0000-\\u001f\\u007f])(?!.*[*?\\[\\]])(?!.*\\s$)(?!.*\\/$).+$(?![\\s\\S])"
+    },
+    "risk": {"enum": ["R0", "R1", "R2", "R3"]},
+    "actor_list": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {
+        "type": "string", "minLength": 1, "maxLength": 128,
+        "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$(?![\\s\\S])"
+      }
+    },
+    "nullable_mode": {
+      "oneOf": [
+        {"enum": ["active", "quarantine-only", "retired"]},
+        {"type": "null"}
+      ]
+    },
+    "nullable_sha256": {
+      "oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]
+    },
+    "expectation": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "contract_id", "major", "baseline_commit", "expected_mode",
+        "expected_status", "expected_baseline_state", "change_kind",
+        "expected_owner_module", "expected_source", "expected_source_sha256",
+        "expected_previous_mode", "expected_previous_source_sha256",
+        "quarantine_reason", "quarantine_evidence_sha256"
+      ],
+      "properties": {
+        "contract_id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z0-9]+)+$(?![\\s\\S])"},
+        "major": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "baseline_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$(?![\\s\\S])"},
+        "expected_mode": {"enum": ["active", "quarantine-only", "retired"]},
+        "expected_status": {"enum": ["proposed", "active", "deprecated", "retired"]},
+        "expected_baseline_state": {"enum": ["present", "absent"]},
+        "change_kind": {"enum": ["add-major", "additive-schema", "mode-transition", "introduce-quarantined-major"]},
+        "expected_owner_module": {"$ref": "#/$defs/module_id"},
+        "expected_source": {"$ref": "#/$defs/repo_path"},
+        "expected_source_sha256": {"$ref": "#/$defs/sha256"},
+        "expected_previous_mode": {"$ref": "#/$defs/nullable_mode"},
+        "expected_previous_source_sha256": {"$ref": "#/$defs/nullable_sha256"},
+        "quarantine_reason": {"type": ["string", "null"], "maxLength": 128},
+        "quarantine_evidence_sha256": {"$ref": "#/$defs/nullable_sha256"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"change_kind": {"const": "add-major"}}, "required": ["change_kind"]},
+          "then": {"properties": {
+            "expected_mode": {"const": "active"}, "expected_status": {"const": "proposed"},
+            "expected_baseline_state": {"const": "absent"}, "expected_previous_mode": {"type": "null"},
+            "expected_previous_source_sha256": {"type": "null"}, "quarantine_reason": {"type": "null"},
+            "quarantine_evidence_sha256": {"type": "null"}
+          }}
+        },
+        {
+          "if": {"properties": {"change_kind": {"const": "additive-schema"}}, "required": ["change_kind"]},
+          "then": {"properties": {
+            "expected_mode": {"const": "active"}, "expected_status": {"enum": ["proposed", "active"]},
+            "expected_baseline_state": {"const": "present"}, "expected_previous_mode": {"const": "active"},
+            "expected_previous_source_sha256": {"$ref": "#/$defs/sha256"}, "quarantine_reason": {"type": "null"},
+            "quarantine_evidence_sha256": {"type": "null"}
+          }}
+        },
+        {
+          "if": {"properties": {"change_kind": {"const": "mode-transition"}}, "required": ["change_kind"]},
+          "then": {
+            "properties": {
+              "expected_baseline_state": {"const": "present"},
+              "expected_previous_source_sha256": {"$ref": "#/$defs/sha256"},
+              "quarantine_reason": {"type": "null"},
+              "quarantine_evidence_sha256": {"type": "null"}
+            },
+            "oneOf": [
+              {"properties": {
+                "expected_previous_mode": {"const": "active"},
+                "expected_mode": {"const": "quarantine-only"},
+                "expected_status": {"const": "deprecated"}
+              }},
+              {"properties": {
+                "expected_previous_mode": {"const": "active"},
+                "expected_mode": {"const": "retired"},
+                "expected_status": {"const": "retired"}
+              }},
+              {"properties": {
+                "expected_previous_mode": {"const": "quarantine-only"},
+                "expected_mode": {"const": "retired"},
+                "expected_status": {"const": "retired"}
+              }}
+            ]
+          }
+        },
+        {
+          "if": {"properties": {"change_kind": {"const": "introduce-quarantined-major"}}, "required": ["change_kind"]},
+          "then": {"properties": {
+            "expected_mode": {"const": "quarantine-only"}, "expected_status": {"const": "deprecated"},
+            "expected_baseline_state": {"const": "absent"}, "expected_previous_mode": {"type": "null"},
+            "expected_previous_source_sha256": {"type": "null"},
+            "quarantine_reason": {"const": "historical-wire-import-no-baseline-major"},
+            "quarantine_evidence_sha256": {"$ref": "#/$defs/sha256"}
+          }}
+        }
+      ]
+    }
+  }
+}

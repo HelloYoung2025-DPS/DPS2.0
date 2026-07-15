@@ -1,0 +1,34 @@
+{
+  "schema_version": "dps.legacy-sessionrunner-golden-trace/v1",
+  "trace_id": "trace_01e90a72a3d6e821140b9e8f6772a67d",
+  "fixture_kind": "SYNTHETIC_FORMAT_EXAMPLE",
+  "runtime_observed": false,
+  "evidence_eligibility": [],
+  "source_snapshot_id": "legacy-sessionrunner:3f9f8b9cf1e4f91c84220f6c89a1d7d416bd73d250705f1f0f4c81f41a5e6f97",
+  "scenario": "Attempted split-session start fails closed until the modern execution bridge is available.",
+  "identity_scope": {
+    "soul_id": "soul_dd53a49bc33fc048e66a4407f22fcdadaafa9004a2b998e465c4915ab510d5e3",
+    "device_binding_id": "db_e347a8900e0cfd93609460e27d9050a8",
+    "platform_account_id": "pa_b1dd1668bcd416151454042db6be8c97"
+  },
+  "steps": [
+    {
+      "sequence": 1,
+      "method": "InitSession",
+      "input_fixture": {
+        "fixture": "authorized-device-ready-but-bridge-unavailable"
+      },
+      "expected_return": "ERROR: modern authorization bridge unavailable",
+      "expected_state": {
+        "session_initialized": false,
+        "zd_step_type": "ERROR_BRIDGE_REQUIRED",
+        "zd_action_result": "UNKNOWN",
+        "terminal": true
+      }
+    }
+  ],
+  "limitations": [
+    "Synthetic format fixture only; no legacy runtime execution occurred.",
+    "No Windows, ZennoDroid, ADB, GBrain, integration, or device evidence is claimed."
+  ]
+}

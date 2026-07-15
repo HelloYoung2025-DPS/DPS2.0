@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.EdgeLocalJournal.Contracts</AssemblyName>
+    <RootNamespace>Dps.EdgeLocalJournal</RootNamespace>
+    <PackageId>Dps.EdgeLocalJournal.Contracts</PackageId>
+    <Version>0.2.0</Version>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <DefineConstants>$(DefineConstants);EDGE_LOCAL_JOURNAL_CONTRACTS</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../src/DrainAttestation.cs" Link="JournalDrainAttestationCodec.cs" />
+    <InternalsVisibleTo Include="Dps.EdgeLocalJournal" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="../edge.journal.append.v1.schema.json" Pack="true" PackagePath="contracts" />
+    <None Include="../edge.journal.append.v1.corpus.json" Pack="true" PackagePath="contracts" />
+    <None Include="../edge.journal.checksum.v1.json" Pack="true" PackagePath="contracts" />
+    <None Include="../edge.journal.receipt.v1.schema.json" Pack="true" PackagePath="contracts" />
+    <None Include="../edge.journal.receipt.v1.corpus.json" Pack="true" PackagePath="contracts" />
+    <None Include="../edge.journal.drain.attestation.v1.schema.json" Pack="true" PackagePath="contracts" />
+    <None Include="../edge.journal.drain.attestation.v1.auth.json" Pack="true" PackagePath="contracts" />
+    <None Include="../edge.journal.drain.attestation.v1.corpus.json" Pack="true" PackagePath="contracts" />
+    <None Include="README.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+</Project>

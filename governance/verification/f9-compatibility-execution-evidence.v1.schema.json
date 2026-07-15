@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/verification/f9-compatibility-execution-evidence.v1.schema.json",
+  "title": "F9 signed candidate compatibility execution evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "artifact_id",
+    "evidence_kind",
+    "required",
+    "status",
+    "integration_commit",
+    "candidate_release_bom",
+    "previous_stable_release_bom",
+    "compatibility_snapshot",
+    "environment_id",
+    "issued_at",
+    "expires_at",
+    "row_set_sha256",
+    "row_results",
+    "compatibility_group",
+    "candidate_green_eligible",
+    "attestation"
+  ],
+  "properties": {
+    "schema_version": { "const": "dps.compatibility-execution-evidence/v1" },
+    "artifact_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+    "evidence_kind": { "const": "REAL_EXTERNAL" },
+    "required": { "const": true },
+    "status": { "const": "PASS" },
+    "integration_commit": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/gitObject" },
+    "candidate_release_bom": { "$ref": "#/$defs/bomBinding" },
+    "previous_stable_release_bom": { "$ref": "#/$defs/bomBinding" },
+    "compatibility_snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "sha256", "policy_sha256"],
+      "properties": {
+        "schema_version": { "const": "dps.compatibility-matrix/v2" },
+        "sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+        "policy_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" }
+      }
+    },
+    "environment_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "row_set_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+    "row_results": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 262144,
+      "items": { "$ref": "#/$defs/rowResult" }
+    },
+    "compatibility_group": { "$ref": "#/$defs/groupEvidence" },
+    "candidate_green_eligible": { "const": true },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_issuer_identity", "runner_key_id", "algorithm", "signature_base64"],
+      "properties": {
+        "evidence_issuer_identity": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/identity" },
+        "runner_key_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+        "algorithm": { "const": "ECDSA_P256_SHA256_P1363" },
+        "signature_base64": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    }
+  },
+  "$defs": {
+    "moduleId": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "bomBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["bom_id", "sha256", "generation", "activation_token_sha256", "signature_sha256"],
+      "properties": {
+        "bom_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+        "sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+        "generation": { "type": "integer", "minimum": 1 },
+        "activation_token_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+        "signature_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" }
+      }
+    },
+    "moduleSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["module_id", "version", "artifact_sha256"],
+      "properties": {
+        "module_id": { "$ref": "#/$defs/moduleId" },
+        "version": { "$ref": "#/$defs/semver" },
+        "artifact_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" }
+      }
+    },
+    "combinationResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "combination_id",
+        "expectation",
+        "producer",
+        "consumer",
+        "raw_evidence_artifact_id",
+        "raw_evidence_sha256",
+        "evidence_status",
+        "evidence_class",
+        "environment_id",
+        "executed_test_count",
+        "skip_count",
+        "partial_count",
+        "not_run_count"
+      ],
+      "properties": {
+        "combination_id": { "enum": ["N/N", "N/N-1", "N-1/N", "N-1/N-1"] },
+        "expectation": { "enum": ["RUNNABLE", "FAIL_CLOSED_BY_GROUP"] },
+        "producer": { "$ref": "#/$defs/moduleSelection" },
+        "consumer": { "$ref": "#/$defs/moduleSelection" },
+        "raw_evidence_artifact_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+        "raw_evidence_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+        "evidence_status": { "const": "PASS" },
+        "evidence_class": { "const": "REAL_CANDIDATE_ARTIFACT" },
+        "environment_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+        "executed_test_count": { "type": "integer", "minimum": 1 },
+        "skip_count": { "const": 0 },
+        "partial_count": { "const": 0 },
+        "not_run_count": { "const": 0 }
+      }
+    },
+    "rowResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "matrix_row_id",
+        "matrix_row_sha256",
+        "contract_id",
+        "major",
+        "owner_module",
+        "runtime_producer_module",
+        "transport_sender_module",
+        "consumer_module",
+        "producer_mode",
+        "consumer_mode",
+        "communication_pair_sha256",
+        "combination_results",
+        "row_status"
+      ],
+      "properties": {
+        "matrix_row_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+        "matrix_row_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+        "contract_id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z0-9]+)+$" },
+        "major": { "type": "integer", "minimum": 1 },
+        "owner_module": { "$ref": "#/$defs/moduleId" },
+        "runtime_producer_module": { "$ref": "#/$defs/moduleId" },
+        "transport_sender_module": { "$ref": "#/$defs/moduleId" },
+        "consumer_module": { "$ref": "#/$defs/moduleId" },
+        "producer_mode": { "const": "active" },
+        "consumer_mode": { "const": "active" },
+        "communication_pair_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+        "combination_results": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": { "$ref": "#/$defs/combinationResult" }
+        },
+        "row_status": { "const": "PASS" }
+      }
+    },
+    "groupEdge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["matrix_row_id", "producer_module", "transport_sender_module", "consumer_module", "contract_id", "major"],
+      "properties": {
+        "matrix_row_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+        "producer_module": { "$ref": "#/$defs/moduleId" },
+        "transport_sender_module": { "$ref": "#/$defs/moduleId" },
+        "consumer_module": { "$ref": "#/$defs/moduleId" },
+        "contract_id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z0-9]+)+$" },
+        "major": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "groupEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required",
+        "group_id",
+        "group_version",
+        "members",
+        "edges",
+        "blocked_matrix_row_ids",
+        "release_order",
+        "rollback_unit",
+        "status"
+      ],
+      "properties": {
+        "required": { "type": "boolean" },
+        "group_id": { "type": ["string", "null"] },
+        "group_version": { "oneOf": [{ "$ref": "#/$defs/semver" }, { "type": "null" }] },
+        "members": { "type": "array", "items": { "$ref": "#/$defs/moduleSelection" } },
+        "edges": { "type": "array", "items": { "$ref": "#/$defs/groupEdge" } },
+        "blocked_matrix_row_ids": {
+          "type": "array",
+          "items": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" }
+        },
+        "release_order": { "type": "array", "items": { "$ref": "#/$defs/moduleId" } },
+        "rollback_unit": { "type": ["string", "null"] },
+        "status": { "enum": ["PASS", "NOT_APPLICABLE"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "required": { "const": false } }, "required": ["required"] },
+          "then": {
+            "properties": {
+              "group_id": { "type": "null" },
+              "group_version": { "type": "null" },
+              "members": { "maxItems": 0 },
+              "edges": { "maxItems": 0 },
+              "blocked_matrix_row_ids": { "maxItems": 0 },
+              "release_order": { "maxItems": 0 },
+              "rollback_unit": { "type": "null" },
+              "status": { "const": "NOT_APPLICABLE" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "required": { "const": true } }, "required": ["required"] },
+          "then": {
+            "properties": {
+              "group_id": { "type": "string", "minLength": 8 },
+              "group_version": { "$ref": "#/$defs/semver" },
+              "members": { "minItems": 2 },
+              "edges": { "minItems": 1 },
+              "blocked_matrix_row_ids": { "minItems": 1 },
+              "release_order": { "minItems": 2 },
+              "rollback_unit": { "type": "string", "minLength": 1 },
+              "status": { "const": "PASS" }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

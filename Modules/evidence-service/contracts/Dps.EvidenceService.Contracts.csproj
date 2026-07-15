@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.EvidenceService.Contracts</AssemblyName>
+    <RootNamespace>Dps.EvidenceService.Contracts</RootNamespace>
+    <PackageId>Dps.EvidenceService.Contracts</PackageId>
+    <Version>0.1.0</Version>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/bin/**;**/obj/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="provided/test.evidence.v1.schema.json" Pack="true" PackagePath="contracts" />
+  </ItemGroup>
+</Project>

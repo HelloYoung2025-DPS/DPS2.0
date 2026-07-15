@@ -1,0 +1,39 @@
+* text=auto
+
+# Only structured modern module source and test paths are normalized to LF.
+# The `*/src` and `*/tests` segment is required because this repository lives
+# on case-insensitive Windows/macOS filesystems where `Modules` and `modules`
+# match the same path.
+Modules/*/src/**/*.cs text eol=lf
+Modules/*/tests/**/*.cs text eol=lf
+apps/**/*.cs text eol=lf
+tests/**/*.cs text eol=lf
+zenno/**/*.cs text eol=lf
+
+# Existing ZennoDroid C# contains LF, CRLF, and mixed line endings. Keep these
+# narrow legacy rules after modern rules so old bytes are never normalized and
+# registered module src/tests remain LF text.
+Core/*.cs -text
+Core/**/*.cs -text
+Modules/*.cs -text
+Modules/Core/*.cs -text
+Modules/Core/**/*.cs -text
+ZDProjects/*.cs -text
+ZDProjects/**/*.cs -text
+Extensions/*.cs -text
+Extensions/**/*.cs -text
+
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.py text eol=lf
+*.js text eol=lf
+*.sh text eol=lf
+*.ps1 text eol=crlf
+
+*.droid binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.zip binary

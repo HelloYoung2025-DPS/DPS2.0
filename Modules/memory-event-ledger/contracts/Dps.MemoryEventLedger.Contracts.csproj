@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.MemoryEventLedger.Contracts</AssemblyName>
+    <RootNamespace>Dps.MemoryEventLedger.Contracts</RootNamespace>
+    <PackageId>Dps.MemoryEventLedger.Contracts</PackageId>
+    <Version>0.2.0</Version>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <DefaultItemExcludes>$(DefaultItemExcludes);provided/**/bin/**;provided/**/obj/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Update="README.md" Pack="true" PackagePath="/" />
+    <None Include="provided/memory.event.v1.schema.json" Pack="true" PackagePath="contracts" />
+    <None Include="provided/memory.outbox.v1.schema.json" Pack="true" PackagePath="contracts" />
+    <None Include="provided/memory.event.v2.schema.json" Pack="true" PackagePath="contracts" />
+    <None Include="provided/memory.outbox.v2.schema.json" Pack="true" PackagePath="contracts" />
+    <None Include="provided/memory.append.request.v2.schema.json" Pack="true" PackagePath="contracts" />
+  </ItemGroup>
+</Project>

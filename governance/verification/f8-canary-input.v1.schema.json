@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/verification/f8-canary-input.v1.schema.json",
+  "title": "F8 thirty-device production canary evidence",
+  "allOf": [
+    { "$ref": "external-evidence-envelope.v1.schema.json" },
+    {
+      "type": "object",
+      "required": ["schema_version", "payload"],
+      "properties": {
+        "schema_version": { "const": "dps.canary-verification-input/v1" },
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["environment_id", "os_family"],
+          "properties": {
+            "environment_id": { "type": "string", "pattern": "^env_[a-z0-9][a-z0-9_-]{6,63}$" },
+            "os_family": { "enum": ["Windows", "Android", "Windows+Android", "Linux"] }
+          }
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "waves",
+            "parallel_module_count",
+            "parallel_modules_independent",
+            "zero_tolerance",
+            "technical_measurements",
+            "rollback_drill",
+            "traceable_device_count",
+            "queryable_bom_device_count"
+          ],
+          "properties": {
+            "waves": {
+              "type": "array",
+              "minItems": 8,
+              "maxItems": 8,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "device_count", "environment_kind", "started_at", "finished_at", "commands", "status", "real_side_effect_count"],
+                "properties": {
+                  "name": { "enum": ["simulator", "shadow", "test_soul", "1", "3", "8", "15", "30"] },
+                  "device_count": { "type": "integer", "minimum": 0, "maximum": 200 },
+                  "environment_kind": { "enum": ["SIMULATED", "SHADOW", "TEST", "PRODUCTION"] },
+                  "started_at": { "type": "string", "format": "date-time" },
+                  "finished_at": { "type": "string", "format": "date-time" },
+                  "commands": { "type": "integer", "minimum": 0 },
+                  "status": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                  "real_side_effect_count": { "type": "integer", "minimum": 0 }
+                }
+              }
+            },
+            "parallel_module_count": { "type": "integer", "minimum": 1, "maximum": 2 },
+            "parallel_modules_independent": { "const": true },
+            "zero_tolerance": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "cross_scope_leaks",
+                "unauthorized_side_effects",
+                "duplicate_side_effects",
+                "false_successes",
+                "unknown_contract_acceptances",
+                "shadow_real_side_effects",
+                "zenno_unexpected_restarts",
+                "audit_chain_gaps"
+              ],
+              "properties": {
+                "cross_scope_leaks": { "const": 0 },
+                "unauthorized_side_effects": { "const": 0 },
+                "duplicate_side_effects": { "const": 0 },
+                "false_successes": { "const": 0 },
+                "unknown_contract_acceptances": { "const": 0 },
+                "shadow_real_side_effects": { "const": 0 },
+                "zenno_unexpected_restarts": { "const": 0 },
+                "audit_chain_gaps": { "const": 0 }
+              }
+            },
+            "technical_measurements": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "max_consecutive_health_check_failures",
+                "max_error_rate_delta_percentage_points_over_5m",
+                "max_error_rate_ratio_over_5m",
+                "max_p95_latency_ratio_over_10m",
+                "max_oldest_growing_backlog_seconds",
+                "max_gbrain_projection_lag_seconds"
+              ],
+              "properties": {
+                "max_consecutive_health_check_failures": { "type": "integer", "minimum": 0, "maximum": 2 },
+                "max_error_rate_delta_percentage_points_over_5m": { "type": "number", "minimum": 0, "maximum": 2.0 },
+                "max_error_rate_ratio_over_5m": { "type": "number", "minimum": 0, "exclusiveMaximum": 2.0 },
+                "max_p95_latency_ratio_over_10m": { "type": "number", "minimum": 0, "maximum": 1.5 },
+                "max_oldest_growing_backlog_seconds": { "type": "number", "minimum": 0, "maximum": 120 },
+                "max_gbrain_projection_lag_seconds": { "type": "number", "minimum": 0, "maximum": 300 }
+              }
+            },
+            "rollback_drill": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["status", "duration_minutes", "previous_bom_restored", "event_loss_count", "duplicate_side_effect_count"],
+              "properties": {
+                "status": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                "duration_minutes": { "type": "number", "minimum": 0, "maximum": 5 },
+                "previous_bom_restored": { "const": true },
+                "event_loss_count": { "const": 0 },
+                "duplicate_side_effect_count": { "const": 0 }
+              }
+            },
+            "traceable_device_count": { "type": "integer", "minimum": 30 },
+            "queryable_bom_device_count": { "type": "integer", "minimum": 30 }
+          }
+        }
+      }
+    }
+  ]
+}

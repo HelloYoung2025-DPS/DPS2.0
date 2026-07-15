@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.GBrainProjector</AssemblyName>
+    <RootNamespace>Dps.GBrainProjector</RootNamespace>
+    <Version>0.3.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Dps.GBrainProjector.Tests" />
+    <PackageReference Include="Npgsql" />
+    <ProjectReference Include="../contracts/Dps.GBrainProjector.Contracts.csproj" />
+    <ProjectReference Include="../../memory-event-ledger/contracts/Dps.MemoryEventLedger.Contracts.csproj" />
+    <ProjectReference Include="../../interest-reducer/contracts/Dps.InterestReducer.Contracts.csproj" />
+    <EmbeddedResource Include="../migrations/001_create_gbrain_projector.sql" />
+  </ItemGroup>
+</Project>

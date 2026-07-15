@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../edge-local-journal/contracts/provided/Dps.EdgeLocalJournal.Contracts/Dps.EdgeLocalJournal.Contracts.csproj" />
+    <ProjectReference Include="../../executor-gateway/contracts/provided/Dps.ExecutorGateway.Contracts/Dps.ExecutorGateway.Contracts.csproj" />
+    <ProjectReference Include="../../windows-edge-supervisor/contracts/provided/Dps.WindowsEdgeSupervisor.Contracts/Dps.WindowsEdgeSupervisor.Contracts.csproj" />
+    <InternalsVisibleTo Include="Dps.WindowsEdgeWorker.Tests" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,802 @@
+{
+  "schema_version": "dps.legacy-csharp-bytes/v1",
+  "baseline_commit": "cac7ccbcce927a1a3a62cfd376497f0d30cc47e4",
+  "inventory_scope": "TRACKED_LEGACY_CSHARP_PLUS_APPROVED_REPAIRS",
+  "entry_count": 79,
+  "entries": [
+    {
+      "path": "Core/ErrorRecovery.cs",
+      "baseline_git_blob": "4b715b5ac548dd3ad7d4f3a4560a72e26d6cad18",
+      "baseline_sha256": "1efa01d15d4944927c8b5e6e9d6af7b5cd327782d6a7b44c4d314fb4c610965c",
+      "baseline_byte_length": 6958,
+      "working_sha256": "1efa01d15d4944927c8b5e6e9d6af7b5cd327782d6a7b44c4d314fb4c610965c",
+      "working_byte_length": 6958,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Core/HumanizationEngine.cs",
+      "baseline_git_blob": "c5a6c8202d080d749096f393a94e5d1966a24dbd",
+      "baseline_sha256": "939b12b69fbefac8615e0d58262c6155938d4fa4ef33804451fd673e371a415b",
+      "baseline_byte_length": 1582,
+      "working_sha256": "939b12b69fbefac8615e0d58262c6155938d4fa4ef33804451fd673e371a415b",
+      "working_byte_length": 1582,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Core/ScriptHelpers.cs",
+      "baseline_git_blob": "de8bb78c3097ee2b5c1ffc1e064a52cc69580dca",
+      "baseline_sha256": "bafb0672fdd6283962995bc3bcdb7396cd8079b4744f6f6f65e547d62b8a292e",
+      "baseline_byte_length": 10276,
+      "working_sha256": "bafb0672fdd6283962995bc3bcdb7396cd8079b4744f6f6f65e547d62b8a292e",
+      "working_byte_length": 10276,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Core/UILocator.cs",
+      "baseline_git_blob": "492522f5559706a64215225dd729c6063ea4b82b",
+      "baseline_sha256": "ab03b68d7b29d936bae9b3fa31c6982cf551bf4783d0ed1005d6d048adac60ea",
+      "baseline_byte_length": 8758,
+      "working_sha256": "ab03b68d7b29d936bae9b3fa31c6982cf551bf4783d0ed1005d6d048adac60ea",
+      "working_byte_length": 8758,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Extensions/DataSources/IPLocationExtension.cs",
+      "baseline_git_blob": "30581f4227beebeed7d43ef289431e9b9e7ebb09",
+      "baseline_sha256": "dbbf730b2e3a00d715be2531dc5f3a642d102f0414d2b1f1976ded4d23cb9ce3",
+      "baseline_byte_length": 4708,
+      "working_sha256": "dbbf730b2e3a00d715be2531dc5f3a642d102f0414d2b1f1976ded4d23cb9ce3",
+      "working_byte_length": 4708,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Extensions/DataSources/WeatherExtension.cs",
+      "baseline_git_blob": "aa22bf44cac6880bb1e2d7ef5c1410c2ed837a06",
+      "baseline_sha256": "e03bfab97603b61376c8f3f0264cec379373ba2081df10316d979e644c67ce3a",
+      "baseline_byte_length": 6227,
+      "working_sha256": "e03bfab97603b61376c8f3f0264cec379373ba2081df10316d979e644c67ce3a",
+      "working_byte_length": 6227,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/AIService.cs",
+      "baseline_git_blob": "97d3ce5a3d192261aa6a0df589971e8a9e6bab52",
+      "baseline_sha256": "b914aff9bbc55141835c3b945f1ea1e3a162e6da21573dda506cd65b8ddde8ec",
+      "baseline_byte_length": 27774,
+      "working_sha256": "b914aff9bbc55141835c3b945f1ea1e3a162e6da21573dda506cd65b8ddde8ec",
+      "working_byte_length": 27774,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/ActionExecutor.cs",
+      "baseline_git_blob": "e17fb9aaddd0dc90fc1a393186e077e31b0d6bb4",
+      "baseline_sha256": "66d797a0394fa423d244d623d929c33faea493e3141683e64a04c14d814d28eb",
+      "baseline_byte_length": 57791,
+      "working_sha256": "66d797a0394fa423d244d623d929c33faea493e3141683e64a04c14d814d28eb",
+      "working_byte_length": 57791,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/AppExplorer.cs",
+      "baseline_git_blob": "622ce075110c483794cbe5a382c0e5b741376900",
+      "baseline_sha256": "514ad171214f170431e27381a0b664e8aedd3d9b5c1dd0c5e3b16d4f3f16fa39",
+      "baseline_byte_length": 26274,
+      "working_sha256": "514ad171214f170431e27381a0b664e8aedd3d9b5c1dd0c5e3b16d4f3f16fa39",
+      "working_byte_length": 26274,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/AppExplorer_v2.cs",
+      "baseline_git_blob": "a2738122bc9e3ba22fe7e1e8a6ad2e92b2457a5b",
+      "baseline_sha256": "9e980f0cbbe6f2c0e5ee6b69aef23b2fa0e86fe5df5a6ef7ee5973a418a55cf7",
+      "baseline_byte_length": 25278,
+      "working_sha256": "9e980f0cbbe6f2c0e5ee6b69aef23b2fa0e86fe5df5a6ef7ee5973a418a55cf7",
+      "working_byte_length": 25278,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/CoreHelper.cs",
+      "baseline_git_blob": "f46c596e4d4769bfa1752343ba735f5ac969f8fb",
+      "baseline_sha256": "0df934d8092911244560aa9bbcd3f9ff75cecbe147e449d6fe22def30da16a26",
+      "baseline_byte_length": 15000,
+      "working_sha256": "0df934d8092911244560aa9bbcd3f9ff75cecbe147e449d6fe22def30da16a26",
+      "working_byte_length": 15000,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/ExtensionManager.cs",
+      "baseline_git_blob": "87d36d26e1704849b474844cbeb807ddaa132fc2",
+      "baseline_sha256": "9bf5837a52318001f68200b8c6565a36eff97096c2047797b6705d2bfa871020",
+      "baseline_byte_length": 10979,
+      "working_sha256": "9bf5837a52318001f68200b8c6565a36eff97096c2047797b6705d2bfa871020",
+      "working_byte_length": 10979,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/FileHelper.cs",
+      "baseline_git_blob": "6bfd37cafb30eee26a90be5c2f0caf8836dab825",
+      "baseline_sha256": "92f98cb3618c28dfcc24e4ba48097a966b929af635dfdfdfcf23c99b7a893b69",
+      "baseline_byte_length": 8212,
+      "working_sha256": "92f98cb3618c28dfcc24e4ba48097a966b929af635dfdfdfcf23c99b7a893b69",
+      "working_byte_length": 8212,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/IExtension.cs",
+      "baseline_git_blob": "a1398e90ab2557f74c19d435a1cc44cb89e4e673",
+      "baseline_sha256": "5aec0d179360d04f80ee90e26f0847ed7b91d3ba078969b31729b40d5603004d",
+      "baseline_byte_length": 1355,
+      "working_sha256": "5aec0d179360d04f80ee90e26f0847ed7b91d3ba078969b31729b40d5603004d",
+      "working_byte_length": 1355,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/Intent.cs",
+      "baseline_git_blob": "8a8c82e7075f992109270380b49ae5bfb2fa30f1",
+      "baseline_sha256": "52c4da5b99c6746bea76c51edf74a0a0885ebd55210f09e541a43aac5d2b4ce5",
+      "baseline_byte_length": 6125,
+      "working_sha256": "52c4da5b99c6746bea76c51edf74a0a0885ebd55210f09e541a43aac5d2b4ce5",
+      "working_byte_length": 6125,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/IntentTranslator.cs",
+      "baseline_git_blob": "ce47b1b3669ec7910760106916c89716d1bcd992",
+      "baseline_sha256": "7a4e9dc10cbdddc12fd89fdba30071faf96af851042f30f8a76b3b1e2523e4c8",
+      "baseline_byte_length": 14400,
+      "working_sha256": "7a4e9dc10cbdddc12fd89fdba30071faf96af851042f30f8a76b3b1e2523e4c8",
+      "working_byte_length": 14400,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/JsonHelper.cs",
+      "baseline_git_blob": "df6fc171b64d68cd8fa8fe099c54c2680a8b8e39",
+      "baseline_sha256": "6e25fc5d5392020e5ee73d6d26486dcc31ab47794e859cd93989d3a101fc7e71",
+      "baseline_byte_length": 28631,
+      "working_sha256": "6e25fc5d5392020e5ee73d6d26486dcc31ab47794e859cd93989d3a101fc7e71",
+      "working_byte_length": 28631,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/ManifestLoader.cs",
+      "baseline_git_blob": "63a50790c65a3c24168bb5655a0a100a84296c36",
+      "baseline_sha256": "7e57755cb872772904b0be57ed32b956367e9a7f4c6e1800bf527d9ad9342a7d",
+      "baseline_byte_length": 5129,
+      "working_sha256": "7e57755cb872772904b0be57ed32b956367e9a7f4c6e1800bf527d9ad9342a7d",
+      "working_byte_length": 5129,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/NavigationResolver.cs",
+      "baseline_git_blob": "7f8f6bd59cac02e47f966a24af3315f615521077",
+      "baseline_sha256": "85fe9a4f9e0345fb1d774747e17fc428737c0e070a85956977d554740b2d7cd5",
+      "baseline_byte_length": 8725,
+      "working_sha256": "85fe9a4f9e0345fb1d774747e17fc428737c0e070a85956977d554740b2d7cd5",
+      "working_byte_length": 8725,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/OperationContext.cs",
+      "baseline_git_blob": "805803cb830f269d13faa4cadaad669a02b6e5a6",
+      "baseline_sha256": "813df3971beb7dd03203fc10fc7c8be14fccd81fd2ea1e866212af2f1326c0ae",
+      "baseline_byte_length": 5201,
+      "working_sha256": "813df3971beb7dd03203fc10fc7c8be14fccd81fd2ea1e866212af2f1326c0ae",
+      "working_byte_length": 5201,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/PageDetector.cs",
+      "baseline_git_blob": "4b1fc5bc2e6d7fbc2014339aa1a6f787c4ba0718",
+      "baseline_sha256": "1f91a55a2cc251b044dc85a9993cf885f2099c07aa9348880e19666a8341c66e",
+      "baseline_byte_length": 12111,
+      "working_sha256": "1f91a55a2cc251b044dc85a9993cf885f2099c07aa9348880e19666a8341c66e",
+      "working_byte_length": 12111,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/RateLimiter.cs",
+      "baseline_git_blob": "3554bf5c927ee200c6c04851cc13ca1536857505",
+      "baseline_sha256": "3dcd8a2b73f7a91253ea7aaf177041ca76b75e3ba566dece6cc15b9aae3bf0c3",
+      "baseline_byte_length": 6018,
+      "working_sha256": "3dcd8a2b73f7a91253ea7aaf177041ca76b75e3ba566dece6cc15b9aae3bf0c3",
+      "working_byte_length": 6018,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/SelectorEngine.cs",
+      "baseline_git_blob": "87fc6297ccd57eb47947dd8e65c8a6b5e78e87d0",
+      "baseline_sha256": "8dffaa76af50de03b5c710dfbc077aab25e6a0e2db55ddae8094c9d4a73f3caf",
+      "baseline_byte_length": 11792,
+      "working_sha256": "8dffaa76af50de03b5c710dfbc077aab25e6a0e2db55ddae8094c9d4a73f3caf",
+      "working_byte_length": 11792,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/SmartOrchestrator.cs",
+      "baseline_git_blob": "5395ba6c5a9a40f785b9af7380204be0d08b3b13",
+      "baseline_sha256": "4f7d87f9cda02ffe0aeaadf8f8bd2e7a8a0b9fad096327306ed52b94d169b392",
+      "baseline_byte_length": 15861,
+      "working_sha256": "92887985478f149a782addc1e781b63406159a6f016d81de21aeb9a8abc3fcc1",
+      "working_byte_length": 16344,
+      "disposition": "APPROVED_F5_ORCHESTRATOR_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_ORCHESTRATOR_FAIL_CLOSED_REPAIR"
+    },
+    {
+      "path": "Modules/Core/VisionCorrector.cs",
+      "baseline_git_blob": "ad631a5963ad9b4fbab7d0eb3b6202fc844e7b19",
+      "baseline_sha256": "9a723ae56b82b4fb149cf8daecfc527baf2027168637b7dca35407d3c7a8847c",
+      "baseline_byte_length": 19303,
+      "working_sha256": "9a723ae56b82b4fb149cf8daecfc527baf2027168637b7dca35407d3c7a8847c",
+      "working_byte_length": 19303,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/ZDCommand.cs",
+      "baseline_git_blob": "1cc30e0004af6f461dfb02f8c1a01403e5785961",
+      "baseline_sha256": "cb6e56b31311c4f6123aecde140b33fb39156a08ea8b0e4f504a1679976453b7",
+      "baseline_byte_length": 8582,
+      "working_sha256": "cb6e56b31311c4f6123aecde140b33fb39156a08ea8b0e4f504a1679976453b7",
+      "working_byte_length": 8582,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/ZDResult.cs",
+      "baseline_git_blob": "bdedcaccd440030049c0843f21c3ff56eb57455b",
+      "baseline_sha256": "36c807be5fcf73d86d001fe18d010827993515fb6040be329a4a5d4516a282aa",
+      "baseline_byte_length": 8015,
+      "working_sha256": "36c807be5fcf73d86d001fe18d010827993515fb6040be329a4a5d4516a282aa",
+      "working_byte_length": 8015,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Core/ZennoDroidAdapter.cs",
+      "baseline_git_blob": "a923c611e8ea8f9a667bca8653300e7e690ca23e",
+      "baseline_sha256": "475a0b1f719435c49a08c770eb9e13c2335160cd72dea6f3a06010526e60eb09",
+      "baseline_byte_length": 13555,
+      "working_sha256": "475a0b1f719435c49a08c770eb9e13c2335160cd72dea6f3a06010526e60eb09",
+      "working_byte_length": 13555,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/DailyUpdate.cs",
+      "baseline_git_blob": "7fe006d54494e90239267a31207e9b607b1d6aad",
+      "baseline_sha256": "4b44064fa1f5be83cc547e6e17b96b9c1c2441b62fb7e890d9ea2b2057bb1d3f",
+      "baseline_byte_length": 10164,
+      "working_sha256": "4b44064fa1f5be83cc547e6e17b96b9c1c2441b62fb7e890d9ea2b2057bb1d3f",
+      "working_byte_length": 10164,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Extension.cs",
+      "baseline_git_blob": "bd6d643dabc7bf46450fa9fb9319c1b60ea0eff6",
+      "baseline_sha256": "33a96c7e1c7f0409003873024b6172641bb5baeef5155d8ad80f192b19a72b34",
+      "baseline_byte_length": 4431,
+      "working_sha256": "33a96c7e1c7f0409003873024b6172641bb5baeef5155d8ad80f192b19a72b34",
+      "working_byte_length": 4431,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Initializer.cs",
+      "baseline_git_blob": "26d7fbd44a13b0a2a4898109ee9c37bfd2e0013b",
+      "baseline_sha256": "5f0e2679a12875d45e54f2b0c50e4c1c9c7248a9f180aebf7e4bb4037db7d241",
+      "baseline_byte_length": 8953,
+      "working_sha256": "5f0e2679a12875d45e54f2b0c50e4c1c9c7248a9f180aebf7e4bb4037db7d241",
+      "working_byte_length": 8953,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Main.cs",
+      "baseline_git_blob": "89539b26826190c648e186069381969314d1872d",
+      "baseline_sha256": "057f2cc3d5a1f75c34fb90eee66c8e6b0eeb9c4e0ab617e2076d570640d53e6e",
+      "baseline_byte_length": 13550,
+      "working_sha256": "057f2cc3d5a1f75c34fb90eee66c8e6b0eeb9c4e0ab617e2076d570640d53e6e",
+      "working_byte_length": 13550,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/Maintenance.cs",
+      "baseline_git_blob": "c41e2ea031a0a8240ba25eedda03f21c0529b45a",
+      "baseline_sha256": "c3c8973da3097f5961db188187acea99dfe6df847868a3178b5492e0a518fed3",
+      "baseline_byte_length": 9762,
+      "working_sha256": "c3c8973da3097f5961db188187acea99dfe6df847868a3178b5492e0a518fed3",
+      "working_byte_length": 9762,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/MemoryManager.cs",
+      "baseline_git_blob": "41e86de612978955480dc16d926310277a0f08a3",
+      "baseline_sha256": "4333f757bea2fc784c9a88c4dd5df56e1ad79af3ce6c01f3fbeed725d20930e2",
+      "baseline_byte_length": 24799,
+      "working_sha256": "4333f757bea2fc784c9a88c4dd5df56e1ad79af3ce6c01f3fbeed725d20930e2",
+      "working_byte_length": 24799,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/PersonaCreate.cs",
+      "baseline_git_blob": "39fe73ce868c3c366486e00afa739272c6030fc4",
+      "baseline_sha256": "933f121887d87596bb89ba8074511c75b2f1d860a4eec669be1526f4fe3250cd",
+      "baseline_byte_length": 6097,
+      "working_sha256": "933f121887d87596bb89ba8074511c75b2f1d860a4eec669be1526f4fe3250cd",
+      "working_byte_length": 6097,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/ReportGen.cs",
+      "baseline_git_blob": "2fbcbe585dc5702c4935d496239b0ae988238895",
+      "baseline_sha256": "e97360a3f434969e708a778a445110ac749735006a7b5cc1dd79d433c1216cd2",
+      "baseline_byte_length": 7342,
+      "working_sha256": "e97360a3f434969e708a778a445110ac749735006a7b5cc1dd79d433c1216cd2",
+      "working_byte_length": 7342,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/RuleEngine.cs",
+      "baseline_git_blob": "b8ce06225c62b1d84867b0ec6aa5f735b7af7021",
+      "baseline_sha256": "5af0f53b3b94f6094c7cf6176a9690dfc4de15792f0c83dd754b1c15ec00b34d",
+      "baseline_byte_length": 24274,
+      "working_sha256": "5af0f53b3b94f6094c7cf6176a9690dfc4de15792f0c83dd754b1c15ec00b34d",
+      "working_byte_length": 24274,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/SessionRunner.cs",
+      "baseline_git_blob": "5de0c819c15fa2f4167b6433c86d5813bd9a8070",
+      "baseline_sha256": "92aabe206fd00d37154729daa86f78ec90f4078439bf650df729409c92b4f18c",
+      "baseline_byte_length": 191559,
+      "working_sha256": "3f9f8b9cf1e4f91c84220f6c89a1d7d416bd73d250705f1f0f4c81f41a5e6f97",
+      "working_byte_length": 148924,
+      "disposition": "APPROVED_F5_P0_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_P0_FAIL_CLOSED_REPAIR"
+    },
+    {
+      "path": "Modules/StateSaver.cs",
+      "baseline_git_blob": "53428fb1a859eb1372a43caeef7e3edfed9a1ad1",
+      "baseline_sha256": "79709ac4539cfdb1487680d62fa224b3c3f380749f9fada357c46d1b56928f55",
+      "baseline_byte_length": 5868,
+      "working_sha256": "79709ac4539cfdb1487680d62fa224b3c3f380749f9fada357c46d1b56928f55",
+      "working_byte_length": 5868,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "Modules/WeeklyEvolve.cs",
+      "baseline_git_blob": "6208cc955926497b9213c51ef463936c0b8803dd",
+      "baseline_sha256": "5fcd6ccc0f424bd8a1319fcc4091f42969b49af7622f61b1d850981151132364",
+      "baseline_byte_length": 11026,
+      "working_sha256": "5fcd6ccc0f424bd8a1319fcc4091f42969b49af7622f61b1d850981151132364",
+      "working_byte_length": 11026,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/DPS_CheckResult_OwnCode.cs",
+      "baseline_git_blob": "0d2343591b3f8489ab9bfe083ce690fe52e7bd8b",
+      "baseline_sha256": "190c0b207cbb479957de993183420ed2ae9f6d7a03dd4ce83c84c3100e607f96",
+      "baseline_byte_length": 6015,
+      "working_sha256": "ab90e9980594e760b0e7119f1b2e8e289710328eca1121abfa4d865124fd6fa8",
+      "working_byte_length": 9670,
+      "disposition": "APPROVED_F5_WRAPPER_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_WRAPPER_FAIL_CLOSED_REPAIR"
+    },
+    {
+      "path": "ZDProjects/DPS_DecideAction_OwnCode.cs",
+      "baseline_git_blob": "7edc3ccf32f98ce247dbb00989374ff62e0f048a",
+      "baseline_sha256": "54c1f624d7495075e7da9d1e1080062267ebe223d8ec2952d9a68f217f5cad04",
+      "baseline_byte_length": 5941,
+      "working_sha256": "5d278695d46c49a7c839fdbdfe1ead43982093477ebb39f01cce85ceba63baec",
+      "working_byte_length": 9596,
+      "disposition": "APPROVED_F5_WRAPPER_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_WRAPPER_FAIL_CLOSED_REPAIR"
+    },
+    {
+      "path": "ZDProjects/DPS_Finalize_OwnCode.cs",
+      "baseline_git_blob": "347b72a4b650abee639a1cc5f3314b899dbcf6c9",
+      "baseline_sha256": "28bb379cdd5993b527bdbd5578e2e7dbf7e093721779e55abd5dfd1c346f30e4",
+      "baseline_byte_length": 5964,
+      "working_sha256": "51d43450ad22e4563451f9696247dd97442ac70372c000982d43e5094d6987a0",
+      "working_byte_length": 9619,
+      "disposition": "APPROVED_F5_WRAPPER_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_WRAPPER_FAIL_CLOSED_REPAIR"
+    },
+    {
+      "path": "ZDProjects/DPS_Init_OwnCode.cs",
+      "baseline_git_blob": "30db1fac3802326cec6aa1c7ddcf1cb77ee9e450",
+      "baseline_sha256": "3f056fb0b137c9cb685f069fe8393b3851664b7c4e9cbb8cce7ba8bbdf4fa12e",
+      "baseline_byte_length": 6019,
+      "working_sha256": "cfed8cb560f42300a9ba5ce9e98dde8f3a940e99f0621a6134fe8d021cb008fb",
+      "working_byte_length": 9674,
+      "disposition": "APPROVED_F5_WRAPPER_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_WRAPPER_FAIL_CLOSED_REPAIR"
+    },
+    {
+      "path": "ZDProjects/DailyUpdate_OwnCode.cs",
+      "baseline_git_blob": "b4bfb516eaf0b0d71e0252a2c34a76b5b1ac2df8",
+      "baseline_sha256": "019e7f4e9b7c5c767b8c827799097e6f075d444697136022caded6324de8af98",
+      "baseline_byte_length": 6075,
+      "working_sha256": "019e7f4e9b7c5c767b8c827799097e6f075d444697136022caded6324de8af98",
+      "working_byte_length": 6075,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Extension_OwnCode.cs",
+      "baseline_git_blob": "6d70c1260db976c85073f06c3edcc47f9180604c",
+      "baseline_sha256": "c05605ab3225b9e4debacbde85e18cfcbabd72c0fce0e68a767dc226e377131e",
+      "baseline_byte_length": 5701,
+      "working_sha256": "c05605ab3225b9e4debacbde85e18cfcbabd72c0fce0e68a767dc226e377131e",
+      "working_byte_length": 5701,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Initializer_OwnCode.cs",
+      "baseline_git_blob": "8cd47988be817bb1c06a339ab40630bf70490d18",
+      "baseline_sha256": "856cb8d941552cf7c2dcd7101f857d315400030f078b62eb51c2feca458b9545",
+      "baseline_byte_length": 5271,
+      "working_sha256": "ccce56c5776e5942b23c02086591ecfe737f39057838ae34a3556c108e2950d6",
+      "working_byte_length": 9010,
+      "disposition": "APPROVED_F5_WRAPPER_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_WRAPPER_FAIL_CLOSED_REPAIR"
+    },
+    {
+      "path": "ZDProjects/Main_OwnCode.cs",
+      "baseline_git_blob": "6a4c419e91531344b6e3e0ba196df1afc5170626",
+      "baseline_sha256": "837622a532bc77a0d76bed6acb52c1197202b30be430986a2ae948b3809920e0",
+      "baseline_byte_length": 5693,
+      "working_sha256": "a44fe2c1e539ef7f25304d86ca7097e669ada302f6c1c85d8200a132381f6ab7",
+      "working_byte_length": 9432,
+      "disposition": "APPROVED_F5_WRAPPER_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_WRAPPER_FAIL_CLOSED_REPAIR"
+    },
+    {
+      "path": "ZDProjects/Maintenance_OwnCode.cs",
+      "baseline_git_blob": "3ee7b4fae2f9bf13bc6b85906e2c69e195021b9c",
+      "baseline_sha256": "6b6f3e598ff15fa7ad02956b9734151f6dea78b19e5735c0bb2d83794e4779c1",
+      "baseline_byte_length": 5044,
+      "working_sha256": "6b6f3e598ff15fa7ad02956b9734151f6dea78b19e5735c0bb2d83794e4779c1",
+      "working_byte_length": 5044,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/ModuleLoader.cs",
+      "baseline_git_blob": "e1659187a69c118aa8be1ac389b78ebe89aa3f0d",
+      "baseline_sha256": "4fee76b27dc0874ad671ce3966dd3e6b628e883f61888e1e5a46cf236caef560",
+      "baseline_byte_length": 13493,
+      "working_sha256": "4fee76b27dc0874ad671ce3966dd3e6b628e883f61888e1e5a46cf236caef560",
+      "working_byte_length": 13493,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/PersonaCreate_OwnCode.cs",
+      "baseline_git_blob": "5e27742c5fb3841b1e1ce4ee54828c1ec488dd52",
+      "baseline_sha256": "9a3484150108aabaeb3fc61edbce43b2f47da8c51953c712d14eb6bb637d24f8",
+      "baseline_byte_length": 5062,
+      "working_sha256": "9a3484150108aabaeb3fc61edbce43b2f47da8c51953c712d14eb6bb637d24f8",
+      "working_byte_length": 5062,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/RedditExplorerTest.cs",
+      "baseline_git_blob": "f3c0cd3508ecae5f4163c9a8399d9f79e5834d5d",
+      "baseline_sha256": "dbfd906b7551e54c3fc749fb7dc7cc2151685f441bdbab49320b987444b64a1a",
+      "baseline_byte_length": 13429,
+      "working_sha256": "dbfd906b7551e54c3fc749fb7dc7cc2151685f441bdbab49320b987444b64a1a",
+      "working_byte_length": 13429,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Reddit_Browse.cs",
+      "baseline_git_blob": "f4e4c3b1f4dfb7b23251c5f6f580ca56d6adcf1f",
+      "baseline_sha256": "f536e36e142e71e9e049b9972fd781ebb37b42073e1283765f25a36e7388b400",
+      "baseline_byte_length": 5825,
+      "working_sha256": "f536e36e142e71e9e049b9972fd781ebb37b42073e1283765f25a36e7388b400",
+      "working_byte_length": 5825,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Reddit_Comment.cs",
+      "baseline_git_blob": "7150af88c6545db81bab144d149e8419eea30e3e",
+      "baseline_sha256": "17c2e57cb10b37182d6f9d1872b8cea6257f031fd449d1130a74b174aab26ffa",
+      "baseline_byte_length": 10640,
+      "working_sha256": "17c2e57cb10b37182d6f9d1872b8cea6257f031fd449d1130a74b174aab26ffa",
+      "working_byte_length": 10640,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Reddit_Like.cs",
+      "baseline_git_blob": "7c3651ac26507a6ca3788415bf48e70b7690a2e6",
+      "baseline_sha256": "633f5090f4f362f57af594749130efea095cbc776820422be393e97dc05a5c18",
+      "baseline_byte_length": 6178,
+      "working_sha256": "633f5090f4f362f57af594749130efea095cbc776820422be393e97dc05a5c18",
+      "working_byte_length": 6178,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Reddit_ReadPost.cs",
+      "baseline_git_blob": "bfd09530ebf8c14f84260e18eaeb015b7ec219e4",
+      "baseline_sha256": "d0cde01f98a527978b924ee2420ccc0b1fa8d0d1330e2a983708a36354daa845",
+      "baseline_byte_length": 6128,
+      "working_sha256": "d0cde01f98a527978b924ee2420ccc0b1fa8d0d1330e2a983708a36354daa845",
+      "working_byte_length": 6128,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/ReportGen_OwnCode.cs",
+      "baseline_git_blob": "a8ee6573364e46dcb98ce2a74c8bd83fd2ba623a",
+      "baseline_sha256": "4d46e4b8a5f769a384eaaf204c260a4abe630026bc6d391fd12e98c53addae4b",
+      "baseline_byte_length": 5026,
+      "working_sha256": "4d46e4b8a5f769a384eaaf204c260a4abe630026bc6d391fd12e98c53addae4b",
+      "working_byte_length": 5026,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/RuntimeTestRunner.cs",
+      "baseline_git_blob": "41eab8be533f38e1f70f1082032a35d4dfed8ac9",
+      "baseline_sha256": "ae6105de0ab38308601fedb75caf96551a95313e4f85f7a1e0ac0035330d9d57",
+      "baseline_byte_length": 16971,
+      "working_sha256": "2aa58b3f73820714e36a066b17cb0c9332bc666c3ab6032855f5de2e9fc631c8",
+      "working_byte_length": 18507,
+      "disposition": "APPROVED_F1_FALSE_GREEN_REPAIR",
+      "approval_ref": "F1_FALSE_GREEN_REPAIR"
+    },
+    {
+      "path": "ZDProjects/SessionRunner_OwnCode.cs",
+      "baseline_git_blob": "9a6cdfa0eff85090c67beb95b264a0a267c516c4",
+      "baseline_sha256": "d4fcdd441c0dd6723556bb0def0ddc3c7865b32f3b05f8c63924df5b8528275e",
+      "baseline_byte_length": 6325,
+      "working_sha256": "a1a73cac458dbb657d4ebc4d1726e76d924dbab625edf656f2f6e71e88be13af",
+      "working_byte_length": 10064,
+      "disposition": "APPROVED_F5_WRAPPER_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_WRAPPER_FAIL_CLOSED_REPAIR"
+    },
+    {
+      "path": "ZDProjects/StartReddit_OwnCode.cs",
+      "baseline_git_blob": "ddda8a73255a5f98979661914b05a47076f9f83b",
+      "baseline_sha256": "41b41ca436a7ec8beb71e9c773816b9038052620ba37d660cf6b3871f62c6605",
+      "baseline_byte_length": 3575,
+      "working_sha256": "41b41ca436a7ec8beb71e9c773816b9038052620ba37d660cf6b3871f62c6605",
+      "working_byte_length": 3575,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/StateSaver_OwnCode.cs",
+      "baseline_git_blob": "80d4ea46b1534003e60a714d637fa0f839bf03c9",
+      "baseline_sha256": "ff03f0a1aa1ee7482d79570b67ac07285f102169482cb75a2f2fcd2bb80f6d99",
+      "baseline_byte_length": 5035,
+      "working_sha256": "ff03f0a1aa1ee7482d79570b67ac07285f102169482cb75a2f2fcd2bb80f6d99",
+      "working_byte_length": 5035,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/TestRunner.cs",
+      "baseline_git_blob": "05f835bd12f65aae2975d3591396d58446c2dcb9",
+      "baseline_sha256": "2edfcb4eff2e8f51332c06387d67f5797fceff6a48da0c412ade0b0b5d016a29",
+      "baseline_byte_length": 15966,
+      "working_sha256": "02740c2806314eb8879d2f63d555c1ad50ee35bb1f82be944fd54f8854dcbbce",
+      "working_byte_length": 16587,
+      "disposition": "APPROVED_F1_FALSE_GREEN_REPAIR",
+      "approval_ref": "F1_FALSE_GREEN_REPAIR"
+    },
+    {
+      "path": "ZDProjects/Tests/API_Quick_Check.cs",
+      "baseline_git_blob": "29929fe6f952d8777ddf63180d14dd67290987ec",
+      "baseline_sha256": "d84a2446d8c8b47e694449f85cd936290b2ed59f38c4da15c780d47b3591ec9c",
+      "baseline_byte_length": 3283,
+      "working_sha256": "d84a2446d8c8b47e694449f85cd936290b2ed59f38c4da15c780d47b3591ec9c",
+      "working_byte_length": 3283,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Tests/BabyCenter_E2E_Test.cs",
+      "baseline_git_blob": "0fd613840541d02395615ceb63d2449b2fe73463",
+      "baseline_sha256": "9fbaebb457db097a5fc93372b708ff03e0d4db7fac502b177584a0171b1629dc",
+      "baseline_byte_length": 19513,
+      "working_sha256": "9fbaebb457db097a5fc93372b708ff03e0d4db7fac502b177584a0171b1629dc",
+      "working_byte_length": 19513,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Tests/Comment_Deep_Explore.cs",
+      "baseline_git_blob": "93a2c36ba279f3e53470627618c58e864ebbeec0",
+      "baseline_sha256": "99ae739b5d27b41c12c027279784a83a225eef4b52a61537cff1cb84f384c37e",
+      "baseline_byte_length": 4734,
+      "working_sha256": "99ae739b5d27b41c12c027279784a83a225eef4b52a61537cff1cb84f384c37e",
+      "working_byte_length": 4734,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Tests/Comment_Structure_Explore.cs",
+      "baseline_git_blob": "4b6e689fc8cb70aeedf7fa7eb77ac6c8eabf35fc",
+      "baseline_sha256": "b45969cefd426b054f19e34622d7b9aa66c930b3bb8f1131360f6076a621e78a",
+      "baseline_byte_length": 4826,
+      "working_sha256": "b45969cefd426b054f19e34622d7b9aa66c930b3bb8f1131360f6076a621e78a",
+      "working_byte_length": 4826,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Tests/Instagram_E2E_Test.cs",
+      "baseline_git_blob": "4110649e146178ab8f0d8cee5c506b8752d9872e",
+      "baseline_sha256": "94ab5622a152fbd637024a6cb808b58c75796bb2b98373c2409538aae5e0c552",
+      "baseline_byte_length": 15539,
+      "working_sha256": "94ab5622a152fbd637024a6cb808b58c75796bb2b98373c2409538aae5e0c552",
+      "working_byte_length": 15539,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Tests/MultiPlatform_IntegrationTest.cs",
+      "baseline_git_blob": "5155bc48c96b0e156357daa59975f6dbb4c4c77b",
+      "baseline_sha256": "46f5df7ea2eda149d440251a0e772a45a516a2f5ad5522fdea8ef1eb5d741e62",
+      "baseline_byte_length": 20267,
+      "working_sha256": "46f5df7ea2eda149d440251a0e772a45a516a2f5ad5522fdea8ef1eb5d741e62",
+      "working_byte_length": 20267,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Tests/Reddit_E2E_Test.cs",
+      "baseline_git_blob": "18a4323bf3ec0073b7ea7cd7a4df7bc8250104c4",
+      "baseline_sha256": "72f7c53eb5b84f365ac2b76f2995a8f2f896844e71b20743ef50992f9226041f",
+      "baseline_byte_length": 13859,
+      "working_sha256": "72f7c53eb5b84f365ac2b76f2995a8f2f896844e71b20743ef50992f9226041f",
+      "working_byte_length": 13859,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Tests/Reddit_IntegrationTest.cs",
+      "baseline_git_blob": "3f8a0101d7eebeeb1d312debb64bac3b35ebbfa3",
+      "baseline_sha256": "33d90d785f9e4d5833f0ae545093e57b6d0e4220c0f14a812375470d6c19159d",
+      "baseline_byte_length": 9163,
+      "working_sha256": "f792601c868826eea55b00b4b61cddf941e5d8264eea6e74f5daf3ae2ed3e8a1",
+      "working_byte_length": 7870,
+      "disposition": "APPROVED_F1_FALSE_GREEN_REPAIR",
+      "approval_ref": "F1_FALSE_GREEN_REPAIR"
+    },
+    {
+      "path": "ZDProjects/Tests/Reddit_XMLParsing_Library.cs",
+      "baseline_git_blob": "98bf4b824b492885015236d2a1fd6d3c51046671",
+      "baseline_sha256": "06401dfe744a520da2446e06efd0e5e7e6ce54b89c66eb54a3a502921a81b174",
+      "baseline_byte_length": 6900,
+      "working_sha256": "06401dfe744a520da2446e06efd0e5e7e6ce54b89c66eb54a3a502921a81b174",
+      "working_byte_length": 6900,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Tests/ZennoDroid_AdvancedTest_OwnCode.cs",
+      "baseline_git_blob": "78790380c5223f5f30967811563f5bf05931f6da",
+      "baseline_sha256": "523b9a0880d6eb42fba5117e8f9efa29e399b8b5f497835f19367f5c8df6b2c9",
+      "baseline_byte_length": 4605,
+      "working_sha256": "523b9a0880d6eb42fba5117e8f9efa29e399b8b5f497835f19367f5c8df6b2c9",
+      "working_byte_length": 4605,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Tests/ZennoDroid_CoreAPI_Explore.cs",
+      "baseline_git_blob": "c92a5a48231b092b66f8e1ab02996c503fae80a3",
+      "baseline_sha256": "115dabf394144e05d052fc5b6f971c9b7c824a92f61df76ca5fbd01238592c97",
+      "baseline_byte_length": 6470,
+      "working_sha256": "115dabf394144e05d052fc5b6f971c9b7c824a92f61df76ca5fbd01238592c97",
+      "working_byte_length": 6470,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Tests/ZennoDroid_DeepExplore_OwnCode.cs",
+      "baseline_git_blob": "54a27274ca641e678e92558f47fc30c0c234c399",
+      "baseline_sha256": "d615335438c5159d9b582f565cb4bbd41440da5732cb3e86909302cf88c1ff0c",
+      "baseline_byte_length": 7932,
+      "working_sha256": "d615335438c5159d9b582f565cb4bbd41440da5732cb3e86909302cf88c1ff0c",
+      "working_byte_length": 7932,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Tests/ZennoDroid_DroidInstance_Explore.cs",
+      "baseline_git_blob": "a4115d0f178c877733e14635d52e744d84a1274d",
+      "baseline_sha256": "49c0ac9edd5ee364c72376f0abc38de95c075ac50a86bf3de3b80fb34b0e354c",
+      "baseline_byte_length": 5342,
+      "working_sha256": "49c0ac9edd5ee364c72376f0abc38de95c075ac50a86bf3de3b80fb34b0e354c",
+      "working_byte_length": 5342,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Tests/ZennoDroid_FeatureTest_Clean.cs",
+      "baseline_git_blob": "820728b236d763100efcbb118019ef98e248f67e",
+      "baseline_sha256": "f511d29898bcc33d79d7883f5aa64da30eb6662a889756e29db7f13ba8663e5d",
+      "baseline_byte_length": 3744,
+      "working_sha256": "f511d29898bcc33d79d7883f5aa64da30eb6662a889756e29db7f13ba8663e5d",
+      "working_byte_length": 3744,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Tests/ZennoDroid_FeatureTest_OwnCode.cs",
+      "baseline_git_blob": "f13004c8f7943c4cd7aee23a8ac9a5d6b60dd360",
+      "baseline_sha256": "25ee6f675b968d3ae3d4327cc201279ecff2194f6a37de171b38a3f56116eb10",
+      "baseline_byte_length": 5097,
+      "working_sha256": "25ee6f675b968d3ae3d4327cc201279ecff2194f6a37de171b38a3f56116eb10",
+      "working_byte_length": 5097,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/Tests/ZennoDroid_KeyCode_Explore.cs",
+      "baseline_git_blob": "051db80ffc6f969bad73f50670971d7af0e904e2",
+      "baseline_sha256": "9922e8f2a5de08bf67f947d5567993ea8744903982c40fb237ccec8c6b07ca69",
+      "baseline_byte_length": 1234,
+      "working_sha256": "9922e8f2a5de08bf67f947d5567993ea8744903982c40fb237ccec8c6b07ca69",
+      "working_byte_length": 1234,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    },
+    {
+      "path": "ZDProjects/WeeklyEvolve_OwnCode.cs",
+      "baseline_git_blob": "818b0bd083a5b3f3f27e19aaeaf55d4d17227b99",
+      "baseline_sha256": "1a6176cc1cf3d093b45256d6c9704cec1de8700561a332eee729167d4cd72d65",
+      "baseline_byte_length": 5053,
+      "working_sha256": "1a6176cc1cf3d093b45256d6c9704cec1de8700561a332eee729167d4cd72d65",
+      "working_byte_length": 5053,
+      "disposition": "BYTE_IDENTICAL",
+      "approval_ref": null
+    }
+  ],
+  "limitations": [
+    "This baseline proves byte identity only; it does not prove C# compilation or runtime behavior.",
+    "The original four approved repairs plus the eight separately authorized F5 containment repairs do not prove C# compilation, Windows, ZennoDroid, ADB, or device behavior."
+  ]
+}

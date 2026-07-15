@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/schemas/candidate-gate-evidence.schema.json",
+  "title": "DPS unsigned Contract and Integration candidate gate evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "gate", "mode", "diagnostic_requested", "requested_verification_level",
+    "candidate_verification_level", "verification_level", "signed",
+    "formal_evidence_eligible", "overall_status", "commit_sha",
+    "head_commit_observed", "baseline_commit", "workspace", "started_at",
+    "finished_at", "environment", "upgrade_intent", "changed_paths",
+    "trust_anchors", "instruction_receipt", "phase0_prerequisite",
+    "inventory", "checks", "suites", "formal_test_evidence", "summary",
+    "limitations", "evidence_sha256"
+  ],
+  "properties": {
+    "schema_version": {"const": "dps.candidate-gate-evidence/v1"},
+    "gate": {"const": "DPS_CONTRACT_INTEGRATION_CANDIDATE"},
+    "mode": {"enum": ["CLEAN_CANDIDATE", "WORKSPACE_DIAGNOSTIC_ONLY"]},
+    "diagnostic_requested": {"type": "boolean"},
+    "requested_verification_level": {"enum": ["CONTRACT_VERIFIED", "INTEGRATION_VERIFIED"]},
+    "candidate_verification_level": {"type": "null"},
+    "verification_level": {"type": "null"},
+    "signed": {"const": false},
+    "formal_evidence_eligible": {"const": false},
+    "overall_status": {"$ref": "#/$defs/status"},
+    "commit_sha": {"oneOf": [{"$ref": "#/$defs/gitObject"}, {"type": "null"}]},
+    "head_commit_observed": {"$ref": "#/$defs/gitObject"},
+    "baseline_commit": {"$ref": "#/$defs/gitObject"},
+    "workspace": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "clean_start", "clean_end", "clean_post_write", "digest_start",
+        "digest_end", "digest_post_write", "dirty_entry_count_start",
+        "dirty_entry_count_end", "dirty_entry_count_post_write"
+      ],
+      "properties": {
+        "clean_start": {"type": "boolean"},
+        "clean_end": {"type": "boolean"},
+        "clean_post_write": {"type": "boolean"},
+        "digest_start": {"$ref": "#/$defs/sha256"},
+        "digest_end": {"$ref": "#/$defs/sha256"},
+        "digest_post_write": {"$ref": "#/$defs/sha256"},
+        "dirty_entry_count_start": {"type": "integer", "minimum": 0},
+        "dirty_entry_count_end": {"type": "integer", "minimum": 0},
+        "dirty_entry_count_post_write": {"type": "integer", "minimum": 0}
+      }
+    },
+    "started_at": {"type": "string", "format": "date-time"},
+    "finished_at": {"type": "string", "format": "date-time"},
+    "environment": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "python", "python_executable", "python_executable_realpath",
+        "requirements_ci_sha256", "toolchain_lock_sha256", "python_packages",
+        "dotnet_sdk", "forwarded_environment_keys", "postgres_server_version_num"
+      ],
+      "properties": {
+        "python": {"type": "string", "minLength": 1},
+        "python_executable": {"type": "string", "minLength": 1},
+        "python_executable_realpath": {"type": "string", "minLength": 1},
+        "requirements_ci_sha256": {"$ref": "#/$defs/sha256"},
+        "toolchain_lock_sha256": {"$ref": "#/$defs/sha256"},
+        "python_packages": {"type": "object", "additionalProperties": {"type": ["string", "null"]}},
+        "dotnet_sdk": {"type": ["string", "null"]},
+        "forwarded_environment_keys": {"$ref": "#/$defs/environmentKeys"},
+        "postgres_server_version_num": {"type": ["string", "null"]}
+      }
+    },
+    "upgrade_intent": {"type": "object"},
+    "changed_paths": {
+      "type": "array", "uniqueItems": true,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["path", "state", "sha256"],
+        "properties": {
+          "path": {"$ref": "#/$defs/repoPath"},
+          "state": {"enum": ["file", "deleted"]},
+          "sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+        }
+      }
+    },
+    "trust_anchors": {
+      "type": "array", "minItems": 1, "uniqueItems": true,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["path", "baseline_sha256", "current_sha256", "matches_baseline"],
+        "properties": {
+          "path": {"$ref": "#/$defs/repoPath"},
+          "baseline_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+          "current_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+          "matches_baseline": {"type": "boolean"}
+        }
+      }
+    },
+    "instruction_receipt": {"oneOf": [{"type": "object"}, {"type": "null"}]},
+    "phase0_prerequisite": {"oneOf": [{"type": "object"}, {"type": "null"}]},
+    "inventory": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "module_count", "public_contract_owner_count", "public_contract_count",
+        "public_contract_inventory", "public_contract_inventory_sha256",
+        "selected_suite_count", "contract_suite_count", "integration_suite_count",
+        "modules_without_contract_coverage", "modules_without_integration_coverage",
+        "manifest_inventory_sha256", "policy_sha256"
+      ],
+      "properties": {
+        "module_count": {"type": "integer", "minimum": 1},
+        "public_contract_owner_count": {"type": "integer", "minimum": 0},
+        "public_contract_count": {"type": "integer", "minimum": 0},
+        "public_contract_inventory": {
+          "type": "array", "uniqueItems": true,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["owner_module", "contract_id", "major", "source", "source_sha256"],
+            "properties": {
+              "owner_module": {"$ref": "#/$defs/moduleId"},
+              "contract_id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z0-9]+)+$"},
+              "major": {"type": "integer", "minimum": 1},
+              "source": {"$ref": "#/$defs/repoPath"},
+              "source_sha256": {"$ref": "#/$defs/sha256"}
+            }
+          }
+        },
+        "public_contract_inventory_sha256": {"$ref": "#/$defs/sha256"},
+        "selected_suite_count": {"type": "integer", "minimum": 0},
+        "contract_suite_count": {"type": "integer", "minimum": 0},
+        "integration_suite_count": {"type": "integer", "minimum": 0},
+        "modules_without_contract_coverage": {"$ref": "#/$defs/moduleIds"},
+        "modules_without_integration_coverage": {"$ref": "#/$defs/moduleIds"},
+        "manifest_inventory_sha256": {"$ref": "#/$defs/sha256"},
+        "policy_sha256": {"$ref": "#/$defs/sha256"}
+      }
+    },
+    "checks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/check"}},
+    "suites": {"type": "array", "items": {"$ref": "#/$defs/suite"}},
+    "formal_test_evidence": {"type": "array", "maxItems": 0},
+    "summary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["required", "pass", "fail", "infra_error", "other_non_pass"],
+      "properties": {
+        "required": {"type": "integer", "minimum": 0},
+        "pass": {"type": "integer", "minimum": 0},
+        "fail": {"type": "integer", "minimum": 0},
+        "infra_error": {"type": "integer", "minimum": 0},
+        "other_non_pass": {"type": "integer", "minimum": 0}
+      }
+    },
+    "limitations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "evidence_sha256": {"$ref": "#/$defs/sha256"}
+  },
+  "allOf": [{
+    "if": {"properties": {"mode": {"const": "WORKSPACE_DIAGNOSTIC_ONLY"}}, "required": ["mode"]},
+    "then": {"properties": {"commit_sha": {"type": "null"}}}
+  }],
+  "$defs": {
+    "status": {"enum": ["PASS", "FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"]},
+    "gitObject": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "moduleId": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "moduleIds": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/moduleId"}},
+    "repoPath": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"},
+    "environmentKeys": {
+      "type": "array", "uniqueItems": true,
+      "items": {"enum": [
+        "DPS_TEST_POSTGRES",
+        "DPS_TEST_POSTGRES_ADMIN_URI",
+        "DPS_TEST_POSTGRES_RUNTIME_URI",
+        "DPS_TEST_POSTGRES_URI",
+        "DPS_TEST_PLATFORM_AUTHORITY_PKCS8_FILE",
+        "DPS_PSQL"
+      ]}
+    },
+    "check": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "required", "status", "exit_code", "log", "log_sha256", "details"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "required": {"const": true},
+        "status": {"$ref": "#/$defs/status"},
+        "exit_code": {"type": ["integer", "null"]},
+        "log": {"type": "string"},
+        "log_sha256": {"$ref": "#/$defs/sha256"},
+        "details": {"type": "object"}
+      }
+    },
+    "suite": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "evidence_id", "module_id", "suite_id", "test_type", "evidence_level",
+        "evidence_kind", "required", "status", "declared_command_sha256",
+        "effective_argv_sha256", "test_target", "test_target_sha256",
+        "test_tree_sha256", "manifest_path", "manifest_sha256", "agents_path",
+        "agents_sha256", "instruction_receipt_id", "tested_commit", "workspace_dirty",
+        "started_at", "finished_at", "duration_ms", "exit_code", "executed_tests",
+        "minimum_tests", "forwarded_environment_keys", "log", "log_sha256", "reason"
+      ],
+      "properties": {
+        "evidence_id": {"type": "string", "pattern": "^candidate:[0-9a-f]{32}$"},
+        "module_id": {"$ref": "#/$defs/moduleId"},
+        "suite_id": {"type": "string", "minLength": 1},
+        "test_type": {"enum": ["contract", "integration"]},
+        "evidence_level": {"enum": ["CONTRACT_VERIFIED", "INTEGRATION_VERIFIED"]},
+        "evidence_kind": {"enum": ["CONTRACT", "REAL_POSTGRESQL", "REAL_LOCAL_PROCESS", "SIMULATION", "COVERAGE", "INVENTORY"]},
+        "required": {"const": true},
+        "status": {"$ref": "#/$defs/status"},
+        "declared_command_sha256": {"$ref": "#/$defs/sha256"},
+        "effective_argv_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "test_target": {"type": ["string", "null"]},
+        "test_target_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "test_tree_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "manifest_path": {"$ref": "#/$defs/repoPath"},
+        "manifest_sha256": {"$ref": "#/$defs/sha256"},
+        "agents_path": {"$ref": "#/$defs/repoPath"},
+        "agents_sha256": {"$ref": "#/$defs/sha256"},
+        "instruction_receipt_id": {"type": ["string", "null"]},
+        "tested_commit": {"oneOf": [{"$ref": "#/$defs/gitObject"}, {"type": "null"}]},
+        "workspace_dirty": {"type": "boolean"},
+        "started_at": {"type": "string", "format": "date-time"},
+        "finished_at": {"type": "string", "format": "date-time"},
+        "duration_ms": {"type": "integer", "minimum": 0},
+        "exit_code": {"type": ["integer", "null"]},
+        "executed_tests": {"type": "integer", "minimum": 0},
+        "minimum_tests": {"type": ["integer", "null"], "minimum": 0},
+        "forwarded_environment_keys": {"$ref": "#/$defs/environmentKeys"},
+        "log": {"type": "string"},
+        "log_sha256": {"$ref": "#/$defs/sha256"},
+        "reason": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

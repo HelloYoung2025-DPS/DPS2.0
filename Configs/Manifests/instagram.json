@@ -18,7 +18,6 @@
           "type": "swipe",
           "direction": "up",
           "description": "向下滚动Feed"
-          "description": "向下滚动Feed"
         },
         "double_tap_photo": {
           "type": "gesture",
@@ -83,7 +82,6 @@
           "type": "swipe",
           "direction": "up",
           "description": "滚动照片网格"
-          "description": "滚动照片网格"
         },
         "tap_post": {
           "type": "tap",
@@ -137,7 +135,6 @@
           "type": "swipe",
           "direction": "up",
           "description": "下一个Reel"
-          "description": "下一个Reel"
         },
         "comment": {
           "type": "tap",
@@ -156,7 +153,6 @@
         "scroll": {
           "type": "swipe",
           "direction": "up",
-          "description": "滚动通知列表"
           "description": "滚动通知列表"
         },
         "tap_notification": {

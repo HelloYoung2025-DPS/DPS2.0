@@ -1,0 +1,222 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {
+    "id": "soul-registry",
+    "name": "Soul Registry",
+    "version": "0.1.0",
+    "description": "Stable Soul identity and verified alias resolution without exposing raw aliases.",
+    "lifecycle": "proposed",
+    "runtimeState": "proposed",
+    "releaseEligible": false,
+    "riskTier": "R3",
+    "ownerId": "dps-platform"
+  },
+  "paths": {
+    "actualRoot": "Modules/soul-registry",
+    "canonicalRoot": "modules/soul-registry",
+    "owned": [
+      "Modules/soul-registry/**"
+    ],
+    "excluded": [],
+    "runtimeData": []
+  },
+  "artifacts": [
+    {
+      "id": "dps.soul-registry",
+      "kind": "assembly",
+      "status": "proposed",
+      "build": "scripts/dotnet-pinned.sh restore Modules/soul-registry/src --locked-mode && scripts/dotnet-pinned.sh build Modules/soul-registry/src --configuration Release --no-restore",
+      "versioning": "semver"
+    },
+    {
+      "id": "dps.soul-registry.contracts",
+      "kind": "contract-pack",
+      "status": "proposed",
+      "build": "scripts/dotnet-pinned.sh restore Modules/soul-registry/contracts --locked-mode && scripts/dotnet-pinned.sh build Modules/soul-registry/contracts --configuration Release --no-restore",
+      "versioning": "semver"
+    }
+  ],
+  "runtime": {
+    "track": "modern-service",
+    "language": "C# 14",
+    "target": "net10.0",
+    "processBoundary": "modular-monolith",
+    "entrypoints": [],
+    "toolchainStatus": "proposed"
+  },
+  "contracts": {
+    "provided": [
+      {
+        "contractId": "soul.resolved",
+        "major": 1,
+        "source": "Modules/soul-registry/contracts/provided/soul.resolved.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "soul-registry"
+      }
+    ],
+    "consumed": []
+  },
+  "communication": {
+    "inbound": [],
+    "outbound": [
+      {
+        "peerModule": "memory-event-ledger",
+        "contractId": "soul.resolved",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "in-process-api",
+        "timeoutMs": 5000,
+        "retryPolicy": "bounded-exponential-with-jitter",
+        "idempotencyKey": "trace_id:idempotency_key",
+        "authScope": "module:memory-event-ledger",
+        "failureMode": "fail-closed-and-record-evidence"
+      },
+      {
+        "peerModule": "evidence-service",
+        "contractId": "soul.resolved",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "receipt",
+        "timeoutMs": 5000,
+        "retryPolicy": "bounded-exponential-with-jitter",
+        "idempotencyKey": "trace_id:idempotency_key",
+        "authScope": "module:evidence-service",
+        "failureMode": "fail-closed-and-record-evidence"
+      }
+    ]
+  },
+  "dependencies": [],
+  "permissions": {
+    "allowed": [
+      "postgresql:soul_registry",
+      "cryptography:hmac-sha256-alias-digest"
+    ],
+    "denied": [
+      "raw alias in public contract",
+      "GBrain network",
+      "device command",
+      "production shell"
+    ],
+    "productionApproval": "human-required"
+  },
+  "data": {
+    "ownedStores": [
+      "postgresql:soul_registry.souls",
+      "postgresql:soul_registry.identity_aliases"
+    ],
+    "readModels": [
+      "soul-by-verified-alias"
+    ],
+    "privacyClasses": [
+      "personal",
+      "sensitive"
+    ],
+    "retention": "until verified deletion or legal retention expires",
+    "export": "export scoped Soul and alias metadata without raw secrets",
+    "correction": "append verified alias correction and revoke prior alias",
+    "deletion": "tombstone Soul aliases and execute audited privacy erasure"
+  },
+  "security": {
+    "trustBoundaries": [
+      "module API and versioned contract boundary"
+    ],
+    "secretScopes": [
+      "soul-registry:alias-hmac-keyring",
+      "soul-registry-db"
+    ],
+    "untrustedInputs": [
+      "contract payloads",
+      "raw identity aliases",
+      "alias verification proof",
+      "stored text",
+      "timestamps"
+    ],
+    "failClosedOn": [
+      "unknown contract major",
+      "unknown alias HMAC key id",
+      "unverified alias",
+      "ambiguous alias mapping",
+      "invalid identity scope",
+      "missing evidence"
+    ],
+    "policyIds": [
+      "SOUL-ISO-001",
+      "CMD-IDEMP-001",
+      "RESULT-VERIFY-001",
+      "GBRAIN-READBACK-001",
+      "EDGE-NORESTART-001"
+    ]
+  },
+  "tests": {
+    "requiredOutcome": "PASS",
+    "failureOutcomes": [
+      "FAIL",
+      "SKIP",
+      "PARTIAL",
+      "NOT_RUN",
+      "INFRA_ERROR",
+      "NOT_APPLICABLE"
+    ],
+    "suites": [
+      {
+        "id": "soul-registry.unit",
+        "type": "unit",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/soul-registry/tests --locked-mode && scripts/dotnet-pinned.sh test --project Modules/soul-registry/tests --configuration Release --no-restore --filter-trait Category=Unit --minimum-expected-tests 1 --fail-skips on",
+        "environment": "macos-or-hosted",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "soul-registry.contract",
+        "type": "contract",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/soul-registry/tests --locked-mode && scripts/dotnet-pinned.sh test --project Modules/soul-registry/tests --configuration Release --no-restore --filter-trait Category=Contract --minimum-expected-tests 1 --fail-skips on",
+        "environment": "macos-or-hosted",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "soul-registry.integration",
+        "type": "integration",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/soul-registry/tests --locked-mode && scripts/dotnet-pinned.sh test --project Modules/soul-registry/tests --configuration Release --no-restore --filter-trait Category=Integration --minimum-expected-tests 1 --fail-skips on",
+        "environment": "PostgreSQL 18.4 local integration",
+        "evidenceLevel": "INTEGRATION_VERIFIED"
+      }
+    ]
+  },
+  "compatibility": {
+    "policyRef": "governance/policies/compatibility-policy.yaml",
+    "track": "modern",
+    "moduleMajor": 0,
+    "supportedContractMajors": {
+      "soul.resolved": [
+        1
+      ]
+    },
+    "unknownMajorBehavior": "reject",
+    "missingMajorBehavior": "reject",
+    "unknownModeBehavior": "reject",
+    "missingModeBehavior": "reject"
+  },
+  "rollout": {
+    "featureFlag": "soul_registry_v1",
+    "canary": "synthetic then shadow then bounded Soul cohort",
+    "rollback": "disable feature flag and restore previous signed Release BOM",
+    "killSwitch": "kill_soul_registry"
+  },
+  "deviceGates": {
+    "requiresWindows": false,
+    "requiresZennoDroid": false,
+    "requiresAdb": false,
+    "minimumVerification": "INTEGRATION_VERIFIED"
+  },
+  "agents": {
+    "spec": "dps.agents/v1",
+    "policyVersion": "1.0.0",
+    "instructionsFile": "AGENTS.md",
+    "manifestFile": "module.yaml",
+    "receiptRequired": true,
+    "resolver": "factory-instruction-resolver"
+  }
+}

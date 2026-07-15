@@ -44,8 +44,20 @@ class TestRunner(object):
     FIX_TYPE_COORDINATE_ADJUST = "coordinate_adjust"
     FIX_TYPE_WEBVIEW_WAIT_INCREASE = "webview_wait_increase"
 
+    # Required test evidence is fail-closed: only PASS can release a caller.
+    RESULT_PASS = "PASS"
+    BLOCKING_STATUSES = frozenset((
+        "FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR",
+    ))
+    ALLOWED_EVIDENCE_CLASSES = frozenset((
+        "unit", "contract", "integration", "device", "device_e2e",
+        "mock", "unverified",
+    ))
+    ALLOWED_EXECUTION_MODES = frozenset(("real", "mock", "unverified"))
+
     def __init__(self, adb, test_script_path, config_path, operations_path,
-                 platform_key, max_fix_attempts=3):
+                 platform_key, max_fix_attempts=3,
+                 evidence_class="unverified", execution_mode="unverified"):
         """
         初始化测试运行器。
 
@@ -56,6 +68,9 @@ class TestRunner(object):
             operations_path (str): {platform}_operations.json 完整路径
             platform_key (str): 平台标识符（如 'babycenter'）
             max_fix_attempts (int): 最大自动修复循环次数
+            evidence_class (str): unit/contract/integration/device_e2e/mock。
+                未显式声明时为 unverified，不能满足必需门禁。
+            execution_mode (str): real/mock。未显式声明时为 unverified。
         """
         self.adb = adb
         self.test_script_path = os.path.abspath(test_script_path)
@@ -63,6 +78,13 @@ class TestRunner(object):
         self.operations_path = os.path.abspath(operations_path)
         self.platform_key = platform_key
         self.max_fix_attempts = max_fix_attempts
+
+        self.evidence_class = str(evidence_class or "unverified").strip().lower()
+        self.execution_mode = str(execution_mode or "unverified").strip().lower()
+        if self.evidence_class not in self.ALLOWED_EVIDENCE_CLASSES:
+            raise ValueError("未知 evidence_class: {0}".format(evidence_class))
+        if self.execution_mode not in self.ALLOWED_EXECUTION_MODES:
+            raise ValueError("未知 execution_mode: {0}".format(execution_mode))
 
         # 记录所有修复历史
         self.fix_history = []
@@ -121,6 +143,94 @@ class TestRunner(object):
     # 公共接口
     # ================================================================
 
+    @classmethod
+    def _normalize_status(cls, status):
+        """Normalize a machine result token without accepting unknown states."""
+        normalized = re.sub(r"[\s-]+", "_", str(status or "").strip().upper())
+        if normalized == cls.RESULT_PASS or normalized in cls.BLOCKING_STATUSES:
+            return normalized
+        return "INFRA_ERROR"
+
+    def _result_failure_reasons(self, results):
+        """Return fail-closed reasons for a required App Onboarder test."""
+        reasons = []
+        if not isinstance(results, dict):
+            return ["missing_test_report"]
+
+        process_returncode = results.get("process_returncode")
+        if process_returncode is None:
+            reasons.append("missing_process_exit_code")
+        elif process_returncode != 0:
+            reasons.append("process_exit_code_{0}".format(process_returncode))
+
+        if self._normalize_status(results.get("execution_status")) != self.RESULT_PASS:
+            reasons.append("execution_status_{0}".format(
+                self._normalize_status(results.get("execution_status"))
+            ))
+
+        if results.get("evidence_complete") is not True:
+            reasons.append("incomplete_phase_evidence")
+
+        total = results.get("total", 0)
+        phases = results.get("phases", {})
+        if not isinstance(total, int) or total <= 0:
+            reasons.append("no_required_tests")
+        if not isinstance(phases, dict) or not phases:
+            reasons.append("missing_phase_results")
+        elif isinstance(total, int) and total != len(phases):
+            reasons.append("phase_count_mismatch")
+
+        if isinstance(phases, dict):
+            for phase_num, phase_data in phases.items():
+                if not isinstance(phase_data, dict):
+                    reasons.append("phase_{0}_invalid".format(phase_num))
+                    continue
+                if phase_data.get("required", True) is not True:
+                    continue
+                status = self._normalize_status(phase_data.get("status"))
+                if status != self.RESULT_PASS:
+                    reasons.append("phase_{0}_{1}".format(phase_num, status))
+
+        result_evidence_class = str(
+            results.get("evidence_class", self.evidence_class)
+        ).strip().lower()
+        result_execution_mode = str(
+            results.get("execution_mode", self.execution_mode)
+        ).strip().lower()
+
+        # The runner's construction parameters are the trust boundary. A result
+        # payload cannot promote itself by changing its own labels.
+        if result_evidence_class != self.evidence_class:
+            reasons.append("evidence_class_changed_during_run")
+        if result_execution_mode != self.execution_mode:
+            reasons.append("execution_mode_changed_during_run")
+
+        if self.evidence_class == "unverified" or self.execution_mode == "unverified":
+            reasons.append("unverified_test_provenance")
+
+        high_evidence = self.evidence_class in (
+            "integration", "device", "device_e2e",
+        )
+        if high_evidence and self.execution_mode != "real":
+            reasons.append("mock_or_unverified_cannot_satisfy_{0}".format(
+                self.evidence_class
+            ))
+        if results.get("mock") is True and high_evidence:
+            reasons.append("mock_result_cannot_satisfy_{0}".format(
+                self.evidence_class
+            ))
+
+        # Preserve order while avoiding noisy duplicate reasons.
+        unique_reasons = []
+        for reason in reasons:
+            if reason not in unique_reasons:
+                unique_reasons.append(reason)
+        return unique_reasons
+
+    def is_result_successful(self, results):
+        """True only when all required evidence is explicit PASS evidence."""
+        return len(self._result_failure_reasons(results)) == 0
+
     def run_and_fix(self):
         """
         主循环: 运行测试 → 分析失败 → 应用修复 → 重试。
@@ -162,8 +272,15 @@ class TestRunner(object):
                     "pass_count": 0,
                     "phases": {},
                     "raw_output": "",
+                    "raw_stderr": str(e),
+                    "process_returncode": None,
+                    "execution_status": "INFRA_ERROR",
+                    "evidence_complete": False,
+                    "evidence_class": self.evidence_class,
+                    "execution_mode": self.execution_mode,
+                    "verification_level": "TEST_EXECUTION_ONLY",
                 }
-                continue
+                break
 
             self._log_info("测试结果: {0}/{1} 通过".format(
                 results.get("pass_count", 0), results.get("total", 0)
@@ -175,7 +292,7 @@ class TestRunner(object):
                     self._capture_phase_screenshot(phase_num)
 
             # 2. 检查是否全部通过
-            if results["pass_count"] == results["total"] and results["total"] > 0:
+            if self.is_result_successful(results):
                 self._log_info("所有阶段均通过，无需修复。")
                 return self._build_report(
                     total_attempts=attempt_num,
@@ -183,6 +300,23 @@ class TestRunner(object):
                     fixes_applied=all_fixes_applied,
                     success=True,
                 )
+
+            failure_reasons = self._result_failure_reasons(results)
+            self._log_warn("硬门禁未通过: {0}".format(
+                ", ".join(failure_reasons)
+            ))
+
+            # Infrastructure/provenance/report failures cannot be repaired by
+            # changing platform selectors. Stop instead of manufacturing green.
+            non_fixable = (
+                results.get("process_returncode") != 0
+                or results.get("evidence_complete") is not True
+                or "unverified_test_provenance" in failure_reasons
+                or any("mock" in reason for reason in failure_reasons)
+            )
+            if non_fixable:
+                self._log_error("测试证据不可用于自动修复，停止重试。")
+                break
 
             # 3. 分析失败
             fixes = self.analyze_failures(results)
@@ -224,15 +358,21 @@ class TestRunner(object):
                 break
 
         # 循环结束
-        success = (
-            final_results is not None
-            and final_results.get("pass_count", 0) == final_results.get("total", 0)
-            and final_results.get("total", 0) > 0
-        )
+        success = self.is_result_successful(final_results)
 
         return self._build_report(
             total_attempts=attempt_num,
-            final_results=final_results or {"total": 0, "pass_count": 0, "phases": {}},
+            final_results=final_results or {
+                "total": 0,
+                "pass_count": 0,
+                "phases": {},
+                "process_returncode": None,
+                "execution_status": "NOT_RUN",
+                "evidence_complete": False,
+                "evidence_class": self.evidence_class,
+                "execution_mode": self.execution_mode,
+                "verification_level": "TEST_EXECUTION_ONLY",
+            },
             fixes_applied=all_fixes_applied,
             success=success,
         )
@@ -294,46 +434,116 @@ class TestRunner(object):
 
         self._log_info("脚本退出码: {0}".format(proc.returncode))
 
-        # 解析 [PASS] 和 [FAIL] 行
+        # Parse explicit phase evidence. Generated scripts currently emit both
+        # "Phase N - Name: [PASS]" and "[Phase N] [PASS] details"; older
+        # scripts may emit "[PASS] Phase N: details". All supported failure
+        # states remain failures for a required phase.
         phases = {}
-        pass_count = 0
-        total = 0
-
-        # 匹配格式: [PASS] Phase N: details  或  [FAIL] Phase N: details
-        pattern = re.compile(
-            r'\[(PASS|FAIL)\]\s*Phase\s+(\d+)\s*:\s*(.*)',
-            re.IGNORECASE
+        status_token = (
+            r'(PASS|FAIL|SKIP|PARTIAL|NOT[_\s-]?RUN|'
+            r'INFRA[_\s-]?ERROR)'
+        )
+        patterns = (
+            # [PASS] Phase 1: details
+            re.compile(
+                r'\[' + status_token + r'\]\s*Phase\s+(\d+)\s*:\s*(.*)',
+                re.IGNORECASE,
+            ),
+            # Phase 1 - Launch: [PASS]
+            re.compile(
+                r'Phase\s+(\d+)(?:\s*-\s*[^:\]]+)?\s*:\s*\['
+                + status_token + r'\](?:\s*(.*))?',
+                re.IGNORECASE,
+            ),
+            # [Phase 1] [PASS] details
+            re.compile(
+                r'\[Phase\s+(\d+)\]\s*\[' + status_token
+                + r'\]\s*(.*)',
+                re.IGNORECASE,
+            ),
         )
 
         for line in raw_output.splitlines():
             stripped = line.strip()
-            match = pattern.search(stripped)
-            if match:
-                status = match.group(1).upper()
-                phase_num = int(match.group(2))
-                details = match.group(3).strip()
-                passed = (status == "PASS")
+            parsed = None
+            for pattern_index, pattern in enumerate(patterns):
+                match = pattern.search(stripped)
+                if not match:
+                    continue
+                if pattern_index == 0:
+                    status = self._normalize_status(match.group(1))
+                    phase_num = int(match.group(2))
+                    details = (match.group(3) or "").strip()
+                else:
+                    phase_num = int(match.group(1))
+                    status = self._normalize_status(match.group(2))
+                    details = (match.group(3) or "").strip()
+                parsed = (phase_num, status, details)
+                break
 
+            if parsed is None:
+                continue
+
+            phase_num, status, details = parsed
+            existing = phases.get(phase_num)
+            if existing and existing.get("status") != status:
                 phases[phase_num] = {
-                    "passed": passed,
-                    "details": details,
+                    "status": "INFRA_ERROR",
+                    "passed": False,
+                    "required": True,
+                    "details": "conflicting phase statuses: {0} vs {1}".format(
+                        existing.get("status"), status
+                    ),
+                }
+            else:
+                phases[phase_num] = {
+                    "status": status,
+                    "passed": status == self.RESULT_PASS,
+                    "required": True,
+                    "details": details or (existing or {}).get("details", ""),
                 }
 
-                total += 1
-                if passed:
-                    pass_count += 1
+        # Aggregate summary is required as an independent completeness check.
+        summary_pass_count = None
+        summary_total = None
+        total_pattern = re.compile(
+            r'Total:\s*(\d+)/(\d+)\s*passed', re.IGNORECASE
+        )
+        for line in raw_output.splitlines():
+            tmatch = total_pattern.search(line.strip())
+            if tmatch:
+                summary_pass_count = int(tmatch.group(1))
+                summary_total = int(tmatch.group(2))
+                break
 
-        # 额外解析 summary 中的 Total 行作为备用
-        if total == 0:
-            total_pattern = re.compile(
-                r'Total:\s*(\d+)/(\d+)\s*passed', re.IGNORECASE
-            )
-            for line in raw_output.splitlines():
-                tmatch = total_pattern.search(line.strip())
-                if tmatch:
-                    pass_count = int(tmatch.group(1))
-                    total = int(tmatch.group(2))
-                    break
+        total = len(phases) if phases else (summary_total or 0)
+        pass_count = sum(
+            1 for phase_data in phases.values()
+            if phase_data.get("status") == self.RESULT_PASS
+        )
+        expected_phase_numbers = list(range(1, (summary_total or 0) + 1))
+        evidence_complete = (
+            bool(phases)
+            and summary_total is not None
+            and summary_total > 0
+            and len(phases) == summary_total
+            and sorted(phases.keys()) == expected_phase_numbers
+            and summary_pass_count == pass_count
+        )
+
+        status_counts = {}
+        for phase_data in phases.values():
+            status = phase_data.get("status", "INFRA_ERROR")
+            status_counts[status] = status_counts.get(status, 0) + 1
+
+        declared_mock = bool(re.search(
+            r'\[EVIDENCE\].*execution[_\s-]?mode\s*=\s*mock\b',
+            raw_output,
+            re.IGNORECASE,
+        ))
+        execution_status = (
+            self.RESULT_PASS if proc.returncode == 0 else "INFRA_ERROR"
+        )
 
         self._log_info("解析结果: {0}/{1} 通过, {2} 个阶段".format(
             pass_count, total, len(phases)
@@ -352,6 +562,17 @@ class TestRunner(object):
             "pass_count": pass_count,
             "phases": phases,
             "raw_output": raw_output,
+            "raw_stderr": raw_stderr,
+            "process_returncode": proc.returncode,
+            "execution_status": execution_status,
+            "evidence_complete": evidence_complete,
+            "evidence_class": self.evidence_class,
+            "execution_mode": self.execution_mode,
+            "verification_level": "TEST_EXECUTION_ONLY",
+            "mock": declared_mock or self.execution_mode == "mock",
+            "status_counts": status_counts,
+            "summary_pass_count": summary_pass_count,
+            "summary_total": summary_total,
             "screenshot": screenshot_path,
         }
 
@@ -890,6 +1111,8 @@ class TestRunner(object):
         """
         pass_count = final_results.get("pass_count", 0)
         total = final_results.get("total", 0)
+        failure_reasons = self._result_failure_reasons(final_results)
+        success = bool(success) and not failure_reasons
 
         if success:
             summary = "全部 {0}/{1} 阶段通过，共尝试 {2} 次".format(
@@ -910,6 +1133,8 @@ class TestRunner(object):
                 summary += " (失败阶段: {0})".format(", ".join(failed_phases))
             if fixes_applied:
                 summary += "，已应用 {0} 个修复".format(len(fixes_applied))
+            if failure_reasons:
+                summary += "；硬门禁: {0}".format(", ".join(failure_reasons))
 
         report = {
             "total_attempts": total_attempts,
@@ -917,6 +1142,13 @@ class TestRunner(object):
             "fixes_applied": fixes_applied,
             "success": success,
             "summary": summary,
+            "failure_reasons": failure_reasons,
+            "required": True,
+            "evidence_class": self.evidence_class,
+            "execution_mode": self.execution_mode,
+            # This local runner alone never grants a repository-wide verified
+            # level, even when it executed against a real device.
+            "verification_level": "TEST_EXECUTION_ONLY",
             "log": list(self._log_buffer),
             "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "phase_screenshots": getattr(self, '_phase_screenshots', {}),

@@ -1,0 +1,37 @@
+{
+  "corpus_version": "dps.contract-corpus/v1",
+  "owner_module": "edge-local-journal",
+  "contract_id": "edge.journal.append/v1",
+  "schema_file": "edge.journal.append.v1.schema.json",
+  "base_instance": {
+    "schema_version": "1.0",
+    "contract_id": "edge.journal.append/v1",
+    "producer_module": "windows-edge-supervisor",
+    "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "device_binding_id": "db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "platform_account_id": "pa_cccccccccccccccccccccccccccccccc",
+    "trace_id": "trace_dddddddddddddddddddddddddddddddd",
+    "idempotency_key": "idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "occurred_at": "2026-07-14T00:00:00Z",
+    "privacy_class": "personal",
+    "command_id": "command-1",
+    "entry_id": "entry-1",
+    "entry_type": "COMMAND_STATE",
+    "payload_json": "{}",
+    "payload_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+  },
+  "cases": [
+    {"id": "canonical-append", "expected": "PASS", "patch": {}},
+    {"id": "safe-ascii-command-and-entry-tokens", "expected": "PASS", "patch": {"command_id": "command:A-1_test.ok", "entry_id": "worker:idem_abc:EVENT-1"}},
+    {"id": "command-id-terminal-newline", "expected": "FAIL", "patch": {"command_id": "command-1\n"}},
+    {"id": "entry-id-terminal-newline", "expected": "FAIL", "patch": {"entry_id": "entry-1\n"}},
+    {"id": "command-id-whitespace", "expected": "FAIL", "patch": {"command_id": "command 1"}},
+    {"id": "entry-id-slash", "expected": "FAIL", "patch": {"entry_id": "worker/entry-1"}},
+    {"id": "payload-digest-terminal-newline", "expected": "FAIL", "patch": {"payload_sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a\n"}},
+    {"id": "entry-type-terminal-newline", "expected": "FAIL", "patch": {"entry_type": "COMMAND_STATE\n"}},
+    {"id": "entry-type-too-short", "expected": "FAIL", "patch": {"entry_type": "AB"}},
+    {"id": "occurred-at-nonzero-offset", "expected": "FAIL", "patch": {"occurred_at": "2026-07-14T08:00:00+08:00"}},
+    {"id": "occurred-at-year-zero", "expected": "FAIL", "patch": {"occurred_at": "0000-07-14T00:00:00Z"}},
+    {"id": "occurred-at-leap-second", "expected": "FAIL", "patch": {"occurred_at": "2026-07-14T00:00:60Z"}}
+  ]
+}

@@ -1,0 +1,384 @@
+{
+  "schemaVersion": "dps.dependency-graph/v1",
+  "generatedFrom": "Modules/*/module.yaml",
+  "failOnCycle": true,
+  "nodes": [
+    "audit-metrics",
+    "binding",
+    "command-orchestrator",
+    "control-plane-host",
+    "device-registry",
+    "edge-local-journal",
+    "evidence-service",
+    "executor-gateway",
+    "factory-artifact-builder",
+    "factory-control-plane-host",
+    "factory-evidence-ledger",
+    "factory-impact-analyzer",
+    "factory-instruction-resolver",
+    "factory-merge-controller",
+    "factory-release-controller",
+    "factory-rollback-controller",
+    "factory-trusted-runner",
+    "factory-upgrade-intake",
+    "factory-worktree-manager",
+    "gbrain-projector",
+    "interest-reducer",
+    "legacy-runtime-adapter",
+    "memory-event-ledger",
+    "operation-compiler",
+    "persona-store",
+    "planner",
+    "platform-account-registry",
+    "platform-authorization-authority",
+    "policy-approval",
+    "soul-memory-adapter",
+    "soul-registry",
+    "windows-edge-supervisor",
+    "windows-edge-worker",
+    "zenno-bridge"
+  ],
+  "edges": [
+    {
+      "consumer": "audit-metrics",
+      "provider": "command-orchestrator",
+      "reason": "owner of command receipt protocol"
+    },
+    {
+      "consumer": "binding",
+      "provider": "device-registry",
+      "reason": "canonical privacy-safe registration, trusted provider instance identity, and exact-revision reservation client"
+    },
+    {
+      "consumer": "binding",
+      "provider": "platform-account-registry",
+      "reason": "authority-owned pinned-root evidence consumption, trusted provider instance identity, and exact-revision reservation client"
+    },
+    {
+      "consumer": "command-orchestrator",
+      "provider": "operation-compiler",
+      "reason": "approved allowlisted operation input"
+    },
+    {
+      "consumer": "command-orchestrator",
+      "provider": "policy-approval",
+      "reason": "independent versioned P-256 execution-authorization signing port; command owns and constructs the v1 envelope while Policy Approval alone signs it"
+    },
+    {
+      "consumer": "control-plane-host",
+      "provider": "binding",
+      "reason": "signed strict-scope identity binding truth"
+    },
+    {
+      "consumer": "control-plane-host",
+      "provider": "device-registry",
+      "reason": "signed keyed-fingerprint device runtime truth"
+    },
+    {
+      "consumer": "control-plane-host",
+      "provider": "gbrain-projector",
+      "reason": "provider-owned GBrain Source-ID derivation and collision corpus used by the read-back consumer gate"
+    },
+    {
+      "consumer": "control-plane-host",
+      "provider": "persona-store",
+      "reason": "signed persona revision truth"
+    },
+    {
+      "consumer": "control-plane-host",
+      "provider": "platform-account-registry",
+      "reason": "signed canonical account authorization truth with alias key epoch"
+    },
+    {
+      "consumer": "control-plane-host",
+      "provider": "policy-approval",
+      "reason": "policy-owned strict promotion and submission lifecycle DTO, codec, commitment, and signed-state contracts"
+    },
+    {
+      "consumer": "control-plane-host",
+      "provider": "soul-memory-adapter",
+      "reason": "exact SoulMemory read-back truth"
+    },
+    {
+      "consumer": "evidence-service",
+      "provider": "gbrain-projector",
+      "reason": "projection evidence"
+    },
+    {
+      "consumer": "evidence-service",
+      "provider": "interest-reducer",
+      "reason": "snapshot evidence"
+    },
+    {
+      "consumer": "evidence-service",
+      "provider": "memory-event-ledger",
+      "reason": "event evidence"
+    },
+    {
+      "consumer": "evidence-service",
+      "provider": "soul-registry",
+      "reason": "identity-scoped evidence"
+    },
+    {
+      "consumer": "executor-gateway",
+      "provider": "command-orchestrator",
+      "reason": "owner of dispatch and receipt protocol"
+    },
+    {
+      "consumer": "executor-gateway",
+      "provider": "policy-approval",
+      "reason": "owner of the approval fence and durable submission intent, acknowledgement, and state lifecycle"
+    },
+    {
+      "consumer": "factory-artifact-builder",
+      "provider": "factory-merge-controller",
+      "reason": "approved merge-head decision"
+    },
+    {
+      "consumer": "factory-control-plane-host",
+      "provider": "factory-artifact-builder",
+      "reason": "immutable candidate artifact descriptor"
+    },
+    {
+      "consumer": "factory-control-plane-host",
+      "provider": "factory-evidence-ledger",
+      "reason": "independent Factory evidence replay"
+    },
+    {
+      "consumer": "factory-control-plane-host",
+      "provider": "factory-impact-analyzer",
+      "reason": "trusted impact plan and dependency waves"
+    },
+    {
+      "consumer": "factory-control-plane-host",
+      "provider": "factory-instruction-resolver",
+      "reason": "fresh bound instructions"
+    },
+    {
+      "consumer": "factory-control-plane-host",
+      "provider": "factory-merge-controller",
+      "reason": "merge-head decision"
+    },
+    {
+      "consumer": "factory-control-plane-host",
+      "provider": "factory-release-controller",
+      "reason": "signed-BOM rollout state enforcement"
+    },
+    {
+      "consumer": "factory-control-plane-host",
+      "provider": "factory-rollback-controller",
+      "reason": "bounded verified rollback"
+    },
+    {
+      "consumer": "factory-control-plane-host",
+      "provider": "factory-trusted-runner",
+      "reason": "independent exact-argv evidence"
+    },
+    {
+      "consumer": "factory-control-plane-host",
+      "provider": "factory-upgrade-intake",
+      "reason": "validated upgrade intent"
+    },
+    {
+      "consumer": "factory-control-plane-host",
+      "provider": "factory-worktree-manager",
+      "reason": "one-writer worktrees and fenced leases"
+    },
+    {
+      "consumer": "factory-impact-analyzer",
+      "provider": "factory-instruction-resolver",
+      "reason": "fresh instruction and consumer binding"
+    },
+    {
+      "consumer": "factory-impact-analyzer",
+      "provider": "factory-upgrade-intake",
+      "reason": "validated upgrade scope"
+    },
+    {
+      "consumer": "factory-instruction-resolver",
+      "provider": "factory-upgrade-intake",
+      "reason": "validated upgrade identity and declared scope"
+    },
+    {
+      "consumer": "factory-merge-controller",
+      "provider": "factory-trusted-runner",
+      "reason": "independent merge-head test evidence"
+    },
+    {
+      "consumer": "factory-release-controller",
+      "provider": "factory-artifact-builder",
+      "reason": "immutable artifact descriptor"
+    },
+    {
+      "consumer": "factory-release-controller",
+      "provider": "factory-evidence-ledger",
+      "reason": "durable rollout state recovery"
+    },
+    {
+      "consumer": "factory-release-controller",
+      "provider": "factory-merge-controller",
+      "reason": "merge-head decision"
+    },
+    {
+      "consumer": "factory-release-controller",
+      "provider": "factory-upgrade-intake",
+      "reason": "normalized upgrade identity and risk"
+    },
+    {
+      "consumer": "factory-rollback-controller",
+      "provider": "factory-evidence-ledger",
+      "reason": "append-only plan and result evidence"
+    },
+    {
+      "consumer": "factory-rollback-controller",
+      "provider": "factory-release-controller",
+      "reason": "versioned ROLLBACK_REQUIRED event and previous BOM reference"
+    },
+    {
+      "consumer": "factory-trusted-runner",
+      "provider": "factory-instruction-resolver",
+      "reason": "fresh instruction receipt"
+    },
+    {
+      "consumer": "factory-trusted-runner",
+      "provider": "factory-worktree-manager",
+      "reason": "owned plan and active fenced lease"
+    },
+    {
+      "consumer": "factory-worktree-manager",
+      "provider": "factory-impact-analyzer",
+      "reason": "Manifest-owned dependency-safe plan"
+    },
+    {
+      "consumer": "factory-worktree-manager",
+      "provider": "factory-instruction-resolver",
+      "reason": "fresh bound instructions"
+    },
+    {
+      "consumer": "gbrain-projector",
+      "provider": "interest-reducer",
+      "reason": "Soul-scoped interest snapshot"
+    },
+    {
+      "consumer": "gbrain-projector",
+      "provider": "memory-event-ledger",
+      "reason": "Soul-scoped events"
+    },
+    {
+      "consumer": "interest-reducer",
+      "provider": "memory-event-ledger",
+      "reason": "verified append-only event input"
+    },
+    {
+      "consumer": "memory-event-ledger",
+      "provider": "soul-registry",
+      "reason": "validated immutable Soul context"
+    },
+    {
+      "consumer": "operation-compiler",
+      "provider": "policy-approval",
+      "reason": "authenticated authoritative approval snapshot and deterministic decision"
+    },
+    {
+      "consumer": "persona-store",
+      "provider": "binding",
+      "reason": "signed fixed-root composition attestation plus binding-owned active mutation fence held through persona commit"
+    },
+    {
+      "consumer": "platform-account-registry",
+      "provider": "platform-authorization-authority",
+      "reason": "consume the uniquely owned normalized signed platform-authorization evidence contract and canonicalizer"
+    },
+    {
+      "consumer": "policy-approval",
+      "provider": "planner",
+      "reason": "versioned action proposal input"
+    },
+    {
+      "consumer": "soul-memory-adapter",
+      "provider": "gbrain-projector",
+      "reason": "sole versioned Source binding and projection revision/checksum truth"
+    },
+    {
+      "consumer": "windows-edge-supervisor",
+      "provider": "edge-local-journal",
+      "reason": "durable routing and cutover journal"
+    },
+    {
+      "consumer": "windows-edge-supervisor",
+      "provider": "zenno-bridge",
+      "reason": "fixed loopback exchange contract"
+    },
+    {
+      "consumer": "windows-edge-worker",
+      "provider": "edge-local-journal",
+      "reason": "durable lease and idempotency lifecycle"
+    },
+    {
+      "consumer": "windows-edge-worker",
+      "provider": "executor-gateway",
+      "reason": "owner of native.stop.proof/v1 Schema, DTO, evidence digest, canonical signing bytes, and strict JSON codec"
+    },
+    {
+      "consumer": "windows-edge-worker",
+      "provider": "windows-edge-supervisor",
+      "reason": "edge.worker.exchange/v1 command protocol plus Supervisor-owned signed drain directive and Worker-only receipt contracts"
+    }
+  ],
+  "parallelWaves": [
+    [
+      "device-registry",
+      "edge-local-journal",
+      "factory-evidence-ledger",
+      "factory-upgrade-intake",
+      "legacy-runtime-adapter",
+      "planner",
+      "platform-authorization-authority",
+      "soul-registry",
+      "zenno-bridge"
+    ],
+    [
+      "factory-instruction-resolver",
+      "memory-event-ledger",
+      "platform-account-registry",
+      "policy-approval",
+      "windows-edge-supervisor"
+    ],
+    [
+      "binding",
+      "factory-impact-analyzer",
+      "interest-reducer",
+      "operation-compiler"
+    ],
+    [
+      "command-orchestrator",
+      "factory-worktree-manager",
+      "gbrain-projector",
+      "persona-store"
+    ],
+    [
+      "audit-metrics",
+      "evidence-service",
+      "executor-gateway",
+      "factory-trusted-runner",
+      "soul-memory-adapter"
+    ],
+    [
+      "control-plane-host",
+      "factory-merge-controller",
+      "windows-edge-worker"
+    ],
+    [
+      "factory-artifact-builder"
+    ],
+    [
+      "factory-release-controller"
+    ],
+    [
+      "factory-rollback-controller"
+    ],
+    [
+      "factory-control-plane-host"
+    ]
+  ]
+}

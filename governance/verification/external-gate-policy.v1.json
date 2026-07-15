@@ -1,0 +1,97 @@
+{
+  "schema_version": "dps.external-gate-policy/v1",
+  "policy_id": "DPS-EXTERNAL-GATES-2026-07-14",
+  "stages": {
+    "f6": {
+      "verification_level": "WINDOWS_VERIFIED",
+      "required_wave_order": ["A_TO_B", "B_TO_A"],
+      "minimum_switch_cycles": 100,
+      "minimum_observation_hours": 24,
+      "maximum_rollback_minutes": 5,
+      "required_capability_checks": [
+        "windows_exact_version",
+        "zennodroid_exact_version",
+        "dotnet_framework",
+        "csharp_language",
+        "codedom_compile",
+        "gac_resolution",
+        "dll_load",
+        "zenno_project_load",
+        "adb_authorization",
+        "bridge_abi",
+        "fixed_loopback_port",
+        "fail_closed_timeout",
+        "native_error_preservation",
+        "connection_continuity"
+      ],
+      "required_process_observation_binding": "SIGNED_MEASUREMENT_WINDOW_EXACT_BOUNDS"
+    },
+    "f7": {
+      "verification_level": "DEVICE_VERIFIED",
+      "contract_binding_status": "STALE",
+      "contract_binding_stale_reason": "Independent F2 audit invalidated the 2026-07-15 candidate projection/source-binding freeze; these hashes are retained only to detect drift until a repaired v2 set is independently re-frozen.",
+      "required_input_schema": "dps.device-gbrain-verification-input/v3",
+      "required_prerequisite_verification_level": "WINDOWS_VERIFIED",
+      "required_os_family": "Windows+Android",
+      "required_real_devices": 2,
+      "required_unique_souls": 2,
+      "required_unique_gbrain_sources": 2,
+      "required_projection_contract": "gbrain.projection/v2",
+      "required_projection_schema_sha256": "d77938579d957472ebdab1181d25b0a44a27e74c24f1aec324abf34c5a412255",
+      "required_projection_dto_sha256": "f2963bc454ceb774b403814e73b862b4bad0423f4fd34a2147b93448a98dc3ba",
+      "required_source_binding_contract": "gbrain.source.binding/v1",
+      "required_source_binding_schema_sha256": "e15a6dda03be8e33e0379d9501ca6f1bd1b1ba63742652679f8705df1550d815",
+      "required_source_binding_dto_sha256": "161661959fc77100c40e9b00082ee83cc05327de5e088a30c1e0a1256f8d398b",
+      "required_projection_artifacts": 2,
+      "required_search_artifacts": 2,
+      "required_semantic_artifacts": 24,
+      "reject_unreferenced_raw_artifacts": true,
+      "maximum_cross_scope_leaks": 0,
+      "maximum_duplicate_side_effects": 0
+    },
+    "f8": {
+      "verification_level": "CANARY_VERIFIED",
+      "required_wave_order": ["simulator", "shadow", "test_soul", "1", "3", "8", "15", "30"],
+      "wave_minimums": {
+        "1": { "hours": 2, "commands": 500 },
+        "3": { "hours": 2, "commands": 500 },
+        "8": { "hours": 2, "commands": 500 },
+        "15": { "hours": 8, "commands": 1 },
+        "30": { "hours": 24, "commands": 1 }
+      },
+      "maximum_parallel_independent_modules": 2,
+      "maximum_rollback_minutes": 5,
+      "maximum_consecutive_health_failures": 2,
+      "maximum_error_rate_delta_percentage_points_over_5m": 2.0,
+      "maximum_error_rate_ratio_over_5m_exclusive": 2.0,
+      "maximum_p95_latency_ratio_over_10m": 1.5,
+      "maximum_oldest_growing_backlog_seconds": 120,
+      "maximum_gbrain_projection_lag_seconds": 300
+    },
+    "f9": {
+      "verification_level": "SCALE_VERIFIED",
+      "required_wave_order": ["2", "10", "20", "50", "100", "200"],
+      "minimum_managed_devices": 200,
+      "minimum_sustained_concurrency": 100,
+      "minimum_burst_concurrency": 200,
+      "minimum_simulated_concurrency": 400,
+      "minimum_control_plane_instances": 2,
+      "minimum_soak_hours": 72,
+      "maximum_raw_load_window_seconds": 300,
+      "maximum_oldest_backlog_age_seconds_per_load_window": 120,
+      "reject_monotonically_growing_backlog_across_windows": true,
+      "require_final_window_recovery_tuple_continuity": true,
+      "maximum_backlog_recovery_seconds": 120,
+      "minimum_backlog_recovery_stability_seconds": 300,
+      "required_prerequisite_verification_level": "CANARY_VERIFIED",
+      "required_dependency_truth_sources": [
+        "signed_bom_manifest_hashes",
+        "canonical_dependency_graph",
+        "canonical_compatibility_matrix"
+      ],
+      "maximum_parallel_independent_module_lines": 4,
+      "maximum_module_rollback_minutes": 5,
+      "required_rollback_scopes": ["site", "database", "edge", "gbrain", "module"]
+    }
+  }
+}

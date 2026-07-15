@@ -1,0 +1,106 @@
+{
+  "schemaVersion": "dps.canonical-signature-spec/v1",
+  "contractId": "execution.authorization/v1",
+  "fieldEncoding": {
+    "string": "strict-utf8",
+    "framing": "uint32-big-endian-byte-length-then-bytes",
+    "guid": "lowercase-N-text",
+    "integer": "invariant-decimal-text",
+    "dateTimeOffset": "invariant-O-text",
+    "boolean": ["false", "true"],
+    "nullable": "named-presence-boolean-then-named-value-when-present"
+  },
+  "commandDigest": {
+    "domain": "dps.command-orchestrator.command-dispatch/v1",
+    "algorithm": "SHA-256",
+    "fieldOrder": [
+      "domain", "schema_version", "contract_id", "producer_module", "command_id", "operation_id",
+      "approval_id", "approval_sha256", "soul_id", "device_binding_id", "platform_account_id", "trace_id",
+      "idempotency_key", "occurred_at", "privacy_class", "action_kind", "is_side_effect",
+      "platform_authorization_id_nullable", "lease_id", "lease_owner", "lease_expires_at", "attempt",
+      "steps_count", "steps_in_original_ordinal_with_arguments_sorted_by_ordinal_key"
+    ]
+  },
+  "authorizationSignature": {
+    "domain": "dps.command-orchestrator.execution-authorization/v1",
+    "algorithm": "ecdsa-p256-sha256",
+    "format": "ieee-p1363-fixed-field-concatenation",
+    "encoding": "base64",
+    "signedFieldOrder": [
+      "domain", "schema_version", "contract_id", "producer_module", "signature_domain", "canonical_encoding",
+      "command_digest_algorithm", "signature_algorithm", "signature_format", "signature_encoding", "caller_module",
+      "auth_scope", "command_id", "lease_id", "attempt", "soul_id", "device_binding_id", "platform_account_id",
+      "trace_id", "idempotency_key", "occurred_at", "privacy_class", "command_sha256", "release_bom_sha256",
+      "active_release_bom_generation", "active_release_bom_token_sha256", "valid_until", "shadow_mode"
+    ],
+    "excludedFields": ["signature_base64"]
+  },
+  "goldenVector": {
+    "command": {
+      "schema_version": "1.0.0",
+      "contract_id": "command.dispatch/v1",
+      "producer_module": "command-orchestrator",
+      "command_id": "71000000-0000-0000-0000-000000000001",
+      "operation_id": "72000000-0000-0000-0000-000000000002",
+      "approval_id": "73000000-0000-0000-0000-000000000003",
+      "approval_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "device_binding_id": "db_11111111111111111111111111111111",
+      "platform_account_id": "pa_22222222222222222222222222222222",
+      "trace_id": "trace_33333333333333333333333333333333",
+      "idempotency_key": "idem_4444444444444444444444444444444444444444444444444444444444444444",
+      "occurred_at": "2025-12-31T23:59:58.0000000+00:00",
+      "privacy_class": "internal",
+      "action_kind": "observe",
+      "is_side_effect": false,
+      "platform_authorization_id": null,
+      "lease_id": "74000000-0000-0000-0000-000000000004",
+      "lease_owner": "worker-a",
+      "lease_expires_at": "2026-01-01T00:01:00.0000000+00:00",
+      "attempt": 1,
+      "steps": [{
+        "step_id": "75000000-0000-0000-0000-000000000005",
+        "step_kind": "ui.observe",
+        "arguments": {},
+        "retry_safe": true,
+        "postcondition_kind": "native-read-complete"
+      }]
+    },
+    "commandCanonicalBase64": "AAAALGRwcy5jb21tYW5kLW9yY2hlc3RyYXRvci5jb21tYW5kLWRpc3BhdGNoL3YxAAAADnNjaGVtYV92ZXJzaW9uAAAABTEuMC4wAAAAC2NvbnRyYWN0X2lkAAAAE2NvbW1hbmQuZGlzcGF0Y2gvdjEAAAAPcHJvZHVjZXJfbW9kdWxlAAAAFGNvbW1hbmQtb3JjaGVzdHJhdG9yAAAACmNvbW1hbmRfaWQAAAAgNzEwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEAAAAMb3BlcmF0aW9uX2lkAAAAIDcyMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAyAAAAC2FwcHJvdmFsX2lkAAAAIDczMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAzAAAAD2FwcHJvdmFsX3NoYTI1NgAAAEBkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkZGRkAAAAB3NvdWxfaWQAAABFc291bF9hYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhAAAAEWRldmljZV9iaW5kaW5nX2lkAAAAI2RiXzExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExAAAAE3BsYXRmb3JtX2FjY291bnRfaWQAAAAjcGFfMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIAAAAIdHJhY2VfaWQAAAAmdHJhY2VfMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMAAAAPaWRlbXBvdGVuY3lfa2V5AAAARWlkZW1fNDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NAAAAAtvY2N1cnJlZF9hdAAAACEyMDI1LTEyLTMxVDIzOjU5OjU4LjAwMDAwMDArMDA6MDAAAAANcHJpdmFjeV9jbGFzcwAAAAhpbnRlcm5hbAAAAAthY3Rpb25fa2luZAAAAAdvYnNlcnZlAAAADmlzX3NpZGVfZWZmZWN0AAAABWZhbHNlAAAAIXBsYXRmb3JtX2F1dGhvcml6YXRpb25faWQucHJlc2VudAAAAAVmYWxzZQAAAAhsZWFzZV9pZAAAACA3NDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwNAAAAAtsZWFzZV9vd25lcgAAAAh3b3JrZXItYQAAABBsZWFzZV9leHBpcmVzX2F0AAAAITIwMjYtMDEtMDFUMDA6MDE6MDAuMDAwMDAwMCswMDowMAAAAAdhdHRlbXB0AAAAATEAAAALc3RlcHMuY291bnQAAAABMQAAAA1zdGVwcy5vcmRpbmFsAAAAATAAAAANc3RlcHMuc3RlcF9pZAAAACA3NTAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwNQAAAA9zdGVwcy5zdGVwX2tpbmQAAAAKdWkub2JzZXJ2ZQAAABBzdGVwcy5yZXRyeV9zYWZlAAAABHRydWUAAAAYc3RlcHMucG9zdGNvbmRpdGlvbl9raW5kAAAAFG5hdGl2ZS1yZWFkLWNvbXBsZXRlAAAAFXN0ZXBzLmFyZ3VtZW50cy5jb3VudAAAAAEw",
+    "commandSha256": "1c0d999c00d87f5beb3fb2e0878cd3a3ca71dd1d7d90f0289860a080a7dc32c3",
+    "authorization": {
+      "schema_version": "1.0.0",
+      "contract_id": "execution.authorization/v1",
+      "producer_module": "command-orchestrator",
+      "signature_domain": "dps.command-orchestrator.execution-authorization/v1",
+      "canonical_encoding": "dps.canonical.uint32be-length-prefixed-utf8/v1",
+      "command_digest_algorithm": "sha256:dps.command-orchestrator.command-dispatch/v1",
+      "signature_algorithm": "ecdsa-p256-sha256",
+      "signature_format": "ieee-p1363-fixed-field-concatenation",
+      "signature_encoding": "base64",
+      "caller_module": "command-orchestrator",
+      "auth_scope": "executor:dispatch",
+      "command_id": "71000000-0000-0000-0000-000000000001",
+      "lease_id": "74000000-0000-0000-0000-000000000004",
+      "attempt": 1,
+      "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "device_binding_id": "db_11111111111111111111111111111111",
+      "platform_account_id": "pa_22222222222222222222222222222222",
+      "trace_id": "trace_33333333333333333333333333333333",
+      "idempotency_key": "idem_4444444444444444444444444444444444444444444444444444444444444444",
+      "occurred_at": "2025-12-31T23:59:59.0000000+00:00",
+      "privacy_class": "internal",
+      "command_sha256": "1c0d999c00d87f5beb3fb2e0878cd3a3ca71dd1d7d90f0289860a080a7dc32c3",
+      "release_bom_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "active_release_bom_generation": 7,
+      "active_release_bom_token_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "valid_until": "2026-01-01T00:00:30.0000000+00:00",
+      "shadow_mode": false,
+      "signature_base64": "+adHzFyZREQYK6TDwwu6qM94BActHO8aPzSP8Y7AIFxih2c8Qxl9X6SsJIk1egflXDQ9kBKWyjgT0o3Xf08V+Q=="
+    },
+    "authorizationCanonicalBase64": "AAAAM2Rwcy5jb21tYW5kLW9yY2hlc3RyYXRvci5leGVjdXRpb24tYXV0aG9yaXphdGlvbi92MQAAAA5zY2hlbWFfdmVyc2lvbgAAAAUxLjAuMAAAAAtjb250cmFjdF9pZAAAABpleGVjdXRpb24uYXV0aG9yaXphdGlvbi92MQAAAA9wcm9kdWNlcl9tb2R1bGUAAAAUY29tbWFuZC1vcmNoZXN0cmF0b3IAAAAQc2lnbmF0dXJlX2RvbWFpbgAAADNkcHMuY29tbWFuZC1vcmNoZXN0cmF0b3IuZXhlY3V0aW9uLWF1dGhvcml6YXRpb24vdjEAAAASY2Fub25pY2FsX2VuY29kaW5nAAAALmRwcy5jYW5vbmljYWwudWludDMyYmUtbGVuZ3RoLXByZWZpeGVkLXV0ZjgvdjEAAAAYY29tbWFuZF9kaWdlc3RfYWxnb3JpdGhtAAAAM3NoYTI1NjpkcHMuY29tbWFuZC1vcmNoZXN0cmF0b3IuY29tbWFuZC1kaXNwYXRjaC92MQAAABNzaWduYXR1cmVfYWxnb3JpdGhtAAAAEWVjZHNhLXAyNTYtc2hhMjU2AAAAEHNpZ25hdHVyZV9mb3JtYXQAAAAkaWVlZS1wMTM2My1maXhlZC1maWVsZC1jb25jYXRlbmF0aW9uAAAAEnNpZ25hdHVyZV9lbmNvZGluZwAAAAZiYXNlNjQAAAANY2FsbGVyX21vZHVsZQAAABRjb21tYW5kLW9yY2hlc3RyYXRvcgAAAAphdXRoX3Njb3BlAAAAEWV4ZWN1dG9yOmRpc3BhdGNoAAAACmNvbW1hbmRfaWQAAAAgNzEwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEAAAAIbGVhc2VfaWQAAAAgNzQwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQAAAAHYXR0ZW1wdAAAAAExAAAAB3NvdWxfaWQAAABFc291bF9hYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhAAAAEWRldmljZV9iaW5kaW5nX2lkAAAAI2RiXzExMTExMTExMTExMTExMTExMTExMTExMTExMTExMTExAAAAE3BsYXRmb3JtX2FjY291bnRfaWQAAAAjcGFfMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIAAAAIdHJhY2VfaWQAAAAmdHJhY2VfMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMzMAAAAPaWRlbXBvdGVuY3lfa2V5AAAARWlkZW1fNDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NDQ0NAAAAAtvY2N1cnJlZF9hdAAAACEyMDI1LTEyLTMxVDIzOjU5OjU5LjAwMDAwMDArMDA6MDAAAAANcHJpdmFjeV9jbGFzcwAAAAhpbnRlcm5hbAAAAA5jb21tYW5kX3NoYTI1NgAAAEAxYzBkOTk5YzAwZDg3ZjViZWIzZmIyZTA4NzhjZDNhM2NhNzFkZDFkN2Q5MGYwMjg5ODYwYTA4MGE3ZGMzMmMzAAAAEnJlbGVhc2VfYm9tX3NoYTI1NgAAAEBhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhAAAAHWFjdGl2ZV9yZWxlYXNlX2JvbV9nZW5lcmF0aW9uAAAAATcAAAAfYWN0aXZlX3JlbGVhc2VfYm9tX3Rva2VuX3NoYTI1NgAAAEBiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiAAAAC3ZhbGlkX3VudGlsAAAAITIwMjYtMDEtMDFUMDA6MDA6MzAuMDAwMDAwMCswMDowMAAAAAtzaGFkb3dfbW9kZQAAAAVmYWxzZQ==",
+    "authorizationSha256": "5573d304a379ccfed3fc0db27d604e68957bf9c9bed5c13cf48eeb3c5a14b37e",
+    "signerPublicKeySpkiBase64": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAENOAWalLDA4QXphMmCU33nlfsSf21bSwNq7nYAdD0AbFMSfeAyb9dJWzWSpEtIlq9iU+z2A95H4QLgJirfR+KuA==",
+    "signatureBase64": "+adHzFyZREQYK6TDwwu6qM94BActHO8aPzSP8Y7AIFxih2c8Qxl9X6SsJIk1egflXDQ9kBKWyjgT0o3Xf08V+Q=="
+  }
+}

@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/schemas/legacy-sessionrunner-golden-trace.v1.schema.json",
+  "title": "Legacy SessionRunner synthetic Golden Trace format",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "trace_id",
+    "fixture_kind",
+    "runtime_observed",
+    "evidence_eligibility",
+    "source_snapshot_id",
+    "scenario",
+    "identity_scope",
+    "steps",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "dps.legacy-sessionrunner-golden-trace/v1"
+    },
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "fixture_kind": {
+      "const": "SYNTHETIC_FORMAT_EXAMPLE"
+    },
+    "runtime_observed": {
+      "const": false
+    },
+    "evidence_eligibility": {
+      "type": "array",
+      "maxItems": 0
+    },
+    "source_snapshot_id": {
+      "type": "string",
+      "pattern": "^legacy-sessionrunner:[0-9a-f]{64}$(?![\\s\\S])"
+    },
+    "scenario": {
+      "type": "string",
+      "minLength": 1
+    },
+    "identity_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["soul_id", "device_binding_id", "platform_account_id"],
+      "properties": {
+        "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+        "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+        "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"}
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence",
+          "method",
+          "input_fixture",
+          "expected_return",
+          "expected_state"
+        ],
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "method": {
+            "enum": [
+              "Run",
+              "InitSession",
+              "DecideNextAction",
+              "EvaluateActionResult",
+              "FinalizeSession"
+            ]
+          },
+          "input_fixture": {
+            "$ref": "#/$defs/scalarMap"
+          },
+          "expected_return": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_state": {
+            "$ref": "#/$defs/scalarMap"
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "scalarMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": ["string", "number", "integer", "boolean", "null"]
+      }
+    }
+  }
+}

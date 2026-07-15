@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/edge.bridge.exchange.v1.schema.json",
+  "title": "Zenno bridge loopback exchange v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "producer_module",
+    "soul_id",
+    "device_binding_id",
+    "platform_account_id",
+    "trace_id",
+    "idempotency_key",
+    "occurred_at",
+    "privacy_class",
+    "auth_nonce",
+    "exchange_kind",
+    "command_id",
+    "action_kind",
+    "step_kind",
+    "selector",
+    "text",
+    "wait_ms",
+    "expected_postcondition",
+    "native_status",
+    "native_detail",
+    "postcondition_verified"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "contract_id": {"const": "edge.bridge.exchange/v1"},
+    "producer_module": {"const": "zenno-bridge"},
+    "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time", "pattern": "^(?!0000)[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(?:Z|\\+00:00)$(?![\\s\\S])"},
+    "privacy_class": {"enum": ["internal", "personal", "sensitive"]},
+    "auth_nonce": {"type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+    "exchange_kind": {"enum": ["POLL", "NATIVE_RESULT"]},
+    "command_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 128},
+    "action_kind": {
+      "type": ["string", "null"],
+      "enum": ["OBSERVE", "LOCATE", "VERIFY", "WAIT", "TAP", "TYPE", null]
+    },
+    "step_kind": {
+      "type": ["string", "null"],
+      "enum": ["OBSERVE_SCREEN", "LOCATE_SELECTOR", "VERIFY_POSTCONDITION", "WAIT_DURATION", "TAP_SELECTOR", "TYPE_TEXT", null]
+    },
+    "selector": {"type": ["string", "null"], "maxLength": 2048},
+    "text": {"type": ["string", "null"], "maxLength": 4096},
+    "wait_ms": {"type": ["integer", "null"], "minimum": 0, "maximum": 300000},
+    "expected_postcondition": {"type": ["string", "null"], "maxLength": 2048},
+    "native_status": {
+      "type": ["string", "null"],
+      "enum": ["SUCCESS", "FAILED", "UNKNOWN_OUTCOME", null]
+    },
+    "native_detail": {"type": ["string", "null"], "maxLength": 4096},
+    "postcondition_verified": {"type": ["boolean", "null"]}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"exchange_kind": {"const": "POLL"}}, "required": ["exchange_kind"]},
+      "then": {
+        "properties": {
+          "command_id": {"type": "null"},
+          "action_kind": {"type": "null"},
+          "step_kind": {"type": "null"},
+          "selector": {"type": "null"},
+          "text": {"type": "null"},
+          "wait_ms": {"type": "null"},
+          "expected_postcondition": {"type": "null"},
+          "native_status": {"type": "null"},
+          "native_detail": {"type": "null"},
+          "postcondition_verified": {"type": "null"}
+        }
+      }
+    },
+    {
+      "if": {"properties": {"exchange_kind": {"const": "NATIVE_RESULT"}}, "required": ["exchange_kind"]},
+      "then": {
+        "properties": {
+          "command_id": {"type": "string", "minLength": 1, "maxLength": 128},
+          "action_kind": {"enum": ["OBSERVE", "LOCATE", "VERIFY", "WAIT", "TAP", "TYPE"]},
+          "step_kind": {"enum": ["OBSERVE_SCREEN", "LOCATE_SELECTOR", "VERIFY_POSTCONDITION", "WAIT_DURATION", "TAP_SELECTOR", "TYPE_TEXT"]},
+          "native_status": {"enum": ["SUCCESS", "FAILED", "UNKNOWN_OUTCOME"]},
+          "native_detail": {"type": "string", "minLength": 1, "maxLength": 4096}
+        },
+        "oneOf": [
+          {"properties": {"action_kind": {"const": "OBSERVE"}, "step_kind": {"const": "OBSERVE_SCREEN"}}},
+          {"properties": {"action_kind": {"const": "LOCATE"}, "step_kind": {"const": "LOCATE_SELECTOR"}, "selector": {"type": "string", "minLength": 1}}},
+          {"properties": {"action_kind": {"const": "VERIFY"}, "step_kind": {"const": "VERIFY_POSTCONDITION"}, "selector": {"type": "string", "minLength": 1}}},
+          {"properties": {"action_kind": {"const": "WAIT"}, "step_kind": {"const": "WAIT_DURATION"}, "wait_ms": {"type": "integer"}}},
+          {"properties": {"action_kind": {"const": "TAP"}, "step_kind": {"const": "TAP_SELECTOR"}, "selector": {"type": "string", "minLength": 1}}},
+          {"properties": {"action_kind": {"const": "TYPE"}, "step_kind": {"const": "TYPE_TEXT"}, "text": {"type": "string", "minLength": 1}}}
+        ]
+      }
+    },
+    {
+      "if": {"properties": {"native_status": {"const": "SUCCESS"}}, "required": ["native_status"]},
+      "then": {"properties": {"postcondition_verified": {"type": "boolean"}}}
+    },
+    {
+      "if": {"properties": {"native_status": {"const": "UNKNOWN_OUTCOME"}}, "required": ["native_status"]},
+      "then": {"properties": {"postcondition_verified": {"type": "null"}}}
+    }
+  ]
+}

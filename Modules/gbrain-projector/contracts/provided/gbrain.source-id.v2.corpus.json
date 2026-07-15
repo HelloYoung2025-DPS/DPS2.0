@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "dps.contract-corpus/v1",
+  "contractId": "gbrain.source-id/v2",
+  "algorithm": "SHA-256(domain || full ASCII soul_id || NUL || signed int64 big-endian nonce), dps- plus first 28 lowercase hex, with persistent uniqueness retry",
+  "domainAsciiWithTerminalNul": "dps.gbrain-source-binding/source-id/v1\\u0000",
+  "sourcePattern": "^dps-[a-f0-9]{28}$(?![\\s\\S])",
+  "sourceIdAloneIsAuthoritative": false,
+  "maximumNonce": 1023,
+  "requiredBindingProof": ["soul_id", "source_id", "algorithm", "nonce", "soul_hash", "allocated_at", "binding_revision", "binding_checksum"],
+  "cases": [
+    {
+      "id": "legacy-collision-left",
+      "soul_id": "soul_1234567890abcdef1234567890ab000000000000000000000000000000000000",
+      "nonce": 0,
+      "legacy_v1_source_id": "dps-1234567890abcdef1234567890ab",
+      "expected_v2_candidate": "dps-8e02f38a6f3e83a4f2da91a65ed8"
+    },
+    {
+      "id": "legacy-collision-right",
+      "soul_id": "soul_1234567890abcdef1234567890abffffffffffffffffffffffffffffffffffff",
+      "nonce": 0,
+      "legacy_v1_source_id": "dps-1234567890abcdef1234567890ab",
+      "expected_v2_candidate": "dps-d8a4a01be21363651112f3637f26"
+    }
+  ]
+}

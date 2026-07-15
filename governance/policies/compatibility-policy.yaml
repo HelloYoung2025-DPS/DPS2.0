@@ -1,0 +1,164 @@
+{
+  "schemaVersion": "dps.compatibility-policy/v1",
+  "moduleVersioning": "SemVer",
+  "contractVersioning": "explicit-major",
+  "additiveWithinMajor": true,
+  "breakingChange": "new-major",
+  "compatibilitySnapshot": {
+    "schemaVersion": "dps.compatibility-matrix/v2",
+    "schemaRef": "governance/verification/f9-compatibility-matrix.v2.schema.json",
+    "legacyV1Behavior": "historical-verification-only-do-not-emit"
+  },
+  "supportWindow": [
+    "N",
+    "N-1"
+  ],
+  "contractMajorModes": {
+    "manifestPath": "contracts.{provided,consumed}[]",
+    "identityFields": [
+      "contractId",
+      "major"
+    ],
+    "modeField": "mode",
+    "allowedModes": [
+      "active",
+      "compat-read",
+      "quarantine-only",
+      "retired"
+    ],
+    "resolution": {
+      "exactIdentityRequired": true,
+      "duplicateIdentityBehavior": "reject",
+      "unknownContractBehavior": "reject",
+      "missingContractBehavior": "reject",
+      "unknownMajorBehavior": "reject",
+      "missingMajorBehavior": "reject",
+      "unknownModeBehavior": "reject",
+      "missingModeBehavior": "reject",
+      "implicitFallback": "forbidden"
+    },
+    "countingRule": {
+      "trueMeaning": "may-contribute-only-after-all-other-contract-test-evidence-bom-and-rollout-gates-pass",
+      "falseMeaning": "must-not-contribute-to-that-result",
+      "modeAloneIsSufficient": false
+    },
+    "modes": {
+      "active": {
+        "allowedDeclarations": ["provided", "consumed"],
+        "wireAction": "decode-validate-and-use-exact-major",
+        "decoder": "required",
+        "encoder": "allowed-only-when-communication-direction-and-contract-producer-permit",
+        "domainPath": "allowed-after-all-policy-and-approval-gates",
+        "countsToward": {
+          "runnable": true,
+          "deployability": true,
+          "activeProducerConsumer": true,
+          "candidateGreen": true
+        },
+        "candidateGreenScope": "active-runtime"
+      },
+      "compat-read": {
+        "allowedDeclarations": ["consumed"],
+        "wireAction": "decode-validate-and-read-previous-major-without-runtime-execution",
+        "decoder": "required",
+        "encoder": "forbidden-for-this-major",
+        "domainPath": "forbidden",
+        "countsToward": {
+          "runnable": false,
+          "deployability": false,
+          "activeProducerConsumer": false,
+          "candidateGreen": false
+        },
+        "candidateGreenScope": "none"
+      },
+      "quarantine-only": {
+        "allowedDeclarations": ["provided", "consumed"],
+        "wireAction": "bounded-identify-quarantine-and-audit",
+        "decoder": "routing-metadata-and-exact-quarantine-proof-only",
+        "encoder": "forbidden",
+        "domainPath": "forbidden",
+        "businessSuccess": "forbidden",
+        "countsToward": {
+          "runnable": false,
+          "deployability": false,
+          "activeProducerConsumer": false,
+          "candidateGreen": false
+        },
+        "candidateGreenScope": "none"
+      },
+      "retired": {
+        "allowedDeclarations": ["provided", "consumed"],
+        "wireAction": "reject",
+        "decoder": "forbidden-in-runtime",
+        "encoder": "forbidden",
+        "domainPath": "forbidden",
+        "businessSuccess": "forbidden",
+        "countsToward": {
+          "runnable": false,
+          "deployability": false,
+          "activeProducerConsumer": false,
+          "candidateGreen": false
+        },
+        "candidateGreenScope": "none"
+      }
+    },
+    "producerConsumerModePairs": {
+      "activeRuntime": [
+        ["active", "active"]
+      ],
+      "mixedReadWindow": [
+        ["active", "compat-read"]
+      ],
+      "roleResolutionSource": "exact-contract-schema-producer_module-plus-reciprocal-communication-outbound-inbound",
+      "mixedReadWindowAccounting": "read-compatible-only-not-runnable-not-deployable-not-active-not-candidate-green",
+      "anyPairContainingQuarantineOnly": "not-runnable-not-deployable-not-active-not-candidate-green",
+      "anyPairContainingRetired": "reject"
+    }
+  },
+  "runtimeRoleResolution": {
+    "contractOwnerSource": "provided-manifest-ownerModule",
+    "runtimeProducerSource": "exact-contract-schema-producer_module-const-or-enum",
+    "runtimeConsumerSource": "reciprocal-communication-outbound-inbound-receiver",
+    "reciprocalRequired": true,
+    "relayProducerRule": "outbound-preserveProducer-retains-exact-schema-producer",
+    "communicationPairDigest": "sha256-stable-canonical-reciprocal-pair",
+    "ownerIsRuntimeProducerByDefault": false,
+    "unresolvedRoleBehavior": "not-runnable-not-deployable-not-active-not-candidate-green"
+  },
+  "combinations": {
+    "N/N": "required",
+    "N/N-1": "required",
+    "N-1/N": "required",
+    "N-1/N-1": "required",
+    "unknown-N+1": "reject"
+  },
+  "compatibilityGroups": {
+    "trigger": "current-active-pair-runnable-and-required-previous-major-not-runnable",
+    "independentDeployable": "all-required-current-and-previous-declaration-rows-runnable",
+    "compatibilityGroupRequired": "current-active-row-runnable-and-required-previous-row-missing-compat-read-quarantine-only-or-retired",
+    "phase0Authority": "identify-only-never-authorize",
+    "releaseAuthority": "exact-signed-release-bom-plus-complete-group-execution-evidence",
+    "candidateGreenWithoutEvidence": false
+  },
+  "contractUpgradeOrder": [
+    "add-v2",
+    "consumers-read-v1-and-v2",
+    "expand-schema",
+    "producer-v2-feature-disabled",
+    "merge-head-verification",
+    "shadow",
+    "canary",
+    "observe-mixed-window",
+    "disable-v1-in-separate-release",
+    "remove-v1-in-later-release"
+  ],
+  "databaseMigration": "expand-migrate-contract",
+  "productionSelection": "exact-signed-release-bom-only",
+  "candidateSelection": {
+    "unknownOrMissingContractMajor": "fail",
+    "unknownOrMissingMode": "fail",
+    "quarantineOnlyAsPositiveEvidence": "forbidden",
+    "activePathRequiresExactModePair": true,
+    "mixedReadPathRequiresExactModePair": true
+  }
+}

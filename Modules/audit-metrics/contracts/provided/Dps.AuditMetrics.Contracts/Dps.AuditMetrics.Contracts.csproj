@@ -1,0 +1,1 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><AssemblyName>Dps.AuditMetrics.Contracts</AssemblyName><RootNamespace>Dps.AuditMetrics.Contracts</RootNamespace><PackageId>Dps.AuditMetrics.Contracts</PackageId><Version>0.1.0</Version></PropertyGroup><ItemGroup><None Include="../audit.event.v1.schema.json" Pack="true" PackagePath="contracts" /></ItemGroup></Project>

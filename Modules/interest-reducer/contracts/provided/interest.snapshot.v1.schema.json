@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/interest.snapshot.v1.schema.json",
+  "title": "interest.snapshot/v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "producer_module",
+    "soul_id",
+    "device_binding_id",
+    "platform_account_id",
+    "trace_id",
+    "idempotency_key",
+    "occurred_at",
+    "privacy_class",
+    "as_of",
+    "algorithm_version",
+    "half_life_seconds",
+    "source_event_count",
+    "interests"
+  ],
+  "properties": {
+    "schema_version": { "type": "string", "maxLength": 32, "pattern": "^1(?:\\.[0-9]+){0,2}$(?![\\s\\S])" },
+    "contract_id": { "const": "interest.snapshot/v1" },
+    "producer_module": { "const": "interest-reducer" },
+    "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "maxLength": 32, "format": "date-time", "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{0,6}[1-9])?Z$(?![\\s\\S])"},
+    "privacy_class": { "const": "personal" },
+    "as_of": {"type": "string", "maxLength": 32, "format": "date-time", "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{0,6}[1-9])?Z$(?![\\s\\S])"},
+    "algorithm_version": { "const": "exponential-half-life/v1" },
+    "half_life_seconds": { "type": "number", "exclusiveMinimum": 0 },
+    "source_event_count": { "type": "integer", "minimum": 0 },
+    "interests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "topic",
+          "original_confidence",
+          "decayed_confidence",
+          "half_life_seconds",
+          "algorithm_version",
+          "evidence"
+        ],
+        "properties": {
+          "topic": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "original_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "decayed_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+          "half_life_seconds": { "type": "number", "exclusiveMinimum": 0 },
+          "algorithm_version": { "const": "exponential-half-life/v1" },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "event_id",
+                "event_hash",
+                "occurred_at",
+                "original_confidence",
+                "decayed_confidence"
+              ],
+              "properties": {
+                "event_id": { "type": "string", "format": "uuid" },
+                "event_hash": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-f0-9]{64}$(?![\\s\\S])" },
+                "occurred_at": {"type": "string", "maxLength": 32, "format": "date-time", "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]{0,6}[1-9])?Z$(?![\\s\\S])"},
+                "original_confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+                "decayed_confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

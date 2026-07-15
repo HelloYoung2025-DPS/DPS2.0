@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.InterestReducer.Contracts</AssemblyName>
+    <RootNamespace>Dps.InterestReducer.Contracts</RootNamespace>
+    <PackageId>Dps.InterestReducer.Contracts</PackageId>
+    <Version>0.1.0</Version>
+    <DefaultItemExcludes>$(DefaultItemExcludes);provided/**/bin/**;provided/**/obj/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="provided/interest.snapshot.v1.schema.json" Pack="true" PackagePath="contracts" />
+  </ItemGroup>
+</Project>

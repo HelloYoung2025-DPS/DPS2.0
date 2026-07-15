@@ -1,0 +1,238 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/verification/f7-device-gbrain-input.v2.schema.json",
+  "title": "F7 two-device and live GBrain evidence with raw projection binding",
+  "$comment": "Historical partial-artifact input retained only for migration review. It cannot satisfy DEVICE_VERIFIED; the executable gate requires f7-device-gbrain-input.v3.schema.json with an F6 prerequisite and complete semantic artifacts.",
+  "allOf": [
+    { "$ref": "external-evidence-envelope.v1.schema.json" },
+    {
+      "type": "object",
+      "required": ["schema_version", "payload"],
+      "properties": {
+        "schema_version": { "const": "dps.device-gbrain-verification-input/v2" },
+        "environment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["environment_id", "os_family", "gbrain_deployment_id"],
+          "properties": {
+            "environment_id": { "type": "string", "pattern": "^env_[a-z0-9][a-z0-9_-]{6,63}$" },
+            "os_family": { "enum": ["Android", "Windows+Android"] },
+            "gbrain_deployment_id": {
+              "type": "string",
+              "pattern": "^gbrain_[a-z0-9][a-z0-9_-]{6,63}$"
+            }
+          }
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "devices",
+            "source_mappings",
+            "operation_sequence",
+            "gbrain_live",
+            "projection_checks",
+            "search_readback_checks",
+            "cross_scope_leak_count",
+            "duplicate_side_effect_count",
+            "spoken_without_postcondition_count",
+            "data_subject_operations",
+            "fixture_mutation"
+          ],
+          "properties": {
+            "operation_sequence": {
+              "const": [
+                "OBSERVE",
+                "VERIFY",
+                "MEMORY_EVENT",
+                "INTEREST",
+                "GBRAIN_PROJECTION",
+                "EXACT_READBACK",
+                "DELETE_REBUILD"
+              ]
+            },
+            "devices": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "device_binding_id",
+                  "soul_id",
+                  "platform_account_id",
+                  "authorized",
+                  "non_production",
+                  "real_device"
+                ],
+                "properties": {
+                  "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+                  "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+                  "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+                  "authorized": { "const": true },
+                  "non_production": { "const": true },
+                  "real_device": { "const": true }
+                }
+              }
+            },
+            "source_mappings": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "One-to-one mapping from each DPS logical Source to the deterministic short non-PII alias accepted by the external GBrain deployment.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["soul_id", "logical_source_id", "external_source_alias"],
+                "properties": {
+                  "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+                  "logical_source_id": {
+                    "type": "string",
+                    "pattern": "^dps-[a-f0-9]{28}$(?![\\s\\S])"
+                  },
+                  "external_source_alias": {
+                    "type": "string",
+                    "pattern": "^gs_[0-9a-f]{16}$"
+                  }
+                }
+              }
+            },
+            "gbrain_live": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["status", "deployment_id", "source_scoped_credentials", "semantic_search_not_used_for_current_persona"],
+              "properties": {
+                "status": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                "deployment_id": { "type": "string", "pattern": "^gbrain_[a-z0-9][a-z0-9_-]{6,63}$" },
+                "source_scoped_credentials": { "const": true },
+                "semantic_search_not_used_for_current_persona": { "const": true }
+              }
+            },
+            "projection_checks": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "soul_id",
+                  "logical_source_id",
+                  "external_source_alias",
+                  "projection_revision",
+                  "written_checksum",
+                  "read_checksum",
+                  "raw_artifact_id",
+                  "raw_artifact_sha256",
+                  "exact_readback",
+                  "delete_rebuild",
+                  "purge"
+                ],
+                "properties": {
+                  "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+                  "logical_source_id": {
+                    "type": "string",
+                    "pattern": "^dps-[a-f0-9]{28}$(?![\\s\\S])"
+                  },
+                  "external_source_alias": { "type": "string", "pattern": "^gs_[0-9a-f]{16}$" },
+                  "projection_revision": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$",
+                    "description": "Required DPS logical revision from gbrain.projection/v1."
+                  },
+                  "external_revision": {
+                    "description": "Optional revision assigned by the external GBrain platform; metadata only.",
+                    "oneOf": [
+                      { "type": "integer", "minimum": 1 },
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$"
+                      }
+                    ]
+                  },
+                  "written_checksum": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+                  "read_checksum": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+                  "raw_artifact_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+                  "raw_artifact_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+                  "exact_readback": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                  "delete_rebuild": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                  "purge": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["page", "chunks", "embeddings", "cache", "backup_policy"],
+                    "properties": {
+                      "page": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                      "chunks": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                      "embeddings": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                      "cache": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                      "backup_policy": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" }
+                    }
+                  }
+                }
+              }
+            },
+            "search_readback_checks": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "description": "One source-scoped normalized search readback check per Soul. The external raw artifact binds Source, Soul, result schema, provenance, observation time, freshness, and query/response digests.",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "soul_id",
+                  "logical_source_id",
+                  "external_source_alias",
+                  "result_schema_version",
+                  "provenance",
+                  "observed_at",
+                  "freshness_seconds",
+                  "raw_artifact_id",
+                  "raw_artifact_sha256"
+                ],
+                "properties": {
+                  "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+                  "logical_source_id": { "type": "string", "pattern": "^dps-[a-f0-9]{28}$(?![\\s\\S])" },
+                  "external_source_alias": { "type": "string", "pattern": "^gs_[0-9a-f]{16}$" },
+                  "result_schema_version": { "const": "gbrain.search-result/v1" },
+                  "provenance": { "const": "SOURCE_SCOPED_EXTERNAL_READBACK" },
+                  "observed_at": { "type": "string", "format": "date-time" },
+                  "freshness_seconds": { "type": "integer", "minimum": 0, "maximum": 300 },
+                  "raw_artifact_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+                  "raw_artifact_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" }
+                }
+              }
+            },
+            "cross_scope_leak_count": { "const": 0 },
+            "duplicate_side_effect_count": { "const": 0 },
+            "spoken_without_postcondition_count": { "const": 0 },
+            "data_subject_operations": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["export", "correction", "deletion"],
+              "properties": {
+                "export": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                "correction": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                "deletion": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" }
+              }
+            },
+            "fixture_mutation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["status", "owned_fixture_app", "platform_authorized", "approval_lease_idempotency_verified"],
+              "properties": {
+                "status": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/outcome" },
+                "owned_fixture_app": { "const": true },
+                "platform_authorized": { "const": true },
+                "approval_lease_idempotency_verified": { "const": true }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

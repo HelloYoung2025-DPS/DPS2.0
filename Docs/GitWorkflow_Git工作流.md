@@ -41,12 +41,16 @@ Check status:
 git status
 ```
 
-Stage and commit:
+Review the diff, then stage only the files that belong to the change:
 
 ```bash
-git add .
+git diff --check
+git add path/to/file1 path/to/file2
+git diff --cached
 git commit -m "feat: short description"
 ```
+
+Do not use `git add .` in release automation. It can silently include generated files, local secrets, unrelated edits, or large deletion sets.
 
 ## 4) Versioning strategy
 
@@ -66,14 +70,16 @@ Examples:
 ## 5) Release steps for major upgrades
 
 1. Update `CHANGELOG.md`.
-2. Update `.omo/context.md` and `Docs/TechManual_技术手册.md` if architecture changed.
+2. Update `Docs/Architecture/`, `Docs/TechManual_技术手册.md`, and external contracts if architecture changed.
 3. Commit all changes.
-4. Create tag.
+4. Confirm Hosted CI and the required Windows ZennoDroid gate passed.
+5. Create tag.
 
 Commands:
 
 ```bash
-git add .
+git add CHANGELOG.md Docs/ path/to/changed/source
+git diff --cached
 git commit -m "release: v5.0.0 major upgrade"
 git tag -a v5.0.0 -m "Major upgrade v5.0.0"
 ```
@@ -84,27 +90,27 @@ If using remote:
 git push origin main --tags
 ```
 
-## 5.1) One-command release (recommended)
+## 5.1) Release helper
 
-Use the helper script:
+The helper is a validation-only preflight. It requires a completely clean checkout whose `HEAD` exactly matches the signed candidate BOM, then runs the unique Phase 0 gate and the candidate BOM validator. It does not create commits, tags, signatures, deployments, approvals, or production routing changes.
 
 ```bash
-./scripts/release.sh v4.6.0 "release: v4.6.0 major upgrade"
-```
-
-PowerShell:
-
-```powershell
-bash ./scripts/release.sh v4.6.0 "release: v4.6.0 major upgrade"
+./scripts/release.sh \
+  --bundle-root /absolute/path/to/candidate-bundle \
+  --bom release-bom.json \
+  --previous-bom previous-stable-bom.json \
+  --schema-sha256 <lowercase-sha256>
 ```
 
 The script will:
 
-- Validate version format (`vX.Y.Z`)
-- Ensure there are changes to commit
-- Create one commit
-- Create annotated tag
-- Show push command
+- Refuse any tracked, staged, or untracked worktree difference
+- Require the BOM `integration_commit` to equal the current `HEAD`
+- Run `Tools/ci/run_phase0_gate.py`
+- Validate the exact artifacts, SBOM, provenance, compatibility data, previous stable BOM, and fixed deployed trust anchor
+- Exit without changing Git or any deployment state
+
+An authorized human or separately deployed release controller performs any later commit, tag, signature, publication, or rollout step under its own approval and credentials. Passing this helper is necessary preflight evidence, not release authorization.
 
 ## 6) Useful commands
 

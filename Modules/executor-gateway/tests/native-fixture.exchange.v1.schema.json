@@ -1,0 +1,186 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/tests/native-fixture.exchange.v1.schema.json",
+  "title": "DPS executor-gateway native fixture JSON-lines exchange v1",
+  "oneOf": [
+    {"$ref": "#/$defs/request"},
+    {"$ref": "#/$defs/response"}
+  ],
+  "$defs": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "requestId", "operation"],
+      "properties": {
+        "schemaVersion": {"const": "dps.native-fixture.request/v1"},
+        "requestId": {"type": "string", "format": "uuid"},
+        "operation": {"enum": ["hello", "read_active", "read_state", "set_mode", "submit", "complete"]},
+        "mode": {"enum": ["none", "crash_before_flush", "crash_after_flush", "old_attempt_result", "cross_scope_result", "switch_bom_after_effect"]},
+        "execution": {"$ref": "#/$defs/execution"},
+        "completionHandleId": {"type": "string", "format": "uuid"}
+      }
+    },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "evidenceKind", "requestId", "status", "errorCode", "activeBinding", "submissionAck", "nativeResult", "sideEffectCount"],
+      "properties": {
+        "schemaVersion": {"const": "dps.native-fixture.response/v1"},
+        "evidenceKind": {"const": "REAL_LOCAL_PROCESS"},
+        "requestId": {"type": "string", "minLength": 1},
+        "status": {"enum": ["OK", "ERROR"]},
+        "errorCode": {"type": ["string", "null"]},
+        "activeBinding": {"oneOf": [{"$ref": "#/$defs/activeBinding"}, {"type": "null"}]},
+        "submissionAck": {"oneOf": [{"$ref": "#/$defs/submissionAck"}, {"type": "null"}]},
+        "nativeResult": {"oneOf": [{"$ref": "#/$defs/nativeResult"}, {"type": "null"}]},
+        "sideEffectCount": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "activeBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "deviceBindingId", "releaseBomSha256", "generation", "executionTokenBase64"],
+      "properties": {
+        "schemaVersion": {"const": "dps.active-release-bom-binding/v1"},
+        "deviceBindingId": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+        "releaseBomSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "generation": {"type": "integer", "minimum": 1},
+        "executionTokenBase64": {"type": "string", "contentEncoding": "base64"}
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "commandId", "leaseId", "attempt", "soulId", "deviceBindingId", "platformAccountId", "traceId", "idempotencyKey", "stepId", "stepKind", "commandSha256", "authorizationSha256", "submissionAttemptId", "submissionIntentSha256", "pendingStateSha256", "activeReleaseBomSha256", "activeReleaseBomGeneration", "activeReleaseBomExecutionTokenBase64", "activeReleaseBomTokenSha256"],
+      "properties": {
+        "command": {"$ref": "#/$defs/command"},
+        "commandId": {"type": "string", "format": "uuid"},
+        "leaseId": {"type": "string", "format": "uuid"},
+        "attempt": {"type": "integer", "minimum": 1, "maximum": 3},
+        "soulId": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+        "deviceBindingId": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+        "platformAccountId": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+        "traceId": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+        "idempotencyKey": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+        "stepId": {"type": "string", "format": "uuid"},
+        "stepKind": {"type": "string", "minLength": 1, "maxLength": 128},
+        "commandSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+        "authorizationSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+        "submissionAttemptId": {"type": "string", "format": "uuid"},
+        "submissionIntentSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+        "pendingStateSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+        "activeReleaseBomSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "activeReleaseBomGeneration": {"type": "integer", "minimum": 1},
+        "activeReleaseBomExecutionTokenBase64": {"type": "string", "contentEncoding": "base64"},
+        "activeReleaseBomTokenSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    },
+    "submissionAck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "contract_id", "producer_module", "submission_id", "completion_handle_id", "command_id", "lease_id", "attempt", "soul_id", "device_binding_id", "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class", "durability", "command_sha256", "authorization_sha256", "submission_attempt_id", "submission_intent_sha256", "pending_state_sha256", "active_release_bom_sha256", "active_release_bom_generation", "active_release_bom_token_sha256", "submitted_request_sha256", "acknowledgement_sha256"],
+      "properties": {
+        "schema_version": {"const": "1.0.0"},
+        "contract_id": {"const": "native.submission.ack/v1"},
+        "producer_module": {"const": "windows-edge-worker"},
+        "submission_id": {"type": "string", "format": "uuid", "pattern": "^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$(?![\\s\\S])"},
+        "completion_handle_id": {"type": "string", "format": "uuid", "pattern": "^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$(?![\\s\\S])"},
+        "command_id": {"type": "string", "format": "uuid", "pattern": "^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$(?![\\s\\S])"},
+        "lease_id": {"type": "string", "format": "uuid", "pattern": "^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$(?![\\s\\S])"},
+        "attempt": {"type": "integer", "minimum": 1, "maximum": 3},
+        "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+        "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+        "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+        "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+        "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+        "occurred_at": {"type": "string", "format": "date-time", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{7}Z$(?![\\s\\S])"},
+        "privacy_class": {"const": "internal"},
+        "durability": {"const": "REQUEST_AND_STATE_FLUSHED"},
+        "command_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+        "authorization_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+        "submission_attempt_id": {"type": "string", "format": "uuid", "pattern": "^(?!00000000-0000-0000-0000-000000000000$)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$(?![\\s\\S])"},
+        "submission_intent_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+        "pending_state_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+        "active_release_bom_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+        "active_release_bom_generation": {"type": "integer", "minimum": 1},
+        "active_release_bom_token_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+        "submitted_request_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"},
+        "acknowledgement_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"}
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "contractId", "producerModule", "commandId", "operationId", "approvalId", "approvalSha256", "soulId", "deviceBindingId", "platformAccountId", "traceId", "idempotencyKey", "occurredAt", "privacyClass", "actionKind", "isSideEffect", "platformAuthorizationId", "leaseId", "leaseOwner", "leaseExpiresAt", "attempt", "steps"],
+      "properties": {
+        "schemaVersion": {"type": "string", "pattern": "^1(?:\\.[0-9]+){0,2}$"},
+        "contractId": {"const": "command.dispatch/v1"},
+        "producerModule": {"const": "command-orchestrator"},
+        "commandId": {"type": "string", "format": "uuid"},
+        "operationId": {"type": "string", "format": "uuid"},
+        "approvalId": {"type": "string", "format": "uuid"},
+        "approvalSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "soulId": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+        "deviceBindingId": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+        "platformAccountId": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+        "traceId": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+        "idempotencyKey": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+        "occurredAt": {"type": "string", "format": "date-time"},
+        "privacyClass": {"const": "internal"},
+        "actionKind": {"type": "string", "minLength": 1},
+        "isSideEffect": {"type": "boolean"},
+        "platformAuthorizationId": {"type": ["string", "null"], "maxLength": 256},
+        "leaseId": {"type": "string", "format": "uuid"},
+        "leaseOwner": {"type": "string", "minLength": 1, "maxLength": 128},
+        "leaseExpiresAt": {"type": "string", "format": "date-time"},
+        "attempt": {"type": "integer", "minimum": 1, "maximum": 3},
+        "steps": {"type": "array", "minItems": 1, "maxItems": 1, "items": {"$ref": "#/$defs/commandStep"}}
+      }
+    },
+    "commandStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stepId", "stepKind", "arguments", "retrySafe", "postconditionKind"],
+      "properties": {
+        "stepId": {"type": "string", "format": "uuid"},
+        "stepKind": {"type": "string", "minLength": 1, "maxLength": 128},
+        "arguments": {"type": "object", "additionalProperties": {"type": "string", "minLength": 1, "maxLength": 256}},
+        "retrySafe": {"type": "boolean"},
+        "postconditionKind": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    },
+    "nativeResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nativeResultId", "commandId", "leaseId", "attempt", "soulId", "deviceBindingId", "platformAccountId", "traceId", "idempotencyKey", "occurredAt", "activeReleaseBomSha256", "activeReleaseBomGeneration", "activeReleaseBomTokenSha256", "stepResults"],
+      "properties": {
+        "nativeResultId": {"type": "string", "format": "uuid"},
+        "commandId": {"type": "string", "format": "uuid"},
+        "leaseId": {"type": "string", "format": "uuid"},
+        "attempt": {"type": "integer", "minimum": 1, "maximum": 3},
+        "soulId": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+        "deviceBindingId": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+        "platformAccountId": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+        "traceId": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+        "idempotencyKey": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+        "occurredAt": {"type": "string", "format": "date-time"},
+        "activeReleaseBomSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "activeReleaseBomGeneration": {"type": "integer", "minimum": 1},
+        "activeReleaseBomTokenSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "stepResults": {"type": "array", "minItems": 1, "maxItems": 1, "items": {"$ref": "#/$defs/nativeStepResult"}}
+      }
+    },
+    "nativeStepResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stepId", "stepKind", "status", "nativeCode", "evidenceDigest"],
+      "properties": {
+        "stepId": {"type": "string", "format": "uuid"},
+        "stepKind": {"type": "string", "minLength": 1, "maxLength": 128},
+        "status": {"enum": ["SUCCESS", "FAILED", "UNKNOWN"]},
+        "nativeCode": {"type": "string", "minLength": 1, "maxLength": 128},
+        "evidenceDigest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    }
+  }
+}

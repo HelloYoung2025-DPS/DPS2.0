@@ -1,0 +1,227 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/contracts/instruction.receipt.v2.schema.json",
+  "title": "instruction.receipt/v2",
+  "description": "Binds unverified future contract expectations separately from verified baseline facts. It never proves that the expected changes were implemented.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "contract_id", "producer_module", "soul_id", "device_binding_id",
+    "platform_account_id", "trace_id", "idempotency_key", "occurred_at", "privacy_class",
+    "receipt_id", "intent_id", "auth_context_id", "agent_identity", "agent_role",
+    "baseline_commit", "resolved_at", "scope", "source_intent_contract",
+    "source_intake_payload_sha256", "source_intake_peer_module", "source_intake_audience",
+    "source_intake_trust_receipt_id", "source_intake_trust_nonce",
+    "source_intake_trust_issued_at", "source_intake_verified_at", "source_intake_trust_expires_at",
+    "source_requester_auth_expires_at", "source_manifest_ownership_expires_at",
+    "source_approval_expires_at",
+    "source_upgrade_intent_sha256", "source_approval_subject_sha256",
+    "source_requester_auth_context_sha256", "source_requester_auth_receipt_id",
+    "source_requester_auth_nonce", "source_manifest_ownership_sha256",
+    "source_manifest_ownership_receipt_id", "requested_risk_tier", "requested_stage",
+    "requested_target_modules", "authorized_write_paths",
+    "source_authorization_status",
+    "source_contract_change_claims_status", "source_contract_change_claims_sha256",
+    "baseline_verification_required", "bound_contract_change_expectations",
+    "verified_baseline_contract_facts", "verified_baseline_contract_facts_sha256",
+    "changeset_contract_verification_required", "contract_declarations", "instructions",
+    "manifests", "contracts", "governance", "tests", "operations", "diff_fingerprint",
+    "status", "invalidated_reason"
+  ],
+  "properties": {
+    "schema_version": {"const": "dps.instruction-receipt/v2"},
+    "contract_id": {"const": "instruction.receipt/v2"},
+    "producer_module": {"const": "factory-instruction-resolver"},
+    "soul_id": {"type": ["string", "null"], "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
+    "device_binding_id": {"type": ["string", "null"], "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
+    "platform_account_id": {"type": ["string", "null"], "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},
+    "trace_id": {"type": "string", "pattern": "^trace_[a-f0-9]{32}$(?![\\s\\S])"},
+    "idempotency_key": {"type": "string", "pattern": "^idem_[a-f0-9]{64}$(?![\\s\\S])"},
+    "occurred_at": {"type": "string", "format": "date-time", "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$(?![\\s\\S])"},
+    "privacy_class": {"const": "internal"},
+    "receipt_id": {"type": "string", "pattern": "^instruction:[0-9a-f]{32}$(?![\\s\\S])"},
+    "intent_id": {"type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "auth_context_id": {"type": "string", "minLength": 8, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "agent_identity": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9][a-z0-9._:-]{0,127}$(?![\\s\\S])"},
+    "agent_role": {"enum": ["impact-planner", "contract-architect", "module-implementer", "independent-test-agent", "security-privacy-adversary", "reliability-reviewer", "windows-zenno-reviewer", "evidence-auditor", "release-rollback-controller"]},
+    "baseline_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$(?![\\s\\S])"},
+    "resolved_at": {"type": "string", "format": "date-time", "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$(?![\\s\\S])"},
+    "scope": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/module_id"}},
+    "source_intent_contract": {"$ref": "#/$defs/source_intent_contract"},
+    "source_intake_payload_sha256": {"$ref": "#/$defs/sha256"},
+    "source_intake_peer_module": {"const": "factory-upgrade-intake"},
+    "source_intake_audience": {"const": "dps.factory-instruction-resolver"},
+    "source_intake_trust_receipt_id": {"$ref": "#/$defs/authority_receipt_id"},
+    "source_intake_trust_nonce": {"$ref": "#/$defs/nonce"},
+    "source_intake_trust_issued_at": {"$ref": "#/$defs/canonical_utc"},
+    "source_intake_verified_at": {"$ref": "#/$defs/canonical_utc"},
+    "source_intake_trust_expires_at": {"$ref": "#/$defs/canonical_utc"},
+    "source_requester_auth_expires_at": {"$ref": "#/$defs/canonical_utc"},
+    "source_manifest_ownership_expires_at": {"$ref": "#/$defs/canonical_utc"},
+    "source_approval_expires_at": {"oneOf": [{"$ref": "#/$defs/canonical_utc"}, {"type": "null"}]},
+    "source_upgrade_intent_sha256": {"$ref": "#/$defs/sha256"},
+    "source_approval_subject_sha256": {"$ref": "#/$defs/sha256"},
+    "source_requester_auth_context_sha256": {"$ref": "#/$defs/sha256"},
+    "source_requester_auth_receipt_id": {"$ref": "#/$defs/authority_receipt_id"},
+    "source_requester_auth_nonce": {"$ref": "#/$defs/nonce"},
+    "source_manifest_ownership_sha256": {"$ref": "#/$defs/sha256"},
+    "source_manifest_ownership_receipt_id": {"$ref": "#/$defs/authority_receipt_id"},
+    "requested_risk_tier": {"enum": ["R0", "R1", "R2", "R3"]},
+    "requested_stage": {"$ref": "#/$defs/stage"},
+    "requested_target_modules": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"$ref": "#/$defs/module_id"}},
+    "authorized_write_paths": {"type": "array", "minItems": 1, "maxItems": 512, "uniqueItems": true, "items": {"$ref": "#/$defs/contract_source_path"}},
+    "source_authorization_status": {"enum": ["not-required", "approved"]},
+    "source_contract_change_claims_status": {"const": "UNVERIFIED_EXPECTATIONS"},
+    "source_contract_change_claims_sha256": {"$ref": "#/$defs/sha256"},
+    "baseline_verification_required": {"const": true},
+    "bound_contract_change_expectations": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"$ref": "#/$defs/contract_change_expectation"}},
+    "verified_baseline_contract_facts": {"type": "array", "maxItems": 128, "uniqueItems": true, "items": {"$ref": "#/$defs/baseline_contract_fact"}},
+    "verified_baseline_contract_facts_sha256": {"$ref": "#/$defs/sha256"},
+    "changeset_contract_verification_required": {"const": true},
+    "contract_declarations": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/contract_declaration"}},
+    "instructions": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/bound_file"}},
+    "manifests": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/bound_file"}},
+    "contracts": {"type": "array", "items": {"$ref": "#/$defs/bound_file"}},
+    "governance": {"type": "array", "minItems": 3, "items": {"$ref": "#/$defs/bound_file"}},
+    "tests": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/bound_file"}},
+    "operations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/bound_file"}},
+    "diff_fingerprint": {"$ref": "#/$defs/sha256"},
+    "status": {"enum": ["BOUND", "STALE"]},
+    "invalidated_reason": {"type": ["string", "null"], "maxLength": 512}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "BOUND"}}, "required": ["status"]},
+      "then": {"properties": {"invalidated_reason": {"type": "null"}}}
+    },
+    {
+      "if": {"properties": {"status": {"const": "STALE"}}, "required": ["status"]},
+      "then": {"properties": {"invalidated_reason": {"type": "string", "minLength": 1, "maxLength": 512}}}
+    }
+  ],
+  "$defs": {
+    "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])"},
+    "canonical_utc": {"type": "string", "format": "date-time", "pattern": "^[0-9]{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12][0-9]|3[01])T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]Z$(?![\\s\\S])"},
+    "repo_path": {"type": "string", "maxLength": 512, "pattern": "^(?!/)(?!.*\\\\)(?!.*//)(?!\\.{1,2}(?:/|$))(?!\\.git(?:/|$))(?!\\.omo(?:/|$))(?!.*\\/\\.{1,2}(?:/|$))(?!.*\\/\\.git(?:/|$))(?!.*\\/\\.omo(?:/|$))(?!.*[\\u0000-\\u001F\\u007F])(?!.*\\s$)(?!.*\\/$).+$(?![\\s\\S])"},
+    "contract_source_path": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^(?!/)(?!\\.)(?!.*\\/\\.)(?!.*\\\\)(?!.*//)(?!.*[\\u0000-\\u001F\\u007F])(?!.*[*?\\[\\]])(?!.*\\s$)(?!.*\\/$).+$(?![\\s\\S])"},
+    "module_id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$(?![\\s\\S])"},
+    "authority_receipt_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]*:[a-z0-9][a-z0-9._:-]{7,127}$(?![\\s\\S])"},
+    "nonce": {"type": "string", "pattern": "^nonce_[a-f0-9]{32}$(?![\\s\\S])"},
+    "stage": {"enum": ["development", "shadow", "canary", "rolling", "soaking"]},
+    "contract_name": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:\\.[a-z0-9]+)+$(?![\\s\\S])"},
+    "mode": {"enum": ["active", "compat-read", "quarantine-only", "retired"]},
+    "status": {"enum": ["proposed", "active", "deprecated", "retired"]},
+    "source_intent_contract": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contract_id", "major", "mode"],
+      "properties": {
+        "contract_id": {"const": "upgrade.intent"},
+        "major": {"const": 2},
+        "mode": {"const": "active"}
+      }
+    },
+    "contract_change_expectation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contract_id", "major", "baseline_commit", "expected_mode", "expected_status", "expected_baseline_state", "change_kind", "expected_owner_module", "expected_source", "expected_source_sha256", "expected_previous_mode", "expected_previous_source_sha256", "quarantine_reason", "quarantine_evidence_sha256"],
+      "properties": {
+        "contract_id": {"$ref": "#/$defs/contract_name"},
+        "major": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "baseline_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$(?![\\s\\S])"},
+        "expected_mode": {"enum": ["active", "quarantine-only", "retired"]},
+        "expected_status": {"$ref": "#/$defs/status"},
+        "expected_baseline_state": {"enum": ["present", "absent"]},
+        "change_kind": {"enum": ["add-major", "additive-schema", "mode-transition", "introduce-quarantined-major"]},
+        "expected_owner_module": {"$ref": "#/$defs/module_id"},
+        "expected_source": {"$ref": "#/$defs/contract_source_path"},
+        "expected_source_sha256": {"$ref": "#/$defs/sha256"},
+        "expected_previous_mode": {"oneOf": [{"enum": ["active", "quarantine-only", "retired"]}, {"type": "null"}]},
+        "expected_previous_source_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "quarantine_reason": {"type": ["string", "null"], "maxLength": 128},
+        "quarantine_evidence_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"change_kind": {"const": "add-major"}}, "required": ["change_kind"]},
+          "then": {"properties": {"expected_mode": {"const": "active"}, "expected_status": {"const": "proposed"}, "expected_baseline_state": {"const": "absent"}, "expected_previous_mode": {"type": "null"}, "expected_previous_source_sha256": {"type": "null"}, "quarantine_reason": {"type": "null"}, "quarantine_evidence_sha256": {"type": "null"}}}
+        },
+        {
+          "if": {"properties": {"change_kind": {"const": "additive-schema"}}, "required": ["change_kind"]},
+          "then": {"properties": {"expected_mode": {"const": "active"}, "expected_status": {"enum": ["proposed", "active"]}, "expected_baseline_state": {"const": "present"}, "expected_previous_mode": {"const": "active"}, "expected_previous_source_sha256": {"$ref": "#/$defs/sha256"}, "quarantine_reason": {"type": "null"}, "quarantine_evidence_sha256": {"type": "null"}}}
+        },
+        {
+          "if": {"properties": {"change_kind": {"const": "mode-transition"}}, "required": ["change_kind"]},
+          "then": {
+            "oneOf": [
+              {"properties": {"expected_previous_mode": {"const": "active"}, "expected_mode": {"const": "quarantine-only"}, "expected_status": {"const": "deprecated"}}},
+              {"properties": {"expected_previous_mode": {"const": "active"}, "expected_mode": {"const": "retired"}, "expected_status": {"const": "retired"}}},
+              {"properties": {"expected_previous_mode": {"const": "quarantine-only"}, "expected_mode": {"const": "retired"}, "expected_status": {"const": "retired"}}}
+            ],
+            "properties": {"expected_baseline_state": {"const": "present"}, "expected_previous_source_sha256": {"$ref": "#/$defs/sha256"}, "quarantine_reason": {"type": "null"}, "quarantine_evidence_sha256": {"type": "null"}}
+          }
+        },
+        {
+          "if": {"properties": {"change_kind": {"const": "introduce-quarantined-major"}}, "required": ["change_kind"]},
+          "then": {"properties": {"expected_mode": {"const": "quarantine-only"}, "expected_status": {"const": "deprecated"}, "expected_baseline_state": {"const": "absent"}, "expected_previous_mode": {"type": "null"}, "expected_previous_source_sha256": {"type": "null"}, "quarantine_reason": {"const": "historical-wire-import-no-baseline-major"}, "quarantine_evidence_sha256": {"$ref": "#/$defs/sha256"}}}
+        }
+      ]
+    },
+    "baseline_contract_fact": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contract_id", "major", "baseline_commit", "presence", "owner_module", "source", "source_sha256", "mode", "status", "family_owner_module", "consumer_modules"],
+      "properties": {
+        "contract_id": {"$ref": "#/$defs/contract_name"},
+        "major": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "baseline_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$(?![\\s\\S])"},
+        "presence": {"enum": ["present", "absent"]},
+        "owner_module": {"oneOf": [{"$ref": "#/$defs/module_id"}, {"type": "null"}]},
+        "source": {"oneOf": [{"$ref": "#/$defs/repo_path"}, {"type": "null"}]},
+        "source_sha256": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]},
+        "mode": {"oneOf": [{"$ref": "#/$defs/mode"}, {"type": "null"}]},
+        "status": {"oneOf": [{"$ref": "#/$defs/status"}, {"type": "null"}]},
+        "family_owner_module": {"oneOf": [{"$ref": "#/$defs/module_id"}, {"type": "null"}]},
+        "consumer_modules": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/module_id"}}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"presence": {"const": "absent"}}, "required": ["presence"]},
+          "then": {"properties": {"owner_module": {"type": "null"}, "source": {"type": "null"}, "source_sha256": {"type": "null"}, "mode": {"type": "null"}, "status": {"type": "null"}, "consumer_modules": {"maxItems": 0}}}
+        },
+        {
+          "if": {"properties": {"presence": {"const": "present"}}, "required": ["presence"]},
+          "then": {"properties": {"owner_module": {"$ref": "#/$defs/module_id"}, "source": {"$ref": "#/$defs/repo_path"}, "source_sha256": {"$ref": "#/$defs/sha256"}, "mode": {"$ref": "#/$defs/mode"}, "status": {"$ref": "#/$defs/status"}}}
+        }
+      ]
+    },
+    "contract_declaration": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contract_id", "major", "mode", "source", "status", "owner_module", "declaring_module", "declaration_kind"],
+      "properties": {
+        "contract_id": {"$ref": "#/$defs/contract_name"},
+        "major": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+        "mode": {"$ref": "#/$defs/mode"},
+        "source": {"$ref": "#/$defs/repo_path"},
+        "status": {"$ref": "#/$defs/status"},
+        "owner_module": {"$ref": "#/$defs/module_id"},
+        "declaring_module": {"$ref": "#/$defs/module_id"},
+        "declaration_kind": {"enum": ["provided", "consumed"]}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"declaration_kind": {"const": "provided"}}, "required": ["declaration_kind"]},
+          "then": {"properties": {"mode": {"enum": ["active", "quarantine-only", "retired"]}}}
+        }
+      ]
+    },
+    "bound_file": {
+      "type": "object", "additionalProperties": false,
+      "required": ["path", "order", "source_state", "git_blob", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/repo_path"},
+        "order": {"type": "integer", "minimum": 0},
+        "source_state": {"enum": ["tracked", "modified", "untracked"]},
+        "git_blob": {"type": ["string", "null"], "pattern": "^[0-9a-f]{40}$(?![\\s\\S])"},
+        "sha256": {"$ref": "#/$defs/sha256"}
+      }
+    }
+  }
+}

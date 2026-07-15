@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.EvidenceService.Tests</AssemblyName>
+    <RootNamespace>Dps.EvidenceService.Tests</RootNamespace>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/bin/**;**/obj/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit.v3" />
+    <ProjectReference Include="../contracts/Dps.EvidenceService.Contracts.csproj" />
+    <ProjectReference Include="../src/Dps.EvidenceService.csproj" />
+    <ProjectReference Include="../../soul-registry/src/Dps.SoulRegistry.csproj" />
+    <ProjectReference Include="../../memory-event-ledger/src/Dps.MemoryEventLedger.csproj" />
+    <ProjectReference Include="../../interest-reducer/src/Dps.InterestReducer.csproj" />
+    <ProjectReference Include="../../gbrain-projector/src/Dps.GBrainProjector.csproj" />
+    <None Include="../contracts/provided/test.evidence.v1.schema.json"
+          Link="contracts/test.evidence.v1.schema.json"
+          CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

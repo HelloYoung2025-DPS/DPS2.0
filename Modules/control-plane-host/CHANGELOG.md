@@ -1,0 +1,44 @@
+# Changelog
+
+## Unreleased
+
+- Added six direct outbound lifecycle-signer adversarial Contract executions across both reconciliation and recovery paths. Declared-key/private-key mismatch, malformed P1363 material, DER substitution, wrong length, late completion, and post-composition key replacement now prove fail-closed production verification before any rejected lifecycle wire reaches a Policy port; the .NET Contract floor is 23.
+- Added the real Control-side Policy submission lifecycle boundary: Policy-owned strict DTO/codecs and public commitments now drive an authority-separated reconciliation producer, human-recovery producer, signed-state consumer, and role-specific port coordinator. Exact attempt/scope/idempotency/BOM/native binding/predecessor/evidence checks fail closed; lifecycle private keys and Policy tables remain outside this module.
+- Replaced the generic lifecycle signer with separate reconciliation and human-recovery approval capabilities, added exact port scope/distinct credential-authority checks and a hard five-second maximum timeout, and documented that current in-process facades are not authenticated transport or production isolation evidence.
+- Made both lifecycle authorities cancellation-aware asynchronous capabilities with hard five-second bounds, pre/post external-boundary cancellation checks, and quarantine cleanup that retains an uncooperative call's private canonical copy until its late signature and payload can be discarded and zeroed.
+- Extended the locked Control contract gates to 17 .NET cases and 16 schema cases across reconciliation, recovery, and submission state; the real PostgreSQL and production authority compositions remain unverified and `releaseEligible` remains false.
+
+- Rebound platform-account authority metadata to the provider-owned lowercase-only alias-key and authorization-evidence contract, and moved the Python schema gate to trusted isolated CPython 3.12 discovery with an exact 11-test floor.
+- Bound the signed provider consumer parser directly to provider-owned device, platform-account, binding, Persona, SoulMemory read-back, and GBrain Source-ID corpora, including exact raw duplicate/numeric boundaries, explicit prepared-versus-verified read-back outcomes, and truncated Source collision semantics.
+- Replaced permissive end-of-line timestamp anchors with absolute input anchors so a terminal newline cannot pass a provider timestamp check.
+
+- Consumed the policy-owned strict signed `action.execution.promotion/v1` contract pack as its only allowed wire producer; retained bounded snake_case, absolute UUID/Zulu-time, canonical signing, and shadow-proposal regressions without duplicating ownership.
+- Closed promotion Schema/codec differentials for Int64 overflow and non-canonical Base64 pad bits; both are now adversarial corpus failures.
+- Made PostgreSQL 18.4 constraint attestation explicitly exclude catalog-native NOT NULL (`contype = 'n'`) rows already proven by `pg_attribute`, while requiring all 89 named constraints to be enforced as well as validated.
+- Added strict function call-shape attestation and a `STRICT` mutation regression so nullable control parameters cannot silently skip the atomic function and manufacture an accepted zero-write receipt.
+- Closed column-level INSERT ACL bypasses and made the module schema relation inventory exact: only the five registered ordinary tables are accepted, with no column ACLs or extra tables, partitions, views, sequences, or foreign relations.
+- Replaced caller-built production result envelopes with bounded strict-UTF-8 raw provider v1 bytes authenticated by the current signed BOM, append-only provider trust revision, canonical P-256 SPKI key, and P1363 signature.
+- Persisted the exact signed source bytes and digest together with the matched trust revision, public-key digest, signature, and domain-separated authorization digest; GBrain acceptance now explicitly means a signed adapter checksum proof, not a local recomputation from unavailable GBrain content.
+- Removed direct runtime table inserts. Two migration-owned, fixed-search-path `SECURITY DEFINER` functions now commit the truth/receipt/outbox atom or append hash-only conflict quarantine, while direct partial writes fail closed.
+- Added exact runtime catalog attestation for five persistent built-in-C-collated tables, 83 columns, 89 named constraints bound to persisted PostgreSQL 18.4 definition comments, 13 trigger tuples, three scope indexes, eight function bodies/security modes, object ACLs, isolated role graph, and migration ownership; unmarked existing schemas are refused instead of adopted.
+- Tightened all aggregate scope identifiers to digest-only `db_`/`pa_`/`trace_` 32-hex and `idem_` 64-hex forms so phone, email, token, or free-form values cannot enter truth, receipts, or outbox.
+- Rebound `device.registered/v1` to its keyed fingerprint HMAC/key-id/epoch fields and removed the legacy unkeyed fingerprint field from the consumer parser.
+- Added independent PostgreSQL migration/runtime credentials, exact PostgreSQL 18.4 and five-second runtime enforcement, and explicit refusal of the persistent GBrain Company service.
+- Added one atomic append-only transaction for allowlisted runtime truth, deterministic receipts, exact-scope outbox records, and hash-only conflict quarantine, including concurrent duplicate, crash, cancellation, and restart recovery paths.
+- Added runtime role/ownership/ACL/trigger attestation and database constraints that reject unknown producer/contract/status combinations and any non-verified GBrain readback.
+- Tightened `control.plane.receipt/v1` within its existing fields and major so each source contract accepts only its unique owner producer; malformed version strings now fail closed.
+- Added the required `REAL_POSTGRESQL` Integration suite; missing infrastructure fails instead of skipping or producing mock evidence.
+- Corrected the manifest to state that privacy export, correction, retention enforcement, and verified erasure remain unimplemented release blockers for the append-only physical model.
+- Hardened correlation identifiers against trailing-newline acceptance across Receipt JSON Schema, C# provider/receipt validation, and PostgreSQL exact-octet plus ASCII constraints.
+- Rebound `platform.account.authorized/v1` to its keyed alias epoch field so the strict consumer accepts only the current provider contract shape.
+- Pinned strict device, platform-account, and binding provider ingestion to their published `1.0.0` schema instead of accepting undeclared v1 minors.
+- Replaced delimiter-concatenated runtime-truth keys and receipt identifiers with domain-separated, fixed-order, uint32 big-endian length-prefixed UTF-8 canonical hashing.
+- Added stable golden vectors and a constructive regression proving inputs that collided under the legacy delimiter format now receive distinct keys and receipt IDs while exact duplicates remain idempotent.
+- Packed and embedded the strict `control.plane.receipt/v1` schema/corpus, added a bounded exact-field codec plus a semantic-only PostgreSQL `jsonb` read path, and split the executable 11-case schema gate from the 12-case .NET contract gate.
+- Aligned provider ingestion with platform's 64-byte name and 0.3.0 alias-key-epoch contract, Persona's 2020-2199 time window, canonical NIST P-256 SPKI bytes, Int64 bounds, and canonical timestamps.
+- Defined exact committed redelivery after provider-key revocation: only a byte/BOM/key/signature/authorization/record-identical packet returns the prior receipt and creates no new row; all new or equivocal ingest still requires current active trust.
+- Aligned SoulMemory readback with the owner-defined `dps-` plus 28-hex GBrain Source address while retaining full `soul_id` scope checks and a truncated-address collision isolation regression.
+
+## 0.1.0 - 2026-07-14
+
+- Added the proposed fail-closed modular host and scoped runtime-truth receipt contract.

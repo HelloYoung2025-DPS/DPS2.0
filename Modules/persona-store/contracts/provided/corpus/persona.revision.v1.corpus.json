@@ -1,0 +1,278 @@
+{
+  "schema_version": "dps.contract-corpus/v1",
+  "contract_id": "persona.revision/v1",
+  "owner_module": "persona-store",
+  "codec_policy": "All raw_json entries are complete wire payloads. Provider Draft 2020-12 validation first rejects duplicate JSON members, then applies the schema plus x-dps-order. The .NET strict codec must make the same accept/reject decision.",
+  "cases": [
+    {
+      "id": "persona.valid.active.minimal",
+      "valid": true,
+      "expectations": {
+        "draft2020": "accept",
+        "dotnet_strict_codec": "accept"
+      },
+      "note": "Canonical active v1 payload.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.valid.active.utc-seven-fraction-int64-max",
+      "valid": true,
+      "expectations": {
+        "draft2020": "accept",
+        "dotnet_strict_codec": "accept"
+      },
+      "note": "Upper UTC, fractional precision, and Int64 boundaries.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2199-12-31T23:59:59.1234567+00:00\",\"privacy_class\":\"personal\",\"persona_revision\":9223372036854775807,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.valid.deleted.empty-traits",
+      "valid": true,
+      "expectations": {
+        "draft2020": "accept",
+        "dotnet_strict_codec": "accept"
+      },
+      "note": "Deleted wire state exposes no trait keys; this is a live-primary logical deletion marker, not final erasure.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"cf337ecd78b410737dc34bfdb15770a3d8e57a6c9b04b7fc693d54a34ecff583\",\"trait_keys\":[],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"deleted\"}"
+    },
+    {
+      "id": "persona.invalid.version.unknown-major",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Unknown contract major fails closed.",
+      "raw_json": "{\"schema_version\":\"2.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.version.trailing-newline",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Absolute-end version validation.",
+      "raw_json": "{\"schema_version\":\"1.0.0\\n\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.occurred-at.nonzero-offset",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Only zero-offset UTC is accepted.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T01:00:00+01:00\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.occurred-at.before-range",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Lower time boundary.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2019-12-31T23:59:59Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.occurred-at.after-range",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Upper time boundary.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2200-01-01T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.occurred-at.eight-fraction-digits",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Wire precision is at most seven fractional digits.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00.12345678Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.revision.int64-overflow",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Revision exceeds signed Int64.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":9223372036854775808,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.active.empty-traits",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Active revisions require at least one trait key.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.deleted.nonempty-traits",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Deleted revisions cannot expose trait keys.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"deleted\"}"
+    },
+    {
+      "id": "persona.invalid.traits.reversed",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Trait keys are strict ordinal ascending.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"tone\",\"curiosity\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.traits.duplicate",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Trait keys are unique.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"tone\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.evidence.reversed",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Evidence hashes are strict ordinal ascending.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"2222222222222222222222222222222222222222222222222222222222222222\",\"1111111111111111111111111111111111111111111111111111111111111111\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.evidence.duplicate",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Evidence hashes are unique.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"1111111111111111111111111111111111111111111111111111111111111111\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.evidence.over-64",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Evidence is bounded at 64 hashes.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"0000000000000000000000000000000000000000000000000000000000000000\",\"0000000000000000000000000000000000000000000000000000000000000001\",\"0000000000000000000000000000000000000000000000000000000000000002\",\"0000000000000000000000000000000000000000000000000000000000000003\",\"0000000000000000000000000000000000000000000000000000000000000004\",\"0000000000000000000000000000000000000000000000000000000000000005\",\"0000000000000000000000000000000000000000000000000000000000000006\",\"0000000000000000000000000000000000000000000000000000000000000007\",\"0000000000000000000000000000000000000000000000000000000000000008\",\"0000000000000000000000000000000000000000000000000000000000000009\",\"000000000000000000000000000000000000000000000000000000000000000a\",\"000000000000000000000000000000000000000000000000000000000000000b\",\"000000000000000000000000000000000000000000000000000000000000000c\",\"000000000000000000000000000000000000000000000000000000000000000d\",\"000000000000000000000000000000000000000000000000000000000000000e\",\"000000000000000000000000000000000000000000000000000000000000000f\",\"0000000000000000000000000000000000000000000000000000000000000010\",\"0000000000000000000000000000000000000000000000000000000000000011\",\"0000000000000000000000000000000000000000000000000000000000000012\",\"0000000000000000000000000000000000000000000000000000000000000013\",\"0000000000000000000000000000000000000000000000000000000000000014\",\"0000000000000000000000000000000000000000000000000000000000000015\",\"0000000000000000000000000000000000000000000000000000000000000016\",\"0000000000000000000000000000000000000000000000000000000000000017\",\"0000000000000000000000000000000000000000000000000000000000000018\",\"0000000000000000000000000000000000000000000000000000000000000019\",\"000000000000000000000000000000000000000000000000000000000000001a\",\"000000000000000000000000000000000000000000000000000000000000001b\",\"000000000000000000000000000000000000000000000000000000000000001c\",\"000000000000000000000000000000000000000000000000000000000000001d\",\"000000000000000000000000000000000000000000000000000000000000001e\",\"000000000000000000000000000000000000000000000000000000000000001f\",\"0000000000000000000000000000000000000000000000000000000000000020\",\"0000000000000000000000000000000000000000000000000000000000000021\",\"0000000000000000000000000000000000000000000000000000000000000022\",\"0000000000000000000000000000000000000000000000000000000000000023\",\"0000000000000000000000000000000000000000000000000000000000000024\",\"0000000000000000000000000000000000000000000000000000000000000025\",\"0000000000000000000000000000000000000000000000000000000000000026\",\"0000000000000000000000000000000000000000000000000000000000000027\",\"0000000000000000000000000000000000000000000000000000000000000028\",\"0000000000000000000000000000000000000000000000000000000000000029\",\"000000000000000000000000000000000000000000000000000000000000002a\",\"000000000000000000000000000000000000000000000000000000000000002b\",\"000000000000000000000000000000000000000000000000000000000000002c\",\"000000000000000000000000000000000000000000000000000000000000002d\",\"000000000000000000000000000000000000000000000000000000000000002e\",\"000000000000000000000000000000000000000000000000000000000000002f\",\"0000000000000000000000000000000000000000000000000000000000000030\",\"0000000000000000000000000000000000000000000000000000000000000031\",\"0000000000000000000000000000000000000000000000000000000000000032\",\"0000000000000000000000000000000000000000000000000000000000000033\",\"0000000000000000000000000000000000000000000000000000000000000034\",\"0000000000000000000000000000000000000000000000000000000000000035\",\"0000000000000000000000000000000000000000000000000000000000000036\",\"0000000000000000000000000000000000000000000000000000000000000037\",\"0000000000000000000000000000000000000000000000000000000000000038\",\"0000000000000000000000000000000000000000000000000000000000000039\",\"000000000000000000000000000000000000000000000000000000000000003a\",\"000000000000000000000000000000000000000000000000000000000000003b\",\"000000000000000000000000000000000000000000000000000000000000003c\",\"000000000000000000000000000000000000000000000000000000000000003d\",\"000000000000000000000000000000000000000000000000000000000000003e\",\"000000000000000000000000000000000000000000000000000000000000003f\",\"0000000000000000000000000000000000000000000000000000000000000040\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.soul.trailing-newline",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Absolute-end Soul ID validation.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\n\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.device-binding.bad-length",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Device binding ID has an exact length.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.platform-account.bad-hex",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Platform account ID uses lowercase hex only.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_gggggggggggggggggggggggggggggggg\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.trace.trailing-newline",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Absolute-end trace ID validation.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\\n\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.idempotency.bad-prefix",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Idempotency key uses the fixed opaque prefix.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idempotency_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.traits-hash.trailing-newline",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Absolute-end commitment validation.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\\n\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.evidence-hash.trailing-newline",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Absolute-end evidence hash validation.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\\n\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.unknown-field",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Unknown public fields fail closed.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\",\"unexpected\":true}"
+    },
+    {
+      "id": "persona.invalid.contract-id.case-change",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Contract ID is exact and case-sensitive.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"Persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\"}"
+    },
+    {
+      "id": "persona.invalid.duplicate-json-property",
+      "valid": false,
+      "expectations": {
+        "draft2020": "reject-before-schema",
+        "dotnet_strict_codec": "reject"
+      },
+      "note": "Duplicate JSON object members fail before semantic validation.",
+      "raw_json": "{\"schema_version\":\"1.0.0\",\"contract_id\":\"persona.revision/v1\",\"producer_module\":\"persona-store\",\"soul_id\":\"soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"device_binding_id\":\"db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"platform_account_id\":\"pa_cccccccccccccccccccccccccccccccc\",\"trace_id\":\"trace_dddddddddddddddddddddddddddddddd\",\"idempotency_key\":\"idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee\",\"occurred_at\":\"2026-07-15T00:00:00Z\",\"privacy_class\":\"personal\",\"persona_revision\":1,\"traits_sha256\":\"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\",\"trait_keys\":[\"curiosity\",\"tone\"],\"evidence_sha256\":[\"1111111111111111111111111111111111111111111111111111111111111111\",\"2222222222222222222222222222222222222222222222222222222222222222\"],\"status\":\"active\",\"status\":\"deleted\"}"
+    }
+  ]
+}

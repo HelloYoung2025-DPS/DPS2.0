@@ -1,0 +1,78 @@
+{
+  "schema_version": "dps.approved-legacy-repairs-policy/v1",
+  "policy_id": "legacy-runtime-adapter-exact-repairs-v1",
+  "original_approved_repairs": [
+    {
+      "path": "Modules/SessionRunner.cs",
+      "disposition": "APPROVED_F5_P0_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_P0_FAIL_CLOSED_REPAIR"
+    },
+    {
+      "path": "ZDProjects/RuntimeTestRunner.cs",
+      "disposition": "APPROVED_F1_FALSE_GREEN_REPAIR",
+      "approval_ref": "F1_FALSE_GREEN_REPAIR"
+    },
+    {
+      "path": "ZDProjects/TestRunner.cs",
+      "disposition": "APPROVED_F1_FALSE_GREEN_REPAIR",
+      "approval_ref": "F1_FALSE_GREEN_REPAIR"
+    },
+    {
+      "path": "ZDProjects/Tests/Reddit_IntegrationTest.cs",
+      "disposition": "APPROVED_F1_FALSE_GREEN_REPAIR",
+      "approval_ref": "F1_FALSE_GREEN_REPAIR"
+    }
+  ],
+  "containment_repairs": [
+    {
+      "path": "Modules/Core/SmartOrchestrator.cs",
+      "disposition": "APPROVED_F5_ORCHESTRATOR_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_ORCHESTRATOR_FAIL_CLOSED_REPAIR"
+    },
+    {
+      "path": "ZDProjects/SessionRunner_OwnCode.cs",
+      "disposition": "APPROVED_F5_WRAPPER_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_WRAPPER_FAIL_CLOSED_REPAIR"
+    },
+    {
+      "path": "ZDProjects/DPS_Init_OwnCode.cs",
+      "disposition": "APPROVED_F5_WRAPPER_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_WRAPPER_FAIL_CLOSED_REPAIR"
+    },
+    {
+      "path": "ZDProjects/DPS_DecideAction_OwnCode.cs",
+      "disposition": "APPROVED_F5_WRAPPER_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_WRAPPER_FAIL_CLOSED_REPAIR"
+    },
+    {
+      "path": "ZDProjects/DPS_CheckResult_OwnCode.cs",
+      "disposition": "APPROVED_F5_WRAPPER_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_WRAPPER_FAIL_CLOSED_REPAIR"
+    },
+    {
+      "path": "ZDProjects/DPS_Finalize_OwnCode.cs",
+      "disposition": "APPROVED_F5_WRAPPER_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_WRAPPER_FAIL_CLOSED_REPAIR"
+    },
+    {
+      "path": "ZDProjects/Initializer_OwnCode.cs",
+      "disposition": "APPROVED_F5_WRAPPER_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_WRAPPER_FAIL_CLOSED_REPAIR"
+    },
+    {
+      "path": "ZDProjects/Main_OwnCode.cs",
+      "disposition": "APPROVED_F5_WRAPPER_FAIL_CLOSED_REPAIR",
+      "approval_ref": "F5_WRAPPER_FAIL_CLOSED_REPAIR"
+    }
+  ],
+  "rules": [
+    "The original four approved repairs are a closed set and must never be extended by a candidate change.",
+    "The eight containment repairs are a separate closed set and do not amend the original four approvals.",
+    "Every old and new byte hash and length must be bound by the independent external provider anchor.",
+    "Any other legacy C# change, path, deletion, symlink, or case-insensitive collision fails closed."
+  ],
+  "limitations": [
+    "This policy grants no production release approval.",
+    "It provides no compilation, Windows, ZennoDroid, ADB, or device evidence."
+  ]
+}

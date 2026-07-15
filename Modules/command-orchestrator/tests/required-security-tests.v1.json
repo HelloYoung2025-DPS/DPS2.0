@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "dps.required-test-ids/v1",
+  "suiteId": "command-orchestrator.contract",
+  "requiredTestIds": [
+    "Dps.CommandOrchestrator.Tests.ExecutionAuthorizationContractTests.PolicySignerPortIsVersionedKeyBoundAndRawIssuedAuthorizationEntryPointIsNotPublic",
+    "Dps.CommandOrchestrator.Tests.ExecutionAuthorizationContractTests.AuthorizationContractRejectsUnknownEncodingAlgorithmFormatAndSignatureShape",
+    "Dps.CommandOrchestrator.Tests.ExecutionAuthorizationContractTests.OpaqueIdBaselinesRejectPiiTokenAndDelimiterShapesAndBindPayload",
+    "Dps.CommandOrchestrator.Tests.ExecutionAuthorizationContractTests.AuthorizationCanonicalBytesExcludeSignatureAndBindEveryScopeField",
+    "Dps.CommandOrchestrator.Tests.ExecutionAuthorizationContractTests.MachineCanonicalSpecGoldenBytesDigestAndSignatureAreCrossLanguageStable",
+    "Dps.CommandOrchestrator.Tests.InMemoryCommandOrchestratorTests.OperationDigestBindsPreviouslyOmittedEnvelopeFields",
+    "Dps.CommandOrchestrator.Tests.InMemoryCommandOrchestratorTests.InvalidUtf16TraceAndArgumentValuesFailClosedBeforeHashing",
+    "Dps.CommandOrchestrator.Tests.InMemoryCommandOrchestratorTests.UnknownStepMajorAndFalseSuccessAreRejected",
+    "Dps.CommandOrchestrator.Tests.InMemoryCommandOrchestratorTests.RawReceiptEntryPointIsAbsentAndForgedSuccessCannotAdvanceState",
+    "Dps.CommandOrchestrator.Tests.InMemoryCommandOrchestratorTests.AuthenticSignedSuccessIsTheOnlyPathToSucceeded",
+    "Dps.CommandOrchestrator.Tests.InMemoryCommandOrchestratorTests.RetryableFailedReceiptRequiresAuthenticSignatureAndVerifiedNativeResult",
+    "Dps.CommandOrchestrator.Tests.InMemoryCommandOrchestratorTests.SignedReceiptTamperingCommandScopeAttemptEvidenceAndBomFailsClosed",
+    "Dps.CommandOrchestrator.Tests.InMemoryCommandOrchestratorTests.BomOrAuthorizationMismatchIsRejectedEvenWhenSignedByTrustedKey",
+    "Dps.CommandOrchestrator.Tests.InMemoryCommandOrchestratorTests.SignedReceiptRejectsUnknownAlgorithmsMalformedSignatureAndNonP256TrustAnchor",
+    "Dps.CommandOrchestrator.Tests.ExecutionAuthorizationContractTests.SignedReceiptSchemaRequiresAndConstrainsThePublicEnvelopeScope"
+  ]
+}

@@ -1,0 +1,599 @@
+{
+  "schemaVersion": "dps.candidate-test-policy/v1",
+  "contractSuites": [
+    {
+      "moduleId": "audit-metrics",
+      "suiteId": "audit-metrics.contract",
+      "testTarget": "Modules/audit-metrics/tests/Dps.AuditMetrics.Tests/Dps.AuditMetrics.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 4
+    },
+    {
+      "moduleId": "binding",
+      "suiteId": "binding.contract",
+      "testTarget": "Modules/binding/tests/Dps.Binding.Tests/Dps.Binding.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 8
+    },
+    {
+      "moduleId": "command-orchestrator",
+      "suiteId": "command-orchestrator.contract",
+      "testTarget": "Modules/command-orchestrator/tests/Dps.CommandOrchestrator.Tests/Dps.CommandOrchestrator.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 9
+    },
+    {
+      "moduleId": "command-orchestrator",
+      "suiteId": "command-orchestrator.contract-schema",
+      "testTarget": "Modules/command-orchestrator/tests/test_command_receipt_schema.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 4
+    },
+    {
+      "moduleId": "control-plane-host",
+      "suiteId": "control-plane-host.contract",
+      "testTarget": "Modules/control-plane-host/tests/Dps.ControlPlaneHost.Tests/Dps.ControlPlaneHost.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 23
+    },
+    {
+      "moduleId": "control-plane-host",
+      "suiteId": "control-plane-host.contract-schema",
+      "testTarget": "Modules/control-plane-host/tests/test_control_plane_contract_schemas.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 16
+    },
+    {
+      "moduleId": "device-registry",
+      "suiteId": "device-registry.contract",
+      "testTarget": "Modules/device-registry/tests/Dps.DeviceRegistry.Tests/Dps.DeviceRegistry.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 4
+    },
+    {
+      "moduleId": "edge-local-journal",
+      "suiteId": "edge-local-journal.contract",
+      "testTarget": "Modules/edge-local-journal/tests/Dps.EdgeLocalJournal.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 3
+    },
+    {
+      "moduleId": "edge-local-journal",
+      "suiteId": "edge-local-journal.contract-schema",
+      "testTarget": "Modules/edge-local-journal/tests/test_contract_schemas.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 6
+    },
+    {
+      "moduleId": "evidence-service",
+      "suiteId": "evidence-service.contract",
+      "testTarget": "Modules/evidence-service/tests/Dps.EvidenceService.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 6
+    },
+    {
+      "moduleId": "executor-gateway",
+      "suiteId": "executor-gateway.contract",
+      "testTarget": "Modules/executor-gateway/tests/Dps.ExecutorGateway.Tests/Dps.ExecutorGateway.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 12
+    },
+    {
+      "moduleId": "factory-artifact-builder",
+      "suiteId": "factory-artifact-builder.contract",
+      "testTarget": "Modules/factory-artifact-builder/tests/test_contracts.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 5
+    },
+    {
+      "moduleId": "factory-control-plane-host",
+      "suiteId": "factory-control-plane-host.contract",
+      "testTarget": "Modules/factory-control-plane-host/tests/test_contracts.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 7
+    },
+    {
+      "moduleId": "factory-evidence-ledger",
+      "suiteId": "factory-evidence-ledger.contract",
+      "testTarget": "Modules/factory-evidence-ledger/tests/test_contracts.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 4
+    },
+    {
+      "moduleId": "factory-impact-analyzer",
+      "suiteId": "factory-impact-analyzer.contract",
+      "testTarget": "Modules/factory-impact-analyzer/tests/test_contracts.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 4
+    },
+    {
+      "moduleId": "factory-instruction-resolver",
+      "suiteId": "factory-instruction-resolver.contract",
+      "testTarget": "Modules/factory-instruction-resolver/tests/test_contracts.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 4
+    },
+    {
+      "moduleId": "factory-merge-controller",
+      "suiteId": "factory-merge-controller.contract",
+      "testTarget": "Modules/factory-merge-controller/tests/test_contracts.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 4
+    },
+    {
+      "moduleId": "factory-release-controller",
+      "suiteId": "factory-release-controller.contract",
+      "testTarget": "Modules/factory-release-controller/tests/test_contracts.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 4
+    },
+    {
+      "moduleId": "factory-rollback-controller",
+      "suiteId": "factory-rollback-controller.contract",
+      "testTarget": "Modules/factory-rollback-controller/tests/test_contracts.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 4
+    },
+    {
+      "moduleId": "factory-trusted-runner",
+      "suiteId": "factory-trusted-runner.contract",
+      "testTarget": "Modules/factory-trusted-runner/tests/test_contracts.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 4
+    },
+    {
+      "moduleId": "factory-worktree-manager",
+      "suiteId": "factory-worktree-manager.contract",
+      "testTarget": "Modules/factory-worktree-manager/tests/test_contracts.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 4
+    },
+    {
+      "moduleId": "gbrain-projector",
+      "suiteId": "gbrain-projector.contract",
+      "testTarget": "Modules/gbrain-projector/tests/Dps.GBrainProjector.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 8
+    },
+    {
+      "moduleId": "interest-reducer",
+      "suiteId": "interest-reducer.contract",
+      "testTarget": "Modules/interest-reducer/tests/Dps.InterestReducer.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 10
+    },
+    {
+      "moduleId": "memory-event-ledger",
+      "suiteId": "memory-event-ledger.contract",
+      "testTarget": "Modules/memory-event-ledger/tests/Dps.MemoryEventLedger.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 4
+    },
+    {
+      "moduleId": "operation-compiler",
+      "suiteId": "operation-compiler.contract",
+      "testTarget": "Modules/operation-compiler/tests/Dps.OperationCompiler.Tests/Dps.OperationCompiler.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 11
+    },
+    {
+      "moduleId": "persona-store",
+      "suiteId": "persona-store.contract",
+      "testTarget": "Modules/persona-store/tests/Dps.PersonaStore.Tests/Dps.PersonaStore.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 8
+    },
+    {
+      "moduleId": "persona-store",
+      "suiteId": "persona-store.schema-contract",
+      "testTarget": "Modules/persona-store/tests/test_persona_revision_schema.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 13
+    },
+    {
+      "moduleId": "planner",
+      "suiteId": "planner.contract",
+      "testTarget": "Modules/planner/tests/Dps.Planner.Tests/Dps.Planner.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 7
+    },
+    {
+      "moduleId": "planner",
+      "suiteId": "planner.contract-schema",
+      "testTarget": "Modules/planner/tests/test_action_proposal_schema.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 5
+    },
+    {
+      "moduleId": "platform-account-registry",
+      "suiteId": "platform-account-registry.contract",
+      "testTarget": "Modules/platform-account-registry/tests/Dps.PlatformAccountRegistry.Tests/Dps.PlatformAccountRegistry.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 5
+    },
+    {
+      "moduleId": "platform-authorization-authority",
+      "suiteId": "platform-authorization-authority.contract",
+      "testTarget": "Modules/platform-authorization-authority/tests/Dps.PlatformAuthorizationAuthority.Tests/Dps.PlatformAuthorizationAuthority.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 14
+    },
+    {
+      "moduleId": "policy-approval",
+      "suiteId": "policy-approval.contract",
+      "testTarget": "Modules/policy-approval/tests/Dps.PolicyApproval.Tests/Dps.PolicyApproval.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 22
+    },
+    {
+      "moduleId": "policy-approval",
+      "suiteId": "policy-approval.schema-contract",
+      "testTarget": "Modules/policy-approval/tests/test_contract_schemas.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 5
+    },
+    {
+      "moduleId": "soul-memory-adapter",
+      "suiteId": "soul-memory-adapter.schema-corpus",
+      "testTarget": "Modules/soul-memory-adapter/tests/test_readback_schema_corpus.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 3
+    },
+    {
+      "moduleId": "soul-memory-adapter",
+      "suiteId": "soul-memory-adapter.contract",
+      "testTarget": "Modules/soul-memory-adapter/tests/Dps.SoulMemoryAdapter.Tests/Dps.SoulMemoryAdapter.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 5
+    },
+    {
+      "moduleId": "soul-registry",
+      "suiteId": "soul-registry.contract",
+      "testTarget": "Modules/soul-registry/tests/Dps.SoulRegistry.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 7
+    },
+    {
+      "moduleId": "windows-edge-supervisor",
+      "suiteId": "windows-edge-supervisor.contract",
+      "testTarget": "Modules/windows-edge-supervisor/tests/Dps.WindowsEdgeSupervisor.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 12
+    },
+    {
+      "moduleId": "windows-edge-supervisor",
+      "suiteId": "windows-edge-supervisor.contract-schema",
+      "testTarget": "Modules/windows-edge-supervisor/tests/test_edge_worker_exchange_schema.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 7
+    },
+    {
+      "moduleId": "windows-edge-worker",
+      "suiteId": "windows-edge-worker.contract",
+      "testTarget": "Modules/windows-edge-worker/tests/Dps.WindowsEdgeWorker.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 9
+    },
+    {
+      "moduleId": "windows-edge-worker",
+      "suiteId": "windows-edge-worker.provider-contracts",
+      "testTarget": "Modules/windows-edge-worker/tests/test_provider_contracts.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 6
+    },
+    {
+      "moduleId": "zenno-bridge",
+      "suiteId": "zenno-bridge.contract-schema",
+      "testTarget": "Modules/zenno-bridge/tests/test_contracts.py",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 5
+    },
+    {
+      "moduleId": "zenno-bridge",
+      "suiteId": "zenno-bridge.contract-wire",
+      "testTarget": "Modules/zenno-bridge/tests/Dps.ZennoBridge.AuthSimulation.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 2
+    }
+  ],
+  "integrationSuites": [
+    {
+      "moduleId": "audit-metrics",
+      "suiteId": "audit-metrics.integration",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/audit-metrics/tests/Dps.AuditMetrics.Tests/Dps.AuditMetrics.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 8,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES"
+      ]
+    },
+    {
+      "moduleId": "binding",
+      "suiteId": "binding.integration",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/binding/tests/Dps.Binding.Tests/Dps.Binding.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 42,
+      "requiredEnvironment": [
+        "DPS_TEST_PLATFORM_AUTHORITY_PKCS8_FILE",
+        "DPS_TEST_POSTGRES"
+      ]
+    },
+    {
+      "moduleId": "command-orchestrator",
+      "suiteId": "command-orchestrator.postgresql18",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/command-orchestrator/tests/Dps.CommandOrchestrator.Tests/Dps.CommandOrchestrator.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 21,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES"
+      ]
+    },
+    {
+      "moduleId": "control-plane-host",
+      "suiteId": "control-plane-host.integration",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/control-plane-host/tests/Dps.ControlPlaneHost.Tests/Dps.ControlPlaneHost.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 56,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES"
+      ]
+    },
+    {
+      "moduleId": "device-registry",
+      "suiteId": "device-registry.integration",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/device-registry/tests/Dps.DeviceRegistry.Tests/Dps.DeviceRegistry.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 15,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES"
+      ]
+    },
+    {
+      "moduleId": "edge-local-journal",
+      "suiteId": "edge-local-journal.recovery-simulation",
+      "evidenceKind": "SIMULATION",
+      "testTarget": "Modules/edge-local-journal/tests/Dps.EdgeLocalJournal.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 7,
+      "requiredEnvironment": []
+    },
+    {
+      "moduleId": "evidence-service",
+      "suiteId": "evidence-service.integration",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/evidence-service/tests/Dps.EvidenceService.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 1,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES"
+      ]
+    },
+    {
+      "moduleId": "executor-gateway",
+      "suiteId": "executor-gateway.local-process",
+      "evidenceKind": "REAL_LOCAL_PROCESS",
+      "testTarget": "Modules/executor-gateway/tests/Dps.ExecutorGateway.Tests/Dps.ExecutorGateway.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 8,
+      "requiredEnvironment": []
+    },
+    {
+      "moduleId": "factory-control-plane-host",
+      "suiteId": "factory-control-plane-host.simulation",
+      "evidenceKind": "SIMULATION",
+      "testTarget": "Modules/factory-control-plane-host/tests/test_end_to_end_simulation.py",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 2,
+      "requiredEnvironment": []
+    },
+    {
+      "moduleId": "factory-control-plane-host",
+      "suiteId": "factory-control-plane-host.postgresql18",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/factory-control-plane-host/tests/test_postgres_integration.py",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 4,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES_ADMIN_URI",
+        "DPS_TEST_POSTGRES_RUNTIME_URI"
+      ]
+    },
+    {
+      "moduleId": "factory-evidence-ledger",
+      "suiteId": "factory-evidence-ledger.crash-recovery",
+      "evidenceKind": "REAL_LOCAL_PROCESS",
+      "testTarget": "Modules/factory-evidence-ledger/tests/test_crash_recovery.py",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 2,
+      "requiredEnvironment": []
+    },
+    {
+      "moduleId": "factory-evidence-ledger",
+      "suiteId": "factory-evidence-ledger.postgresql18",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/factory-evidence-ledger/tests/test_postgres_integration.py",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 2,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES_URI",
+        "DPS_PSQL"
+      ]
+    },
+    {
+      "moduleId": "factory-release-controller",
+      "suiteId": "factory-release-controller.simulation",
+      "evidenceKind": "SIMULATION",
+      "testTarget": "Modules/factory-release-controller/tests/test_fleet_simulation.py",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 2,
+      "requiredEnvironment": []
+    },
+    {
+      "moduleId": "factory-worktree-manager",
+      "suiteId": "factory-worktree-manager.git-worktree",
+      "evidenceKind": "REAL_LOCAL_PROCESS",
+      "testTarget": "Modules/factory-worktree-manager/tests/test_git_worktree_materializer.py",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 4,
+      "requiredEnvironment": []
+    },
+    {
+      "moduleId": "factory-worktree-manager",
+      "suiteId": "factory-worktree-manager.postgresql18",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/factory-worktree-manager/tests/test_postgres_lease_integration.py",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 5,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES_URI"
+      ]
+    },
+    {
+      "moduleId": "gbrain-projector",
+      "suiteId": "gbrain-projector.integration",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/gbrain-projector/tests/Dps.GBrainProjector.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 1,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES"
+      ]
+    },
+    {
+      "moduleId": "interest-reducer",
+      "suiteId": "interest-reducer.integration",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/interest-reducer/tests/Dps.InterestReducer.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 1,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES"
+      ]
+    },
+    {
+      "moduleId": "memory-event-ledger",
+      "suiteId": "memory-event-ledger.integration",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/memory-event-ledger/tests/Dps.MemoryEventLedger.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 9,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES"
+      ]
+    },
+    {
+      "moduleId": "operation-compiler",
+      "suiteId": "operation-compiler.crypto-storage-simulation",
+      "evidenceKind": "SIMULATION",
+      "testTarget": "Modules/operation-compiler/tests/Dps.OperationCompiler.Tests/Dps.OperationCompiler.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 10,
+      "requiredEnvironment": []
+    },
+    {
+      "moduleId": "persona-store",
+      "suiteId": "persona-store.integration",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/persona-store/tests/Dps.PersonaStore.Tests/Dps.PersonaStore.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 25,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES"
+      ]
+    },
+    {
+      "moduleId": "planner",
+      "suiteId": "planner.real-local-process",
+      "evidenceKind": "REAL_LOCAL_PROCESS",
+      "testTarget": "Modules/planner/tests/Dps.Planner.Tests/Dps.Planner.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 7,
+      "requiredEnvironment": []
+    },
+    {
+      "moduleId": "platform-account-registry",
+      "suiteId": "platform-account-registry.integration",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/platform-account-registry/tests/Dps.PlatformAccountRegistry.Tests/Dps.PlatformAccountRegistry.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 15,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES"
+      ]
+    },
+    {
+      "moduleId": "policy-approval",
+      "suiteId": "policy-approval.integration",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/policy-approval/tests/Dps.PolicyApproval.Tests/Dps.PolicyApproval.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 40,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES"
+      ]
+    },
+    {
+      "moduleId": "soul-memory-adapter",
+      "suiteId": "soul-memory-adapter.gbrain-loopback-protocol",
+      "evidenceKind": "SIMULATION",
+      "testTarget": "Modules/soul-memory-adapter/tests/Dps.SoulMemoryAdapter.Tests/Dps.SoulMemoryAdapter.Tests.csproj",
+      "testCategory": "SecuritySimulation",
+      "minimumExecutedTests": 23,
+      "requiredEnvironment": []
+    },
+    {
+      "moduleId": "soul-memory-adapter",
+      "suiteId": "soul-memory-adapter.postgres-integration",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/soul-memory-adapter/tests/Dps.SoulMemoryAdapter.Tests/Dps.SoulMemoryAdapter.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 9,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES"
+      ]
+    },
+    {
+      "moduleId": "soul-registry",
+      "suiteId": "soul-registry.integration",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/soul-registry/tests/Dps.SoulRegistry.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 5,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES"
+      ]
+    },
+    {
+      "moduleId": "windows-edge-supervisor",
+      "suiteId": "windows-edge-supervisor.ab-simulation",
+      "evidenceKind": "SIMULATION",
+      "testTarget": "Modules/windows-edge-supervisor/tests/Dps.WindowsEdgeSupervisor.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 2,
+      "requiredEnvironment": []
+    },
+    {
+      "moduleId": "windows-edge-worker",
+      "suiteId": "windows-edge-worker.failure-simulation",
+      "evidenceKind": "SIMULATION",
+      "testTarget": "Modules/windows-edge-worker/tests/Dps.WindowsEdgeWorker.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 45,
+      "requiredEnvironment": []
+    },
+    {
+      "moduleId": "zenno-bridge",
+      "suiteId": "zenno-bridge.auth-simulation",
+      "evidenceKind": "SIMULATION",
+      "testTarget": "Modules/zenno-bridge/tests/Dps.ZennoBridge.AuthSimulation.Tests.csproj",
+      "testCategory": "SecuritySimulation",
+      "minimumExecutedTests": 4,
+      "requiredEnvironment": []
+    }
+  ]
+}

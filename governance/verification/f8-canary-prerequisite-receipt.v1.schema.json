@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dps.local/verification/f8-canary-prerequisite-receipt.v1.schema.json",
+  "title": "Signed F8 prerequisite receipt consumed by F9",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "receipt_id",
+    "source_stage",
+    "verification_level",
+    "status",
+    "required",
+    "evidence_kind",
+    "evidence_id",
+    "baseline_commit",
+    "release_bom_id",
+    "release_bom_sha256",
+    "candidate_artifact_sha256",
+    "issued_at",
+    "evidence_issuer_identity",
+    "signature"
+  ],
+  "properties": {
+    "schema_version": { "const": "dps.external-verification-receipt/v1" },
+    "receipt_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+    "source_stage": { "const": "f8" },
+    "verification_level": { "const": "CANARY_VERIFIED" },
+    "status": { "const": "PASS" },
+    "required": { "const": true },
+    "evidence_kind": { "const": "REAL_EXTERNAL" },
+    "evidence_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+    "baseline_commit": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/gitObject" },
+    "release_bom_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+    "release_bom_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+    "candidate_artifact_sha256": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/sha256" },
+    "issued_at": { "type": "string", "format": "date-time" },
+    "evidence_issuer_identity": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/identity" },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "runner_key_id", "value"],
+      "properties": {
+        "algorithm": { "const": "ECDSA_P256_SHA256_P1363" },
+        "runner_key_id": { "$ref": "external-evidence-envelope.v1.schema.json#/$defs/id" },
+        "value": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    }
+  }
+}

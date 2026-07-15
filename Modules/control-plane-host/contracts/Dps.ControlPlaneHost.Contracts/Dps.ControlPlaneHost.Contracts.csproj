@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Dps.ControlPlaneHost.Contracts</AssemblyName>
+    <RootNamespace>Dps.ControlPlaneHost.Contracts</RootNamespace>
+    <PackageId>Dps.ControlPlaneHost.Contracts</PackageId>
+    <Version>0.4.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="../provided/control.plane.receipt.v1.schema.json"
+          Pack="true"
+          PackagePath="contracts" />
+    <None Include="../provided/control.plane.receipt.v1.corpus.json"
+          Pack="true"
+          PackagePath="contracts" />
+    <EmbeddedResource Include="../provided/control.plane.receipt.v1.schema.json"
+                      LogicalName="Dps.ControlPlaneHost.Contracts.control.plane.receipt.v1.schema.json" />
+    <EmbeddedResource Include="../provided/control.plane.receipt.v1.corpus.json"
+                      LogicalName="Dps.ControlPlaneHost.Contracts.control.plane.receipt.v1.corpus.json" />
+  </ItemGroup>
+</Project>

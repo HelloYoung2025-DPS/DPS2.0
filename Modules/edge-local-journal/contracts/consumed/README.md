@@ -1,0 +1,3 @@
+# Consumed contracts
+
+The journal consumes no contract owned by another module in v0.1. It owns the request/receipt schemas for its API. In the current product communication graph, the declared Worker caller produces `edge.journal.append/v1`, the Journal returns `edge.journal.receipt/v1` to that Worker, and Supervisor receives only the independently owned drain attestation. Provider schemas retain explicit caller provenance, but no direct Supervisor append/receipt transport is currently implemented or declared. Payload JSON is opaque untrusted input and does not transfer ownership of another module's schema.

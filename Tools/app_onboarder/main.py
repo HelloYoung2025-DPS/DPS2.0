@@ -44,6 +44,31 @@ DPS_ROOT = os.path.normpath(os.path.join(
     "..", ".."
 ))
 
+EXIT_SUCCESS = 0
+EXIT_REQUIRED_TEST_FAILED = 2
+
+
+def _required_test_failure_report(status, summary):
+    """Build an explicit failed report for a required test that did not run."""
+    return {
+        "total_attempts": 0,
+        "final_results": {
+            "total": 0,
+            "pass_count": 0,
+            "phases": {},
+            "process_returncode": None,
+            "execution_status": status,
+            "evidence_complete": False,
+            "verification_level": "TEST_EXECUTION_ONLY",
+        },
+        "fixes_applied": [],
+        "success": False,
+        "required": True,
+        "failure_reasons": [str(status).lower()],
+        "summary": summary,
+        "verification_level": "TEST_EXECUTION_ONLY",
+    }
+
 
 def print_banner():
     """打印工具横幅"""
@@ -392,7 +417,9 @@ def step_test(adb, platform_key, generated_paths, skip=False):
 
     if skip:
         print("[跳过] 用户请求跳过测试")
-        return None
+        return _required_test_failure_report(
+            "SKIP", "必需 E2E 测试被跳过，不能通过发布门禁"
+        )
 
     test_path = generated_paths.get("e2e_test")
     config_path = os.path.join(DPS_ROOT, "Config", "PlatformsConfig.json")
@@ -400,11 +427,15 @@ def step_test(adb, platform_key, generated_paths, skip=False):
 
     if not test_path or not os.path.exists(test_path):
         print("[跳过] E2E 测试脚本不存在")
-        return None
+        return _required_test_failure_report(
+            "NOT_RUN", "必需 E2E 测试脚本缺失，不能通过发布门禁"
+        )
 
     if not confirm("是否运行 E2E 测试？"):
         print("[跳过] 用户取消测试")
-        return None
+        return _required_test_failure_report(
+            "SKIP", "必需 E2E 测试被取消，不能通过发布门禁"
+        )
 
     print("[开始] 运行 E2E 测试...")
     print("  测试脚本: {}".format(test_path))
@@ -417,10 +448,16 @@ def step_test(adb, platform_key, generated_paths, skip=False):
         test_script_path=test_path,
         config_path=config_path,
         operations_path=ops_path or "",
-        platform_key=platform_key
+        platform_key=platform_key,
+        evidence_class="device_e2e",
+        execution_mode="real",
     )
 
     report = runner.run_and_fix()
+    if not isinstance(report, dict):
+        report = _required_test_failure_report(
+            "INFRA_ERROR", "测试运行器没有返回报告，不能通过发布门禁"
+        )
 
     # 打印测试报告
     print("")
@@ -441,9 +478,16 @@ def step_test(adb, platform_key, generated_paths, skip=False):
 
 def step_summary(app_map, generated_paths, test_report=None):
     """Step 6: 最终汇总"""
+    test_success = (
+        isinstance(test_report, dict)
+        and test_report.get("success") is True
+    )
     print("")
     print("=" * 56)
-    print("  接入完成！")
+    if test_success:
+        print("  接入验证通过")
+    else:
+        print("  接入未通过硬门禁")
     print("=" * 56)
     print("")
 
@@ -471,13 +515,18 @@ def step_summary(app_map, generated_paths, test_report=None):
             print("    {} {} {}".format(exists, name, path))
     print("")
 
-    if test_report:
+    if isinstance(test_report, dict):
         pass_count = test_report.get("final_results", {}).get("pass_count", 0)
-        total = test_report.get("final_results", {}).get("total", 7)
-        status = "通过" if pass_count == total else "部分通过 ({}/{})".format(pass_count, total)
+        total = test_report.get("final_results", {}).get("total", 0)
+        if test_success:
+            status = "通过"
+        else:
+            status = "失败 ({}/{})".format(pass_count, total)
         print("  E2E 测试: {}".format(status))
+        if test_report.get("summary"):
+            print("  门禁摘要: {}".format(test_report["summary"]))
     else:
-        print("  E2E 测试: 未运行")
+        print("  E2E 测试: 缺少报告（失败）")
 
     print("")
     print("  下一步操作:")
@@ -538,7 +587,7 @@ def _load_api_key_from_aiconfig(ai_config_path=None):
 
 
 def main():
-    """主入口"""
+    """主入口；返回值直接作为进程退出码。"""
     print_banner()
 
     args = parse_args()
@@ -634,6 +683,14 @@ def main():
     # Step 6: 汇总
     step_summary(app_map, generated_paths, test_report)
 
+    if not isinstance(test_report, dict):
+        print("[失败] 必需 E2E 测试没有返回报告")
+        return EXIT_REQUIRED_TEST_FAILED
+    if test_report.get("success") is not True:
+        print("[失败] 必需 E2E 测试未通过")
+        return EXIT_REQUIRED_TEST_FAILED
+    return EXIT_SUCCESS
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

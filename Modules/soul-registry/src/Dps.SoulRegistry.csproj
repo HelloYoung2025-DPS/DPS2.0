@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.SoulRegistry</AssemblyName>
+    <RootNamespace>Dps.SoulRegistry</RootNamespace>
+    <PackageId>Dps.SoulRegistry</PackageId>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+    <ProjectReference Include="../contracts/Dps.SoulRegistry.Contracts.csproj" />
+    <EmbeddedResource Include="../migrations/001_create_soul_registry.sql" />
+    <InternalsVisibleTo Include="Dps.SoulRegistry.Tests" />
+  </ItemGroup>
+</Project>

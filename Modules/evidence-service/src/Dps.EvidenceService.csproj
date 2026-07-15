@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>Dps.EvidenceService</AssemblyName>
+    <RootNamespace>Dps.EvidenceService</RootNamespace>
+    <PackageId>Dps.EvidenceService</PackageId>
+    <Version>0.1.0</Version>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/bin/**;**/obj/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" />
+    <ProjectReference Include="../contracts/Dps.EvidenceService.Contracts.csproj" />
+    <ProjectReference Include="../../soul-registry/contracts/Dps.SoulRegistry.Contracts.csproj" />
+    <ProjectReference Include="../../memory-event-ledger/contracts/Dps.MemoryEventLedger.Contracts.csproj" />
+    <ProjectReference Include="../../interest-reducer/contracts/Dps.InterestReducer.Contracts.csproj" />
+    <ProjectReference Include="../../gbrain-projector/contracts/Dps.GBrainProjector.Contracts.csproj" />
+    <EmbeddedResource Include="../migrations/001_create_evidence_store.sql" />
+  </ItemGroup>
+</Project>

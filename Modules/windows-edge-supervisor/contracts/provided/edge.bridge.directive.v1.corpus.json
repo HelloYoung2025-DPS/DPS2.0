@@ -1,0 +1,47 @@
+{
+  "corpus_version": "dps.contract-corpus/v1",
+  "owner_module": "windows-edge-supervisor",
+  "contract_id": "edge.bridge.directive/v1",
+  "schema_file": "edge.bridge.directive.v1.schema.json",
+  "base_instance": {
+    "schema_version": "1.0",
+    "contract_id": "edge.bridge.directive/v1",
+    "producer_module": "windows-edge-supervisor",
+    "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "device_binding_id": "db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "platform_account_id": "pa_cccccccccccccccccccccccccccccccc",
+    "trace_id": "trace_dddddddddddddddddddddddddddddddd",
+    "idempotency_key": "idem_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "occurred_at": "2026-07-14T00:00:00Z",
+    "privacy_class": "personal",
+    "auth_key_id": "sha256_1111111111111111111111111111111111111111111111111111111111111111",
+    "auth_nonce": "2222222222222222222222222222222222222222222222222222222222222222",
+    "auth_issued_at": "2026-07-14T00:00:00Z",
+    "auth_body_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "auth_proof": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "directive_kind": "COMMAND",
+    "command_id": "command-1",
+    "action_kind": "TAP",
+    "step_kind": "TAP_SELECTOR",
+    "selector": "fixture:button",
+    "text": null,
+    "wait_ms": null,
+    "expected_postcondition": "fixture changed"
+  },
+  "cases": [
+    {"id": "canonical-command", "expected": "PASS", "patch": {}},
+    {"id": "command-action-step-mismatch", "expected": "FAIL", "patch": {"step_kind": "TYPE_TEXT"}},
+    {"id": "type-command-without-text", "expected": "FAIL", "patch": {"action_kind": "TYPE", "step_kind": "TYPE_TEXT", "selector": null, "text": null}},
+    {"id": "wait-command-without-duration", "expected": "FAIL", "patch": {"action_kind": "WAIT", "step_kind": "WAIT_DURATION", "selector": null, "wait_ms": null}},
+    {"id": "key-terminal-newline", "expected": "FAIL", "patch": {"auth_key_id": "sha256_1111111111111111111111111111111111111111111111111111111111111111\n"}},
+    {"id": "nonce-terminal-newline", "expected": "FAIL", "patch": {"auth_nonce": "2222222222222222222222222222222222222222222222222222222222222222\n"}},
+    {"id": "body-digest-terminal-newline", "expected": "FAIL", "patch": {"auth_body_sha256": "3333333333333333333333333333333333333333333333333333333333333333\n"}},
+    {"id": "proof-whitespace", "expected": "FAIL", "patch": {"auth_proof": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}},
+    {"id": "proof-terminal-newline", "expected": "FAIL", "patch": {"auth_proof": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n"}},
+    {"id": "occurred-at-nonzero-offset", "expected": "FAIL", "patch": {"occurred_at": "2026-07-14T08:00:00+08:00"}},
+    {"id": "auth-issued-year-zero", "expected": "FAIL", "patch": {"auth_issued_at": "0000-07-14T00:00:00Z"}},
+    {"id": "auth-issued-leap-second", "expected": "FAIL", "patch": {"auth_issued_at": "2026-07-14T00:00:60Z"}}
+    ,{"id": "ack-with-command-fields", "expected": "FAIL", "patch": {"directive_kind": "ACK"}}
+    ,{"id": "canonical-wait-response", "expected": "PASS", "patch": {"directive_kind": "WAIT", "command_id": null, "action_kind": null, "step_kind": null, "selector": null, "text": null, "wait_ms": null, "expected_postcondition": null}}
+  ]
+}
