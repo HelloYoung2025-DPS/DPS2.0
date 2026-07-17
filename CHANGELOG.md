@@ -1,6 +1,42 @@
 # DPS v4.5 更新日志
 
-## [Unreleased] - 2026-07-14
+## [Unreleased] - 2026-07-17
+
+### M0/R0-A 基线复现（第一个实现批次）
+
+#### Added
+
+- 施工权威文档落库：`Docs/RebuildPlan_重构计划书.md` v4、`Docs/Operations/ExternalReview_外审机制.md`、根 `CLAUDE.md` 会话纪律。此前这些文件仅存在于工作区。
+- 按 `toolchain.lock.json` 在当前 macOS 环境恢复固定工具链：CPython 3.12.13（重建断链 `.venv`）、Node 24.18.0、.NET SDK 10.0.301、PowerShell 7.6.2、PostgreSQL 18.4（Postgres.app 2.9.5）、Android Platform Tools 37.0.0-14910828（全部经官方源与校验和/版本断言验证）。
+- 在基线 `458f9bd41290` 的干净可丢弃 checkout 与工作区各完成一次 Phase 0 门禁运行，取得可复现的保留侧红项清单；红项 -> 目标批次迁移表随第一个实现 PR 的描述提交，不入库（依 AGENTS.md 任务状态不入仓规则）。
+
+#### Known issues
+
+- 基线 Phase 0 门禁存在既有红项（门禁自身裁决，非本批次引入）：`module-governance` 合同图互惠边缺失；候选测试 policy 与 Manifest 清单不一致；`Dps.slnx` 缺 `factory-release-controller` contracts 项目；`evidence-service`/`executor-gateway`/`memory-event-ledger`/`operation-compiler`/`soul-memory-adapter` 测试编译失败；`legacy-runtime-adapter` 四个 required 套件声明的 `.venv/bin/python` 不在门禁 `PYTHON_NAMES` 信任集内；`factory-*` 两个 `contract` 套件类型不被 Phase 0 接受。各红项归属批次见第一个实现 PR 的迁移表。
+- 受信环境缺 `DPS_LEGACY_BASELINE_ANCHOR` 外部只读 anchor（计划书 §15 条目 7 用户前置事项），5 个 adversarial 测试因此失败。
+- GitHub Free 计划私有仓库不支持分支保护与 rulesets（API 403），计划书 §4.1 第 5 条的仓库保护规则待用户决策（转公开或升级 GitHub Pro）后启用。
+
+### Rebuild plan v4 (三轮交叉审核修订)
+
+#### Changed
+
+- `Docs/RebuildPlan_重构计划书.md` v3 -> v4。按三轮交叉审核的确认项修订：对 v2 多智能体交叉审核报告中仍适用于 v3 的残留项、对 v3 的异构模型终审（零 blocker，未引入修改）、以及对 v3 本体的补充完备性批判；方向与边界不变，仍为 `Proposed`、正式证据等级 `NONE`。明确 §4.5 信任根再基线化两段式取证、§11 Legacy anchor 重签枚举与 ZennoDroid/AVD 环境接受性探针、§15 用户一次性前置事项清单。取代 v3 作为最新施工提案。
+
+### Rebuild plan v3 (多角色对抗审查重写)
+
+#### Changed
+
+- `Docs/RebuildPlan_重构计划书.md` v2 -> v3。六类独立审查角色与一轮 `code-reviewer` 终审从架构治理、Soul/认知、Legacy/执行、安全和可靠性统计等角度复核同一基线，并阻断 v2 直接施工。v3 保留“11 个 `factory-*` 全删”和“99% 使用滚动窗口”两项用户拍板，同时纠正：计划状态降为 `Proposed`；删除非法 `EMULATOR_VERIFIED`；Factory 删除改为 receipt 治理迁移、Release BOM 权威迁移、目录删除三个独立审查批次；模型仅保留 advisory/veto 权；tracked kill-switch/通知文件改为 Control Plane 与受保护 CI 外部状态；Legacy 物理删除推迟到目标 ZennoDroid 探针后；Persona v1、memory.event v3、gbrain.projection v3、interest v2、由 operation-compiler 拥有的 APP package、operation.compiled v2、edge handoff v2、独立 Legacy 入口、唯一 ActionExecutor、按需视觉提案链，以及 session/command 两套 300 滚动健康门和正式统计声明门分别定义。此前 Rebuild v2 与 UpgradePlan v3 仅保留为审查历史，不再作为最新施工提案。
+
+### Rebuild plan v2 (取代 v1 与 UpgradePlan v3)
+
+#### Changed
+
+- `Docs/RebuildPlan_重构计划书.md` v1 → v2，依据用户四条硬要求（Soul 化拟人化 / 精简 / 单独并行升级 / 回归八条设计初衷）+ 五路实证盘点 + **Codex(GPT xhigh) 异构交叉复核** + 用户两项拍板（factory 删 11 全清、会话门控 99% 滚动窗口）修订. 核心变化：确立"删 11 factory 重资产 + 解锁两道 fail-closed 锁 + 经授权桥接线 + 六层 Soul 化 + 补四缺口"主线；§3.4 factory 删除手术补入 Codex 发现的四个隐藏依赖（run_candidate_gate 代码级 import、candidate_bom_validator 的 trust-policy 依赖、保留模块悬空边、运行时 active Release BOM 权威悬空）并加 R0-0 抛弃-worktree dry-run 前置；视觉验证上移大脑侧新增 request_vision_verdict exchange kind（边缘不持 AI 凭证）；桥 kind 改为 exchange v2 schema 并存（非改 v1 枚举）+ 修 denied 边界；persona 扩展定性纠正为 persona.revision v2 破坏性升级；legacy 物理删除补第五件 external trusted anchor 重签 runbook；并行升级如实定性为"开发并行、落地串行"+ landing 协议；§11 完整记录 Claude 对抗评审与 Codex 交叉复核的 14 项议题裁决. 该文件是施工方案，不改变任何模块验证等级.
+
+#### Changed
+
+- `Docs/UpgradePlan_升级方案.md` v2 → v3，依据用户 2026-07-16 苏格拉底审题十九问答复（方案 §8 为授权记录）与四路实证调研修订：A9 重释为"用户驱动的外部 AI 会话执行模块化升级"（不建自主编排流水线）；原 M3 瘦身为 M3'（升级门禁 CI 化 + 会话规程，Host v2 接线与 factory-evidence-ledger 通电标 DEFERRED，九锚点验收缩至六锚点）；新增 MV 虚拟化环境里程碑（Windows 电脑与安卓真机当前缺位，过渡拓扑 = macOS AVD + Parallels Windows 11 ARM + ZennoDroid Enterprise + 网络 ADB，新增 EMULATOR_VERIFIED 证据等级、F7 仍需真机）；M0 新增 M0-P 桥可行性探针工作包与初始授权锚点；安全网具体化（异构模型交叉复核 + 埋错演练上岗、governance/KILL_SWITCH 冻结开关、计数型硬停止、通知义务、进度账本转强制、会话启动协议）；选择器校准升级为任意 APP 通用工作流并加 SELECTOR_STALE 失效循环. 该文件是施工方案，不改变任何模块验证等级.
 
 ### Governance reset and modernization baseline
 

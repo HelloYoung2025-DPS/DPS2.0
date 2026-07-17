@@ -1,6 +1,6 @@
 # DPS 文档中心
 
-> 最后更新: 2026-07-15
+> 最后更新: 2026-07-16
 
 当前仓库正在从 legacy ZennoDroid 单体流程迁移为 `DPS Control Plane + GBrain Company + ZennoDroid Thin Executor`. 旧手册描述当前或历史实现, 新架构文档描述目标状态. 阅读时请注意文档状态标签.
 
@@ -8,6 +8,7 @@
 
 | 文档 | 说明 | 目标读者 |
 |------|------|----------|
+| [RebuildPlan_重构计划书.md](RebuildPlan_重构计划书.md) | DPS 2.0 最新 Proposed 重构设计、迁移顺序与验收合同；不代表已实施或已获验证等级 | 用户、架构师、开发与审查人员 |
 | [ProjectTechnicalBook_项目技术书.md](ProjectTechnicalBook_项目技术书.md) | 换电脑、换 AI 的完整项目事实、架构、模块、环境、边界、F0–F9、门禁与接手协议 | 新 AI、架构师、开发与运维人员 |
 | [ConfigGuide_配置指南.md](ConfigGuide_配置指南.md) | 新人施工文档：变量、Own Code 复制、ZennoDroid 条件分支、首次运行闭环 | 所有用户 |
 | [TechManual_技术手册.md](TechManual_技术手册.md) | Legacy 历史参考；其中 SessionRunner 直接执行说明与当前 fail-closed 状态冲突，不得用来重启旧执行链 | Legacy 审计人员 |
@@ -17,6 +18,7 @@
 | [Architecture/TargetArchitecture_目标架构.md](Architecture/TargetArchitecture_目标架构.md) | GBrain Soul 记忆与 ZennoDroid 薄执行器目标架构 | 架构与开发人员 |
 | [Operations/RepositoryProtection_仓库保护.md](Operations/RepositoryProtection_仓库保护.md) | Factory 治理路径, 两人审批, 受保护工作流和外部信任根要求 | 仓库与发布管理员 |
 | [Operations/GBrainCompany_LocalNonProduction_本地非生产.md](Operations/GBrainCompany_LocalNonProduction_本地非生产.md) | GBrain Company 的本机 PostgreSQL, Voyage, Source/OAuth 和证据边界 | 运维与测试管理员 |
+| [Operations/ExternalReview_外审机制.md](Operations/ExternalReview_外审机制.md) | 重构批次/会话/里程碑三级异构双复核外审程序（Codex + 第二异构 reviewer）与意见处置纪律 | 所有贡献者与批准者 |
 | [Platforms/GBrainCompany_Compatibility.md](Platforms/GBrainCompany_Compatibility.md) | 本机 GBrain 0.42.42.0 Source 隔离、32 字符 Source ID、软删除与 OAuth 能力探测；仅限诊断事实 | 架构、运维与适配器开发人员 |
 | [Platforms/ExternalVerification_F6-F9_外部验收.md](Platforms/ExternalVerification_F6-F9_外部验收.md) | Windows, GBrain, 真机, 灰度和规模证据输入边界 | 测试与发布管理员 |
 
@@ -28,10 +30,11 @@
 | 审计旧 ZennoDroid 搭建方式 | [ConfigGuide_配置指南.md](ConfigGuide_配置指南.md)（仅历史/非生产审计；不得启用旧 SessionRunner 执行链） |
 | 想看主执行链和真实代码结构 | [TechManual_技术手册.md](TechManual_技术手册.md) |
 | 想接入一个新平台 | [PlatformTemplate_平台模块模板.md](PlatformTemplate_平台模块模板.md) + [App Onboarder README](../Tools/app_onboarder/README.md) |
-| 想了解项目未来如何重构 | [Architecture/TargetArchitecture_目标架构.md](Architecture/TargetArchitecture_目标架构.md) |
+| 想了解项目未来如何重构 | [RebuildPlan_重构计划书.md](RebuildPlan_重构计划书.md) + [Architecture/TargetArchitecture_目标架构.md](Architecture/TargetArchitecture_目标架构.md) |
 | 想知道现代工程的验收标准 | [EngineeringStandards_工程标准.md](EngineeringStandards_工程标准.md) |
 | 想配置 AI Factory 的权限分离 | [Operations/RepositoryProtection_仓库保护.md](Operations/RepositoryProtection_仓库保护.md) |
 | 想配置本地 Company GBrain | [Operations/GBrainCompany_LocalNonProduction_本地非生产.md](Operations/GBrainCompany_LocalNonProduction_本地非生产.md) |
+| 重构批次收尾要跑外审 | [Operations/ExternalReview_外审机制.md](Operations/ExternalReview_外审机制.md) |
 | 想核对当前 GBrain 本机能力与仍未验证项 | [Platforms/GBrainCompany_Compatibility.md](Platforms/GBrainCompany_Compatibility.md) |
 
 ### 平台指南
@@ -81,6 +84,7 @@
 Docs/
 ├── Architecture/
 │   └── TargetArchitecture_目标架构.md — GBrain 和 ZennoDroid 目标架构
+├── RebuildPlan_重构计划书.md       — DPS 2.0 最新 Proposed 重构设计与验收合同
 ├── ProjectTechnicalBook_项目技术书.md — 换机与新 AI 接手总技术书
 ├── ConfigGuide_配置指南.md          — 新人施工指南
 ├── EngineeringStandards_工程标准.md — 工程质量和发布标准
