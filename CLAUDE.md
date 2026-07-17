@@ -15,7 +15,7 @@
 
 ## 硬规则
 
-- 推送目标锁定 `dps2` 远程（`origin` 是旧仓库，禁推）。
+- 推送目标锁定 `https://github.com/HelloYoung2025/DPS2.0.git`（本机 checkout 中别名为 `dps2`；新 clone 若无此别名先 `git remote add dps2 <该 URL>`）。指向 `HelloYoung2025/DPS.git` 的远程是旧仓库，禁推。
 - 触碰候选门禁信任根的批次按计划书 §4.5 两段式取证；触碰 Legacy 字节基线/anchor 保护文件的批次按 §11 同批重签 anchor。
 - 不翻转 legacy 三道锁；不新建工厂/仓内任务状态/进度账本；证据不入 Git（Reports/ 被 ignore 是设计）。
 - 已有红项（如受信环境缺 `DPS_LEGACY_BASELINE_ANCHOR`）单独记录，不与当前批次混批修复。

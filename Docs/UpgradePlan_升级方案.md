@@ -1,6 +1,6 @@
 # DPS 升级总方案（v3）
 
-> 文档状态：`Current`（现行施工方案）
+> 文档状态：`Deprecated`（历史方案，已被 `Docs/RebuildPlan_重构计划书.md` v4 取代；仅作审查历史保留，**不可按本文件施工**。本文件中的 `EMULATOR_VERIFIED`、`governance/KILL_SWITCH`、进度账本等机制均已被 v4 明确否决）
 > 基准提交：`458f9bd`（chore: modernization baseline snapshot (WIP)）
 > 制定日期：2026-07-16（经三路事实核查修订）
 > v3 修订：2026-07-16 苏格拉底审题十九问用户答复（§8）+ 四路实证调研（虚拟化拓扑 / 仓库设备假设 / M3 瘦身 / 桥探针）。核心变化：A9 重释（用户驱动的 AI 升级，非自主流水线）、新增 MV 虚拟化环境里程碑（Windows/真机当前不具备）、M3 瘦身为 M3'、安全网具体化（异构模型复核 + Kill switch 落地 + 计数型停止）
