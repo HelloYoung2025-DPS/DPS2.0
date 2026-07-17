@@ -21,6 +21,25 @@
 /codex:setup --disable-review-gate  # 关闭（问答类会话嫌吵时）
 ```
 
+## 一之二、第二异构复核（已自动化，2026-07-17 起）
+
+第二票由 DeepSeek（`deepseek-v4-pro`）担任，脚本在仓外 `~/dps-authority/second_review_deepseek.py`，API key 在仓外 `../Deepseek_DPS2_API.txt`（相对仓库父目录；不入 Git）。批次收尾命令：
+
+```text
+python3 ~/dps-authority/second_review_deepseek.py \
+  --root ~/Documents/ZennoDroid_DSP/DSP_ZD \
+  --pr <N> --repo HelloYoung2025/DPS2.0 \
+  --focus "<本批次范围一句话>"
+```
+
+exit 0 = PASS；exit 1 = FAIL（冻结不合入）；exit 2 = UNAVAILABLE（同样冻结，对应计划书 §13 "reviewer 不可用"）。判决 JSON 贴回 PR。与 Codex 票合计：**两票均 PASS 才满足合入前双复核**；任一 FAIL/UNAVAILABLE/两票矛盾即冻结。
+
+该脚本的三条不可弱化语义（2026-07-17 外审 F4/F5/F6 采纳）：
+
+1. **外发前 fail-closed 敏感扫描**：diff 与 PR 描述先过确定性密钥/凭证模式扫描（私钥块、AWS/GitHub/OpenAI/Slack token、JWT、bearer 头、凭证赋值），任一命中即 exit 2 冻结，**一个字节都不发出**。命中样本只截前 12 字符入报告。
+2. **可执行文件钉版本**：合入门所依赖的脚本按 SHA-256 钉死，当前为 `d1729c2baad4e8a72c0c4b7137d954aa2abba2018df91136d47d445338c57402`（model `deepseek-v4-pro`，输出 schema `{verdict, blocking_findings[], advisory_notes[]}` + 绑定 head_oid/diff_sha256）。改脚本＝改合入程序，须在本文件同步更新指纹并走批次外审；采信任何一票前先核对脚本实际指纹与本行一致。
+3. **显式 FAIL 永不折算成 PASS**：任何 chunk 显式 `verdict:FAIL` 都保留——有 blocking_findings 则总裁决 FAIL（exit 1）；FAIL 而 findings 为空属于歧义裁决，按 UNAVAILABLE（exit 2）冻结。
+
 ## 二、三个触发点
 
 | 层级 | 触发时机 | 动作 | 失败语义 |

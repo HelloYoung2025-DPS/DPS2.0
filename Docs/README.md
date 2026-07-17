@@ -19,7 +19,7 @@
 | [Operations/RepositoryProtection_仓库保护.md](Operations/RepositoryProtection_仓库保护.md) | Factory 治理路径, 两人审批, 受保护工作流和外部信任根要求 | 仓库与发布管理员 |
 | [Operations/GBrainCompany_LocalNonProduction_本地非生产.md](Operations/GBrainCompany_LocalNonProduction_本地非生产.md) | GBrain Company 的本机 PostgreSQL, Voyage, Source/OAuth 和证据边界 | 运维与测试管理员 |
 | [Operations/ExternalReview_外审机制.md](Operations/ExternalReview_外审机制.md) | 重构批次/会话/里程碑三级异构双复核外审程序（Codex + 第二异构 reviewer）与意见处置纪律 | 所有贡献者与批准者 |
-| [Operations/RebuildSessionPrompts_施工会话提示词.md](Operations/RebuildSessionPrompts_施工会话提示词.md) | 重构全程 19 个零填空施工会话模板（T1-T19 + 兜底），按序整块粘贴即可 | 施工发起人 |
+| [Operations/RebuildSessionPrompts_施工会话提示词.md](Operations/RebuildSessionPrompts_施工会话提示词.md) | 重构全程零填空施工会话模板（T0 补证 + T1-T19 + 兜底），按序整块粘贴即可 | 施工发起人 |
 | [Platforms/GBrainCompany_Compatibility.md](Platforms/GBrainCompany_Compatibility.md) | 本机 GBrain 0.42.42.0 Source 隔离、32 字符 Source ID、软删除与 OAuth 能力探测；仅限诊断事实 | 架构、运维与适配器开发人员 |
 | [Platforms/ExternalVerification_F6-F9_外部验收.md](Platforms/ExternalVerification_F6-F9_外部验收.md) | Windows, GBrain, 真机, 灰度和规模证据输入边界 | 测试与发布管理员 |
 
