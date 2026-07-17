@@ -45,3 +45,6 @@ TestResults/
 artifacts/
 *.tmp
 *.bak
+
+# Local tooling state (not project deliverables)
+.codex/
