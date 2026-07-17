@@ -43,7 +43,7 @@ python3 ~/dps-authority/second_review_deepseek.py \
 - **外审档位分级**：高危批次（信任根、Legacy anchor、执行链）用 `xhigh`；常规批次用 `high`。切档由驱动会话在调用前设置 `~/.codex/config.toml` 的 `model_reasoning_effort`（xhigh↔high），审后复位。
 - **物理步骤**：sudo anchor 重签、Parallels/真机环境（WP/M5/M6）、平台授权在会话内即时向用户提问获取，不预授权。
 
-此授权是程序性的、可随时口头收回；它不改变"模型不持密钥、不能自批准发布、不能清除冻结"（§9.1）。**自动合入必须绑定已审 head**：合入前复核 PR 当前 head SHA 与外审时的已审 commit 一致，用 `gh pr merge --match-head-commit <已审SHA>` 精确绑定；若 PASS 后 head 又变（有新推送），视为未审，重跑外审再合，不得裸 `gh pr merge`（那会合入当前 head 而非已审 commit）。合入人身份仍是用户账号。
+此授权是程序性的、可随时口头收回；它不改变"模型不持密钥、不能自批准发布、不能清除冻结"（§9.1）。**所有合入都必须绑定已审 head——不分自动合入还是高危批次经用户手动批准后合入**：合入前复核 PR 当前 head SHA 与外审时的已审 commit 一致，用 `gh pr merge --match-head-commit <已审SHA>` 精确绑定；若 PASS 后 head 又变（包括高危批次等待用户批准期间被推入新 commit），视为未审，重跑外审再合，不得裸 `gh pr merge`（那会合入当前 head 而非已审 commit）。合入人身份仍是用户账号。
 
 ## 二、三个触发点
 
