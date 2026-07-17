@@ -25,13 +25,14 @@
 
 循环，从 dps2 已合入 PR 推导的下一个未合入批次开始：
 1. 为该批次派一个 fresh-context 子智能体，喂给它对应 T# 模板全文，让它施工到"开 PR 到 dps2"为止（含跑 required 门禁）。
-2. 批次收尾 Codex 外审：常规批次前把 ~/.codex/config.toml 的 model_reasoning_effort 设为 high、高危批次（信任根 R0-B/C/D、动 Legacy 字节的 M3-2/M3-3）设为 xhigh，审后复位；绑定该批 commit/diff。
+2. 批次收尾 Codex 外审：常规批次前把 ~/.codex/config.toml 的 model_reasoning_effort 设为 high、高危批次（信任根 R0-B/C/D、动 Legacy 字节的 M3-2/M3-3、每个 T18/LC Legacy 物理删除）设为 xhigh 且用 adversarial-review，审后复位；记下该批已审 head SHA 与 diff。
 3. 判据：门禁全绿 且 Codex PASS →
-   - 常规批次：用 gh pr merge 自动合入，继续下一批。
-   - 高危批次 / 里程碑收口批次：停下，把外审结论摆给我，等我点头再合入。
+   - 常规批次：先核对 PR 当前 head == 第 2 步记下的已审 SHA；一致才用 `gh pr merge --match-head-commit <已审SHA>` 合入，继续下一批。head 若变了（有新推送）视为未审，重跑外审再合，不得裸 `gh pr merge`。
+   - 高危批次（信任根 R0-B/C/D、动 Legacy 字节的 M3-2/M3-3、**每个 T18/LC Legacy 物理删除**）/ 里程碑收口批次：停下，把外审结论摆给我，等我点头再合入。
 4. 任一 FAIL/UNAVAILABLE、两段式取证缺口、越出批次范围、或需要 sudo anchor 重签 / Parallels 真机环境 / 平台授权 → 停下，明确告诉我卡在哪、需要我做什么。
 5. 信任根批次合入后按 §4.5 第 2 步取正式 clean 证据贴回 PR，再进下一批。
 6. 里程碑边界（M1 后、M2M3 后、终局）分别跑 T4/T13/T19 审计；审计发现未决 critical 即停下等我。
+7. 顺序例外（WP 探针，破 T10 死锁）：T15（WP Windows/Zenno 探针）不在 T1→T19 主序的自然位置——它是 T10（M3-2）的**前置门**（T10 明确拒绝在 WP 未完成时开工）。推进 M3 轨、准备开 T10 前，若 WP 探针尚未完成，**先插入 T15**（需 Parallels 环境，属物理步骤 → 停下让我备好环境），完成后再回到 T10；不要按 T1→T19 的字面序号直冲 T10。
 
 每批开工前先播报：批次名、依据、本批是否高危、将自动合入还是等我。不要一次跑完就沉默——每完成一批或每次停下都向我汇报。
 ```
