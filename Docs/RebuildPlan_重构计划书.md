@@ -353,6 +353,8 @@ attempt、eligibility 和 outcome append-only；重复 ID 只计一次，冲突�
 
 每个候选 diff 至少交给两个独立、便宜的异构 reviewer，绑定同一 commit/diff/evidence hash，并输出严格 schema。任一 `FAIL`、`UNAVAILABLE`、结果分歧或 hash 不一致都冻结候选并通知用户。
 
+> 适用层级裁定（用户拍板，2026-07-17）：本节双异构复核描述的是**项目自身无人值守升级的运行时安全网**——在相应里程碑作为交付物接线（DeepSeek/GLM 凭证见 §15 条目 2）。**重构施工期**的批次合入外审为 Codex 一票 + required 门禁 + 用户批准，程序见 `Docs/Operations/ExternalReview_外审机制.md`；施工期作者与审查者异族（Claude 施工、OpenAI 审查），不构成自审。
+
 模型只能输出建议或 advisory veto；确定性控制器在收到 schema-valid `FAIL`、`UNAVAILABLE`、分歧或 hash 不一致时置位冻结。模型不能直接写控制面状态，不能审批、签发 Release BOM、持私钥或清除冻结。无实时人工盯守通过“一次性预先签名的有限范围授权 + 确定性门禁 + 自动冻结”实现；超出授权范围和当前 human-required R2/R3 发布仍需用户/具名批准者批准。
 
 ### 9.2 两个停止面

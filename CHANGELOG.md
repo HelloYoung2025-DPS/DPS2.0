@@ -11,6 +11,10 @@
 - 在基线 `458f9bd41290` 的干净可丢弃 checkout 与工作区各完成一次 Phase 0 门禁运行，取得可复现的保留侧红项清单；红项 -> 目标批次迁移表随第一个实现 PR 的描述提交，不入库（依 AGENTS.md 任务状态不入仓规则）。
 - 外审第二票（DeepSeek）自动化接入并按本批 Codex 复核意见硬化：施工模板补信任根严格串行取证/T10 探针前置/T8 合同前置三道防呆；外审机制登记仓外复核脚本的 SHA-256 指纹、外发前 fail-closed 敏感扫描与"显式 FAIL 不折算 PASS"聚合语义。
 
+#### Changed
+
+- 外审规则经用户裁定更正（同日生效，取代上一条中的"第二票"定位）：**开发期批次合入外审 = Codex 一票 + required 门禁 + 用户批准**；计划书 §9.1 的双异构复核判归项目运行时无人值守安全网（交付物），DeepSeek 脚本降级为 advisory 预备资产——其判决不构成合入条件，外审机制文档不再维护其 SHA-256 指纹（接线批次自行定版）。脚本本体保留敏感扫描（含 `--focus` 参数）与"显式 FAIL 不折算 PASS"语义。新增半自动驾驶授权（外审机制 §一之三）与驱动会话模板 TA。
+
 #### Known issues
 
 - 基线 Phase 0 门禁存在既有红项（门禁自身裁决，非本批次引入）：`module-governance` 合同图互惠边缺失；候选测试 policy 与 Manifest 清单不一致；`Dps.slnx` 缺 `factory-release-controller` contracts 项目；`evidence-service`/`executor-gateway`/`memory-event-ledger`/`operation-compiler`/`soul-memory-adapter` 测试编译失败；`legacy-runtime-adapter` 四个 required 套件声明的 `.venv/bin/python` 不在门禁 `PYTHON_NAMES` 信任集内；`factory-*` 两个 `contract` 套件类型不被 Phase 0 接受。各红项归属批次见第一个实现 PR 的迁移表。
