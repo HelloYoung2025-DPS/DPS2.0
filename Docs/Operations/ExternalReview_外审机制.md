@@ -4,10 +4,10 @@
 > 证据状态: `NONE`（本文档描述审查流程本身，不签发任何验证等级）  
 > 上游依据: `Docs/RebuildPlan_重构计划书.md` §9.1（异构模型复核）、§13（停止条件）
 
-本文档把重构计划书 §9.1 的"异构模型复核"落成当前工具链下可执行的操作程序。两条核心约束不变：
+本文档定义**重构施工期**的外审程序（用户拍板，2026-07-17）：**批次收尾外审 = Codex 一票**（最新最强模型）。两条核心约束：
 
-1. **模型只有 advisory/veto 权**——任何 `FAIL/UNAVAILABLE/分歧` 都必须导致候选冻结；这是 §9.1 的目标语义，在其确定性控制器建成前由用户程序性执行（见 §三-4），当前没有任何自动冻结机制。`PASS` 不能替代 required 门禁和具名批准。
-2. **每个候选 diff 至少两个独立异构 reviewer**（§9.1 原文）——Codex 只是其中一个。单一 Codex review `PASS` 不满足批次合入条件；本文档任何表述不得被解读为把双复核门降级为单复核。
+1. **模型只有 advisory/veto 权**——Codex `FAIL/UNAVAILABLE` 即候选冻结，由用户在合入前程序性执行（见 §三-4）；`PASS` 不能替代 required 门禁和具名批准。
+2. **层级不要混淆**：计划书 §9.1 的"每个候选 diff 至少两个异构 reviewer（DeepSeek/GLM）"说的是**项目自身无人值守升级的运行时安全网**——那是要在相应里程碑接线的交付物，其凭证（§15 条目 2）供系统运行时使用。它不是本开发流程的合入门；开发期合入门只有 Codex 一票 + required 门禁 + 用户批准。
 
 ## 一、工具与配置（已就绪）
 
@@ -21,9 +21,11 @@
 /codex:setup --disable-review-gate  # 关闭（问答类会话嫌吵时）
 ```
 
-## 一之二、第二异构复核（已自动化，2026-07-17 起）
+## 一之二、DeepSeek 复核脚本（运行时安全网预备资产，不是开发期合入门）
 
-第二票由 DeepSeek（`deepseek-v4-pro`）担任，脚本在仓外 `~/dps-authority/second_review_deepseek.py`，API key 在仓外 `../Deepseek_DPS2_API.txt`（相对仓库父目录；不入 Git）。批次收尾命令：
+**定位更正（2026-07-17 用户拍板）**：DeepSeek/GLM 属于计划书 §9.1 运行时安全网的异构 reviewer，凭证与脚本为该交付物预备；**开发期批次合入不要求 DeepSeek 出票**。脚本可随时手动调用取额外意见（advisory only），其判决不构成合入条件、也不因缺席而冻结。
+
+资产位置：脚本 `~/dps-authority/second_review_deepseek.py`（model `deepseek-v4-pro`，判决绑定 head_oid/diff_sha256，外发前 fail-closed 敏感扫描，显式 FAIL 不折算 PASS，超限分块、不完整不发 PASS）；API key 在仓外 `../Deepseek_DPS2_API.txt`（相对仓库父目录；不入 Git）。§9.1 安全网在相应里程碑接线时以此为起点，接线批次自行定版并纳入门禁。调用方式：
 
 ```text
 python3 ~/dps-authority/second_review_deepseek.py \
@@ -32,23 +34,15 @@ python3 ~/dps-authority/second_review_deepseek.py \
   --focus "<本批次范围一句话>"
 ```
 
-exit 0 = PASS；exit 1 = FAIL（冻结不合入）；exit 2 = UNAVAILABLE（同样冻结，对应计划书 §13 "reviewer 不可用"）。判决 JSON 贴回 PR。与 Codex 票合计：**两票均 PASS 才满足合入前双复核**；任一 FAIL/UNAVAILABLE/两票矛盾即冻结。
-
-该脚本的三条不可弱化语义（2026-07-17 外审 F4/F5/F6 采纳）：
-
-1. **外发前 fail-closed 敏感扫描**：diff 与 PR 描述先过确定性密钥/凭证模式扫描（私钥块、AWS/GitHub/OpenAI/Slack token、JWT、bearer 头、凭证赋值），任一命中即 exit 2 冻结，**一个字节都不发出**。命中样本只截前 12 字符入报告。
-2. **可执行文件钉版本**：合入门所依赖的脚本按 SHA-256 钉死，当前为 `d1729c2baad4e8a72c0c4b7137d954aa2abba2018df91136d47d445338c57402`（model `deepseek-v4-pro`，输出 schema `{verdict, blocking_findings[], advisory_notes[]}` + 绑定 head_oid/diff_sha256）。改脚本＝改合入程序，须在本文件同步更新指纹并走批次外审；采信任何一票前先核对脚本实际指纹与本行一致。
-3. **显式 FAIL 永不折算成 PASS**：任何 chunk 显式 `verdict:FAIL` 都保留——有 blocking_findings 则总裁决 FAIL（exit 1）；FAIL 而 findings 为空属于歧义裁决，按 UNAVAILABLE（exit 2）冻结。
-
 ## 二、三个触发点
 
 | 层级 | 触发时机 | 动作 | 失败语义 |
 |---|---|---|---|
 | 会话收尾 | 施工会话每次 stop（review gate 自动强制） | Codex 对 working-tree 变更 review。这是便利层，不是 §9.1 门 | 未通过则不视为本段工作完成 |
-| 批次收尾 | 每个批次门禁全绿后、合入前（计划书 §16 的每个 PR） | **双复核，绑定同一 commit/diff**：① Codex `review --base <上一批合入提交>`（高危批次——信任根、Legacy anchor、执行链——改用 `adversarial-review`）；② 至少一个与 diff 作者模型不同族的第二异构复核（见下"第二复核员"） | 任一 reviewer `FAIL/UNAVAILABLE`、两者分歧或输入 hash 不一致 = 冻结不合入（程序性规则，由用户在合入前执行；对应计划书 §9.1/§13 的目标语义） |
+| 批次收尾 | 每个批次门禁全绿后、合入前（计划书 §16 的每个 PR） | **Codex 一票，绑定 commit/diff**：`review --base <上一批合入提交>`（高危批次——信任根、Legacy anchor、执行链——改用 `adversarial-review`） | Codex `FAIL/UNAVAILABLE` = 冻结不合入（程序性规则，由用户在合入前执行） |
 | 里程碑收尾 | M0–M6 每个退出条件评定前 | 多智能体 workflow 交叉审核 + Codex 深审双轨，产出对照裁决表 | 未决 critical 未修订前不得进入下一里程碑 |
 
-**第二复核员的选取**：异构 = 与该批次 diff 的作者模型不同厂商。diff 由 Claude 会话产出时，第二复核员用 DeepSeek/GLM（凭证见计划书 §15 条目 2，未接入前可临时用其他非 Anthropic 模型）——作者不能自审，Claude 系模型不算该批次的独立复核；diff 由 Codex 会话产出时，Codex review 不计为独立复核，改由 Claude + 第三家模型构成双复核。计划书 §9.1 的确定性控制器（自动比对 schema 输出并置位冻结）落地前，双复核结果由用户在合入前人工核对，缺一不合。
+异构性由施工分工天然保证：diff 由 Claude 会话产出、Codex（OpenAI）审——作者与审查者不同族。若某批 diff 改由 Codex 产出，则该批外审换 Claude 或其他非 OpenAI 模型担任，作者不自审。
 
 批次收尾命令（在仓库内执行；companion 脚本路径中的版本号随插件升级变化，以实际安装为准）：
 

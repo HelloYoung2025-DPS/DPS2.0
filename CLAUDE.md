@@ -11,7 +11,7 @@
 ## 外审（必须）
 
 - 会话收尾：Codex review gate 已启用，stop 前必须有新鲜 review；若本会话未生效，先运行 `/codex:setup --enable-review-gate`。
-- 批次合入前：双复核（Codex + 与 diff 作者不同族的第二异构 reviewer），程序见 `Docs/Operations/ExternalReview_外审机制.md`。单一 Codex PASS 不满足合入条件。
+- 批次合入前：Codex 一票外审（绑定 commit/diff；高危批次用 adversarial-review），程序见 `Docs/Operations/ExternalReview_外审机制.md`；FAIL/UNAVAILABLE 即冻结不合入。DeepSeek/GLM 是计划书 §9.1 运行时安全网的组件，不参与开发期合入投票。
 
 ## 硬规则
 
