@@ -6,7 +6,7 @@
 
 #### Added
 
-- 施工权威文档落库：`Docs/RebuildPlan_重构计划书.md` v4、`Docs/Operations/ExternalReview_外审机制.md`、根 `CLAUDE.md` 会话纪律。此前这些文件仅存在于工作区。
+- 施工权威文档落库：`Docs/RebuildPlan_重构计划书.md` v4、`Docs/Operations/ExternalReview_外审机制.md`、根 `CLAUDE.md` 会话纪律，以及作为其审查依据的 `Docs/RebuildPlan_审核报告.md`、`Docs/RebuildPlan_交叉审核报告.md` 与被 v4 取代但被 CHANGELOG 历史引用的 `Docs/UpgradePlan_升级方案.md`。此前这些文件仅存在于工作区。
 - 按 `toolchain.lock.json` 在当前 macOS 环境恢复固定工具链：CPython 3.12.13（重建断链 `.venv`）、Node 24.18.0、.NET SDK 10.0.301、PowerShell 7.6.2、PostgreSQL 18.4（Postgres.app 2.9.5）、Android Platform Tools 37.0.0-14910828（全部经官方源与校验和/版本断言验证）。
 - 在基线 `458f9bd41290` 的干净可丢弃 checkout 与工作区各完成一次 Phase 0 门禁运行，取得可复现的保留侧红项清单；红项 -> 目标批次迁移表随第一个实现 PR 的描述提交，不入库（依 AGENTS.md 任务状态不入仓规则）。
 
