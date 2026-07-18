@@ -78,6 +78,7 @@ PYTHON_NAMES = {"python", "python3", "python3.12"}
 # ``_parse_python_invocation``).  Anything looser would silently substitute the
 # interpreter and record REPOSITORY_STATIC_VERIFIED evidence naming one that never
 # ran, which the legacy byte-baseline contract explicitly forbids.
+REPOSITORY_PINNED_VENV = ".venv"
 REPOSITORY_PINNED_PYTHON = ".venv/bin/python"
 DECLARED_PYTHON_NAMES = PYTHON_NAMES | {REPOSITORY_PINNED_PYTHON}
 LEGACY_BASELINE_ANCHOR_ENV = "DPS_LEGACY_BASELINE_ANCHOR"
@@ -378,6 +379,13 @@ def run_phase0_unittests() -> Dict[str, Any]:
         "test_declared_expectations_match_the_pinned_verdicts",
         "test_every_rejecting_sample_actually_mutates_its_base",
         "test_pinned_attack_verdicts_hold_against_both_schemas",
+        # The repository-pinned interpreter guard.  Comparing resolved executables
+        # was fail-open -- the venv launcher symlinks onto the shared base CPython,
+        # so that comparison also accepted the bare PATH interpreter and every
+        # sibling venv built on it.  These pin the venv-identity comparison.
+        "test_sibling_venv_on_the_same_base_interpreter_is_rejected",
+        "test_resolved_launcher_target_is_rejected",
+        "test_bare_base_interpreter_is_rejected",
     }
     command = [
         sys.executable,
@@ -1409,14 +1417,19 @@ def _parse_python_invocation(
     if declared_python not in DECLARED_PYTHON_NAMES:
         raise Phase0Error("only the pinned Phase0 Python interpreter is allowed")
     if declared_python == REPOSITORY_PINNED_PYTHON:
-        # Phase0 executes ``sys.executable``, never the declared path.  Accept the
-        # repository-pinned declaration only when the two are the same file, so the
-        # interpreter named in the manifest is provably the one that ran.  A
-        # PATH-selected interpreter cannot satisfy the legacy byte-baseline gate.
+        # Phase0 executes ``sys.executable``, never the declared path.  Bind the
+        # declaration to the *virtual environment*, not to the interpreter file:
+        # ``.venv/bin/python`` is a symlink onto the shared base CPython, so
+        # comparing resolved executables collapses both sides onto that base and
+        # would accept the bare PATH interpreter and every sibling venv built on
+        # it -- including one carrying a hostile ``sitecustomize`` module, which
+        # still executes under ``-I`` and could patch hashlib inside the legacy
+        # byte-baseline verifier.  ``sys.prefix`` is the venv's own identity and
+        # survives the symlink, so it is what the pin must compare.
         try:
-            declared_same = (root / REPOSITORY_PINNED_PYTHON).resolve(
-                strict=True
-            ) == Path(sys.executable).resolve(strict=True)
+            declared_same = Path(sys.prefix).resolve(strict=True) == (
+                root / REPOSITORY_PINNED_VENV
+            ).resolve(strict=True)
         except (OSError, RuntimeError):
             declared_same = False
         if not declared_same:
