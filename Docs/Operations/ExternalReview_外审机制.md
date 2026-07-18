@@ -60,7 +60,9 @@ node ~/.claude/plugins/cache/openai-codex/codex/<版本>/scripts/codex-companion
 3. **证据要求**：采纳与驳回都必须给 `文件:行号` 级证据；无法核验的意见按"未复核"单列，采信前自行核验。
 4. **权限边界与冻结的现状**：目前只有会话收尾的 review gate 是机器强制（review 不过，会话无法正常收尾）；批次级"冻结不合入"是程序性规则，由用户在合入前人工执行——计划书 §9.1 的确定性控制器（自动比对 schema 判决并置位冻结）尚未建成，本文档不得被解读为该控制器已存在。解除冻结、合入批准、里程碑评定始终是用户/具名批准者的动作；模型不持密钥、不能自批准（§9.1）。
 
-5. **合入前绑定已审提交（fail-closed；合入是用户/具名批准者的动作）**：外审 `PASS` 后、合入前，若 PR head 被推入新 commit，本次 `PASS` 即失效——复核 PR 当前 head == 外审时已审 commit，用 `gh pr merge --match-head-commit <已审SHA>` 绑定已审 head；不符即视为未审，重跑外审再合，不得裸 `gh pr merge`（那会合入当前 head 而非已审 commit）。**范围界定**：R0 段严格串行（一次一个 PR，base 只因上一批合入而动，且受施工模板「信任根严格串行取证」硬规则控制），故 head 绑定即足够。并行轨 / merge queue 下"base 前移使集成 diff 变化"的严格 merge-group 级绑定（`--match-head-commit` 只校验 head、不校验 base OID，挡不住队列用更新的 base 合并）属 **R0 后并行编排批次**的设计范围（与已移出 M0 的自动驾驶同批设计），本文档在 M0 不预先规定，届时以该批次设计为准。
+5. **合入前绑定已审提交（程序性合入下限；合入是用户/具名批准者的动作）**：当前 M0/R0 阶段采用程序性合入下限，不宣称已具备 §9.1 的确定性控制器能力。外审 `PASS` **仅对『已审 head commit + 已审 base tip 的组合』有效**。合入前由用户人工复核：PR head 必须等于已审 commit、base tip 必须未发生变化；任一不一致即使原 `PASS` 失效——冻结合入、重新生成集成 diff 并复审。合入时用 `gh pr merge --match-head-commit <已审-head-oid>` 约束 head。
+   - **前置门（fail-closed）**：在 §9.1 专门实现批次合入并启用前，**R0-B/R0-C/R0-D 必须严格串行、一次仅一个施工 PR，不开并行施工 PR、不启用 merge queue**；任一前置条件无法人工确认时不得合入。
+   - **能力界定**：`--match-head-commit` 只绑定 head，**不构成 base OID 或 merge-group 的机器绑定**；原子化的 head/base/merge-group fail-closed 绑定明确延期至 **R0 后的 §9.1 专门批次**。本文档不得被解读为该机器机制已存在。
 
 ## 四、给每个施工会话的固定开工输入
 
