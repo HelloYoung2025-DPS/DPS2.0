@@ -1,6 +1,49 @@
 # DPS v4.5 更新日志
 
-## [Unreleased] - 2026-07-14
+## [Unreleased] - 2026-07-17
+
+### M0/R0-A 基线复现（第一个实现批次）
+
+#### Added
+
+- 施工权威文档落库：`Docs/RebuildPlan_重构计划书.md` v4、`Docs/Operations/ExternalReview_外审机制.md`、根 `CLAUDE.md` 会话纪律，以及作为其审查依据的 `Docs/RebuildPlan_审核报告.md`、`Docs/RebuildPlan_交叉审核报告.md` 与被 v4 取代但被 CHANGELOG 历史引用的 `Docs/UpgradePlan_升级方案.md`。此前这些文件仅存在于工作区。
+- 按 `toolchain.lock.json` 在当前 macOS 环境恢复固定工具链：CPython 3.12.13（重建断链 `.venv`）、Node 24.18.0、.NET SDK 10.0.301、PowerShell 7.6.2、PostgreSQL 18.4（Postgres.app 2.9.5）、Android Platform Tools 37.0.0-14910828（全部经官方源与校验和/版本断言验证）。
+- 在基线 `458f9bd41290` 的干净可丢弃 checkout 与工作区各完成一次 Phase 0 门禁运行，取得可复现的保留侧红项清单；红项 -> 目标批次迁移表随第一个实现 PR 的描述提交，不入库（依 AGENTS.md 任务状态不入仓规则）。
+- 外审第二票（DeepSeek）自动化接入并按本批 Codex 复核意见硬化：施工模板补信任根严格串行取证/T10 探针前置/T8 合同前置三道防呆；外审机制登记仓外复核脚本的 SHA-256 指纹、外发前 fail-closed 敏感扫描与"显式 FAIL 不折算 PASS"聚合语义。
+
+#### Changed
+
+- 外审规则经用户裁定更正（同日生效，取代上一条中的"第二票"定位）：**开发期批次合入外审 = Codex 一票 + required 门禁 + 用户批准**；计划书 §9.1 的双异构复核判归项目运行时无人值守安全网（交付物），DeepSeek 脚本降级为 advisory 预备资产——其判决不构成合入条件，外审机制文档不再维护其 SHA-256 指纹（接线批次自行定版）。脚本本体保留敏感扫描（含 `--focus` 参数）与"显式 FAIL 不折算 PASS"语义。施工会话模板（`RebuildSessionPrompts_施工会话提示词.md`）定为**手动逐批**模式：按计划书 §16 依赖顺序挑对应 T# 模板，T 编号仅为索引、非执行顺序，跨轨/探针前置（T15 探针先于 T10、T10 合入后才可开 T8）由各模板自带的开工前置门强制。
+
+- 半自动驾驶驱动（驱动会话模板 TA + 外审机制 §一之三 自动合入授权）经四轮 Codex 外审仍反复暴露调度/合并安全缺陷（审计节点 T4/T13/T19 只审不改无法进入"开 PR→合并"循环而空转、`--match-head-commit` 只绑 head 不绑已审 base/diff、手动序与依赖序不一致），且不属于 M0/R0-A（§10）退出范围、当前无可驱动批次——2026-07-18 用户拍板将其**移出 M0**，留待 R0 段完成后单独批次专门设计。M0 回归"每批一会话、门禁全绿 + Codex 一票 + 用户手动合入"的安全基线。剥离后按 Codex round-5/round-6 外审补齐并校正手动基线三处（原被自动驾驶层遮盖）：施工模板补完整执行依赖 DAG 节并清理 `Docs/README.md` 等入口的"按序粘贴"陈述；合入下限与审计门经 round-6/round-7 外审及一次 Codex 收口咨询（裁定采纳 A）定为**诚实下限 + 串行兜底 + 显式延期**——外审机制 §三-5 采程序性合入下限：`PASS` 仅对『已审 head + 已审 base 的组合』有效、合入前用户人工复核 head==已审 commit 且 base tip 未变（任一不符即冻结重审）、`gh pr merge --match-head-commit` 只绑 head；R0 依 §16 天然串行（R0-D 用 merge queue 做单 PR 冲突/合并验证，非并行合入），并行轨（M2∥M3）的安全并行合并编排作为**声明式延期**显式归 §9.1 专门批次、未就绪则退化串行（DAG 并行段同注此延期）；硬规则#1 审计门为程序性门（裁决落审计 PR 描述遵 `AGENTS.md:90`、可编辑不构成放行、由用户人工把关）。原子 head/base/merge-group 绑定与不可篡改审计门均显式延期至 R0 后 §9.1 专门批次，本文不宣称机器级保证已存在。（round-8 采纳后:去掉与计划书 §10 M1C 冲突的"不启用 merge queue"禁令、把并行前置门收敛为声明式延期,避免向 T5/T9 等模板传播半成品治理规则。round-9 恢复被过度精简掉的"审计裁决 FAIL/UNAVAILABLE 或记录不一致/无法核验即冻结"语义并传播至 T5/T9/T14；round-10 两条经用户拍板收口:外审机制 §三-5 不再复述 R0-D 退出门构成、明确 module-impact 必需套件与外部配置的 merge queue 为**并列独立**的强制验证且"真实合入串行"不折抵任一项,施工模板 T5/T9/T14/兜底 的开工前置门由"拒绝 FAIL/UNAVAILABLE"改为"要求可核验的 PASS"白名单、非 PASS 一律冻结。剩余的原子 head/base/merge-group 机器绑定与防篡改审计门深度仍显式归 R0 后 §9.1 专门批次,本文不宣称机器级保证已存在。）会话收尾 stop-gate 复审再指出 round-10 的 PASS 白名单是**单侧**的（消费侧 T5/T9/T14/兜底 要求 PASS,生产侧 T4/T13/T19 未产出定义明确的 PASS 令牌）——补齐**审计输出契约**:T4/T13/T19 在审计 PR 描述开头产出 `总裁决: PASS|FAIL|UNAVAILABLE` + `未决 DEFERRED` 两行令牌、裁决表每条"通过"引用证据锚点、下游对 §4.5 信任根锚点逐条核验其余抽验;并修复由此暴露的两个真缺口——(i) round-10"一律要求 PASS"把计划书 §5.4 **强制**的合法 DEFERRED 也判非 PASS、在 M2/M3→M4 造成环形死锁（DEFERRED 豁免"视为该条通过"+ 终局 T19 一次性回补问责修复）;(ii) 空提交证据锚被误当 clean 证据的误放行窗口（证据锚点引用 + 下游逐条核验收窄）。经内部对抗验证（Claude 多代理 freeze/false-pass/framing 三视角复测）确认 freeze 死锁闭合、越权为空。审计员主观误判 + 人工漏检的不可约内核仍属 §9.1 机器门、显式延期。
+
+#### Known issues
+
+- 基线 Phase 0 门禁存在既有红项（门禁自身裁决，非本批次引入）：`module-governance` 合同图互惠边缺失；候选测试 policy 与 Manifest 清单不一致；`Dps.slnx` 缺 `factory-release-controller` contracts 项目；`evidence-service`/`executor-gateway`/`memory-event-ledger`/`operation-compiler`/`soul-memory-adapter` 测试编译失败；`legacy-runtime-adapter` 四个 required 套件声明的 `.venv/bin/python` 不在门禁 `PYTHON_NAMES` 信任集内；`factory-*` 两个 `contract` 套件类型不被 Phase 0 接受。各红项归属批次见第一个实现 PR 的迁移表。
+- 受信环境缺 `DPS_LEGACY_BASELINE_ANCHOR` 外部只读 anchor（计划书 §15 条目 7 用户前置事项），5 个 adversarial 测试因此失败。
+- GitHub Free 计划私有仓库不支持分支保护与 rulesets（API 403），计划书 §4.1 第 5 条的仓库保护规则待用户决策（转公开或升级 GitHub Pro）后启用。
+
+### Rebuild plan v4 (三轮交叉审核修订)
+
+#### Changed
+
+- `Docs/RebuildPlan_重构计划书.md` v3 -> v4。按三轮交叉审核的确认项修订：对 v2 多智能体交叉审核报告中仍适用于 v3 的残留项、对 v3 的异构模型终审（零 blocker，未引入修改）、以及对 v3 本体的补充完备性批判；方向与边界不变，仍为 `Proposed`、正式证据等级 `NONE`。明确 §4.5 信任根再基线化两段式取证、§11 Legacy anchor 重签枚举与 ZennoDroid/AVD 环境接受性探针、§15 用户一次性前置事项清单。取代 v3 作为最新施工提案。
+
+### Rebuild plan v3 (多角色对抗审查重写)
+
+#### Changed
+
+- `Docs/RebuildPlan_重构计划书.md` v2 -> v3。六类独立审查角色与一轮 `code-reviewer` 终审从架构治理、Soul/认知、Legacy/执行、安全和可靠性统计等角度复核同一基线，并阻断 v2 直接施工。v3 保留“11 个 `factory-*` 全删”和“99% 使用滚动窗口”两项用户拍板，同时纠正：计划状态降为 `Proposed`；删除非法 `EMULATOR_VERIFIED`；Factory 删除改为 receipt 治理迁移、Release BOM 权威迁移、目录删除三个独立审查批次；模型仅保留 advisory/veto 权；tracked kill-switch/通知文件改为 Control Plane 与受保护 CI 外部状态；Legacy 物理删除推迟到目标 ZennoDroid 探针后；Persona v1、memory.event v3、gbrain.projection v3、interest v2、由 operation-compiler 拥有的 APP package、operation.compiled v2、edge handoff v2、独立 Legacy 入口、唯一 ActionExecutor、按需视觉提案链，以及 session/command 两套 300 滚动健康门和正式统计声明门分别定义。此前 Rebuild v2 与 UpgradePlan v3 仅保留为审查历史，不再作为最新施工提案。
+
+### Rebuild plan v2 (取代 v1 与 UpgradePlan v3)
+
+#### Changed
+
+- `Docs/RebuildPlan_重构计划书.md` v1 → v2，依据用户四条硬要求（Soul 化拟人化 / 精简 / 单独并行升级 / 回归八条设计初衷）+ 五路实证盘点 + **Codex(GPT xhigh) 异构交叉复核** + 用户两项拍板（factory 删 11 全清、会话门控 99% 滚动窗口）修订. 核心变化：确立"删 11 factory 重资产 + 解锁两道 fail-closed 锁 + 经授权桥接线 + 六层 Soul 化 + 补四缺口"主线；§3.4 factory 删除手术补入 Codex 发现的四个隐藏依赖（run_candidate_gate 代码级 import、candidate_bom_validator 的 trust-policy 依赖、保留模块悬空边、运行时 active Release BOM 权威悬空）并加 R0-0 抛弃-worktree dry-run 前置；视觉验证上移大脑侧新增 request_vision_verdict exchange kind（边缘不持 AI 凭证）；桥 kind 改为 exchange v2 schema 并存（非改 v1 枚举）+ 修 denied 边界；persona 扩展定性纠正为 persona.revision v2 破坏性升级；legacy 物理删除补第五件 external trusted anchor 重签 runbook；并行升级如实定性为"开发并行、落地串行"+ landing 协议；§11 完整记录 Claude 对抗评审与 Codex 交叉复核的 14 项议题裁决. 该文件是施工方案，不改变任何模块验证等级.
+
+#### Changed
+
+- `Docs/UpgradePlan_升级方案.md` v2 → v3，依据用户 2026-07-16 苏格拉底审题十九问答复（方案 §8 为授权记录）与四路实证调研修订：A9 重释为"用户驱动的外部 AI 会话执行模块化升级"（不建自主编排流水线）；原 M3 瘦身为 M3'（升级门禁 CI 化 + 会话规程，Host v2 接线与 factory-evidence-ledger 通电标 DEFERRED，九锚点验收缩至六锚点）；新增 MV 虚拟化环境里程碑（Windows 电脑与安卓真机当前缺位，过渡拓扑 = macOS AVD + Parallels Windows 11 ARM + ZennoDroid Enterprise + 网络 ADB，新增 EMULATOR_VERIFIED 证据等级、F7 仍需真机）；M0 新增 M0-P 桥可行性探针工作包与初始授权锚点；安全网具体化（异构模型交叉复核 + 埋错演练上岗、governance/KILL_SWITCH 冻结开关、计数型硬停止、通知义务、进度账本转强制、会话启动协议）；选择器校准升级为任意 APP 通用工作流并加 SELECTOR_STALE 失效循环. 该文件是施工方案，不改变任何模块验证等级.
 
 ### Governance reset and modernization baseline
 
