@@ -315,14 +315,13 @@
     "agents": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["spec", "policyVersion", "instructionsFile", "manifestFile", "receiptRequired", "resolver"],
+      "required": ["spec", "policyVersion", "instructionsFile", "manifestFile", "receiptRequired"],
       "properties": {
         "spec": { "const": "dps.agents/v1" },
         "policyVersion": { "$ref": "#/$defs/semver" },
         "instructionsFile": { "const": "AGENTS.md" },
         "manifestFile": { "const": "module.yaml" },
-        "receiptRequired": { "const": true },
-        "resolver": { "const": "factory-instruction-resolver" }
+        "receiptRequired": { "const": true }
       }
     }
   },

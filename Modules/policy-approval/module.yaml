@@ -52,5 +52,5 @@
   "compatibility": {"policyRef": "governance/policies/compatibility-policy.yaml", "track": "modern", "moduleMajor": 0, "supportedContractMajors": {"action.proposal": [1], "action.execution.promotion": [1], "approval.decision": [1], "approval.execution.fence": [1], "approval.submission.intent": [1], "approval.submission.acknowledgement": [1], "approval.submission.reconciliation": [1], "approval.submission.recovery": [1], "approval.submission.state": [1]}, "unknownMajorBehavior": "reject", "missingMajorBehavior": "reject", "unknownModeBehavior": "reject", "missingModeBehavior": "reject"},
   "rollout": {"featureFlag": "policy_approval_v1", "canary": "shadow decisions before any human-approved bounded canary", "rollback": "activate kill_policy_approval and restore the previous signed Release BOM", "killSwitch": "kill_policy_approval"},
   "deviceGates": {"requiresWindows": false, "requiresZennoDroid": false, "requiresAdb": false, "minimumVerification": "INTEGRATION_VERIFIED"},
-  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true, "resolver": "factory-instruction-resolver"}
+  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true}
 }

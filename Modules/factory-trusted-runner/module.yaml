@@ -38,5 +38,5 @@
   "compatibility": {"policyRef": "governance/policies/compatibility-policy.yaml", "track": "factory", "moduleMajor": 0, "supportedContractMajors": {"instruction.receipt": [1], "worktree.plan": [1], "worktree.lease": [1], "merge.request": [1], "trusted.test.result": [1]}, "unknownMajorBehavior": "reject", "missingMajorBehavior": "reject", "unknownModeBehavior": "reject", "missingModeBehavior": "reject"},
   "rollout": {"featureFlag": "factory_trusted_runner_v1", "canary": "synthetic fixture execution only before separately approved isolated shadow", "rollback": "disable new execution and route to the previous signed runner while retaining evidence hashes", "killSwitch": "factory_disable_trusted_execution"},
   "deviceGates": {"requiresWindows": false, "requiresZennoDroid": false, "requiresAdb": false, "minimumVerification": "CONTRACT_VERIFIED"},
-  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true, "resolver": "factory-instruction-resolver"}
+  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true}
 }
