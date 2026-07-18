@@ -369,6 +369,12 @@ def run_phase0_unittests() -> Dict[str, Any]:
         "test_declared_expectations_match_the_pinned_verdicts",
         "test_every_rejecting_sample_actually_mutates_its_base",
         "test_pinned_attack_verdicts_hold_against_both_schemas",
+        # RebuildPlan 4.2.3 requires freezing the old validator, not just the old
+        # schema.  These anchor the frozen corpus to the immutable baseline commit
+        # blob and prove the validator is unchanged, so reusing the current
+        # validator for both dual-run sides stays sound and fail-closed.
+        "test_frozen_fixtures_equal_the_baseline_commit_blobs",
+        "test_receipt_validator_is_unchanged_in_this_batch",
     }
     command = [
         sys.executable,

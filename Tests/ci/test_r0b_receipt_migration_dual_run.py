@@ -589,5 +589,74 @@ class ReceiptManifestBindingTest(unittest.TestCase):
             )
 
 
+def _git_blob(commit: str, repo_relpath: str) -> bytes:
+    """Raw bytes of ``repo_relpath`` at ``commit`` with no newline munging."""
+
+    result = subprocess.run(
+        ["git", "-c", "core.autocrlf=false", "show", "{0}:{1}".format(commit, repo_relpath)],
+        cwd=str(ROOT),
+        capture_output=True,
+        check=True,
+    )
+    return result.stdout
+
+
+class BaselineCommitAnchoringTest(unittest.TestCase):
+    """RebuildPlan 4.2.3 requires freezing the *old validator*, not just the old
+    schema.  This batch does not touch ``Tools/ci/phase0.py``, so the dual-run
+    reuses the current ``validate_json_schema`` for both sides.  That reuse is
+    sound only if two facts are proven fail-closed rather than assumed:
+
+    * the frozen fixtures really are the pre-migration bytes -- anchored to the
+      immutable baseline commit blob, not merely to a digest recorded beside them
+      in ``provenance.json``, which an attacker could rewrite in the same change;
+    * the receipt validator is unchanged since that baseline, so "current
+      validator" and "old validator" are provably the same code.
+
+    If either stops holding these tests fail, forcing a genuinely isolated
+    old/new validator run instead of two schemas compared under one validator.
+    """
+
+    def setUp(self) -> None:
+        self.baseline_commit = _load_json(FIXTURES / "provenance.json")["baseline_commit"]
+
+    def test_frozen_fixtures_equal_the_baseline_commit_blobs(self) -> None:
+        frozen = {
+            "governance/schemas/module-manifest.schema.json": BASELINE
+            / "module-manifest.schema.json"
+        }
+        for path in _baseline_manifest_paths():
+            frozen["Modules/{0}/module.yaml".format(_module_id_of_baseline(path))] = path
+
+        drift = [
+            repo_relpath
+            for repo_relpath, fixture in sorted(frozen.items())
+            if fixture.read_bytes() != _git_blob(self.baseline_commit, repo_relpath)
+        ]
+        self.assertEqual(
+            [],
+            drift,
+            "frozen fixture bytes diverge from the baseline commit blobs; the "
+            "old-schema side of the dual-run is no longer the real pre-migration corpus",
+        )
+
+    def test_receipt_validator_is_unchanged_in_this_batch(self) -> None:
+        changed = _git(
+            ROOT,
+            "diff",
+            "--name-only",
+            self.baseline_commit,
+            "--",
+            "Tools/ci/phase0.py",
+        )
+        self.assertEqual(
+            "",
+            changed,
+            "Tools/ci/phase0.py changed since the baseline; the dual-run may no longer "
+            "reuse the current validator for the old side and must execute the frozen "
+            "baseline validator in isolation",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
