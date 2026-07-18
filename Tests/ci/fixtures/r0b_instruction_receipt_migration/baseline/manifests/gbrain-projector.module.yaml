@@ -1,0 +1,313 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {
+    "id": "gbrain-projector",
+    "name": "GBrain Projector",
+    "version": "0.3.0",
+    "description": "Fixed-derivation full-Soul Source authority and pure gbrain.projection/v2 renderer with strict PostgreSQL role separation, catalog attestation, append-only revision truth, and tamper-evident read-back; no external GBrain write.",
+    "lifecycle": "proposed",
+    "runtimeState": "proposed",
+    "releaseEligible": false,
+    "riskTier": "R3",
+    "ownerId": "dps-platform"
+  },
+  "paths": {
+    "actualRoot": "Modules/gbrain-projector",
+    "canonicalRoot": "modules/gbrain-projector",
+    "owned": [
+      "Modules/gbrain-projector/**"
+    ],
+    "excluded": [],
+    "runtimeData": []
+  },
+  "artifacts": [
+    {
+      "id": "dps.gbrain-projector",
+      "kind": "assembly",
+      "status": "proposed",
+      "build": "scripts/dotnet-pinned.sh restore Modules/gbrain-projector/src --locked-mode && scripts/dotnet-pinned.sh build Modules/gbrain-projector/src --configuration Release --no-restore",
+      "versioning": "semver"
+    },
+    {
+      "id": "dps.gbrain-projector.contracts",
+      "kind": "contract-pack",
+      "status": "proposed",
+      "build": "scripts/dotnet-pinned.sh restore Modules/gbrain-projector/contracts --locked-mode && scripts/dotnet-pinned.sh build Modules/gbrain-projector/contracts --configuration Release --no-restore",
+      "versioning": "semver"
+    }
+  ],
+  "runtime": {
+    "track": "modern-service",
+    "language": "C# 14",
+    "target": "net10.0",
+    "processBoundary": "modular-monolith",
+    "entrypoints": [
+      "Modules/gbrain-projector/src/PostgresGBrainProjectorMigration.cs",
+      "Modules/gbrain-projector/src/PostgresGBrainProjectorRuntime.cs"
+    ],
+    "toolchainStatus": "proposed"
+  },
+  "contracts": {
+    "provided": [
+      {
+        "contractId": "gbrain.projection",
+        "major": 1,
+        "source": "Modules/gbrain-projector/contracts/provided/gbrain.projection.v1.schema.json",
+        "status": "deprecated",
+        "mode": "quarantine-only",
+        "ownerModule": "gbrain-projector"
+      },
+      {
+        "contractId": "gbrain.projection",
+        "major": 2,
+        "source": "Modules/gbrain-projector/contracts/provided/gbrain.projection.v2.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "gbrain-projector"
+      },
+      {
+        "contractId": "gbrain.source.binding",
+        "major": 1,
+        "source": "Modules/gbrain-projector/contracts/provided/gbrain.source-binding.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "gbrain-projector"
+      }
+    ],
+    "consumed": [
+      {
+        "contractId": "memory.event",
+        "major": 1,
+        "source": "Modules/memory-event-ledger/contracts/provided/memory.event.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "memory-event-ledger"
+      },
+      {
+        "contractId": "interest.snapshot",
+        "major": 1,
+        "source": "Modules/interest-reducer/contracts/provided/interest.snapshot.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "interest-reducer"
+      }
+    ]
+  },
+  "communication": {
+    "inbound": [
+      {
+        "peerModule": "memory-event-ledger",
+        "contractId": "memory.event",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "event",
+        "timeoutMs": 5000,
+        "retryPolicy": "bounded-exponential-with-jitter",
+        "idempotencyKey": "trace_id:idempotency_key",
+        "authScope": "module:memory-event-ledger",
+        "failureMode": "fail-closed-and-record-evidence"
+      },
+      {
+        "peerModule": "interest-reducer",
+        "contractId": "interest.snapshot",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "event",
+        "timeoutMs": 5000,
+        "retryPolicy": "bounded-exponential-with-jitter",
+        "idempotencyKey": "trace_id:idempotency_key",
+        "authScope": "module:interest-reducer",
+        "failureMode": "fail-closed-and-record-evidence"
+      }
+    ],
+    "outbound": [
+      {
+        "peerModule": "evidence-service",
+        "contractId": "gbrain.projection",
+        "major": 2,
+        "direction": "outbound",
+        "transport": "receipt",
+        "timeoutMs": 5000,
+        "retryPolicy": "bounded-exponential-with-jitter",
+        "idempotencyKey": "trace_id:idempotency_key",
+        "authScope": "module:evidence-service",
+        "failureMode": "fail-closed-and-record-evidence"
+      },
+      {
+        "peerModule": "soul-memory-adapter",
+        "contractId": "gbrain.projection",
+        "major": 2,
+        "direction": "outbound",
+        "transport": "soul-memory-adapter",
+        "timeoutMs": 5000,
+        "retryPolicy": "identical-projection-redelivery",
+        "idempotencyKey": "soul_id:source_binding_revision:projection_revision",
+        "authScope": "module:soul-memory-adapter",
+        "failureMode": "fail-closed-and-retain-unverified-state"
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "moduleId": "memory-event-ledger",
+      "versionRange": ">=0.1.0 <1.0.0",
+      "required": true,
+      "reason": "Soul-scoped events"
+    },
+    {
+      "moduleId": "interest-reducer",
+      "versionRange": ">=0.1.0 <1.0.0",
+      "required": true,
+      "reason": "Soul-scoped interest snapshot"
+    }
+  ],
+  "permissions": {
+    "allowed": [
+      "cpu:pure-render",
+      "postgresql-migrator:separate-direct-login-and-owned-ddl",
+      "postgresql-runtime:schema-usage-and-table-select-insert-only",
+      "postgresql:gbrain_projection.source_bindings",
+      "postgresql:gbrain_projection.rendered_revisions",
+      "postgresql:gbrain_projection.source_binding_quarantine"
+    ],
+    "denied": [
+      "gbrain-company-network-in-first-slice",
+      "GBrain credentials",
+      "device command",
+      "production shell",
+      "runtime PostgreSQL DDL, UPDATE, DELETE, or TRUNCATE",
+      "shared migration and runtime credential"
+    ],
+    "productionApproval": "human-required"
+  },
+  "data": {
+    "ownedStores": [
+      "postgresql:gbrain_projection.source_bindings",
+      "postgresql:gbrain_projection.rendered_revisions",
+      "postgresql:gbrain_projection.source_binding_quarantine"
+    ],
+    "readModels": [
+      "projection-by-soul-and-revision"
+    ],
+    "privacyClasses": [
+      "personal",
+      "sensitive"
+    ],
+    "retention": "projection DTO retained only for configured verification window",
+    "export": "exact Soul-scoped DTO and checksum",
+    "correction": "render a new revision from corrected source facts",
+    "deletion": "delete DTO cache and emit rebuild/delete plan for adapter"
+  },
+  "security": {
+    "trustBoundaries": [
+      "module API and versioned contract boundary"
+    ],
+    "secretScopes": [
+      "postgresql:gbrain-projector:migration-admin",
+      "postgresql:gbrain-projector:runtime"
+    ],
+    "untrustedInputs": [
+      "contract payloads",
+      "stored text",
+      "relational proof columns",
+      "canonical JSON and JSONB persistence",
+      "timestamps"
+    ],
+    "failClosedOn": [
+      "unknown contract major",
+      "invalid identity scope",
+      "missing evidence",
+      "mismatched Source/Soul/revision/checksum",
+      "schema, owner, trigger, constraint, index, or ACL drift",
+      "shared or elevated runtime PostgreSQL identity"
+    ],
+    "policyIds": [
+      "SOUL-ISO-001",
+      "CMD-IDEMP-001",
+      "RESULT-VERIFY-001",
+      "GBRAIN-READBACK-001",
+      "EDGE-NORESTART-001"
+    ]
+  },
+  "tests": {
+    "requiredOutcome": "PASS",
+    "failureOutcomes": [
+      "FAIL",
+      "SKIP",
+      "PARTIAL",
+      "NOT_RUN",
+      "INFRA_ERROR",
+      "NOT_APPLICABLE"
+    ],
+    "suites": [
+      {
+        "id": "gbrain-projector.unit",
+        "type": "unit",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/gbrain-projector/tests --locked-mode && scripts/dotnet-pinned.sh test --project Modules/gbrain-projector/tests --configuration Release --no-restore --filter-trait Category=Unit --minimum-expected-tests 1 --fail-skips on",
+        "environment": "macos-or-hosted",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "gbrain-projector.contract",
+        "type": "contract",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/gbrain-projector/tests --locked-mode && scripts/dotnet-pinned.sh test --project Modules/gbrain-projector/tests --configuration Release --no-restore --filter-trait Category=Contract --minimum-expected-tests 1 --fail-skips on",
+        "environment": "macos-or-hosted",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "gbrain-projector.integration",
+        "type": "integration",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/gbrain-projector/tests --locked-mode && scripts/dotnet-pinned.sh test --project Modules/gbrain-projector/tests --configuration Release --no-restore --filter-trait Category=Integration --minimum-expected-tests 1 --fail-skips on",
+        "environment": "PostgreSQL 18.4 with distinct DPS_TEST_POSTGRES_ADMIN_URI and DPS_TEST_POSTGRES_RUNTIME_URI direct-login credentials",
+        "evidenceLevel": "INTEGRATION_VERIFIED"
+      }
+    ]
+  },
+  "compatibility": {
+    "policyRef": "governance/policies/compatibility-policy.yaml",
+    "track": "modern",
+    "moduleMajor": 0,
+    "supportedContractMajors": {
+      "gbrain.projection": [
+        1,
+        2
+      ],
+      "gbrain.source.binding": [
+        1
+      ],
+      "memory.event": [
+        1
+      ],
+      "interest.snapshot": [
+        1
+      ]
+    },
+    "unknownMajorBehavior": "reject",
+    "missingMajorBehavior": "reject",
+    "unknownModeBehavior": "reject",
+    "missingModeBehavior": "reject"
+  },
+  "rollout": {
+    "featureFlag": "gbrain_projector_v2",
+    "canary": "synthetic then shadow then bounded Soul cohort",
+    "rollback": "disable feature flag and restore previous signed Release BOM",
+    "killSwitch": "kill_gbrain_projector"
+  },
+  "deviceGates": {
+    "requiresWindows": false,
+    "requiresZennoDroid": false,
+    "requiresAdb": false,
+    "minimumVerification": "INTEGRATION_VERIFIED"
+  },
+  "agents": {
+    "spec": "dps.agents/v1",
+    "policyVersion": "1.0.0",
+    "instructionsFile": "AGENTS.md",
+    "manifestFile": "module.yaml",
+    "receiptRequired": true,
+    "resolver": "factory-instruction-resolver"
+  }
+}

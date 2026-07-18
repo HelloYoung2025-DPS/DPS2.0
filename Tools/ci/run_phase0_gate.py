@@ -72,6 +72,15 @@ ALLOWED_TRUSTED_EXECUTOR_ENVIRONMENT = ALLOWED_MANIFEST_ENVIRONMENT | {
     "DPS_TEST_PLATFORM_AUTHORITY_PKCS8_FILE",
 }
 PYTHON_NAMES = {"python", "python3", "python3.12"}
+# A manifest may also pin the repository interpreter by path.  Phase0 never runs a
+# declared path -- it always executes ``sys.executable`` -- so this token is only
+# accepted when the gate is itself already running that exact interpreter (see
+# ``_parse_python_invocation``).  Anything looser would silently substitute the
+# interpreter and record REPOSITORY_STATIC_VERIFIED evidence naming one that never
+# ran, which the legacy byte-baseline contract explicitly forbids.
+REPOSITORY_PINNED_PYTHON = ".venv/bin/python"
+DECLARED_PYTHON_NAMES = PYTHON_NAMES | {REPOSITORY_PINNED_PYTHON}
+LEGACY_BASELINE_ANCHOR_ENV = "DPS_LEGACY_BASELINE_ANCHOR"
 FORBIDDEN_COMMAND_FRAGMENTS = ("\n", "\r", "\x00", "`", "$(`", "${", ";", "|", ">", "<")
 PUBLICATION_SCHEMA_VERSION = "dps.evidence-publication/v1"
 PUBLICATION_MARKER_SUFFIX = ".publication.json"
@@ -354,6 +363,21 @@ def run_phase0_unittests() -> Dict[str, Any]:
         "test_weak_receipt_empty_suites_forgery_is_rejected",
         "test_contract_policy_is_exactly_the_required_contract_inventory",
         "test_integration_policy_is_exactly_the_required_integration_inventory",
+        # RebuildPlan 4.2.3 old/new dual-run for the R0-B receipt migration.  Naming
+        # these here makes the frozen migration corpus load-bearing: deleting or
+        # renaming it fails this gate instead of silently shrinking coverage.
+        "test_every_frozen_file_matches_its_recorded_digest",
+        "test_old_schema_rejects_all_34_current_manifests",
+        "test_new_schema_rejects_all_34_baseline_manifests",
+        "test_reintroducing_the_factory_resolver_breaks_the_new_gate",
+        "test_stale_receipt_is_rejected_after_a_manifest_edit",
+        # The attack corpus is only evidence while these hold: the corpus file
+        # cannot be neutered into no-op mutations or weakened verdicts, because the
+        # expectations are pinned in test code rather than read from the corpus.
+        "test_corpus_declares_exactly_the_pinned_attack_classes",
+        "test_declared_expectations_match_the_pinned_verdicts",
+        "test_every_rejecting_sample_actually_mutates_its_base",
+        "test_pinned_attack_verdicts_hold_against_both_schemas",
     }
     command = [
         sys.executable,
@@ -1379,8 +1403,35 @@ def _parse_python_invocation(
 ) -> TrustedInvocation:
     python_prefix = [sys.executable, "-I"]
     values = list(segment)
-    if not values or values.pop(0) not in PYTHON_NAMES:
+    if not values:
         raise Phase0Error("only the pinned Phase0 Python interpreter is allowed")
+    declared_python = values.pop(0)
+    if declared_python not in DECLARED_PYTHON_NAMES:
+        raise Phase0Error("only the pinned Phase0 Python interpreter is allowed")
+    if declared_python == REPOSITORY_PINNED_PYTHON:
+        # Phase0 executes ``sys.executable``, never the declared path.  Accept the
+        # repository-pinned declaration only when the two are the same file, so the
+        # interpreter named in the manifest is provably the one that ran.  A
+        # PATH-selected interpreter cannot satisfy the legacy byte-baseline gate.
+        try:
+            declared_same = (root / REPOSITORY_PINNED_PYTHON).resolve(
+                strict=True
+            ) == Path(sys.executable).resolve(strict=True)
+        except (OSError, RuntimeError):
+            declared_same = False
+        if not declared_same:
+            raise Phase0Error(
+                "required suite pins {0} but Phase0 is running a different "
+                "interpreter; run the gate with the repository-pinned "
+                "interpreter".format(REPOSITORY_PINNED_PYTHON)
+            )
+    # ``-I`` is already forced for unittest shapes via ``python_prefix``; accept an
+    # explicit declaration and honour it for direct static scripts so a manifest
+    # that asks for isolated mode actually gets it.
+    declared_isolated = False
+    if values and values[0] == "-I":
+        values.pop(0)
+        declared_isolated = True
     if values[:3] == ["-m", "unittest", "discover"]:
         if len(values) != 7 or values[3] != "-s" or values[5] != "-p":
             raise Phase0Error("unittest discovery must use the fixed -s/-p shape")
@@ -1441,7 +1492,9 @@ def _parse_python_invocation(
     if values not in ([], ["--root", "."]):
         raise Phase0Error("static Python suite arguments are not allowlisted")
     return TrustedInvocation(
-        [sys.executable, str(script), *values], "static-json", 1
+        [sys.executable, *(["-I"] if declared_isolated else []), str(script), *values],
+        "static-json",
+        1,
     )
 
 
@@ -1491,7 +1544,7 @@ def parse_manifest_suite_command(
             test_type,
             expected_test_category=expected_test_category,
         )
-    elif executable in PYTHON_NAMES:
+    elif executable in DECLARED_PYTHON_NAMES:
         if len(segments) != 1:
             raise Phase0Error("Python suites cannot use compound shell commands")
         invocations = (
@@ -1830,6 +1883,20 @@ def _trusted_test_environment(
         sandbox_value = os.environ.get(sandbox_key)
         if sandbox_value:
             environment[sandbox_key] = sandbox_value
+    # The legacy byte-baseline verifier fails closed without an out-of-repository
+    # read-only anchor owned by an identity other than the verifier (plan §11).
+    # The path is supplied by the gate operator and is deliberately NOT declarable
+    # by a manifest, so a candidate cannot aim the verifier at an anchor it
+    # controls.  Every trust property of the anchor itself -- read-only mode,
+    # foreign owner, non-writable parent, commit ancestry -- stays the verifier's
+    # own fail-closed responsibility; the gate only stops silently dropping it.
+    anchor_path = os.environ.get(LEGACY_BASELINE_ANCHOR_ENV)
+    if anchor_path:
+        if not os.path.isabs(anchor_path):
+            raise Phase0Error(
+                "legacy baseline anchor path must be absolute: " + anchor_path
+            )
+        environment[LEGACY_BASELINE_ANCHOR_ENV] = anchor_path
     unknown = sorted(set(extra).difference(ALLOWED_TRUSTED_EXECUTOR_ENVIRONMENT))
     if unknown:
         raise Phase0Error(

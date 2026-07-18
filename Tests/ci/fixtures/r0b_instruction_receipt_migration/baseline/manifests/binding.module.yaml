@@ -1,0 +1,292 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {
+    "id": "binding",
+    "name": "Identity Binding",
+    "version": "0.4.0",
+    "description": "Authoritative PostgreSQL binding saga with provider-owned exact-revision reservations and commit-spanning mutation fences.",
+    "lifecycle": "proposed",
+    "runtimeState": "proposed",
+    "releaseEligible": false,
+    "riskTier": "R3",
+    "ownerId": "dps-platform"
+  },
+  "paths": {
+    "actualRoot": "Modules/binding",
+    "canonicalRoot": "modules/binding",
+    "owned": ["Modules/binding/**"],
+    "excluded": [],
+    "runtimeData": []
+  },
+  "artifacts": [
+    {
+      "id": "dps.binding",
+      "kind": "assembly",
+      "status": "proposed",
+      "build": "scripts/dotnet-pinned.sh restore Modules/binding/src/Dps.Binding/Dps.Binding.csproj --locked-mode && scripts/dotnet-pinned.sh build Modules/binding/src/Dps.Binding/Dps.Binding.csproj --configuration Release --no-restore",
+      "versioning": "semver"
+    },
+    {
+      "id": "dps.binding.contracts",
+      "kind": "contract-pack",
+      "status": "proposed",
+      "build": "scripts/dotnet-pinned.sh restore Modules/binding/contracts/Dps.Binding.Contracts/Dps.Binding.Contracts.csproj --locked-mode && scripts/dotnet-pinned.sh build Modules/binding/contracts/Dps.Binding.Contracts/Dps.Binding.Contracts.csproj --configuration Release --no-restore",
+      "versioning": "semver"
+    }
+  ],
+  "runtime": {
+    "track": "modern-service",
+    "language": "C# 14",
+    "target": "net10.0",
+    "processBoundary": "modular-monolith",
+    "entrypoints": [],
+    "toolchainStatus": "proposed"
+  },
+  "contracts": {
+    "provided": [
+      {
+        "contractId": "identity.binding",
+        "major": 1,
+        "source": "Modules/binding/contracts/provided/identity.binding.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "binding"
+      },
+      {
+        "contractId": "identity.binding.mutation.fence",
+        "major": 1,
+        "source": "Modules/binding/contracts/provided/identity.binding.mutation-fence.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "binding"
+      },
+      {
+        "contractId": "binding.composition.attestation",
+        "major": 1,
+        "source": "Modules/binding/contracts/provided/binding.composition.attestation.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "binding"
+      }
+    ],
+    "consumed": [
+      {
+        "contractId": "device.registered",
+        "major": 1,
+        "source": "Modules/device-registry/contracts/provided/device.registered.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "device-registry"
+      },
+      {
+        "contractId": "platform.account.authorized",
+        "major": 1,
+        "source": "Modules/platform-account-registry/contracts/provided/platform.account.authorized.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "platform-account-registry"
+      },
+      {
+        "contractId": "device.binding.reservation",
+        "major": 1,
+        "source": "Modules/device-registry/contracts/provided/device.binding.reservation.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "device-registry"
+      },
+      {
+        "contractId": "platform.account.binding.reservation",
+        "major": 1,
+        "source": "Modules/platform-account-registry/contracts/provided/platform.account.binding.reservation.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "platform-account-registry"
+      }
+    ]
+  },
+  "communication": {
+    "inbound": [
+      {
+        "peerModule": "device-registry",
+        "contractId": "device.registered",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "read-only-query",
+        "timeoutMs": 5000,
+        "retryPolicy": "same-idempotency-key-identical-payload",
+        "idempotencyKey": "soul_id:device_binding_id:platform_account_id:idempotency_key",
+        "authScope": "module:device-registry",
+        "failureMode": "fail-closed"
+      },
+      {
+        "peerModule": "platform-account-registry",
+        "contractId": "platform.account.authorized",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "read-only-query",
+        "timeoutMs": 5000,
+        "retryPolicy": "same-idempotency-key-identical-payload",
+        "idempotencyKey": "soul_id:device_binding_id:platform_account_id:idempotency_key",
+        "authScope": "module:platform-account-registry",
+        "failureMode": "fail-closed"
+      },
+      {
+        "peerModule": "device-registry",
+        "contractId": "device.binding.reservation",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "in-process-api",
+        "timeoutMs": 5000,
+        "retryPolicy": "same-reservation-id-exact-scope",
+        "idempotencyKey": "reservation_id:state",
+        "authScope": "module:device-registry",
+        "failureMode": "fail-closed-and-recover-pending-attempt"
+      },
+      {
+        "peerModule": "platform-account-registry",
+        "contractId": "platform.account.binding.reservation",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "in-process-api",
+        "timeoutMs": 5000,
+        "retryPolicy": "same-reservation-id-exact-scope",
+        "idempotencyKey": "reservation_id:state",
+        "authScope": "module:platform-account-registry",
+        "failureMode": "fail-closed-and-recover-pending-attempt"
+      }
+    ],
+    "outbound": [
+      {
+        "peerModule": "control-plane-host",
+        "contractId": "identity.binding",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "event",
+        "timeoutMs": 5000,
+        "retryPolicy": "outbox-identical-redelivery",
+        "idempotencyKey": "device_binding_id:binding_revision",
+        "authScope": "module:control-plane-host",
+        "failureMode": "retain-outbox-and-fail-closed"
+      },
+      {
+        "peerModule": "persona-store",
+        "contractId": "identity.binding.mutation.fence",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "in-process-api",
+        "timeoutMs": 5000,
+        "retryPolicy": "reacquire-same-operation-after-session-loss",
+        "idempotencyKey": "soul_id:device_binding_id:platform_account_id:idempotency_key",
+        "authScope": "module:persona-store",
+        "failureMode": "hold-authoritative-session-fence-through-consumer-commit"
+      },
+      {
+        "peerModule": "persona-store",
+        "contractId": "binding.composition.attestation",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "receipt",
+        "timeoutMs": 5000,
+        "retryPolicy": "none-expired-or-mismatched-attestation",
+        "idempotencyKey": "release-bom:generation",
+        "authScope": "module:persona-store",
+        "failureMode": "reject-consumer-composition-before-database-access"
+      }
+    ]
+  },
+  "dependencies": [
+    {"moduleId": "device-registry", "versionRange": ">=0.4.0 <1.0.0", "required": true, "reason": "canonical privacy-safe registration, trusted provider instance identity, and exact-revision reservation client"},
+    {"moduleId": "platform-account-registry", "versionRange": ">=0.4.0 <1.0.0", "required": true, "reason": "authority-owned pinned-root evidence consumption, trusted provider instance identity, and exact-revision reservation client"}
+  ],
+  "permissions": {
+    "allowed": ["postgresql:binding", "canonical-identity-validation", "binding-lifecycle"],
+    "denied": ["raw email or phone", "device command", "platform credential", "GBrain network", "cross-module table access", "production shell"],
+    "productionApproval": "human-required"
+  },
+  "data": {
+    "ownedStores": [
+      "postgresql:binding.bindings",
+      "postgresql:binding.binding_revisions",
+      "postgresql:binding.idempotency_receipts",
+      "postgresql:binding.idempotency_quarantine",
+      "postgresql:binding.outbox"
+      ,"postgresql:binding.binding_attempts"
+      ,"postgresql:binding.binding_mutation_fences"
+      ,"postgresql:binding.composition_generation_state"
+      ,"postgresql:binding.module_schema_migrations"
+    ],
+    "readModels": ["binding-by-id-and-soul", "active-binding-by-device", "active-binding-by-account"],
+    "privacyClasses": ["personal", "sensitive"],
+    "retention": "until binding revocation, privacy erasure, and audit retention expire",
+    "export": "export exact Soul-scoped binding revisions without raw aliases or credentials",
+    "correction": "revoke the incorrect binding and create a distinct binding identifier",
+    "deletion": "revoke first, then erase scoped identifiers under audited privacy policy"
+  },
+  "security": {
+    "trustBoundaries": ["current device-registry read-only query to binding", "current platform-account-registry read-only query to binding", "provider-owned exact-revision binding reservations", "fixed-root signed Release BOM composition attestation", "Soul-scoped binding query"],
+    "secretScopes": [],
+    "untrustedInputs": ["identity fields", "queried provider contract payloads", "composition attestations", "timestamps", "idempotency keys"],
+    "failClosedOn": ["unknown contract version", "unknown producer", "scope mismatch", "inactive proof", "stale revision", "conflicting idempotency key", "cross-Soul query", "invalid composition signature", "expired composition attestation", "composition generation rollback or equivocation", "implementation, contract-pack, or host artifact digest mismatch", "instance configuration digest or trust epoch mismatch", "applied migration digest mismatch"],
+    "policyIds": ["SOUL-ISO-001", "CMD-IDEMP-001", "RESULT-VERIFY-001", "GBRAIN-READBACK-001", "EDGE-NORESTART-001"]
+  },
+  "tests": {
+    "requiredOutcome": "PASS",
+    "failureOutcomes": ["FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"],
+    "suites": [
+      {
+        "id": "binding.unit",
+        "type": "unit",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/binding/tests/Dps.Binding.Tests/Dps.Binding.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/binding/tests/Dps.Binding.Tests/Dps.Binding.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Unit --minimum-expected-tests 15 --fail-skips on",
+        "environment": "macos-or-hosted deterministic store",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "binding.contract",
+        "type": "contract",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/binding/tests/Dps.Binding.Tests/Dps.Binding.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/binding/tests/Dps.Binding.Tests/Dps.Binding.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Contract --minimum-expected-tests 8 --fail-skips on",
+        "environment": "macos-or-hosted deterministic store",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "binding.integration",
+        "type": "integration",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/binding/tests/Dps.Binding.Tests/Dps.Binding.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/binding/tests/Dps.Binding.Tests/Dps.Binding.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Integration --minimum-expected-tests 42 --fail-skips on",
+        "environment": "PostgreSQL 18.4 via DPS_TEST_POSTGRES plus an external pinned-root P-256 PKCS#8 signer file via DPS_TEST_PLATFORM_AUTHORITY_PKCS8_FILE; independent binding/device/account schemas; port 55434 and dps_gbrain_company are rejected",
+        "evidenceLevel": "INTEGRATION_VERIFIED"
+      }
+    ]
+  },
+  "compatibility": {
+    "policyRef": "governance/policies/compatibility-policy.yaml",
+    "track": "modern",
+    "moduleMajor": 0,
+    "supportedContractMajors": {"device.registered": [1], "platform.account.authorized": [1], "device.binding.reservation": [1], "platform.account.binding.reservation": [1], "identity.binding": [1], "identity.binding.mutation.fence": [1], "binding.composition.attestation": [1]},
+    "unknownMajorBehavior": "reject",
+    "missingMajorBehavior": "reject",
+    "unknownModeBehavior": "reject",
+    "missingModeBehavior": "reject"
+  },
+  "rollout": {
+    "featureFlag": "identity_binding_v1",
+    "canary": "synthetic then shadow then human-approved bounded identity cohort",
+    "rollback": "stop new bindings and issue a higher-generation rollback attestation for the previous stable BOM without rewriting binding history",
+    "killSwitch": "kill_identity_binding_writes"
+  },
+  "deviceGates": {
+    "requiresWindows": false,
+    "requiresZennoDroid": false,
+    "requiresAdb": false,
+    "minimumVerification": "INTEGRATION_VERIFIED"
+  },
+  "agents": {
+    "spec": "dps.agents/v1",
+    "policyVersion": "1.0.0",
+    "instructionsFile": "AGENTS.md",
+    "manifestFile": "module.yaml",
+    "receiptRequired": true,
+    "resolver": "factory-instruction-resolver"
+  }
+}

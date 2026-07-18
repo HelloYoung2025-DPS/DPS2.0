@@ -1,0 +1,196 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {
+    "id": "device-registry",
+    "name": "Device Registry",
+    "version": "0.4.0",
+    "description": "Stable device identity from versioned fingerprint HMACs, bounded capability inventory, and provider-owned binding reservation leases.",
+    "lifecycle": "proposed",
+    "runtimeState": "proposed",
+    "releaseEligible": false,
+    "riskTier": "R3",
+    "ownerId": "dps-platform"
+  },
+  "paths": {
+    "actualRoot": "Modules/device-registry",
+    "canonicalRoot": "modules/device-registry",
+    "owned": ["Modules/device-registry/**"],
+    "excluded": [],
+    "runtimeData": []
+  },
+  "artifacts": [
+    {
+      "id": "dps.device-registry",
+      "kind": "assembly",
+      "status": "proposed",
+      "build": "scripts/dotnet-pinned.sh restore Modules/device-registry/src/Dps.DeviceRegistry/Dps.DeviceRegistry.csproj --locked-mode && scripts/dotnet-pinned.sh build Modules/device-registry/src/Dps.DeviceRegistry/Dps.DeviceRegistry.csproj --configuration Release --no-restore",
+      "versioning": "semver"
+    },
+    {
+      "id": "dps.device-registry.contracts",
+      "kind": "contract-pack",
+      "status": "proposed",
+      "build": "scripts/dotnet-pinned.sh restore Modules/device-registry/contracts/Dps.DeviceRegistry.Contracts/Dps.DeviceRegistry.Contracts.csproj --locked-mode && scripts/dotnet-pinned.sh build Modules/device-registry/contracts/Dps.DeviceRegistry.Contracts/Dps.DeviceRegistry.Contracts.csproj --configuration Release --no-restore",
+      "versioning": "semver"
+    }
+  ],
+  "runtime": {
+    "track": "modern-service",
+    "language": "C# 14",
+    "target": "net10.0",
+    "processBoundary": "modular-monolith",
+    "entrypoints": [],
+    "toolchainStatus": "proposed"
+  },
+  "contracts": {
+    "provided": [
+      {
+        "contractId": "device.registered",
+        "major": 1,
+        "source": "Modules/device-registry/contracts/provided/device.registered.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "device-registry"
+      },
+      {
+        "contractId": "device.binding.reservation",
+        "major": 1,
+        "source": "Modules/device-registry/contracts/provided/device.binding.reservation.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "device-registry"
+      }
+    ],
+    "consumed": []
+  },
+  "communication": {
+    "inbound": [],
+    "outbound": [
+      {
+        "peerModule": "binding",
+        "contractId": "device.registered",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "read-only-query",
+        "timeoutMs": 5000,
+        "retryPolicy": "bounded-exponential-with-jitter",
+        "idempotencyKey": "trace_id:idempotency_key",
+        "authScope": "module:binding",
+        "failureMode": "fail-closed"
+      },
+      {
+        "peerModule": "binding",
+        "contractId": "device.binding.reservation",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "in-process-api",
+        "timeoutMs": 5000,
+        "retryPolicy": "same-reservation-id-exact-scope",
+        "idempotencyKey": "reservation_id:state",
+        "authScope": "module:binding",
+        "failureMode": "fail-closed-and-retain-provider-reservation"
+      },
+      {
+        "peerModule": "control-plane-host",
+        "contractId": "device.registered",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "event",
+        "timeoutMs": 5000,
+        "retryPolicy": "outbox-identical-redelivery",
+        "idempotencyKey": "soul_id:device_binding_id:platform_account_id:idempotency_key",
+        "authScope": "module:control-plane-host",
+        "failureMode": "retain-outbox-and-fail-closed"
+      }
+    ]
+  },
+  "dependencies": [],
+  "permissions": {
+    "allowed": ["postgresql:device_registry", "validation:keyed-hmac-sha256-device-fingerprint"],
+    "denied": ["raw hardware identifier persistence", "unkeyed fingerprint digest persistence", "fingerprint HMAC secret access", "Soul ownership", "platform account ownership", "device command", "GBrain network", "production shell"],
+    "productionApproval": "human-required"
+  },
+  "data": {
+    "ownedStores": [
+      "postgresql:device_registry.devices",
+      "postgresql:device_registry.capability_revisions",
+      "postgresql:device_registry.idempotency_receipts",
+      "postgresql:device_registry.outbox",
+      "postgresql:device_registry.idempotency_quarantine"
+      ,"postgresql:device_registry.binding_reservations"
+    ],
+    "readModels": ["device-by-id", "device-by-fingerprint-key-epoch-hmac"],
+    "privacyClasses": ["internal", "sensitive"],
+    "retention": "until device retirement and configured audit retention expire",
+    "export": "export device identity and capability revisions without raw hardware identifiers",
+    "correction": "append a capability revision using optimistic concurrency",
+    "deletion": "tombstone the device and erase keyed fingerprint HMAC mappings after binding checks"
+  },
+  "security": {
+    "trustBoundaries": ["strict versioned module API", "key-id-and-epoch-bound fingerprint HMAC boundary", "signed binding composition pins provider configuration digest and trust epoch"],
+    "secretScopes": [],
+    "untrustedInputs": ["fingerprint HMAC digests", "fingerprint key metadata", "capability declarations", "contract timestamps"],
+    "failClosedOn": ["non-exact schema version", "unknown JSON property", "missing JSON property", "non-canonical envelope identifier", "inactive fingerprint key id or epoch", "invalid provider trust epoch", "provider configuration digest mismatch", "unkeyed legacy fingerprint row", "invalid digest", "unbounded or non-ASCII capability declaration", "stale capability revision", "conflicting idempotency key", "effective binding reservation"],
+    "policyIds": ["SOUL-ISO-001", "CMD-IDEMP-001", "RESULT-VERIFY-001", "GBRAIN-READBACK-001", "EDGE-NORESTART-001"]
+  },
+  "tests": {
+    "requiredOutcome": "PASS",
+    "failureOutcomes": ["FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"],
+    "suites": [
+      {
+        "id": "device-registry.unit",
+        "type": "unit",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/device-registry/tests/Dps.DeviceRegistry.Tests/Dps.DeviceRegistry.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/device-registry/tests/Dps.DeviceRegistry.Tests/Dps.DeviceRegistry.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Unit --minimum-expected-tests 6 --fail-skips on",
+        "environment": "macos-or-hosted deterministic store",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "device-registry.contract",
+        "type": "contract",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/device-registry/tests/Dps.DeviceRegistry.Tests/Dps.DeviceRegistry.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/device-registry/tests/Dps.DeviceRegistry.Tests/Dps.DeviceRegistry.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Contract --minimum-expected-tests 4 --fail-skips on",
+        "environment": "macos-or-hosted deterministic store",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "device-registry.integration",
+        "type": "integration",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/device-registry/tests/Dps.DeviceRegistry.Tests/Dps.DeviceRegistry.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/device-registry/tests/Dps.DeviceRegistry.Tests/Dps.DeviceRegistry.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Integration --minimum-expected-tests 15 --fail-skips on",
+        "environment": "PostgreSQL 18.4 via DPS_TEST_POSTGRES using one disposable schema per test",
+        "evidenceLevel": "INTEGRATION_VERIFIED"
+      }
+    ]
+  },
+  "compatibility": {
+    "policyRef": "governance/policies/compatibility-policy.yaml",
+    "track": "modern",
+    "moduleMajor": 0,
+    "supportedContractMajors": {"device.registered": [1], "device.binding.reservation": [1]},
+    "unknownMajorBehavior": "reject",
+    "missingMajorBehavior": "reject",
+    "unknownModeBehavior": "reject",
+    "missingModeBehavior": "reject"
+  },
+  "rollout": {
+    "featureFlag": "device_registry_v1",
+    "canary": "synthetic then shadow then bounded authorized device cohort",
+    "rollback": "stop new registrations and route reads only to a keyed-fingerprint-schema-compatible signed BOM; never downgrade populated HMAC truth to the pre-release unkeyed schema",
+    "killSwitch": "kill_device_registry_writes"
+  },
+  "deviceGates": {
+    "requiresWindows": false,
+    "requiresZennoDroid": false,
+    "requiresAdb": false,
+    "minimumVerification": "INTEGRATION_VERIFIED"
+  },
+  "agents": {
+    "spec": "dps.agents/v1",
+    "policyVersion": "1.0.0",
+    "instructionsFile": "AGENTS.md",
+    "manifestFile": "module.yaml",
+    "receiptRequired": true,
+    "resolver": "factory-instruction-resolver"
+  }
+}

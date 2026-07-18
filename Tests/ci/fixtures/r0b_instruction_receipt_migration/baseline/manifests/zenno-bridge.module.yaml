@@ -1,0 +1,195 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {
+    "id": "zenno-bridge",
+    "name": "Zenno Bridge",
+    "version": "0.1.0",
+    "description": "Frozen C# 5 compatible loopback bridge between ZennoDroid and Windows Edge.",
+    "lifecycle": "proposed",
+    "runtimeState": "proposed",
+    "releaseEligible": false,
+    "riskTier": "R3",
+    "ownerId": "dps-edge"
+  },
+  "paths": {
+    "actualRoot": "Modules/zenno-bridge",
+    "canonicalRoot": "modules/zenno-bridge",
+    "owned": ["Modules/zenno-bridge/**"],
+    "excluded": [],
+    "runtimeData": []
+  },
+  "artifacts": [
+    {
+      "id": "dps.zenno-bridge",
+      "kind": "assembly",
+      "status": "buildable",
+      "build": "bash Modules/zenno-bridge/operations/build.sh",
+      "versioning": "semver"
+    },
+    {
+      "id": "dps.zenno-bridge.contracts",
+      "kind": "contract-pack",
+      "status": "proposed",
+      "build": "python3.12 -m unittest discover -s Modules/zenno-bridge/tests -p test_contracts.py",
+      "versioning": "semver"
+    }
+  ],
+  "runtime": {
+    "track": "legacy-zennodroid",
+    "language": "C# 5",
+    "target": "net40 compile target; ZennoDroid host compatibility pending Windows capability probe",
+    "processBoundary": "legacy-host",
+    "entrypoints": ["Modules/zenno-bridge/src/LoopbackBridgeClient.cs"],
+    "toolchainStatus": "verified"
+  },
+  "contracts": {
+    "provided": [
+      {
+        "contractId": "edge.bridge.exchange",
+        "major": 1,
+        "source": "Modules/zenno-bridge/contracts/provided/edge.bridge.exchange.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "zenno-bridge"
+      }
+    ],
+    "consumed": [
+      {
+        "contractId": "edge.bridge.directive",
+        "major": 1,
+        "source": "Modules/windows-edge-supervisor/contracts/provided/edge.bridge.directive.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "windows-edge-supervisor"
+      }
+    ]
+  },
+  "communication": {
+    "inbound": [
+      {
+        "peerModule": "windows-edge-supervisor",
+        "contractId": "edge.bridge.directive",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "command",
+        "timeoutMs": 15000,
+        "retryPolicy": "none; next poll repeats by command id",
+        "idempotencyKey": "command_id:directive_kind",
+        "authScope": "windows-process-identity-and-pinned-rsa-proof:zenno-bridge",
+        "failureMode": "fail-closed-and-return-no-action"
+      }
+    ],
+    "outbound": [
+      {
+        "peerModule": "windows-edge-supervisor",
+        "contractId": "edge.bridge.exchange",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "command",
+        "timeoutMs": 15000,
+        "retryPolicy": "poll-only; mutation outcome requires reconciliation",
+        "idempotencyKey": "command_id:exchange_kind",
+        "authScope": "windows-process-identity-and-pinned-rsa-proof:zenno-bridge",
+        "failureMode": "fail-closed-and-return-unknown-outcome"
+      }
+    ]
+  },
+  "dependencies": [],
+  "permissions": {
+    "allowed": ["loopback:http", "windows:default-process-identity", "crypto:pinned-rsa-public-key-proof", "authorized native Zenno action invocation"],
+    "denied": ["gbrain access", "persona storage", "interest evolution", "AI planning", "production credentials", "arbitrary shell"],
+    "productionApproval": "human-required"
+  },
+  "data": {
+    "ownedStores": [],
+    "readModels": [],
+    "privacyClasses": ["internal", "personal"],
+    "retention": "no durable payload retention in the bridge",
+    "export": "not applicable; native receipts flow through the versioned exchange",
+    "correction": "not applicable; corrected commands require a new command id",
+    "deletion": "no bridge-owned durable personal data"
+  },
+  "security": {
+    "trustBoundaries": ["ZennoDroid host boundary", "fixed loopback endpoint", "Windows process identity", "SPKI SHA-256 pinned public-key proof using rsa-pkcs1-sha256", "bounded versioned JSON envelope"],
+    "secretScopes": [],
+    "untrustedInputs": ["loopback JSON response", "peer auth fields", "selectors", "action and step kinds", "native result text"],
+    "failClosedOn": ["missing trust configuration", "non-loopback endpoint", "unknown contract major", "unknown exchange kind", "unknown action", "unknown step", "identity mismatch", "undeclared JSON field", "untrusted key", "stale proof", "body digest mismatch", "invalid signature", "replayed nonce"],
+    "policyIds": ["SOUL-ISO-001", "CMD-IDEMP-001", "RESULT-VERIFY-001", "EDGE-NORESTART-001"]
+  },
+  "tests": {
+    "requiredOutcome": "PASS",
+    "failureOutcomes": ["FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"],
+    "suites": [
+      {
+        "id": "zenno-bridge.static-csharp5",
+        "type": "static",
+        "required": true,
+        "command": "python3.12 Modules/zenno-bridge/tests/test_bridge_static.py",
+        "environment": "macos static source and contract validation",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "zenno-bridge.auth-simulation",
+        "type": "integration",
+        "required": true,
+        "command": "bash Modules/zenno-bridge/operations/test-auth-simulation.sh",
+        "environment": "SIMULATION only: macOS or Windows with .NET 10, exact Category=SecuritySimulation, minimum four tests, fail-skips on; linked legacy source, no ZennoDroid or Windows verification claim",
+        "evidenceLevel": "INTEGRATION_VERIFIED"
+      },
+      {
+        "id": "zenno-bridge.contract-schema",
+        "type": "contract",
+        "required": true,
+        "command": "python3.12 -m unittest discover -s Modules/zenno-bridge/tests -p test_contracts.py",
+        "environment": "repository-pinned Python 3.12.13 with locked jsonschema; owned exchange and supervisor-owned directive corpora, exact UTC and terminal security boundaries, no Windows claim",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "zenno-bridge.contract-wire",
+        "type": "contract",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/zenno-bridge/tests/Dps.ZennoBridge.AuthSimulation.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/zenno-bridge/tests/Dps.ZennoBridge.AuthSimulation.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Contract --minimum-expected-tests 2 --fail-skips on",
+        "environment": "macOS or hosted .NET 10 test host linking the exact C# 5 bridge source; production DataContract wire output checked against the owned schema envelope, no Windows claim",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "zenno-bridge.windows",
+        "type": "windows",
+        "required": false,
+        "command": "python3 Modules/zenno-bridge/tests/windows_gate_launcher.py",
+        "environment": "authorized Windows host with ZennoDroid and ADB",
+        "evidenceLevel": "WINDOWS_VERIFIED"
+      }
+    ]
+  },
+  "compatibility": {
+    "policyRef": "governance/policies/compatibility-policy.yaml",
+    "track": "bridge",
+    "moduleMajor": 0,
+    "supportedContractMajors": {"edge.bridge.exchange": [1], "edge.bridge.directive": [1]},
+    "unknownMajorBehavior": "reject",
+    "missingMajorBehavior": "reject",
+    "unknownModeBehavior": "reject",
+    "missingModeBehavior": "reject"
+  },
+  "rollout": {
+    "featureFlag": "zenno_bridge_v1",
+    "canary": "maintenance-window install on two non-production phones before any production binding",
+    "rollback": "restore the exact previous bridge only in an approved maintenance window",
+    "killSwitch": "kill_edge_command_intake"
+  },
+  "deviceGates": {
+    "requiresWindows": true,
+    "requiresZennoDroid": true,
+    "requiresAdb": true,
+    "minimumVerification": "WINDOWS_VERIFIED"
+  },
+  "agents": {
+    "spec": "dps.agents/v1",
+    "policyVersion": "1.0.0",
+    "instructionsFile": "AGENTS.md",
+    "manifestFile": "module.yaml",
+    "receiptRequired": true,
+    "resolver": "factory-instruction-resolver"
+  }
+}

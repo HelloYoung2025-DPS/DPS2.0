@@ -1,0 +1,325 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {
+    "id": "windows-edge-supervisor",
+    "name": "Windows Edge Supervisor",
+    "version": "0.5.0",
+    "description": "Proposed Windows-only authenticated Zenno loopback health host and fail-closed A/B Supervisor. Complete signed Worker runtime closure, route-state fencing, and capability evidence exist, but the Worker launch/runtime ABI and crash-recovery protocol remain unavailable, so production staging and route transitions are disabled.",
+    "lifecycle": "proposed",
+    "runtimeState": "proposed",
+    "releaseEligible": false,
+    "riskTier": "R3",
+    "ownerId": "dps-edge"
+  },
+  "paths": {
+    "actualRoot": "Modules/windows-edge-supervisor",
+    "canonicalRoot": "modules/windows-edge-supervisor",
+    "owned": ["Modules/windows-edge-supervisor/**"],
+    "excluded": [],
+    "runtimeData": ["edge-runtime/slots/**", "edge-runtime/routes/**", "edge-runtime/evidence/supervisor-evidence.jsonl", "edge-runtime/supervisor-state.json", "edge-runtime/supervisor-state.json.writer.lock"]
+  },
+  "artifacts": [
+    {
+      "id": "dps.windows-edge-supervisor",
+      "kind": "service",
+      "status": "buildable",
+      "build": "bash Modules/windows-edge-supervisor/operations/build.sh",
+      "versioning": "semver"
+    },
+    {
+      "id": "dps.windows-edge-supervisor.contracts",
+      "kind": "contract-pack",
+      "status": "buildable",
+      "build": "bash scripts/dotnet-pinned.sh restore Modules/windows-edge-supervisor/contracts/provided/Dps.WindowsEdgeSupervisor.Contracts/Dps.WindowsEdgeSupervisor.Contracts.csproj --locked-mode && bash scripts/dotnet-pinned.sh build Modules/windows-edge-supervisor/contracts/provided/Dps.WindowsEdgeSupervisor.Contracts/Dps.WindowsEdgeSupervisor.Contracts.csproj --configuration Release --no-restore",
+      "versioning": "semver"
+    }
+  ],
+  "runtime": {
+    "track": "modern-service",
+    "language": "C# 14",
+    "target": "net10.0",
+    "processBoundary": "out-of-process",
+    "entrypoints": ["Modules/windows-edge-supervisor/src/Dps.WindowsEdgeSupervisor.csproj"],
+    "toolchainStatus": "verified"
+  },
+  "contracts": {
+    "provided": [
+      {
+        "contractId": "edge.worker.exchange",
+        "major": 1,
+        "source": "Modules/windows-edge-supervisor/contracts/provided/edge.worker.exchange.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "windows-edge-supervisor"
+      },
+      {
+        "contractId": "edge.worker.drain.directive",
+        "major": 1,
+        "source": "Modules/windows-edge-supervisor/contracts/provided/edge.worker.drain.directive.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "windows-edge-supervisor"
+      },
+      {
+        "contractId": "edge.worker.drain.receipt",
+        "major": 1,
+        "source": "Modules/windows-edge-supervisor/contracts/provided/edge.worker.drain.receipt.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "windows-edge-supervisor"
+      },
+      {
+        "contractId": "edge.bridge.directive",
+        "major": 1,
+        "source": "Modules/windows-edge-supervisor/contracts/provided/edge.bridge.directive.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "windows-edge-supervisor"
+      },
+      {
+        "contractId": "edge.capability.evidence",
+        "major": 1,
+        "source": "Modules/windows-edge-supervisor/contracts/provided/edge.capability.evidence.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "windows-edge-supervisor"
+      }
+    ],
+    "consumed": [
+      {
+        "contractId": "edge.bridge.exchange",
+        "major": 1,
+        "source": "Modules/zenno-bridge/contracts/provided/edge.bridge.exchange.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "zenno-bridge"
+      },
+      {
+        "contractId": "edge.journal.receipt",
+        "major": 1,
+        "source": "Modules/edge-local-journal/contracts/provided/edge.journal.receipt.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "edge-local-journal"
+      },
+      {
+        "contractId": "edge.journal.drain.attestation",
+        "major": 1,
+        "source": "Modules/edge-local-journal/contracts/provided/edge.journal.drain.attestation.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "edge-local-journal"
+      }
+    ]
+  },
+  "communication": {
+    "inbound": [
+      {
+        "peerModule": "windows-edge-worker",
+        "contractId": "edge.worker.drain.receipt",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "receipt",
+        "timeoutMs": 30000,
+        "retryPolicy": "same signed drain receipt until durable cutover state is recorded",
+        "idempotencyKey": "drain_id",
+        "authScope": "deployment-pinned-worker-rsa-pss-identity",
+        "failureMode": "fail-closed-and-preserve-active-drain"
+      },
+      {
+        "peerModule": "windows-edge-worker",
+        "contractId": "edge.worker.exchange",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "command",
+        "timeoutMs": 30000,
+        "retryPolicy": "same-command-id-and-original-request-sha256",
+        "idempotencyKey": "idempotency_key:exchange_kind",
+        "authScope": "module:windows-edge-worker",
+        "failureMode": "retain-command-state-and-reconcile"
+      },
+      {
+        "peerModule": "zenno-bridge",
+        "contractId": "edge.bridge.exchange",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "command",
+        "timeoutMs": 15000,
+        "retryPolicy": "poll-only; result submission is idempotent",
+        "idempotencyKey": "command_id:exchange_kind",
+        "authScope": "windows-process-identity-and-pinned-rsa-proof:zenno-bridge",
+        "failureMode": "fail-closed-and-journal"
+      },
+      {
+        "peerModule": "edge-local-journal",
+        "contractId": "edge.journal.drain.attestation",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "in-process-api",
+        "timeoutMs": 5000,
+        "retryPolicy": "new request_id only after stable-state re-read",
+        "idempotencyKey": "request_id",
+        "authScope": "direct-provider-and-deployment-pinned-journal-rsa-pss-identity",
+        "failureMode": "fail-closed-no-attestation"
+      }
+    ],
+    "outbound": [
+      {
+        "peerModule": "windows-edge-worker",
+        "contractId": "edge.worker.drain.directive",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "command",
+        "timeoutMs": 30000,
+        "retryPolicy": "same exact signed directive; after expiry only a Worker-matching durable PREPARED/COMMITTED continuation may accept it, and new intake fails closed",
+        "idempotencyKey": "drain_id",
+        "authScope": "deployment-pinned-supervisor-rsa-pss-signing-authority",
+        "failureMode": "fail-closed-and-preserve-active-drain"
+      },
+      {
+        "peerModule": "zenno-bridge",
+        "contractId": "edge.bridge.directive",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "command",
+        "timeoutMs": 15000,
+        "retryPolicy": "poll-response only; mutation results require idempotent reconciliation",
+        "idempotencyKey": "command_id:directive_kind",
+        "authScope": "windows-process-identity-and-pinned-rsa-proof:zenno-bridge",
+        "failureMode": "fail-closed-and-journal"
+      },
+      {
+        "peerModule": "windows-edge-worker",
+        "contractId": "edge.worker.exchange",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "command",
+        "timeoutMs": 30000,
+        "retryPolicy": "bounded-only-before-dispatch-acknowledgement",
+        "idempotencyKey": "idempotency_key",
+        "authScope": "module:windows-edge-worker",
+        "failureMode": "unknown-outcome-and-reconcile"
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "moduleId": "zenno-bridge",
+      "versionRange": ">=0.1.0 <1.0.0",
+      "required": true,
+      "reason": "fixed loopback exchange contract"
+    },
+    {
+      "moduleId": "edge-local-journal",
+      "versionRange": ">=0.1.0 <1.0.0",
+      "required": true,
+      "reason": "durable routing and cutover journal"
+    }
+  ],
+  "permissions": {
+    "allowed": ["loopback:http", "windows-auth:negotiate-sid-allowlist", "certificate-store:LocalMachine-My", "filesystem:signed-version-directories", "filesystem:pinned-trust-store", "filesystem:append-only-evidence-log", "filesystem:recoverable-supervisor-state", "external:monotonic-supervisor-state-anchor", "external:drain-directive-signing-broker", "process:edge-workers", "process:job-object-kill-on-close", "checksum:sha256", "signature:rsa-pss-sha256", "signature:rsa-pkcs1-sha256"],
+    "denied": ["device action", "gbrain access", "persona storage", "AI planning", "production credentials", "raw private signing key", "arbitrary production shell"],
+    "productionApproval": "human-required"
+  },
+  "data": {
+    "ownedStores": ["edge-route-state", "edge-slot-state"],
+    "readModels": ["device-binding-route", "worker-slot-health", "capability-evidence"],
+    "privacyClasses": ["internal", "personal"],
+    "retention": "route state retained through the active and previous stable BOM",
+    "export": "redacted route and capability evidence by trace and binding",
+    "correction": "append route correction and preserve prior decision evidence",
+    "deletion": "remove binding-specific route state after command reconciliation"
+  },
+  "security": {
+    "trustBoundaries": ["loopback bridge boundary", "signed artifact directory", "worker process boundary", "journal boundary"],
+    "secretScopes": ["local worker authentication only"],
+    "untrustedInputs": ["bridge JSON", "Windows client identity", "host configuration", "worker health", "artifact paths", "capability probe output", "raw Worker drain receipt", "raw Journal drain attestation", "persisted supervisor state", "append-only evidence log", "external supervisor anchor snapshot"],
+    "failClosedOn": ["non-Windows host", "non-loopback endpoint", "unauthenticated or unallowlisted Windows SID", "mismatched certificate thumbprint or SPKI", "unknown contract major", "unknown action or step", "free-text or unsigned drain request", "uncomposed Worker result channel", "unfrozen Worker launch/runtime ABI", "unsigned missing extra or mutable Worker runtime closure member", "expired capability or directive including expiry equality without exact durable Worker continuation", "invalid exchange kind truth table", "duplicate unknown oversized or timed-out wire", "reparse point symlink parent replacement hardlink or file replacement", "Worker Job Object assignment failure", "evidence chain truncation replacement or tampering", "evidence-log root mismatch", "digest mismatch", "overlapping artifact capability bridge Supervisor Worker or Journal key role", "untrusted signing key", "invalid signature", "missing capability", "unhealthy candidate", "Worker runtime operation deadline exceeded", "missing hung or untrusted Worker or Journal drain proof", "mismatched Journal request id or Worker and Journal proof pair", "wrong worker or journal artifact", "wrong Release BOM or protected policy", "stale Journal evidence", "incomplete or non-durable drain truth", "missing corrupt replayed unanchored concurrent-writer or in-flight restart state", "non-canonical stale or mismatched anchor preparation token", "state file outside committed and prepared anchor heads", "half-persisted drain proof pair", "rollback slot overwrite before soak release", "missing declarative trust configuration", "missing external evidence"],
+    "policyIds": ["SOUL-ISO-001", "CMD-IDEMP-001", "RESULT-VERIFY-001", "EDGE-NORESTART-001"]
+  },
+  "tests": {
+    "requiredOutcome": "PASS",
+    "failureOutcomes": ["FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"],
+    "suites": [
+      {
+        "id": "windows-edge-supervisor.unit",
+        "type": "unit",
+        "required": true,
+        "command": "bash Modules/windows-edge-supervisor/operations/test.sh Unit",
+        "environment": "macos diagnostic environment with .NET 10; exact local wrapper floor is 12; Windows execution remains an external gate",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "windows-edge-supervisor.contract",
+        "type": "contract",
+        "required": true,
+        "command": "bash Modules/windows-edge-supervisor/operations/test.sh Contract",
+        "environment": "macos diagnostic environment with .NET 10; exact local and candidate floor is 13; Windows execution remains an external gate",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "windows-edge-supervisor.contract-schema",
+        "type": "contract",
+        "required": true,
+        "command": "python3.12 -m unittest discover -s Modules/windows-edge-supervisor/tests -p test_edge_worker_exchange_schema.py",
+        "environment": "repository-pinned Python 3.12.13 with locked jsonschema; 64 owner-corpus cases, Zenno consumer corpus, exact owner-compatible UTC/version syntax, signed drain-directive and Worker-only receipt schemas, canonical Journal payload order, exact RSA-PSS parameters, SPKI/PKCS1 Zenno directive authentication, deployment-bound signed capability evidence, independent Worker and Journal proof boundaries, digest, key, Base64, null-array, Int32, and receipt truth boundaries",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "windows-edge-supervisor.ab-simulation",
+        "type": "integration",
+        "required": true,
+        "command": "bash Modules/windows-edge-supervisor/operations/test.sh Integration",
+        "environment": "macos deterministic 100-switch simulation without ZennoDroid; exact local and candidate floor is 2; not Windows evidence",
+        "evidenceLevel": "INTEGRATION_VERIFIED"
+      },
+      {
+        "id": "windows-edge-supervisor.windows-gate",
+        "type": "windows",
+        "required": false,
+        "command": "bash Modules/windows-edge-supervisor/operations/windows-gate.sh",
+        "environment": "authorized Windows host with PowerShell, ZennoDroid, ADB, signed workers, externally protected configuration SHA/BOM/policy/host/trust-store fingerprints, durable Supervisor state, and 24-hour soak",
+        "evidenceLevel": "WINDOWS_VERIFIED"
+      }
+    ]
+  },
+  "compatibility": {
+    "policyRef": "governance/policies/compatibility-policy.yaml",
+    "track": "modern",
+    "moduleMajor": 0,
+    "supportedContractMajors": {
+      "edge.bridge.exchange": [1],
+      "edge.bridge.directive": [1],
+      "edge.worker.exchange": [1],
+      "edge.worker.drain.directive": [1],
+      "edge.worker.drain.receipt": [1],
+      "edge.journal.receipt": [1],
+      "edge.journal.drain.attestation": [1],
+      "edge.capability.evidence": [1]
+    },
+    "unknownMajorBehavior": "reject",
+    "missingMajorBehavior": "reject",
+    "unknownModeBehavior": "reject",
+    "missingModeBehavior": "reject"
+  },
+  "rollout": {
+    "featureFlag": "windows_edge_supervisor_v1",
+    "canary": "shadow then 1, 3, 8, 15, and 30 authorized device bindings",
+    "rollback": "stop new intake, drain, reconcile, and atomically route to the previous exact validated slot within five minutes",
+    "killSwitch": "kill_edge_command_intake"
+  },
+  "deviceGates": {
+    "requiresWindows": true,
+    "requiresZennoDroid": true,
+    "requiresAdb": true,
+    "minimumVerification": "WINDOWS_VERIFIED"
+  },
+  "agents": {
+    "spec": "dps.agents/v1",
+    "policyVersion": "1.0.0",
+    "instructionsFile": "AGENTS.md",
+    "manifestFile": "module.yaml",
+    "receiptRequired": true,
+    "resolver": "factory-instruction-resolver"
+  }
+}

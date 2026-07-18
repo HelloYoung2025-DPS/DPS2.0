@@ -1,0 +1,113 @@
+{
+  "baseline_commit": "8f63593d4f262ec1496b05300da75a71b86eaab4",
+  "corpus": "dps.r0b-instruction-receipt-migration-corpus/v1",
+  "files": {
+    "Modules/audit-metrics/module.yaml": {
+      "sha256": "95cafac2b04365af982246f5c0e791e78671d0087590e90db11fb7618b95a950"
+    },
+    "Modules/binding/module.yaml": {
+      "sha256": "3e8a511ce4bad5bc9d0ad7e169fd0c2042deb679f4f7a7c17dda527023fe23ef"
+    },
+    "Modules/command-orchestrator/module.yaml": {
+      "sha256": "6ebc54ecdf300be49486384eef660437e0d7f475069a7baa357628244568d6e0"
+    },
+    "Modules/control-plane-host/module.yaml": {
+      "sha256": "487a11d9d0dcdec6135a6ab6cde6709439478a38afefd07c784cc9db824c971b"
+    },
+    "Modules/device-registry/module.yaml": {
+      "sha256": "91309919e4c8f3bb4bd3fa02ba1327ab9114a7fc75d2b7b01500ab4e7e99594a"
+    },
+    "Modules/edge-local-journal/module.yaml": {
+      "sha256": "3f68370869e360e7c975ff013ecd4a46548d8ecefa13ff1ed3b706f9c10abf02"
+    },
+    "Modules/evidence-service/module.yaml": {
+      "sha256": "e88cfeeafeb9135c1de9e99d36e56158a8c87db4c94d792ce2810ce3ae3670c4"
+    },
+    "Modules/executor-gateway/module.yaml": {
+      "sha256": "de91e549e96b65050c52da4534a39327150c0684753323aa0a06ff39071baa7a"
+    },
+    "Modules/factory-artifact-builder/module.yaml": {
+      "sha256": "b9bd21937c692d1fd894820cdf88d9a159794858a5e2d88929df4f6f7cc2507f"
+    },
+    "Modules/factory-control-plane-host/module.yaml": {
+      "sha256": "96d6592d042a954ee9a65d60e7c4bce7209fec49c4e20a0f2f2fdd390c057f06"
+    },
+    "Modules/factory-evidence-ledger/module.yaml": {
+      "sha256": "3cab71679fc3293bf5c54e91ca2ce7e79c95669458e59447cef950144fad8b3b"
+    },
+    "Modules/factory-impact-analyzer/module.yaml": {
+      "sha256": "01544936d04e2959f0343086044d01cb019ff08e536718d79d952b1a83ee48e5"
+    },
+    "Modules/factory-instruction-resolver/module.yaml": {
+      "sha256": "edcf1efdc501c2e5897872c4b6053feb68877558758d9735fcc79b2ec0f3e53b"
+    },
+    "Modules/factory-merge-controller/module.yaml": {
+      "sha256": "9e9a06eef561295075b5f5638db2afdbf87897d05ea1f7b28cdcdd7d0b58da16"
+    },
+    "Modules/factory-release-controller/module.yaml": {
+      "sha256": "0f36548a714675de92e3b32e8eebef3bea83e1beba554b937f8819f3ae87ac75"
+    },
+    "Modules/factory-rollback-controller/module.yaml": {
+      "sha256": "21e3207c08448abf415638e1014c2d259caeee0ac8b74223fee95c260cf6df0d"
+    },
+    "Modules/factory-trusted-runner/module.yaml": {
+      "sha256": "54f96923d5e9d0b4c6e504b0e93bdc88992b9392d18993f340e1cc7e952de776"
+    },
+    "Modules/factory-upgrade-intake/module.yaml": {
+      "sha256": "b5225734df05e219f329a0ccb2f1cc0ac10453704429df9a751365455645b637"
+    },
+    "Modules/factory-worktree-manager/module.yaml": {
+      "sha256": "8e32342a5f9869cc1b7a7c8573e3b80fd58699e1b2214378f96293d796e1990b"
+    },
+    "Modules/gbrain-projector/module.yaml": {
+      "sha256": "d6dfe9d240e72ba422059619eff36684c20a2361ee81b3ed2b7702081ebee35f"
+    },
+    "Modules/interest-reducer/module.yaml": {
+      "sha256": "5bf765e21124d1df04fde96143205f3b835e9e90359769a39853a94f5c5368c1"
+    },
+    "Modules/legacy-runtime-adapter/module.yaml": {
+      "sha256": "7228ffe965157f6088e0ab2e7a8b48cac266f618bcde13fccbe61d66efdcfa25"
+    },
+    "Modules/memory-event-ledger/module.yaml": {
+      "sha256": "6cafeea533e4a9355fb214dc235fb3681d9d4376267c487876a22c1cf22f4993"
+    },
+    "Modules/operation-compiler/module.yaml": {
+      "sha256": "22ab4ca1a348595d2097ea483396313427cab5a3bf1fc453445035f624c0800d"
+    },
+    "Modules/persona-store/module.yaml": {
+      "sha256": "7d8c71c48a8634450d129a455f7110365ca5179d1e52c1d46fd951cfdac2f262"
+    },
+    "Modules/planner/module.yaml": {
+      "sha256": "3742acd84dba7b5a9d2083ea0840cf6387ff9945467b7fb6ba7be6c706310457"
+    },
+    "Modules/platform-account-registry/module.yaml": {
+      "sha256": "3fd5bbabe2335736408feb1a5a89ee5a0d137af18c891bdfdb68c1362f915dd0"
+    },
+    "Modules/platform-authorization-authority/module.yaml": {
+      "sha256": "8298214561f2b443ade83b1a7611f4fb1f00bea3178a5e1e42e1ec4e562ee68f"
+    },
+    "Modules/policy-approval/module.yaml": {
+      "sha256": "c7b6d9530df7c018b44e70b478f504a04a9aea6a3bd086b05eea9be888a38481"
+    },
+    "Modules/soul-memory-adapter/module.yaml": {
+      "sha256": "7cba0abc69da5c2e7b471c6ca886a77226f27660ea0109685edeb95d2b50a84a"
+    },
+    "Modules/soul-registry/module.yaml": {
+      "sha256": "db6ac27196c51f7b02fcef50b70c64978c52090c7ece0fbb7eb2c14f3fb34a78"
+    },
+    "Modules/windows-edge-supervisor/module.yaml": {
+      "sha256": "37775f07b06253c694ab9b017bfbf6c382cd092789952aaa859f92d6883cb475"
+    },
+    "Modules/windows-edge-worker/module.yaml": {
+      "sha256": "dbd6f388f07d5140dd6944d0299a12f65774884a07d4f107721076cdf3b201ad"
+    },
+    "Modules/zenno-bridge/module.yaml": {
+      "sha256": "a48d68e5ab3e353058bdb994fa86a144f7eadd2d5e5f45b99bcbb9766f22d9ca"
+    },
+    "governance/schemas/module-manifest.schema.json": {
+      "sha256": "65d9f0b2654db0884b3bfef45edc3a211ea0aedf9b7eabe11921838b0b1be5a7"
+    }
+  },
+  "module_count": 34,
+  "purpose": "Frozen pre-migration (old) governance corpus for the RebuildPlan section 4.2.3 old/new dual-run of the module manifest schema. Never regenerate: these bytes are the immutable pre-migration baseline."
+}
