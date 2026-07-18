@@ -81,7 +81,7 @@
 
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：M2-1 Persona 投影链（§5.1）。
-开工前先核对 dps2 已合入 PR：M1C 未合入、或 M1 收口审计（T4）未完成/裁决为 FAIL 或 UNAVAILABLE/有未决 critical，则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次（Persona v1 保持、persona outbox -> GBrain projector -> SoulMemory adapter -> exact readback 链及其独立测试），不触碰 M3 轨模块。上一批证据以 dps2 最新已合入 PR 为准，自行获取；若上一合入批次触碰候选门禁信任根（含 catalog/DAG/compatibility 等合同登记文件）且尚无合入后正式 clean 证据，先在当前 HEAD 以 --base <其合入提交> 按 §4.5 第 2 步补跑门禁取证，再开工本批。
+开工前先核对 dps2 已合入 PR：M1C 未合入、或 M1 收口审计（T4）的裁决不是可核验的 PASS（未完成、FAIL/UNAVAILABLE、记录不一致或无法核验、有未决 critical，均属非 PASS，一律停），则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次（Persona v1 保持、persona outbox -> GBrain projector -> SoulMemory adapter -> exact readback 链及其独立测试），不触碰 M3 轨模块。上一批证据以 dps2 最新已合入 PR 为准，自行获取；若上一合入批次触碰候选门禁信任根（含 catalog/DAG/compatibility 等合同登记文件）且尚无合入后正式 clean 证据，先在当前 HEAD 以 --base <其合入提交> 按 §4.5 第 2 步补跑门禁取证，再开工本批。
 完成后：跑 required 门禁、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准。若本批触碰候选门禁信任根：我确认合入后不结束会话，按 §4.5 第 2 步在合入提交的后继提交上取正式 clean 证据（main 暂无后继提交时，先开一个空提交 PR 作证据锚、经我合入后再取证），结果贴回本批 PR，完成后本批才算关闭。
 ```
 
@@ -113,7 +113,7 @@
 
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：M3-1 app.package/v1 与探索安全流（§6.1/§6.2）。
-开工前先核对 dps2 已合入 PR：M1C 未合入、或 M1 收口审计（T4）未完成/裁决为 FAIL 或 UNAVAILABLE/有未决 critical，则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次：operation-compiler 拥有 app.package/v1 与 canonical 包、app_onboarder 只产隔离候选、至少两个非 IG fixture，不触碰 M2 轨模块。上一批证据以 dps2 最新已合入 PR 为准，自行获取；若上一合入批次触碰候选门禁信任根（含 catalog/DAG/compatibility 等合同登记文件）且尚无合入后正式 clean 证据，先在当前 HEAD 以 --base <其合入提交> 按 §4.5 第 2 步补跑门禁取证，再开工本批。
+开工前先核对 dps2 已合入 PR：M1C 未合入、或 M1 收口审计（T4）的裁决不是可核验的 PASS（未完成、FAIL/UNAVAILABLE、记录不一致或无法核验、有未决 critical，均属非 PASS，一律停），则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次：operation-compiler 拥有 app.package/v1 与 canonical 包、app_onboarder 只产隔离候选、至少两个非 IG fixture，不触碰 M2 轨模块。上一批证据以 dps2 最新已合入 PR 为准，自行获取；若上一合入批次触碰候选门禁信任根（含 catalog/DAG/compatibility 等合同登记文件）且尚无合入后正式 clean 证据，先在当前 HEAD 以 --base <其合入提交> 按 §4.5 第 2 步补跑门禁取证，再开工本批。
 完成后：跑 required 门禁（app-package suite）、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准。若本批触碰候选门禁信任根：我确认合入后不结束会话，按 §4.5 第 2 步在合入提交的后继提交上取正式 clean 证据（main 暂无后继提交时，先开一个空提交 PR 作证据锚、经我合入后再取证），结果贴回本批 PR，完成后本批才算关闭。
 ```
 
@@ -157,7 +157,7 @@
 
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：M4 组合与滚动门（§8/§9）。
-开工前先核对 dps2 已合入 PR：M2、M3 未全部合入、或 M2/M3 收口审计（T13）未完成/裁决为 FAIL 或 UNAVAILABLE/有未决 critical，则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次：composition root、attempt/receipt/eligibility 合同、session+command 双 300 滚动门、runtime kill switch 与工程 freeze、通知 outbox。退出条件以 §10 M4 行为准（含 kill-notify suite 的未授权清除负例）。上一批证据以 dps2 最新已合入 PR 为准，自行获取；若上一合入批次触碰候选门禁信任根（含 catalog/DAG/compatibility 等合同登记文件）且尚无合入后正式 clean 证据，先在当前 HEAD 以 --base <其合入提交> 按 §4.5 第 2 步补跑门禁取证，再开工本批。
+开工前先核对 dps2 已合入 PR：M2、M3 未全部合入、或 M2/M3 收口审计（T13）的裁决不是可核验的 PASS（未完成、FAIL/UNAVAILABLE、记录不一致或无法核验、有未决 critical，均属非 PASS，一律停），则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次：composition root、attempt/receipt/eligibility 合同、session+command 双 300 滚动门、runtime kill switch 与工程 freeze、通知 outbox。退出条件以 §10 M4 行为准（含 kill-notify suite 的未授权清除负例）。上一批证据以 dps2 最新已合入 PR 为准，自行获取；若上一合入批次触碰候选门禁信任根（含 catalog/DAG/compatibility 等合同登记文件）且尚无合入后正式 clean 证据，先在当前 HEAD 以 --base <其合入提交> 按 §4.5 第 2 步补跑门禁取证，再开工本批。
 完成后：跑 required 门禁（reliability 与 kill-notify suite）、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准。若本批触碰候选门禁信任根：我确认合入后不结束会话，按 §4.5 第 2 步在合入提交的后继提交上取正式 clean 证据（main 暂无后继提交时，先开一个空提交 PR 作证据锚、经我合入后再取证），结果贴回本批 PR，完成后本批才算关闭。
 ```
 
@@ -201,5 +201,5 @@
 ## 万能兜底模板（不确定该用哪个时）
 
 ```text
-按 Docs/RebuildPlan_重构计划书.md 与 dps2 已合入 PR 推导下一个未合入批次并施工它；范围只做该批次。开工前三项前置缺一即停：①上一合入批次若触碰候选门禁信任根且缺合入后正式 clean 证据，先在当前 HEAD 以 --base <其合入提交> 按 §4.5 第 2 步补跑门禁取证；②跨里程碑边界时确认对应收口审计（M1 用 T4、M2/M3 用 T13）已完成、裁决非 FAIL/UNAVAILABLE 且无未决 critical；③把你推导出的批次名和依据告诉我。完成后跑 required 门禁、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准。若本批触碰候选门禁信任根：我确认合入后不结束会话，按 §4.5 第 2 步在合入提交的后继提交上取正式 clean 证据（main 暂无后继提交时，先开一个空提交 PR 作证据锚、经我合入后再取证），结果贴回本批 PR，完成后本批才算关闭。
+按 Docs/RebuildPlan_重构计划书.md 与 dps2 已合入 PR 推导下一个未合入批次并施工它；范围只做该批次。开工前三项前置缺一即停：①上一合入批次若触碰候选门禁信任根且缺合入后正式 clean 证据，先在当前 HEAD 以 --base <其合入提交> 按 §4.5 第 2 步补跑门禁取证；②跨里程碑边界时确认对应收口审计（M1 用 T4、M2/M3 用 T13）的裁决是可核验的 PASS——未完成、FAIL/UNAVAILABLE、记录不一致或无法核验、有未决 critical 均属非 PASS，任一即停；③把你推导出的批次名和依据告诉我。完成后跑 required 门禁、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准。若本批触碰候选门禁信任根：我确认合入后不结束会话，按 §4.5 第 2 步在合入提交的后继提交上取正式 clean 证据（main 暂无后继提交时，先开一个空提交 PR 作证据锚、经我合入后再取证），结果贴回本批 PR，完成后本批才算关闭。
 ```
