@@ -72,16 +72,6 @@ ALLOWED_TRUSTED_EXECUTOR_ENVIRONMENT = ALLOWED_MANIFEST_ENVIRONMENT | {
     "DPS_TEST_PLATFORM_AUTHORITY_PKCS8_FILE",
 }
 PYTHON_NAMES = {"python", "python3", "python3.12"}
-# A manifest may also pin the repository interpreter by path.  Phase0 never runs a
-# declared path -- it always executes ``sys.executable`` -- so this token is only
-# accepted when the gate is itself already running that exact interpreter (see
-# ``_parse_python_invocation``).  Anything looser would silently substitute the
-# interpreter and record REPOSITORY_STATIC_VERIFIED evidence naming one that never
-# ran, which the legacy byte-baseline contract explicitly forbids.
-REPOSITORY_PINNED_VENV = ".venv"
-REPOSITORY_PINNED_PYTHON = ".venv/bin/python"
-DECLARED_PYTHON_NAMES = PYTHON_NAMES | {REPOSITORY_PINNED_PYTHON}
-LEGACY_BASELINE_ANCHOR_ENV = "DPS_LEGACY_BASELINE_ANCHOR"
 FORBIDDEN_COMMAND_FRAGMENTS = ("\n", "\r", "\x00", "`", "$(`", "${", ";", "|", ">", "<")
 PUBLICATION_SCHEMA_VERSION = "dps.evidence-publication/v1"
 PUBLICATION_MARKER_SUFFIX = ".publication.json"
@@ -379,13 +369,6 @@ def run_phase0_unittests() -> Dict[str, Any]:
         "test_declared_expectations_match_the_pinned_verdicts",
         "test_every_rejecting_sample_actually_mutates_its_base",
         "test_pinned_attack_verdicts_hold_against_both_schemas",
-        # The repository-pinned interpreter guard.  Comparing resolved executables
-        # was fail-open -- the venv launcher symlinks onto the shared base CPython,
-        # so that comparison also accepted the bare PATH interpreter and every
-        # sibling venv built on it.  These pin the venv-identity comparison.
-        "test_sibling_venv_on_the_same_base_interpreter_is_rejected",
-        "test_resolved_launcher_target_is_rejected",
-        "test_bare_base_interpreter_is_rejected",
     }
     command = [
         sys.executable,
@@ -1411,40 +1394,8 @@ def _parse_python_invocation(
 ) -> TrustedInvocation:
     python_prefix = [sys.executable, "-I"]
     values = list(segment)
-    if not values:
+    if not values or values.pop(0) not in PYTHON_NAMES:
         raise Phase0Error("only the pinned Phase0 Python interpreter is allowed")
-    declared_python = values.pop(0)
-    if declared_python not in DECLARED_PYTHON_NAMES:
-        raise Phase0Error("only the pinned Phase0 Python interpreter is allowed")
-    if declared_python == REPOSITORY_PINNED_PYTHON:
-        # Phase0 executes ``sys.executable``, never the declared path.  Bind the
-        # declaration to the *virtual environment*, not to the interpreter file:
-        # ``.venv/bin/python`` is a symlink onto the shared base CPython, so
-        # comparing resolved executables collapses both sides onto that base and
-        # would accept the bare PATH interpreter and every sibling venv built on
-        # it -- including one carrying a hostile ``sitecustomize`` module, which
-        # still executes under ``-I`` and could patch hashlib inside the legacy
-        # byte-baseline verifier.  ``sys.prefix`` is the venv's own identity and
-        # survives the symlink, so it is what the pin must compare.
-        try:
-            declared_same = Path(sys.prefix).resolve(strict=True) == (
-                root / REPOSITORY_PINNED_VENV
-            ).resolve(strict=True)
-        except (OSError, RuntimeError):
-            declared_same = False
-        if not declared_same:
-            raise Phase0Error(
-                "required suite pins {0} but Phase0 is running a different "
-                "interpreter; run the gate with the repository-pinned "
-                "interpreter".format(REPOSITORY_PINNED_PYTHON)
-            )
-    # ``-I`` is already forced for unittest shapes via ``python_prefix``; accept an
-    # explicit declaration and honour it for direct static scripts so a manifest
-    # that asks for isolated mode actually gets it.
-    declared_isolated = False
-    if values and values[0] == "-I":
-        values.pop(0)
-        declared_isolated = True
     if values[:3] == ["-m", "unittest", "discover"]:
         if len(values) != 7 or values[3] != "-s" or values[5] != "-p":
             raise Phase0Error("unittest discovery must use the fixed -s/-p shape")
@@ -1505,9 +1456,7 @@ def _parse_python_invocation(
     if values not in ([], ["--root", "."]):
         raise Phase0Error("static Python suite arguments are not allowlisted")
     return TrustedInvocation(
-        [sys.executable, *(["-I"] if declared_isolated else []), str(script), *values],
-        "static-json",
-        1,
+        [sys.executable, str(script), *values], "static-json", 1
     )
 
 
@@ -1557,7 +1506,7 @@ def parse_manifest_suite_command(
             test_type,
             expected_test_category=expected_test_category,
         )
-    elif executable in DECLARED_PYTHON_NAMES:
+    elif executable in PYTHON_NAMES:
         if len(segments) != 1:
             raise Phase0Error("Python suites cannot use compound shell commands")
         invocations = (
@@ -1896,20 +1845,6 @@ def _trusted_test_environment(
         sandbox_value = os.environ.get(sandbox_key)
         if sandbox_value:
             environment[sandbox_key] = sandbox_value
-    # The legacy byte-baseline verifier fails closed without an out-of-repository
-    # read-only anchor owned by an identity other than the verifier (plan §11).
-    # The path is supplied by the gate operator and is deliberately NOT declarable
-    # by a manifest, so a candidate cannot aim the verifier at an anchor it
-    # controls.  Every trust property of the anchor itself -- read-only mode,
-    # foreign owner, non-writable parent, commit ancestry -- stays the verifier's
-    # own fail-closed responsibility; the gate only stops silently dropping it.
-    anchor_path = os.environ.get(LEGACY_BASELINE_ANCHOR_ENV)
-    if anchor_path:
-        if not os.path.isabs(anchor_path):
-            raise Phase0Error(
-                "legacy baseline anchor path must be absolute: " + anchor_path
-            )
-        environment[LEGACY_BASELINE_ANCHOR_ENV] = anchor_path
     unknown = sorted(set(extra).difference(ALLOWED_TRUSTED_EXECUTOR_ENVIRONMENT))
     if unknown:
         raise Phase0Error(
