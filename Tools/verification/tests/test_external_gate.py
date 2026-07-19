@@ -110,9 +110,50 @@ def synthetic_module_manifest(
     outbound: list[dict] | None = None,
     schema_version: str = "dps.module/v2",
 ) -> dict:
+    # F9 validates every signed manifest against the exact schema for its declared
+    # major, so this fixture has to be a complete conformant document rather than
+    # the handful of blocks the graph checks happen to read.  A partial manifest
+    # here would only prove the gate still ignores the schema.
+    agents = {
+        "spec": "dps.agents/v1",
+        "policyVersion": "1.0.0",
+        "instructionsFile": "AGENTS.md",
+        "manifestFile": "module.yaml",
+        "receiptRequired": True,
+    }
+    if schema_version == "dps.module/v1":
+        agents["resolver"] = "factory-instruction-resolver"
     return {
         "schemaVersion": schema_version,
-        "module": {"id": module_id},
+        "module": {
+            "id": module_id,
+            "name": module_id,
+            "version": "0.1.0",
+            "description": f"synthetic {module_id} manifest for external gate tests",
+            "lifecycle": "active",
+            "runtimeState": "active",
+            "releaseEligible": True,
+            "riskTier": "R2",
+            "ownerId": "dps-platform",
+        },
+        "paths": {
+            "actualRoot": f"Modules/{module_id}",
+            "canonicalRoot": f"modules/{module_id}",
+            "owned": [f"Modules/{module_id}/**"],
+            "excluded": [],
+            "runtimeData": [],
+        },
+        "artifacts": [],
+        "runtime": {
+            "track": "modern-service",
+            "language": "csharp",
+            "target": "net10.0",
+            "processBoundary": "modular-monolith",
+            "entrypoints": [],
+            "toolchainStatus": "verified",
+        },
+        "contracts": {"provided": provided or [], "consumed": consumed or []},
+        "communication": {"inbound": inbound or [], "outbound": outbound or []},
         "dependencies": [
             {
                 "moduleId": provider,
@@ -122,14 +163,64 @@ def synthetic_module_manifest(
             }
             for provider, reason in (dependencies or [])
         ],
-        "contracts": {"provided": provided or [], "consumed": consumed or []},
-        "communication": {"inbound": inbound or [], "outbound": outbound or []},
+        "permissions": {
+            "allowed": ["read-own-module"],
+            "denied": ["write-other-modules"],
+            "productionApproval": "human-required",
+        },
+        "data": {
+            "ownedStores": [],
+            "readModels": [],
+            "privacyClasses": ["internal"],
+            "retention": "not-applicable",
+            "export": "not-applicable",
+            "correction": "not-applicable",
+            "deletion": "not-applicable",
+        },
+        "security": {
+            "trustBoundaries": ["external-verification"],
+            "secretScopes": [],
+            "untrustedInputs": [],
+            "failClosedOn": ["unknown-contract-major"],
+            "policyIds": ["DPS-SEC-001"],
+        },
+        "tests": {
+            "requiredOutcome": "PASS",
+            "failureOutcomes": ["FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"],
+            "suites": [
+                {
+                    "id": f"{module_id}.static",
+                    "type": "static",
+                    "required": True,
+                    "command": None,
+                    "environment": "repository",
+                    "evidenceLevel": "REPOSITORY_STATIC_VERIFIED",
+                }
+            ],
+        },
         "compatibility": {
+            "policyRef": "governance/policies/compatibility-policy.yaml",
+            "track": "modern",
+            "moduleMajor": 0,
+            "supportedContractMajors": {},
             "unknownMajorBehavior": "reject",
             "missingMajorBehavior": "reject",
             "unknownModeBehavior": "reject",
             "missingModeBehavior": "reject",
         },
+        "rollout": {
+            "featureFlag": None,
+            "canary": "not-applicable",
+            "rollback": "not-applicable",
+            "killSwitch": None,
+        },
+        "deviceGates": {
+            "requiresWindows": False,
+            "requiresZennoDroid": False,
+            "requiresAdb": False,
+            "minimumVerification": "REPOSITORY_STATIC_VERIFIED",
+        },
+        "agents": agents,
     }
 
 
@@ -791,6 +882,28 @@ class Fixture:
             )
             manifest_files.append((artifact_id, path, raw, digest))
 
+        # The schema each major is validated against travels in the envelope as a
+        # raw artifact whose digest external_gate pins, so these are the real
+        # governance schema bytes, not a fixture-local copy that could drift.
+        manifest_schema_bindings = []
+        schemas_root = Path(__file__).resolve().parents[3] / "governance" / "schemas"
+        for schema_version, filename, artifact_id in (
+            ("dps.module/v1", "module-manifest.v1.schema.json", "f9-module-manifest-schema-v1-0001"),
+            ("dps.module/v2", "module-manifest.schema.json", "f9-module-manifest-schema-v2-0001"),
+        ):
+            raw = (schemas_root / filename).read_bytes()
+            digest = hashlib.sha256(raw).hexdigest()
+            path = self.root / f"{artifact_id}.json"
+            path.write_bytes(raw)
+            manifest_schema_bindings.append(
+                {
+                    "schema_version": schema_version,
+                    "raw_artifact_id": artifact_id,
+                    "schema_sha256": digest,
+                }
+            )
+            manifest_files.append((artifact_id, path, raw, digest))
+
         dependency_artifact = dependency_artifact_from_manifests(manifests)
         dependency_bytes = canonical_bytes(dependency_artifact)
         dependency_digest = hashlib.sha256(dependency_bytes).hexdigest()
@@ -1191,6 +1304,7 @@ class Fixture:
             "compatibility_execution_artifact_id": execution_artifact_id,
             "compatibility_execution_sha256": execution_digest,
             "manifest_artifacts": manifest_bindings,
+            "manifest_schema_artifacts": manifest_schema_bindings,
             "contract_schema_artifacts": [
                 {
                     "contract_id": contract_id,
@@ -3263,7 +3377,12 @@ class F9ExternalGateTests(unittest.TestCase):
         )
         self.replace_first_manifest(manifest)
         decision = self.decision()
-        self.assertEqual("invalid_shape", decision.reason_code)
+        # Since F9 validates the whole document against the pinned schema, a
+        # contract missing its required mode is now caught by the schema itself,
+        # before the hand-written contract checks it used to reach.  The
+        # hand-written checks stay as defense in depth rather than as the only
+        # thing standing between a malformed manifest and ELIGIBLE.
+        self.assertEqual("manifest_schema_violation", decision.reason_code)
         self.assertNotEqual(0, decision.exit_code)
 
     def test_f9_rejects_unknown_contract_mode(self) -> None:
@@ -3282,7 +3401,104 @@ class F9ExternalGateTests(unittest.TestCase):
         )
         self.replace_first_manifest(manifest)
         decision = self.decision()
-        self.assertEqual("unknown_contract_mode", decision.reason_code)
+        # Same as above: "future-mode" is outside the schema's mode enum, so the
+        # schema rejects it first.  external_gate's own CONTRACT_COMPATIBILITY_MODES
+        # check remains reachable for any mode the schema permits but the gate does
+        # not implement.
+        self.assertEqual("manifest_schema_violation", decision.reason_code)
+        self.assertNotEqual(0, decision.exit_code)
+
+    # ---- per-major manifest schema dispatch -------------------------------
+    # Accepting a schemaVersion string only proved the manifest *claimed* a major.
+    # These prove F9 now holds each document to that major's actual schema, and
+    # that the schema it validates against cannot be swapped or dropped.
+
+    def first_manifest(self) -> dict:
+        rollout = self.fixture.evidence["payload"]["module_rollout_lines"]
+        binding = rollout["manifest_artifacts"][0]
+        return json.loads(Path(self.raw_metadata(binding["raw_artifact_id"])["path"]).read_bytes())
+
+    def schema_binding(self, schema_version: str) -> dict:
+        rollout = self.fixture.evidence["payload"]["module_rollout_lines"]
+        return next(
+            item
+            for item in rollout["manifest_schema_artifacts"]
+            if item["schema_version"] == schema_version
+        )
+
+    def test_f9_rejects_a_v2_manifest_that_reintroduces_the_factory_resolver(self) -> None:
+        # R0-B removed agents.resolver from v2.  Putting it back must fail, or the
+        # migration could be undone in a signed envelope without the gate noticing.
+        manifest = self.first_manifest()
+        manifest["agents"]["resolver"] = "factory-instruction-resolver"
+        self.replace_first_manifest(manifest)
+        decision = self.decision()
+        self.assertEqual("manifest_schema_violation", decision.reason_code)
+        self.assertNotEqual(0, decision.exit_code)
+
+    def test_f9_rejects_a_manifest_that_disables_the_agent_receipt(self) -> None:
+        manifest = self.first_manifest()
+        manifest["agents"]["receiptRequired"] = False
+        self.replace_first_manifest(manifest)
+        decision = self.decision()
+        self.assertEqual("manifest_schema_violation", decision.reason_code)
+        self.assertNotEqual(0, decision.exit_code)
+
+    def test_f9_rejects_a_manifest_without_the_agents_block(self) -> None:
+        manifest = self.first_manifest()
+        del manifest["agents"]
+        self.replace_first_manifest(manifest)
+        decision = self.decision()
+        self.assertEqual("manifest_schema_violation", decision.reason_code)
+        self.assertNotEqual(0, decision.exit_code)
+
+    def test_f9_rejects_a_manifest_field_that_violates_its_schema_pattern(self) -> None:
+        manifest = self.first_manifest()
+        manifest["module"]["version"] = "not-a-semver"
+        self.replace_first_manifest(manifest)
+        decision = self.decision()
+        self.assertEqual("manifest_schema_violation", decision.reason_code)
+        self.assertNotEqual(0, decision.exit_code)
+
+    def test_f9_dispatches_v1_manifests_to_the_v1_schema(self) -> None:
+        # The dispatch is only real if the two majors disagree somewhere.  This
+        # document is accepted on the v2 side of the fixture (the ELIGIBLE case
+        # above), and rejected the moment it calls itself v1, because v1 *requires*
+        # the resolver v2 forbids.  ModuleManifestSchemaDispatchTests proves the
+        # other three corners of that square directly against the schemas.
+        manifest = self.first_manifest()
+        manifest["schemaVersion"] = "dps.module/v1"
+        self.replace_first_manifest(manifest)
+        decision = self.decision()
+        self.assertEqual("manifest_schema_violation", decision.reason_code)
+        self.assertNotEqual(0, decision.exit_code)
+
+    def test_f9_rejects_a_manifest_schema_the_gate_has_not_pinned(self) -> None:
+        # A weakened schema arriving in the envelope must not be honoured just
+        # because the envelope is internally consistent.
+        binding = self.schema_binding("dps.module/v2")
+        metadata = self.raw_metadata(binding["raw_artifact_id"])
+        schema = json.loads(Path(metadata["path"]).read_bytes())
+        schema["properties"]["agents"]["additionalProperties"] = True
+        raw = canonical_bytes(schema)
+        digest = hashlib.sha256(raw).hexdigest()
+        Path(metadata["path"]).write_bytes(raw)
+        metadata["sha256"] = digest
+        metadata["size_bytes"] = len(raw)
+        binding["schema_sha256"] = digest
+        self.fixture.reseal()
+        decision = self.decision()
+        self.assertEqual("manifest_schema_not_pinned", decision.reason_code)
+        self.assertNotEqual(0, decision.exit_code)
+
+    def test_f9_requires_the_schema_of_every_supported_major(self) -> None:
+        rollout = self.fixture.evidence["payload"]["module_rollout_lines"]
+        rollout["manifest_schema_artifacts"] = [
+            item for item in rollout["manifest_schema_artifacts"] if item["schema_version"] != "dps.module/v1"
+        ]
+        self.fixture.reseal()
+        decision = self.decision()
+        self.assertEqual("manifest_schema_inventory_incomplete", decision.reason_code)
         self.assertNotEqual(0, decision.exit_code)
 
     def test_f9_module_rollback_must_finish_within_five_minutes(self) -> None:
@@ -3448,6 +3664,93 @@ class F9ExternalGateTests(unittest.TestCase):
         self.assertNotEqual(0, decision.exit_code)
 
 
+class ModuleManifestSchemaDispatchTests(unittest.TestCase):
+    """The per-major dispatch and the fail-closed limits of the subset evaluator.
+
+    F9 exercises these through a signed envelope; here they are driven directly so
+    the dispatch square (v1/v2 document x v1/v2 schema) and the evaluator's refusal
+    to run a schema it cannot fully honour are proven without envelope bookkeeping.
+    """
+
+    SCHEMAS = Path(__file__).resolve().parents[3] / "governance" / "schemas"
+
+    def schema(self, filename: str) -> dict:
+        return json.loads((self.SCHEMAS / filename).read_text(encoding="utf-8"))
+
+    def validate(self, manifest: dict, filename: str) -> None:
+        external_gate_module._validate_manifest_against_schema(manifest, self.schema(filename), "probe manifest")
+
+    def test_the_pinned_digests_are_the_real_schema_bytes_for_every_major(self) -> None:
+        # If these drift, F9 would reject every honest envelope; if they were
+        # dropped, a rewritten schema could be smuggled in instead.
+        self.assertEqual(
+            set(external_gate_module.SUPPORTED_MODULE_MANIFEST_MAJORS),
+            set(external_gate_module.MODULE_MANIFEST_SCHEMA_SHA256),
+        )
+        for schema_version, filename in (
+            ("dps.module/v1", "module-manifest.v1.schema.json"),
+            ("dps.module/v2", "module-manifest.schema.json"),
+        ):
+            digest = hashlib.sha256((self.SCHEMAS / filename).read_bytes()).hexdigest()
+            self.assertEqual(external_gate_module.MODULE_MANIFEST_SCHEMA_SHA256[schema_version], digest)
+
+    def test_each_major_is_valid_only_against_its_own_schema(self) -> None:
+        v2_manifest = synthetic_module_manifest("windows-edge-worker")
+        v1_manifest = synthetic_module_manifest("windows-edge-worker", schema_version="dps.module/v1")
+
+        self.validate(v2_manifest, "module-manifest.schema.json")
+        self.validate(v1_manifest, "module-manifest.v1.schema.json")
+
+        # v2 forbids the resolver v1 requires, so each document fails the other's
+        # schema.  Reusing one schema for both majors could not produce this.
+        with self.assertRaises(ExternalGateError) as raised:
+            self.validate(v1_manifest, "module-manifest.schema.json")
+        self.assertEqual("manifest_schema_violation", raised.exception.code)
+        with self.assertRaises(ExternalGateError) as raised:
+            self.validate(v2_manifest, "module-manifest.v1.schema.json")
+        self.assertEqual("manifest_schema_violation", raised.exception.code)
+
+    def test_an_unimplemented_keyword_fails_closed_instead_of_being_ignored(self) -> None:
+        # Silently skipping a keyword would drop a real constraint.  Any schema the
+        # evaluator does not fully implement is refused outright.
+        schema = self.schema("module-manifest.schema.json")
+        schema["properties"]["module"]["oneOf"] = [{"type": "object"}]
+        with self.assertRaises(ExternalGateError) as raised:
+            external_gate_module._validate_manifest_against_schema(
+                synthetic_module_manifest("windows-edge-worker"), schema, "probe manifest"
+            )
+        self.assertEqual("unsupported_manifest_schema", raised.exception.code)
+
+    def test_a_reference_outside_local_defs_fails_closed(self) -> None:
+        schema = self.schema("module-manifest.schema.json")
+        schema["properties"]["module"] = {"$ref": "https://example.invalid/module.json"}
+        with self.assertRaises(ExternalGateError) as raised:
+            external_gate_module._validate_manifest_against_schema(
+                synthetic_module_manifest("windows-edge-worker"), schema, "probe manifest"
+            )
+        self.assertEqual("unsupported_manifest_schema", raised.exception.code)
+
+    def test_boolean_true_never_satisfies_an_integer_constraint(self) -> None:
+        # json.loads yields Python bools, which are ints; a naive evaluator would
+        # accept true where the schema demands an integer major.
+        manifest = synthetic_module_manifest(
+            "windows-edge-worker",
+            consumed=[
+                {
+                    "contractId": "sample.event",
+                    "major": True,
+                    "source": "Modules/windows-edge-worker/contracts/consumed/sample.event.v1.schema.json",
+                    "status": "proposed",
+                    "mode": "active",
+                    "ownerModule": "windows-edge-worker",
+                }
+            ],
+        )
+        with self.assertRaises(ExternalGateError) as raised:
+            self.validate(manifest, "module-manifest.schema.json")
+        self.assertEqual("manifest_schema_violation", raised.exception.code)
+
+
 class CryptographicVerifierTests(unittest.TestCase):
     PUBLIC_KEY = """-----BEGIN PUBLIC KEY-----
 MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyQ8otqDDpmvcMwf6JNQyeAvLTv3+
@@ -3584,6 +3887,7 @@ class StagePayloadTests(unittest.TestCase):
             "compatibility_execution_artifact_id",
             "compatibility_execution_sha256",
             "manifest_artifacts",
+            "manifest_schema_artifacts",
             "contract_schema_artifacts",
         ):
             self.assertIn(field, rollout["required"])

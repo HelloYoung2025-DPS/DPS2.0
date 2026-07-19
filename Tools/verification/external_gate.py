@@ -85,6 +85,16 @@ STALE_CANDIDATE_GBRAIN_PROJECTION_V2_SCHEMA_SHA256 = "d77938579d957472ebdab1181d
 STALE_CANDIDATE_GBRAIN_SOURCE_BINDING_V1_SCHEMA_SHA256 = "e15a6dda03be8e33e0379d9501ca6f1bd1b1ba63742652679f8705df1550d815"
 STALE_CANDIDATE_GBRAIN_PROJECTION_V2_DTO_SHA256 = "f2963bc454ceb774b403814e73b862b4bad0423f4fd34a2147b93448a98dc3ba"
 STALE_CANDIDATE_GBRAIN_SOURCE_BINDING_V1_DTO_SHA256 = "161661959fc77100c40e9b00082ee83cc05327de5e088a30c1e0a1256f8d398b"
+# Accepting a schemaVersion string is not the same as checking the document obeys
+# that version's rules.  F9 validates every signed manifest against the exact
+# schema for its declared major, and the schema itself has to be trustworthy from
+# outside the repository: the bytes travel as signed envelope raw artifacts, and
+# their digests are pinned here so a rewritten schema cannot arrive with them.
+# Changing either schema is therefore a deliberate, reviewable edit of this file.
+MODULE_MANIFEST_SCHEMA_SHA256 = {
+    "dps.module/v1": "5a8badea67b160d109baae1b9a448f712b96de88949d013b4233cc0fe2283bb0",
+    "dps.module/v2": "b400b0bd805b5f78cfd25912b0487752c4f3a03e1f7a3065204d2e8193e2480b",
+}
 
 STAGE_SPECS: dict[str, dict[str, Any]] = {
     "f6": {
@@ -5071,6 +5081,219 @@ def _validate_f9_compatibility_execution(
     )
 
 
+# A JSON Schema subset evaluator, deliberately tiny and deliberately fail-closed.
+# external_gate is stdlib-only, so it cannot defer to jsonschema; the alternative
+# of hand-coding "the rules that matter" was rejected because it re-creates the
+# very gap this closes -- a manifest is conformant only if the whole document
+# obeys the whole schema.  The subset below covers every keyword the two module
+# manifest schemas actually use.  Anything outside it is refused rather than
+# ignored, so a future schema that reaches for an unimplemented keyword fails the
+# gate instead of silently losing that constraint.
+_MANIFEST_SCHEMA_ANNOTATIONS = frozenset({"$schema", "$id", "$comment", "title", "description", "default"})
+_MANIFEST_SCHEMA_ASSERTIONS = frozenset(
+    {
+        "$defs",
+        "$ref",
+        "additionalProperties",
+        "allOf",
+        "const",
+        "enum",
+        "if",
+        "items",
+        "maximum",
+        "minItems",
+        "minLength",
+        "minimum",
+        "pattern",
+        "properties",
+        "required",
+        "then",
+        "type",
+        "uniqueItems",
+    }
+)
+_MANIFEST_SCHEMA_TYPES = frozenset({"array", "boolean", "integer", "null", "number", "object", "string"})
+_MANIFEST_SCHEMA_REF_PREFIX = "#/$defs/"
+
+
+def _json_type_name(value: Any) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, int):
+        return "integer"
+    if isinstance(value, float):
+        return "number"
+    if isinstance(value, str):
+        return "string"
+    if isinstance(value, list):
+        return "array"
+    if isinstance(value, dict):
+        return "object"
+    return "unsupported"
+
+
+def _json_equal(left: Any, right: Any) -> bool:
+    """JSON equality, so ``true`` never compares equal to ``1``."""
+
+    if isinstance(left, bool) or isinstance(right, bool):
+        return isinstance(left, bool) and isinstance(right, bool) and left is right
+    if isinstance(left, dict) and isinstance(right, dict):
+        return set(left) == set(right) and all(_json_equal(left[key], right[key]) for key in left)
+    if isinstance(left, list) and isinstance(right, list):
+        return len(left) == len(right) and all(_json_equal(a, b) for a, b in zip(left, right))
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        return left == right
+    return type(left) is type(right) and left == right
+
+
+def _assert_manifest_schema_subset(schema: Any, defs: Mapping[str, Any], location: str) -> None:
+    """Refuse any schema this evaluator cannot fully honour."""
+
+    if not isinstance(schema, dict):
+        _fail("unsupported_manifest_schema", f"module manifest schema at {location} must be an object")
+    unknown = sorted(set(schema) - _MANIFEST_SCHEMA_ANNOTATIONS - _MANIFEST_SCHEMA_ASSERTIONS)
+    if unknown:
+        _fail(
+            "unsupported_manifest_schema",
+            f"module manifest schema at {location} uses unimplemented keywords {unknown}",
+        )
+    if ("if" in schema) != ("then" in schema):
+        _fail("unsupported_manifest_schema", f"module manifest schema at {location} has an unpaired if/then")
+    if "$ref" in schema:
+        reference = schema["$ref"]
+        if (
+            not isinstance(reference, str)
+            or not reference.startswith(_MANIFEST_SCHEMA_REF_PREFIX)
+            or reference[len(_MANIFEST_SCHEMA_REF_PREFIX) :] not in defs
+        ):
+            _fail(
+                "unsupported_manifest_schema",
+                f"module manifest schema at {location} references {reference!r}; only local #/$defs is supported",
+            )
+    if "type" in schema:
+        declared = schema["type"]
+        names = declared if isinstance(declared, list) else [declared]
+        if not names or any(name not in _MANIFEST_SCHEMA_TYPES for name in names):
+            _fail("unsupported_manifest_schema", f"module manifest schema at {location} declares an unknown type")
+    if "required" in schema and (
+        not isinstance(schema["required"], list)
+        or any(not isinstance(name, str) for name in schema["required"])
+    ):
+        _fail("unsupported_manifest_schema", f"module manifest schema at {location} has a malformed required list")
+    if "enum" in schema and (not isinstance(schema["enum"], list) or not schema["enum"]):
+        _fail("unsupported_manifest_schema", f"module manifest schema at {location} has a malformed enum")
+    if "pattern" in schema:
+        try:
+            re.compile(schema["pattern"])
+        except (TypeError, re.error):
+            _fail("unsupported_manifest_schema", f"module manifest schema at {location} has an uncompilable pattern")
+    for keyword in ("minItems", "minLength"):
+        if keyword in schema and (not isinstance(schema[keyword], int) or isinstance(schema[keyword], bool)):
+            _fail("unsupported_manifest_schema", f"module manifest schema at {location} has a malformed {keyword}")
+    if "uniqueItems" in schema and not isinstance(schema["uniqueItems"], bool):
+        _fail("unsupported_manifest_schema", f"module manifest schema at {location} has a malformed uniqueItems")
+
+    for keyword in ("if", "then", "items"):
+        if keyword in schema:
+            _assert_manifest_schema_subset(schema[keyword], defs, f"{location}.{keyword}")
+    if "additionalProperties" in schema and not isinstance(schema["additionalProperties"], bool):
+        _assert_manifest_schema_subset(schema["additionalProperties"], defs, f"{location}.additionalProperties")
+    if "allOf" in schema:
+        if not isinstance(schema["allOf"], list) or not schema["allOf"]:
+            _fail("unsupported_manifest_schema", f"module manifest schema at {location} has a malformed allOf")
+        for index, branch in enumerate(schema["allOf"]):
+            _assert_manifest_schema_subset(branch, defs, f"{location}.allOf[{index}]")
+    for keyword in ("properties", "$defs"):
+        if keyword in schema:
+            if not isinstance(schema[keyword], dict):
+                _fail("unsupported_manifest_schema", f"module manifest schema at {location} has a malformed {keyword}")
+            for name, subschema in schema[keyword].items():
+                _assert_manifest_schema_subset(subschema, defs, f"{location}.{keyword}.{name}")
+
+
+def _manifest_schema_errors(
+    value: Any,
+    schema: Mapping[str, Any],
+    defs: Mapping[str, Any],
+    location: str,
+) -> list[str]:
+    errors: list[str] = []
+    if "$ref" in schema:
+        target = defs[schema["$ref"][len(_MANIFEST_SCHEMA_REF_PREFIX) :]]
+        errors.extend(_manifest_schema_errors(value, target, defs, location))
+
+    observed = _json_type_name(value)
+    if "type" in schema:
+        declared = schema["type"]
+        names = declared if isinstance(declared, list) else [declared]
+        if observed not in names and not (observed == "integer" and "number" in names):
+            return errors + [f"{location} must be {'/'.join(names)}, not {observed}"]
+    if "const" in schema and not _json_equal(value, schema["const"]):
+        errors.append(f"{location} must equal {schema['const']!r}")
+    if "enum" in schema and not any(_json_equal(value, option) for option in schema["enum"]):
+        errors.append(f"{location} is not one of the permitted values")
+
+    if observed == "string":
+        if "minLength" in schema and len(value) < schema["minLength"]:
+            errors.append(f"{location} is shorter than {schema['minLength']} characters")
+        if "pattern" in schema and re.search(schema["pattern"], value) is None:
+            errors.append(f"{location} does not match the required pattern")
+    if observed in ("integer", "number"):
+        if "minimum" in schema and value < schema["minimum"]:
+            errors.append(f"{location} is below the minimum {schema['minimum']}")
+        if "maximum" in schema and value > schema["maximum"]:
+            errors.append(f"{location} is above the maximum {schema['maximum']}")
+    if observed == "array":
+        if "minItems" in schema and len(value) < schema["minItems"]:
+            errors.append(f"{location} needs at least {schema['minItems']} items")
+        if schema.get("uniqueItems") is True:
+            for index, item in enumerate(value):
+                if any(_json_equal(item, earlier) for earlier in value[:index]):
+                    errors.append(f"{location}[{index}] duplicates an earlier item")
+                    break
+        if "items" in schema:
+            for index, item in enumerate(value):
+                errors.extend(_manifest_schema_errors(item, schema["items"], defs, f"{location}[{index}]"))
+    if observed == "object":
+        for name in schema.get("required", []):
+            if name not in value:
+                errors.append(f"{location} is missing the required property {name!r}")
+        properties = schema.get("properties", {})
+        for name, subschema in properties.items():
+            if name in value:
+                errors.extend(_manifest_schema_errors(value[name], subschema, defs, f"{location}.{name}"))
+        if "additionalProperties" in schema:
+            extra = sorted(set(value) - set(properties))
+            if schema["additionalProperties"] is False:
+                for name in extra:
+                    errors.append(f"{location} has the unexpected property {name!r}")
+            elif isinstance(schema["additionalProperties"], dict):
+                for name in extra:
+                    errors.extend(
+                        _manifest_schema_errors(
+                            value[name], schema["additionalProperties"], defs, f"{location}.{name}"
+                        )
+                    )
+
+    for index, branch in enumerate(schema.get("allOf", [])):
+        errors.extend(_manifest_schema_errors(value, branch, defs, location))
+    if "if" in schema and not _manifest_schema_errors(value, schema["if"], defs, location):
+        errors.extend(_manifest_schema_errors(value, schema["then"], defs, location))
+    return errors
+
+
+def _validate_manifest_against_schema(manifest: Mapping[str, Any], schema: Mapping[str, Any], label: str) -> None:
+    defs = schema.get("$defs", {})
+    if not isinstance(defs, dict):
+        _fail("unsupported_manifest_schema", f"{label} schema has a malformed $defs")
+    _assert_manifest_schema_subset(schema, defs, "schema")
+    errors = _manifest_schema_errors(manifest, schema, defs, "manifest")
+    if errors:
+        _fail("manifest_schema_violation", f"{label} violates its declared schema: {errors[0]}")
+
+
 def _validate_f9_rollout_lines(
     binding_value: Any,
     raw_artifacts: Mapping[str, Mapping[str, Any]] | None,
@@ -5093,6 +5316,7 @@ def _validate_f9_rollout_lines(
         "compatibility_execution_artifact_id",
         "compatibility_execution_sha256",
         "manifest_artifacts",
+        "manifest_schema_artifacts",
         "contract_schema_artifacts",
         "lines",
     }
@@ -5217,6 +5441,51 @@ def _validate_f9_rollout_lines(
     if set(manifest_bindings) != set(bom_modules):
         _fail("manifest_inventory_incomplete", "F9 raw manifest bindings must cover exactly every signed BOM module")
 
+    # Every supported major must arrive with its exact schema, digest-pinned above,
+    # so "schemaVersion is one we know" can be upgraded to "the document actually
+    # obeys that version".
+    manifest_schemas: dict[str, Mapping[str, Any]] = {}
+    for index, item in enumerate(
+        _array(binding["manifest_schema_artifacts"], "module_rollout_lines.manifest_schema_artifacts")
+    ):
+        schema_binding = _object(item, f"module_rollout_lines.manifest_schema_artifacts[{index}]")
+        _exact_keys(
+            schema_binding,
+            {"schema_version", "raw_artifact_id", "schema_sha256"},
+            f"module_rollout_lines.manifest_schema_artifacts[{index}]",
+        )
+        schema_version = _text(
+            schema_binding["schema_version"],
+            f"manifest_schema_artifacts[{index}].schema_version",
+        )
+        artifact_id = _external_id(
+            schema_binding["raw_artifact_id"],
+            f"manifest_schema_artifacts[{index}].raw_artifact_id",
+        )
+        schema_sha256 = _sha256(
+            schema_binding["schema_sha256"],
+            f"manifest_schema_artifacts[{index}].schema_sha256",
+        )
+        if schema_version in manifest_schemas:
+            _fail("duplicate_manifest_schema_binding", "F9 manifest schema bindings must be unique by major")
+        if MODULE_MANIFEST_SCHEMA_SHA256.get(schema_version) != schema_sha256:
+            _fail(
+                "manifest_schema_not_pinned",
+                f"F9 manifest schema for {schema_version} is not the digest pinned by the external gate",
+            )
+        _schema_artifact_id, manifest_schema = _raw_json_artifact(
+            raw_artifacts,
+            artifact_id,
+            schema_sha256,
+            f"module manifest schema {schema_version}",
+        )
+        manifest_schemas[schema_version] = manifest_schema
+    if set(manifest_schemas) != set(SUPPORTED_MODULE_MANIFEST_MAJORS):
+        _fail(
+            "manifest_schema_inventory_incomplete",
+            "F9 must bind the exact schema of every supported module manifest major",
+        )
+
     bom_contracts: dict[tuple[str, int], tuple[str, str]] = {}
     for index, value in enumerate(_array(release_bom.get("contracts"), "Release BOM contracts")):
         contract = _object(value, f"Release BOM contracts[{index}]")
@@ -5285,8 +5554,14 @@ def _validate_f9_rollout_lines(
             binding_sha256,
             f"module manifest {module_id}",
         )
-        if manifest.get("schemaVersion") not in SUPPORTED_MODULE_MANIFEST_MAJORS:
+        schema_version = manifest.get("schemaVersion")
+        if schema_version not in manifest_schemas:
             _fail("unknown_manifest_version", f"F9 manifest for {module_id} has an unsupported schema version")
+        _validate_manifest_against_schema(
+            manifest,
+            manifest_schemas[schema_version],
+            f"F9 manifest for {module_id}",
+        )
         module = _object(manifest.get("module"), f"module manifest {module_id}.module")
         if module.get("id") != module_id:
             _fail("manifest_identity_mismatch", f"F9 raw manifest identity does not match {module_id}")

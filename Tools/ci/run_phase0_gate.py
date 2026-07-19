@@ -385,6 +385,13 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         "test_commit_outside_head_ancestry_fails_closed",
         "test_provenance_disagreeing_with_the_injection_fails_closed",
         "test_matching_injection_is_accepted",
+        # F9 now holds every signed manifest to the exact schema of its declared
+        # major, using a stdlib evaluator external_gate had to hand-roll.  These
+        # keep that evaluator pinned to a reference Draft 2020-12 implementation
+        # instead of trusting it because it was written carefully.
+        "test_the_live_corpus_is_accepted_by_both_implementations",
+        "test_the_subset_evaluator_agrees_with_draft_2020_12_on_every_mutation",
+        "test_the_mutations_are_real_rejections_and_not_no_ops",
     }
     command = [
         sys.executable,
