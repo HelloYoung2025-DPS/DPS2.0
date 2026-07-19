@@ -1085,24 +1085,47 @@ def discover_registered_module_dirs(root: Path) -> List[Path]:
     return registered
 
 
-def _manifest_schema_paths(root: Path) -> List[Path]:
-    """Every versioned module-manifest schema on disk.
+# The exact set of module manifest majors this gate implements, and the file each
+# one lives in.  Discovering majors by globbing module-manifest*.schema.json and
+# believing whatever schemaVersion.const each file declared made the supported set
+# candidate-defined: dropping in a permissive module-manifest.v999.schema.json and
+# switching a manifest to dps.module/v999 passed validation with the whole agents
+# block removed.  A major is supported because it is named here -- in a file bound
+# into the candidate trust anchor -- not because a schema file exists.
+SUPPORTED_MANIFEST_SCHEMA_FILES: Dict[str, str] = {
+    "dps.module/v1": "module-manifest.v1.schema.json",
+    "dps.module/v2": "module-manifest.schema.json",
+}
 
-    R0-B publishes ``dps.module/v2`` (resolver removed) beside the retained
-    ``dps.module/v1`` (resolver-bearing), so the gate must load *all* majors and
-    dispatch per manifest rather than pinning one "current" schema.
-    """
+
+_MANIFEST_MAJOR_BY_FILE: Dict[str, str] = {
+    name: major for major, name in SUPPORTED_MANIFEST_SCHEMA_FILES.items()
+}
+
+
+def _manifest_schema_directory(root: Path) -> Optional[Path]:
     for base_name in ("governance", "Governance"):
         base = root / base_name / "schemas"
         if base.is_dir():
-            matches = sorted(base.glob("module-manifest*.schema.json"))
-            if matches:
-                return matches
-    fallbacks = (
-        root / "governance" / "module-manifest.schema.json",
-        root / "Governance" / "schemas" / "module.schema.json",
-    )
-    return [path for path in fallbacks if path.is_file()]
+            return base
+    return None
+
+
+def _manifest_schema_paths(root: Path) -> List[Path]:
+    """The schema file of every supported major, in registry order.
+
+    R0-B publishes ``dps.module/v2`` (resolver removed) beside the retained
+    ``dps.module/v1`` (resolver-bearing), so the gate loads both and dispatches
+    per manifest rather than pinning one "current" schema -- but only these two.
+    """
+    base = _manifest_schema_directory(root)
+    if base is None:
+        fallbacks = (
+            root / "governance" / "module-manifest.schema.json",
+            root / "Governance" / "schemas" / "module.schema.json",
+        )
+        return [path for path in fallbacks if path.is_file()]
+    return [base / name for name in SUPPORTED_MANIFEST_SCHEMA_FILES.values()]
 
 
 def load_manifest_schemas(root: Path) -> Dict[str, Mapping[str, Any]]:
@@ -1114,6 +1137,20 @@ def load_manifest_schemas(root: Path) -> Dict[str, Mapping[str, Any]]:
     ``_load_module_record`` rather than silently reusing another major's rules.
     """
     schemas: Dict[str, Mapping[str, Any]] = {}
+    base = _manifest_schema_directory(root)
+    if base is not None:
+        # An unregistered module-manifest*.schema.json is refused rather than
+        # ignored: leaving it on disk is how a candidate would try to introduce a
+        # major of its own, and a silently skipped file looks identical to one the
+        # gate understood.
+        expected = set(SUPPORTED_MANIFEST_SCHEMA_FILES.values())
+        unexpected = sorted(
+            path.name for path in base.glob("module-manifest*.schema.json") if path.name not in expected
+        )
+        if unexpected:
+            raise Phase0Error(
+                "unregistered module manifest schema files: " + ", ".join(unexpected)
+            )
     for path in _manifest_schema_paths(root):
         try:
             value = json.loads(path.read_text(encoding="utf-8-sig"))
@@ -1136,7 +1173,18 @@ def load_manifest_schemas(root: Path) -> Dict[str, Mapping[str, Any]]:
             )
         if const in schemas:
             raise Phase0Error("duplicate module manifest schema major " + const)
+        expected_major = _MANIFEST_MAJOR_BY_FILE.get(path.name)
+        if expected_major is not None and const != expected_major:
+            raise Phase0Error(
+                "module manifest schema {0} declares major {1}, expected {2}".format(
+                    relative(root, path), const, expected_major
+                )
+            )
         schemas[const] = value
+    if base is not None and set(schemas) != set(SUPPORTED_MANIFEST_SCHEMA_FILES):
+        raise Phase0Error(
+            "module manifest majors on disk do not match the supported registry"
+        )
     return schemas
 
 

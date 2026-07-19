@@ -992,7 +992,7 @@ class BaselineAuthorityFailClosedTest(unittest.TestCase):
             _load_json(FIXTURES / "provenance.json")["baseline_commit"],
         )
 
-    def test_the_frozen_constant_lives_in_a_trust_anchored_file(self) -> None:
+    def test_every_new_trust_bearing_artifact_is_byte_bound(self) -> None:
         # The whole protection is that changing which commit the corpus anchors to
         # invalidates the candidate trust anchor.  That holds only while the constant
         # is defined in a CANDIDATE_TRUST_PATHS file and this module merely imports
@@ -1007,16 +1007,29 @@ class BaselineAuthorityFailClosedTest(unittest.TestCase):
             / "src"
             / "instruction_resolver.py"
         ).read_text(encoding="utf-8")
-        # Anchoring the constant is only half of it: the suites that *enforce* the
-        # binding and the hand-rolled schema evaluator have to be byte-bound too, or
-        # a candidate could keep the registered test names and empty their bodies,
-        # and the gate would report green over a guarantee that no longer runs.
-        # Tests/ci/test_candidate_gate.py and friends are already in the list for
+        # Anchoring the constant is only part of it.  Everything this batch made
+        # trust-bearing has to be byte-bound, or the guarantee can be removed
+        # without the anchor noticing: the suites that enforce it (the runner only
+        # checks that a registered test *name* appears in unittest output, so
+        # emptied bodies still read as green), the F9 code that actually performs
+        # the per-major validation, the two manifest schemas it validates against,
+        # and the envelope schemas that decide which shape is even accepted.
+        # Tests/ci/test_candidate_gate.py and its neighbours are already listed for
         # exactly this reason.
         anchored = (
             '"Tools/ci/run_phase0_gate.py"',
+            # SUPPORTED_MANIFEST_SCHEMA_FILES lives here: it is now the registry
+            # that decides which majors exist at all, so editing it must break the
+            # anchor the same way editing a schema does.
+            '"Tools/ci/phase0.py"',
             '"Tests/ci/test_r0b_receipt_migration_dual_run.py"',
             '"Tests/ci/test_manifest_schema_subset_evaluator.py"',
+            '"Tools/verification/external_gate.py"',
+            '"Tools/verification/tests/test_external_gate.py"',
+            '"governance/schemas/module-manifest.schema.json"',
+            '"governance/schemas/module-manifest.v1.schema.json"',
+            '"governance/verification/f9-scale-input.v1.schema.json"',
+            '"governance/verification/f9-scale-input.v2.schema.json"',
         )
         for source, label in ((gate_source, "run_candidate_gate"), (resolver_source, "instruction_resolver")):
             for path in anchored:
@@ -1144,6 +1157,59 @@ class MajorCoexistenceDispatchTest(unittest.TestCase):
         self.assertIn("resolver", self.live_v1["properties"]["agents"]["properties"])
         self.assertNotIn("resolver", self.live_v2["properties"]["agents"]["properties"])
         self.assertEqual({"dps.module/v1", "dps.module/v2"}, set(self.dispatch))
+
+    def test_a_planted_schema_cannot_introduce_a_major_of_its_own(self) -> None:
+        # Discovering majors by globbing module-manifest*.schema.json and believing
+        # each file's schemaVersion.const made the supported set candidate-defined:
+        # a permissive module-manifest.v999.schema.json plus manifests switched to
+        # dps.module/v999 validated clean with the entire agents block removed.  The
+        # registry in phase0 -- a trust-anchored file -- decides which majors exist,
+        # and an unregistered schema file is refused rather than skipped.
+        self.assertEqual(
+            {"dps.module/v1", "dps.module/v2"},
+            set(phase0.SUPPORTED_MANIFEST_SCHEMA_FILES),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            planted_root = Path(directory)
+            schemas = planted_root / "governance" / "schemas"
+            schemas.mkdir(parents=True)
+            for major, name in phase0.SUPPORTED_MANIFEST_SCHEMA_FILES.items():
+                source = LIVE_V1_SCHEMA_PATH if major == "dps.module/v1" else LIVE_V2_SCHEMA_PATH
+                (schemas / name).write_bytes(source.read_bytes())
+            self.assertEqual(
+                {"dps.module/v1", "dps.module/v2"},
+                set(phase0.load_manifest_schemas(planted_root)),
+            )
+
+            (schemas / "module-manifest.v999.schema.json").write_text(
+                json.dumps(
+                    {
+                        "type": "object",
+                        "properties": {"schemaVersion": {"const": "dps.module/v999"}},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaises(Phase0Error) as raised:
+                phase0.load_manifest_schemas(planted_root)
+            self.assertIn("unregistered module manifest schema", str(raised.exception))
+
+    def test_a_registered_schema_may_not_relabel_its_major(self) -> None:
+        # The other half: keeping the registered filename but changing the const
+        # would let v2's file answer for a major the registry never approved.
+        with tempfile.TemporaryDirectory() as directory:
+            planted_root = Path(directory)
+            schemas = planted_root / "governance" / "schemas"
+            schemas.mkdir(parents=True)
+            for major, name in phase0.SUPPORTED_MANIFEST_SCHEMA_FILES.items():
+                source = LIVE_V1_SCHEMA_PATH if major == "dps.module/v1" else LIVE_V2_SCHEMA_PATH
+                document = _load_json(source)
+                if major == "dps.module/v2":
+                    document["properties"]["schemaVersion"]["const"] = "dps.module/v999"
+                (schemas / name).write_text(json.dumps(document), encoding="utf-8")
+            with self.assertRaises(Phase0Error) as raised:
+                phase0.load_manifest_schemas(planted_root)
+            self.assertIn("declares major", str(raised.exception))
 
     def test_v1_schema_accepts_the_frozen_v1_manifests(self) -> None:
         # proof-obligation 1
