@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://dps.local/schemas/module-manifest.schema.json",
+  "$id": "https://dps.local/schemas/module-manifest.v1.schema.json",
   "title": "DPS module manifest",
   "type": "object",
   "additionalProperties": false,
@@ -23,7 +23,7 @@
     "agents"
   ],
   "properties": {
-    "schemaVersion": { "const": "dps.module/v2" },
+    "schemaVersion": { "const": "dps.module/v1" },
     "module": {
       "type": "object",
       "additionalProperties": false,
@@ -315,13 +315,14 @@
     "agents": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["spec", "policyVersion", "instructionsFile", "manifestFile", "receiptRequired"],
+      "required": ["spec", "policyVersion", "instructionsFile", "manifestFile", "receiptRequired", "resolver"],
       "properties": {
         "spec": { "const": "dps.agents/v1" },
         "policyVersion": { "$ref": "#/$defs/semver" },
         "instructionsFile": { "const": "AGENTS.md" },
         "manifestFile": { "const": "module.yaml" },
-        "receiptRequired": { "const": true }
+        "receiptRequired": { "const": true },
+        "resolver": { "const": "factory-instruction-resolver" }
       }
     }
   },

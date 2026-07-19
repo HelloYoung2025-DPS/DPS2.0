@@ -21,8 +21,10 @@ Everything here is deterministic, offline and model-free:
 
 from __future__ import annotations
 
+import ast
 import copy
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -36,13 +38,22 @@ CI_DIRECTORY = ROOT / "Tools" / "ci"
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "r0b_instruction_receipt_migration"
 BASELINE = FIXTURES / "baseline"
 LIVE_SCHEMA_PATH = ROOT / "governance" / "schemas" / "module-manifest.schema.json"
+# v1/v2 major coexistence (RebuildPlan 4.2(5)): the live v2 schema is the current
+# module-manifest.schema.json; the retained v1 schema keeps historical / rollback
+# manifests interpretable.
+LIVE_V2_SCHEMA_PATH = LIVE_SCHEMA_PATH
+LIVE_V1_SCHEMA_PATH = ROOT / "governance" / "schemas" / "module-manifest.v1.schema.json"
+VERIFICATION_DIRECTORY = ROOT / "Tools" / "verification"
 EXPECTED_MODULE_COUNT = 34
 
 _ORIGINAL_IMPORT_PATH = list(sys.path)
 try:
     if str(CI_DIRECTORY) not in sys.path:
         sys.path.insert(0, str(CI_DIRECTORY))
+    if str(VERIFICATION_DIRECTORY) not in sys.path:
+        sys.path.insert(0, str(VERIFICATION_DIRECTORY))
 
+    import phase0  # noqa: E402
     from phase0 import (  # noqa: E402
         Phase0Error,
         resolve_instruction_receipt,
@@ -50,6 +61,7 @@ try:
         validate_instruction_receipt,
         validate_json_schema,
     )
+    from external_gate import SUPPORTED_MODULE_MANIFEST_MAJORS  # noqa: E402
 finally:
     sys.path = _ORIGINAL_IMPORT_PATH
 
@@ -58,6 +70,30 @@ def _load_json(path: Path) -> Dict[str, Any]:
     """Read a manifest or schema exactly the way phase0 reads manifests."""
 
     return json.loads(path.read_text(encoding="utf-8-sig"))
+
+
+# Finding 2 (ambient git): the baseline anchors below read git.  A bare "git" is
+# PATH-selectable, so a candidate that prepends a directory to PATH could
+# substitute a hostile git that fabricates baseline blob bytes and defeat the
+# anchoring.  Reuse the repository's already-established trusted-git boundary --
+# run_candidate_gate.py locks git to the absolute /usr/bin/git (root:wheel, so
+# candidate code in the repo or its .venv cannot replace it) and refuses it if it
+# is missing, a symlink, or non-executable.  The anchors adopt the same locked
+# executable, making them fail-closed against PATH poisoning rather than trusting
+# a bare name.  The rest of the Phase 0 gate (run_phase0_gate.py, phase0.py and
+# the §11 verifier) still calls bare "git"; unifying that on the locked executable
+# is a repo-wide trusted-runner concern, called out as its own batch in the PR.
+LOCKED_GIT = Path("/usr/bin/git")
+
+
+def _trusted_git_executable() -> str:
+    if (
+        not LOCKED_GIT.is_file()
+        or LOCKED_GIT.is_symlink()
+        or not os.access(str(LOCKED_GIT), os.X_OK)
+    ):
+        raise AssertionError("locked /usr/bin/git is missing or unsafe")
+    return str(LOCKED_GIT)
 
 
 def _baseline_manifest_paths() -> List[Path]:
@@ -391,7 +427,7 @@ class AttackCorpusIsLoadBearingTest(unittest.TestCase):
 
 def _git(root: Path, *arguments: str) -> str:
     result = subprocess.run(
-        ["git", *arguments],
+        [_trusted_git_executable(), *arguments],
         cwd=str(root),
         capture_output=True,
         text=True,
@@ -593,7 +629,13 @@ def _git_blob(commit: str, repo_relpath: str) -> bytes:
     """Raw bytes of ``repo_relpath`` at ``commit`` with no newline munging."""
 
     result = subprocess.run(
-        ["git", "-c", "core.autocrlf=false", "show", "{0}:{1}".format(commit, repo_relpath)],
+        [
+            _trusted_git_executable(),
+            "-c",
+            "core.autocrlf=false",
+            "show",
+            "{0}:{1}".format(commit, repo_relpath),
+        ],
         cwd=str(ROOT),
         capture_output=True,
         check=True,
@@ -601,17 +643,32 @@ def _git_blob(commit: str, repo_relpath: str) -> bytes:
     return result.stdout
 
 
+def _function_source(text: str, func_name: str) -> str:
+    """Exact source of a top-level function, extracted structurally so unrelated
+    edits elsewhere in the file cannot mask a change to the function itself."""
+
+    tree = ast.parse(text)
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name == func_name:
+            segment = ast.get_source_segment(text, node)
+            if segment is not None:
+                return segment
+    raise AssertionError("function {0} not found".format(func_name))
+
+
 class BaselineCommitAnchoringTest(unittest.TestCase):
     """RebuildPlan 4.2.3 requires freezing the *old validator*, not just the old
-    schema.  This batch does not touch ``Tools/ci/phase0.py``, so the dual-run
-    reuses the current ``validate_json_schema`` for both sides.  That reuse is
-    sound only if two facts are proven fail-closed rather than assumed:
+    schema.  The v1/v2 dual-run reuses the current ``validate_json_schema`` for
+    both majors.  That reuse is sound only if two facts are proven fail-closed
+    rather than assumed:
 
     * the frozen fixtures really are the pre-migration bytes -- anchored to the
       immutable baseline commit blob, not merely to a digest recorded beside them
       in ``provenance.json``, which an attacker could rewrite in the same change;
-    * the receipt validator is unchanged since that baseline, so "current
-      validator" and "old validator" are provably the same code.
+    * the validator *core* is unchanged since that baseline.  4.2(5) adds
+      per-schemaVersion dispatch to ``phase0.py``, so the file as a whole changes
+      legitimately; what must stay frozen is ``validate_json_schema`` itself, so
+      "current validator" and "old validator" are provably the same code.
 
     If either stops holding these tests fail, forcing a genuinely isolated
     old/new validator run instead of two schemas compared under one validator.
@@ -641,20 +698,195 @@ class BaselineCommitAnchoringTest(unittest.TestCase):
         )
 
     def test_receipt_validator_is_unchanged_in_this_batch(self) -> None:
-        changed = _git(
-            ROOT,
-            "diff",
-            "--name-only",
-            self.baseline_commit,
-            "--",
-            "Tools/ci/phase0.py",
+        # 4.2(5) adds per-schemaVersion dispatch to phase0, so the file legitimately
+        # changes.  What must stay frozen is the shared validator *core* --
+        # validate_json_schema -- reused for both the v1 and v2 sides.  Anchor that
+        # function's source to the baseline so a change to the validator itself (as
+        # opposed to the surrounding dispatch) fails closed.
+        baseline_source = _function_source(
+            _git_blob(self.baseline_commit, "Tools/ci/phase0.py").decode("utf-8"),
+            "validate_json_schema",
+        )
+        current_source = _function_source(
+            (ROOT / "Tools" / "ci" / "phase0.py").read_text(encoding="utf-8"),
+            "validate_json_schema",
         )
         self.assertEqual(
-            "",
-            changed,
-            "Tools/ci/phase0.py changed since the baseline; the dual-run may no longer "
-            "reuse the current validator for the old side and must execute the frozen "
-            "baseline validator in isolation",
+            baseline_source,
+            current_source,
+            "validate_json_schema (the dual-run validator core) changed since the "
+            "baseline; the dual-run may no longer reuse one validator for both majors "
+            "and must execute the frozen baseline validator in isolation",
+        )
+
+
+class GitAnchoringTrustBoundaryTest(unittest.TestCase):
+    """Finding 2: the baseline anchors must not trust a PATH-selectable bare git.
+    They adopt the repository's locked-git boundary (run_candidate_gate's
+    /usr/bin/git), so a hostile git prepended to PATH cannot fabricate blob bytes.
+    """
+
+    def test_anchor_helpers_resolve_the_locked_absolute_git(self) -> None:
+        resolved = _trusted_git_executable()
+        self.assertEqual(str(LOCKED_GIT), resolved)
+        self.assertTrue(Path(resolved).is_absolute())
+        self.assertFalse(Path(resolved).is_symlink())
+
+    def test_poisoned_path_cannot_substitute_a_hostile_git(self) -> None:
+        # Prepend a directory containing a hostile "git" to PATH.  Because the
+        # anchors call the locked /usr/bin/git rather than resolving "git" from
+        # PATH, _git_blob still returns the real baseline blob, not the hostile
+        # output -- the fail-closed proof, not a mere PATH-dependency note.
+        baseline_commit = _load_json(FIXTURES / "provenance.json")["baseline_commit"]
+        with tempfile.TemporaryDirectory() as poisoned_dir:
+            hostile = Path(poisoned_dir) / "git"
+            hostile.write_text("#!/bin/sh\necho HOSTILE-GIT-OUTPUT\n", encoding="utf-8")
+            hostile.chmod(0o755)
+            original_path = os.environ.get("PATH", "")
+            os.environ["PATH"] = poisoned_dir + os.pathsep + original_path
+            try:
+                blob = _git_blob(
+                    baseline_commit,
+                    "governance/schemas/module-manifest.schema.json",
+                )
+            finally:
+                os.environ["PATH"] = original_path
+        self.assertNotIn(b"HOSTILE-GIT-OUTPUT", blob)
+        self.assertIn(b"schemaVersion", blob)
+
+    def test_a_repo_local_planted_git_on_path_is_ignored(self) -> None:
+        # Even a hostile git planted inside the repo tree (the most reachable
+        # location for candidate code) and prepended to PATH is ignored, because
+        # resolution is locked to the absolute path, not PATH order.
+        with tempfile.TemporaryDirectory(dir=str(ROOT)) as poisoned_dir:
+            hostile = Path(poisoned_dir) / "git"
+            hostile.write_text("#!/bin/sh\necho HOSTILE\n", encoding="utf-8")
+            hostile.chmod(0o755)
+            original_path = os.environ.get("PATH", "")
+            os.environ["PATH"] = poisoned_dir + os.pathsep + original_path
+            try:
+                head = _git(ROOT, "rev-parse", "HEAD")
+            finally:
+                os.environ["PATH"] = original_path
+        self.assertNotIn("HOSTILE", head)
+        self.assertRegex(head, r"^[0-9a-f]{40}$")
+
+
+class MajorCoexistenceDispatchTest(unittest.TestCase):
+    """RebuildPlan 4.2(5): dps.module/v1 (resolver-bearing, historical/rollback)
+    and dps.module/v2 (resolver removed, current) coexist.  Consumers dispatch per
+    manifest ``schemaVersion``; unknown/missing majors fail closed; the historical
+    v1 corpus stays interpretable without contaminating the active v2 world.
+
+    Proof-obligation 9 (a change to validator, fixture or major map turns the
+    dual-run red) is carried by BaselineCommitAnchoringTest (fixtures anchored to
+    the commit blob, validator core frozen) plus the major-const code-pin below.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.live_v1 = _load_json(LIVE_V1_SCHEMA_PATH)
+        cls.live_v2 = _load_json(LIVE_V2_SCHEMA_PATH)
+        cls.baseline_manifests = {
+            _module_id_of_baseline(path): _load_json(path)
+            for path in _baseline_manifest_paths()
+        }
+        cls.live_manifests = {
+            path.parent.name: _load_json(path) for path in _current_manifest_paths()
+        }
+        cls.dispatch = phase0.load_manifest_schemas(ROOT)
+
+    def _a_live_manifest(self) -> Dict[str, Any]:
+        return copy.deepcopy(next(iter(sorted(self.live_manifests.items())))[1])
+
+    def test_live_schemas_pin_two_distinct_majors(self) -> None:
+        # major-map code-pin (proof-obligation 9): reverting either major fails here.
+        self.assertEqual("dps.module/v1", self.live_v1["properties"]["schemaVersion"]["const"])
+        self.assertEqual("dps.module/v2", self.live_v2["properties"]["schemaVersion"]["const"])
+        self.assertIn("resolver", self.live_v1["properties"]["agents"]["properties"])
+        self.assertNotIn("resolver", self.live_v2["properties"]["agents"]["properties"])
+        self.assertEqual({"dps.module/v1", "dps.module/v2"}, set(self.dispatch))
+
+    def test_v1_schema_accepts_the_frozen_v1_manifests(self) -> None:
+        # proof-obligation 1
+        rejected = {
+            module_id: validate_json_schema(manifest, self.live_v1)
+            for module_id, manifest in sorted(self.baseline_manifests.items())
+            if validate_json_schema(manifest, self.live_v1)
+        }
+        self.assertEqual(EXPECTED_MODULE_COUNT, len(self.baseline_manifests))
+        self.assertEqual({}, rejected, "live v1 schema must accept the frozen v1 corpus")
+
+    def test_v2_schema_accepts_the_current_v2_manifests(self) -> None:
+        # proof-obligation 2
+        self.assertEqual(EXPECTED_MODULE_COUNT, len(self.live_manifests))
+        wrong_major = {
+            module_id: manifest.get("schemaVersion")
+            for module_id, manifest in sorted(self.live_manifests.items())
+            if manifest.get("schemaVersion") != "dps.module/v2"
+        }
+        self.assertEqual({}, wrong_major, "every live manifest must declare v2")
+        rejected = {
+            module_id: validate_json_schema(manifest, self.live_v2)
+            for module_id, manifest in sorted(self.live_manifests.items())
+            if validate_json_schema(manifest, self.live_v2)
+        }
+        self.assertEqual({}, rejected, "live v2 schema must accept the current corpus")
+
+    def test_majors_are_not_confused_by_a_shared_version_name(self) -> None:
+        # proof-obligation 3: cross-major application is rejected on the version const
+        const_error = "$.schemaVersion: value does not match const"
+        for module_id, manifest in sorted(self.live_manifests.items()):
+            with self.subTest(direction="v2-manifest-under-v1-schema", module=module_id):
+                self.assertIn(const_error, validate_json_schema(manifest, self.live_v1))
+        for module_id, manifest in sorted(self.baseline_manifests.items()):
+            with self.subTest(direction="v1-manifest-under-v2-schema", module=module_id):
+                self.assertIn(const_error, validate_json_schema(manifest, self.live_v2))
+
+    def test_phase0_dispatches_a_v1_manifest_to_the_v1_schema(self) -> None:
+        # proof-obligation 4: resolver-bearing v1 stays interpretable via the v1 path
+        sample = next(iter(sorted(self.baseline_manifests.items())))[1]
+        self.assertEqual("dps.module/v1", sample["schemaVersion"])
+        self.assertIn("resolver", sample["agents"])
+        chosen = self.dispatch[sample["schemaVersion"]]
+        self.assertEqual([], validate_json_schema(sample, chosen))
+
+    def test_v2_reintroducing_the_resolver_is_rejected(self) -> None:
+        # proof-obligation 5
+        sample = self._a_live_manifest()
+        sample.setdefault("agents", {})["resolver"] = "factory-instruction-resolver"
+        self.assertIn(
+            "$.agents: unexpected property resolver",
+            validate_json_schema(sample, self.live_v2),
+        )
+
+    def test_unknown_or_missing_major_has_no_dispatch_target(self) -> None:
+        # proof-obligation 6: fail closed -- no schema for an unknown/missing major
+        self.assertNotIn("dps.module/v9", self.dispatch)
+        self.assertNotIn(None, self.dispatch)
+        missing = self._a_live_manifest()
+        del missing["schemaVersion"]
+        self.assertNotIn(missing.get("schemaVersion"), self.dispatch)
+
+    def test_phase0_and_f9_agree_on_the_supported_majors(self) -> None:
+        # proof-obligation 7
+        self.assertEqual(set(self.dispatch), set(SUPPORTED_MODULE_MANIFEST_MAJORS))
+
+    def test_historical_and_active_corpora_are_disjoint_worlds(self) -> None:
+        # proof-obligation 8: rollback/historical (v1) never mixes with active (v2)
+        self.assertTrue(
+            all(
+                manifest["schemaVersion"] == "dps.module/v1"
+                and "resolver" in manifest["agents"]
+                for manifest in self.baseline_manifests.values()
+            )
+        )
+        self.assertTrue(
+            all(
+                manifest["schemaVersion"] == "dps.module/v2"
+                and "resolver" not in manifest.get("agents", {})
+                for manifest in self.live_manifests.values()
+            )
         )
 
 

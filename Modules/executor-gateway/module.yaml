@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "dps.module/v1",
+  "schemaVersion": "dps.module/v2",
   "module": {"id": "executor-gateway", "name": "Executor Gateway", "version": "0.1.1", "description": "Authorized execution boundary requiring native and business-postcondition verification before success.", "lifecycle": "proposed", "runtimeState": "proposed", "releaseEligible": false, "riskTier": "R3", "ownerId": "dps-control-plane"},
   "paths": {"actualRoot": "Modules/executor-gateway", "canonicalRoot": "modules/executor-gateway", "owned": ["Modules/executor-gateway/**"], "excluded": [], "runtimeData": []},
   "artifacts": [

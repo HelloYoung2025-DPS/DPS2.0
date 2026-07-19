@@ -108,9 +108,10 @@ def synthetic_module_manifest(
     consumed: list[dict] | None = None,
     inbound: list[dict] | None = None,
     outbound: list[dict] | None = None,
+    schema_version: str = "dps.module/v2",
 ) -> dict:
     return {
-        "schemaVersion": "dps.module/v1",
+        "schemaVersion": schema_version,
         "module": {"id": module_id},
         "dependencies": [
             {
@@ -2956,6 +2957,50 @@ class F9ExternalGateTests(unittest.TestCase):
         self.assertEqual(
             "compatibility_matrix_manifest_mismatch", decision.reason_code
         )
+
+    def test_f9_accepts_current_v2_module_manifest(self) -> None:
+        """The current major (dps.module/v2) is the default fixture world; F9
+        accepts it end-to-end and the complete signed context is eligible.  This
+        is the positive, full-eligibility evidence for the current major -- the
+        removed resolver lives only in the agents block, which F9 does not
+        inspect, so nothing about the migration weakens the F9 checks."""
+        binding = self.fixture.evidence["payload"]["module_rollout_lines"][
+            "manifest_artifacts"
+        ][0]
+        manifest = json.loads(Path(self.raw_metadata(binding["raw_artifact_id"])["path"]).read_bytes())
+        self.assertEqual("dps.module/v2", manifest["schemaVersion"])
+        decision = self.decision()
+        self.assertEqual(0, decision.exit_code)
+        self.assertEqual(ELIGIBLE, decision.decision)
+
+    def test_f9_accepts_historical_v1_module_manifest(self) -> None:
+        """Rollback window: F9 still accepts the historical major (dps.module/v1).
+        Re-stamping the manifest bytes re-digests the module BOM, which this helper
+        does not re-sign into the execution evidence, so only the version axis is
+        asserted: v1 clears the manifest-version gate and reaches the later
+        BOM-binding checks instead of being rejected as an unknown version
+        (contrast test_f9_rejects_unknown_module_manifest_major)."""
+        binding = self.fixture.evidence["payload"]["module_rollout_lines"][
+            "manifest_artifacts"
+        ][0]
+        manifest = json.loads(Path(self.raw_metadata(binding["raw_artifact_id"])["path"]).read_bytes())
+        manifest["schemaVersion"] = "dps.module/v1"
+        self.replace_first_manifest(manifest)
+        decision = self.decision()
+        self.assertNotEqual("unknown_manifest_version", decision.reason_code)
+
+    def test_f9_rejects_unknown_module_manifest_major(self) -> None:
+        """An unrecognised major fails closed rather than being assumed
+        structurally compatible from a loose version prefix."""
+        binding = self.fixture.evidence["payload"]["module_rollout_lines"][
+            "manifest_artifacts"
+        ][0]
+        manifest = json.loads(Path(self.raw_metadata(binding["raw_artifact_id"])["path"]).read_bytes())
+        manifest["schemaVersion"] = "dps.module/v9"
+        self.replace_first_manifest(manifest)
+        decision = self.decision()
+        self.assertNotEqual(0, decision.exit_code)
+        self.assertEqual("unknown_manifest_version", decision.reason_code)
 
     def test_f9_execution_and_observation_examples_conform_to_schemas(
         self,

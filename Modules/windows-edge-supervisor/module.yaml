@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "dps.module/v1",
+  "schemaVersion": "dps.module/v2",
   "module": {
     "id": "windows-edge-supervisor",
     "name": "Windows Edge Supervisor",

@@ -155,6 +155,12 @@ brain-to-hand 的唯一交接合同采用 `edge.bridge.exchange/v2`：由 `zenno
 2. 保留 `receiptRequired=true`，从 Manifest schema 和全部 34 个 Manifest（含 11 个待删 factory Manifest）删除冗余 `resolver` 字段及 factory const；schema 的 `agents` 块为 `additionalProperties: false` 且门禁校验全部注册模块，漏改任一 Manifest 都会使本批次门禁失败。其中 `legacy-runtime-adapter` 的 module.yaml 受 §11 的 Legacy 基线 anchor 保护，本批次需按 §11 同步重签。
 3. 固定旧验证器和攻击语料，对旧/新 receipt 规则双跑；治理迁移由独立审查批准，不能在同一次运行中批准自己。
 4. 新规则通过后，才允许删除 resolver 模块。
+5. 删除 `agents.resolver` 是对 Manifest 契约的 breaking change（v1/v2 结构互不接受）。按工程标准「v1 只做 additive change、breaking change 使用新 major」与 §3.3「公共合同 additive major 并存、逐消费者迁移、保留 rollback 窗口」，删 resolver 后的现行 Manifest 发布为 `dps.module/v2`，与 v1 并存迁移（§4.2 此前遗漏了该 major 迁移步骤，此处补正；这不是 owner 豁免，也不修改工程标准迁就实现）：
+   - 独立保留可解释的 v1 schema（含 `agents.resolver`，`governance/schemas/module-manifest.v1.schema.json`）与 §4.2.3 冻结语料，继续解释历史 Manifest 与 rollback 目标。
+   - 新增明确的 v2 schema（`governance/schemas/module-manifest.schema.json`，`schemaVersion` const 为 `dps.module/v2`）：删 `resolver`，保留 `receiptRequired=true` 与 `agents` 块 `additionalProperties:false`。
+   - 消费者（phase0 Manifest 校验、`external_gate` F9）先具备按 Manifest 顶层 `schemaVersion` 分派 v1→v1 schema、v2→v2 schema 的能力，unknown/missing major 一律 fail closed、不得凭同一松散版本字符串假定结构兼容；具备该能力后，再把 34 份 live `Modules/*/module.yaml` 顶层 `schemaVersion` 切到 `dps.module/v2`。
+   - 嵌套 `agents.spec: dps.agents/v1` 是另一份 AGENTS/frontmatter 合同、语义未改，不随本批升级。
+   - rollback 窗口关闭前不得删除 v1 的解释能力（v1 schema、冻结语料、分派分支保留）。
 
 ### 4.3 R0-C Release BOM 权威迁移
 

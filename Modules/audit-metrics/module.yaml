@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "dps.module/v1",
+  "schemaVersion": "dps.module/v2",
   "module": {"id": "audit-metrics", "name": "Audit Metrics", "version": "0.1.0", "description": "Immutable scoped audit events and low-cardinality metrics without secrets or raw PII.", "lifecycle": "proposed", "runtimeState": "proposed", "releaseEligible": false, "riskTier": "R3", "ownerId": "dps-control-plane"},
   "paths": {"actualRoot": "Modules/audit-metrics", "canonicalRoot": "modules/audit-metrics", "owned": ["Modules/audit-metrics/**"], "excluded": [], "runtimeData": []},
   "artifacts": [

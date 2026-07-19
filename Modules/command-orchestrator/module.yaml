@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "dps.module/v1",
+  "schemaVersion": "dps.module/v2",
   "module": {"id": "command-orchestrator", "name": "Command Orchestrator", "version": "0.2.0", "description": "Owns scoped command idempotency, database-clock leases, bounded retry, recovery, Policy-signed dispatch authorization relay, and verified receipt state.", "lifecycle": "proposed", "runtimeState": "proposed", "releaseEligible": false, "riskTier": "R3", "ownerId": "dps-control-plane"},
   "paths": {"actualRoot": "Modules/command-orchestrator", "canonicalRoot": "modules/command-orchestrator", "owned": ["Modules/command-orchestrator/**"], "excluded": [], "runtimeData": []},
   "artifacts": [

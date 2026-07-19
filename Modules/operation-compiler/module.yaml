@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "dps.module/v1",
+  "schemaVersion": "dps.module/v2",
   "module": {"id": "operation-compiler", "name": "Operation Compiler", "version": "0.3.0", "description": "Compiles deterministic approved actions into allowlisted operations and steps under a fixed deadline with late-outcome quarantine.", "lifecycle": "proposed", "runtimeState": "proposed", "releaseEligible": false, "riskTier": "R3", "ownerId": "dps-control-plane"},
   "paths": {"actualRoot": "Modules/operation-compiler", "canonicalRoot": "modules/operation-compiler", "owned": ["Modules/operation-compiler/**"], "excluded": [], "runtimeData": []},
   "artifacts": [

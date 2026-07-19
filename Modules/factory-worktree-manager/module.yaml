@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "dps.module/v1",
+  "schemaVersion": "dps.module/v2",
   "module": {"id": "factory-worktree-manager", "name": "Factory Worktree Manager", "version": "0.1.0", "description": "Plans one-writer worktrees and owns external transactional leases, path locks, and monotonically fenced authority.", "lifecycle": "proposed", "runtimeState": "proposed", "releaseEligible": false, "riskTier": "R3", "ownerId": "dps-ai-factory"},
   "paths": {"actualRoot": "Modules/factory-worktree-manager", "canonicalRoot": "modules/factory-worktree-manager", "owned": ["Modules/factory-worktree-manager/**"], "excluded": [], "runtimeData": ["external Factory lease database outside the repository"]},
   "artifacts": [

@@ -49,6 +49,13 @@ SEMVER_RE = re.compile(
 CONTRACT_COMPATIBILITY_MODES = {"active", "compat-read", "quarantine-only", "retired"}
 READABLE_CONSUMER_MODES = {"active", "compat-read"}
 RUNNABLE_CONTRACT_MODE = "active"
+# Module-manifest majors F9 accepts through the rollback window: dps.module/v1
+# (historical/rollback, resolver-bearing) and dps.module/v2 (current, resolver
+# removed).  The removed field lives only in the agents block, which F9 does not
+# inspect, so the identity/dependency/contract/communication checks below are
+# shared across both majors.  Any other version string is rejected outright, not
+# assumed structurally compatible from a loose version prefix.
+SUPPORTED_MODULE_MANIFEST_MAJORS = ("dps.module/v1", "dps.module/v2")
 EXTERNAL_COMMUNICATION_PEERS = {
     "gbrain-company",
     "postgresql",
@@ -5278,7 +5285,7 @@ def _validate_f9_rollout_lines(
             binding_sha256,
             f"module manifest {module_id}",
         )
-        if manifest.get("schemaVersion") != "dps.module/v1":
+        if manifest.get("schemaVersion") not in SUPPORTED_MODULE_MANIFEST_MAJORS:
             _fail("unknown_manifest_version", f"F9 manifest for {module_id} has an unsupported schema version")
         module = _object(manifest.get("module"), f"module manifest {module_id}.module")
         if module.get("id") != module_id:

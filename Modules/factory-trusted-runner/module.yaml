@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "dps.module/v1",
+  "schemaVersion": "dps.module/v2",
   "module": {"id": "factory-trusted-runner", "name": "Factory Trusted Runner", "version": "0.1.0", "description": "Runs exact trusted argv without a shell, verifies fencing, and emits fail-closed hashed test evidence.", "lifecycle": "proposed", "runtimeState": "proposed", "releaseEligible": false, "riskTier": "R3", "ownerId": "dps-ai-factory"},
   "paths": {"actualRoot": "Modules/factory-trusted-runner", "canonicalRoot": "modules/factory-trusted-runner", "owned": ["Modules/factory-trusted-runner/**"], "excluded": [], "runtimeData": ["external isolated runner workspace and evidence store"]},
   "artifacts": [
