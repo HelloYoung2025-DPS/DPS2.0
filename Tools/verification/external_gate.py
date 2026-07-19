@@ -92,8 +92,8 @@ STALE_CANDIDATE_GBRAIN_SOURCE_BINDING_V1_DTO_SHA256 = "161661959fc77100c40e9b000
 # their digests are pinned here so a rewritten schema cannot arrive with them.
 # Changing either schema is therefore a deliberate, reviewable edit of this file.
 MODULE_MANIFEST_SCHEMA_SHA256 = {
-    "dps.module/v1": "5a8badea67b160d109baae1b9a448f712b96de88949d013b4233cc0fe2283bb0",
-    "dps.module/v2": "b400b0bd805b5f78cfd25912b0487752c4f3a03e1f7a3065204d2e8193e2480b",
+    "dps.module/v1": "65d9f0b2654db0884b3bfef45edc3a211ea0aedf9b7eabe11921838b0b1be5a7",
+    "dps.module/v2": "4c08cc856a10879121f83507a728823a1b23791d54bdbe2491df2608e0e4a121",
 }
 
 STAGE_SPECS: dict[str, dict[str, Any]] = {

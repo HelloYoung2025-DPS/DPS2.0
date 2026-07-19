@@ -284,6 +284,21 @@ class SchemaRuleChangeTest(unittest.TestCase):
         self.old = _load_json(BASELINE / "module-manifest.schema.json")
         self.new = _load_json(LIVE_SCHEMA_PATH)
 
+    def test_each_major_keeps_its_own_schema_identity(self) -> None:
+        # The URI that named the pre-migration shape must keep naming it.  Letting
+        # the incompatible v2 inherit it would mean one identity resolving to two
+        # incompatible schemas -- the frozen v1 fixture still carries that URI --
+        # so a rollback consumer resolving historical evidence by identity would
+        # judge it against the wrong major.  Same rule as the dps.module major bump
+        # itself (RebuildPlan 158): a breaking shape takes a new identity.
+        frozen_v1_id = _load_json(BASELINE / "module-manifest.schema.json")["$id"]
+        self.assertEqual(frozen_v1_id, _load_json(LIVE_V1_SCHEMA_PATH)["$id"])
+        self.assertNotEqual(frozen_v1_id, _load_json(LIVE_V2_SCHEMA_PATH)["$id"])
+        self.assertEqual(
+            "https://dps.local/schemas/module-manifest.v2.schema.json",
+            _load_json(LIVE_V2_SCHEMA_PATH)["$id"],
+        )
+
     def test_resolver_is_the_only_removed_agents_rule(self) -> None:
         old_agents = self.old["properties"]["agents"]
         new_agents = self.new["properties"]["agents"]
@@ -992,13 +1007,25 @@ class BaselineAuthorityFailClosedTest(unittest.TestCase):
             / "src"
             / "instruction_resolver.py"
         ).read_text(encoding="utf-8")
+        # Anchoring the constant is only half of it: the suites that *enforce* the
+        # binding and the hand-rolled schema evaluator have to be byte-bound too, or
+        # a candidate could keep the registered test names and empty their bodies,
+        # and the gate would report green over a guarantee that no longer runs.
+        # Tests/ci/test_candidate_gate.py and friends are already in the list for
+        # exactly this reason.
+        anchored = (
+            '"Tools/ci/run_phase0_gate.py"',
+            '"Tests/ci/test_r0b_receipt_migration_dual_run.py"',
+            '"Tests/ci/test_manifest_schema_subset_evaluator.py"',
+        )
         for source, label in ((gate_source, "run_candidate_gate"), (resolver_source, "instruction_resolver")):
-            self.assertIn(
-                '"Tools/ci/run_phase0_gate.py"',
-                source,
-                "{0} must keep the runner byte-bound, or the frozen baseline stops "
-                "being anchored".format(label),
-            )
+            for path in anchored:
+                self.assertIn(
+                    path,
+                    source,
+                    "{0} must keep {1} byte-bound, or the frozen baseline stops "
+                    "being enforced".format(label, path),
+                )
 
         module_source = Path(__file__).read_text(encoding="utf-8")
         self.assertNotIn(

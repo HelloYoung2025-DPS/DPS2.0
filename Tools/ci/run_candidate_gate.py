@@ -186,6 +186,8 @@ CANDIDATE_TRUST_PATHS = (
     "governance/policies/compatibility-policy.yaml",
     "Tests/ci/test_candidate_gate.py",
     "Tests/ci/test_candidate_policy.py",
+    "Tests/ci/test_manifest_schema_subset_evaluator.py",
+    "Tests/ci/test_r0b_receipt_migration_dual_run.py",
     "Tests/ci/test_phase0_gate.py",
     "Tools/ci/run_candidate_gate.py",
     "Tools/ci/run_phase0_gate.py",

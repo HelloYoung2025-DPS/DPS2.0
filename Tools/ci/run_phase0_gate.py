@@ -398,6 +398,9 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         "test_provenance_repointed_at_another_ancestor_fails_closed",
         "test_the_frozen_constant_is_what_the_corpus_declares",
         "test_the_frozen_constant_lives_in_a_trust_anchored_file",
+        # A breaking shape takes a new identity, so the URI that named the
+        # pre-migration schema must keep naming it.
+        "test_each_major_keeps_its_own_schema_identity",
         "test_the_frozen_commit_is_accepted_and_returned",
         # The injected baseline is the *current* base tip, so it moves.  Naming this
         # keeps the gate from silently regressing to an equality check that would
