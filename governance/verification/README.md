@@ -35,6 +35,18 @@ observation for every N/N, N/N-1, N-1/N, and N-1/N-1 combination of every
 eligible runtime row. Missing, duplicated, skipped, partial, not-run, stale,
 or independently unverifiable observations fail closed.
 
+`dps.scale-verification-input/v1` was tightened in place in R0-B to require
+`manifest_schema_artifacts`, so F9 can hold every signed module manifest to the
+exact schema of its declared major instead of trusting the declared version
+string. Tightening a released major rather than publishing a v2 was permissible
+only because no external producer had ever issued an F9 envelope; the affected
+population was zero. Once a real envelope is signed, this file is frozen: any
+further shape change goes to `dps.scale-verification-input/v2`. A retained v1
+reader is not an option — a reader that accepts envelopes without
+`manifest_schema_artifacts` has no schema to validate manifests against and is
+byte-for-byte the pre-R0-B path that could return ELIGIBLE for a manifest
+violating its own major.
+
 `f7-device-gbrain-input.v1.schema.json` and v2 are historical only and are
 rejected by the executable gate. F7 v3 binds one current signed F6 prerequisite
 receipt, two projection artifacts, two Search artifacts, and exactly 24

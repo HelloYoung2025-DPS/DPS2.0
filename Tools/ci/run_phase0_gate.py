@@ -382,9 +382,14 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         "test_empty_injection_fails_closed",
         "test_revision_expressions_are_refused",
         "test_unknown_commit_fails_closed",
-        "test_commit_outside_head_ancestry_fails_closed",
-        "test_provenance_disagreeing_with_the_injection_fails_closed",
-        "test_matching_injection_is_accepted",
+        "test_a_baseline_that_does_not_descend_from_the_corpus_fails_closed",
+        "test_a_baseline_older_than_the_corpus_fails_closed",
+        "test_a_malformed_provenance_declaration_fails_closed",
+        "test_the_frozen_commit_is_accepted_and_returned",
+        # The injected baseline is the *current* base tip, so it moves.  Naming this
+        # keeps the gate from silently regressing to an equality check that would
+        # pass today and fail on the next unrelated merge.
+        "test_a_base_that_has_advanced_past_the_corpus_is_still_accepted",
         # F9 now holds every signed manifest to the exact schema of its declared
         # major, using a stdlib evaluator external_gate had to hand-roll.  These
         # keep that evaluator pinned to a reference Draft 2020-12 implementation
