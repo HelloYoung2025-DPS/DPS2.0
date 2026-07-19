@@ -64,6 +64,10 @@ try:
         validate_json_schema,
     )
     from external_gate import SUPPORTED_MODULE_MANIFEST_MAJORS  # noqa: E402
+
+    # Imported, never redefined: the corpus commit must come from a trust-anchored
+    # file so re-pointing it cannot be a quiet edit to this test.
+    from run_phase0_gate import R0B_FROZEN_BASELINE_COMMIT as FROZEN_BASELINE_COMMIT  # noqa: E402
 finally:
     sys.path = _ORIGINAL_IMPORT_PATH
 
@@ -112,11 +116,13 @@ def _trusted_git_executable() -> str:
 # Two separate things are therefore required of the baseline, and neither alone
 # is enough:
 #
-# * WHICH commit is a constant of this batch -- ``FROZEN_BASELINE_COMMIT`` below.
-#   It is the single place the corpus commit is named.  Deriving it from the
-#   injected value instead would bind nothing in particular: ancestry alone is
-#   satisfied by *any* older commit, so a rewritten corpus could quietly re-point
-#   itself at whichever ancestor made the dual-run easiest to pass.
+# * WHICH commit is fixed by ``run_phase0_gate.R0B_FROZEN_BASELINE_COMMIT``.  It is
+#   named there, not here, because that file is in CANDIDATE_TRUST_PATHS: its bytes
+#   are bound into the candidate trust anchor, so moving the corpus to a different
+#   commit invalidates that anchor rather than passing as a quiet data edit.
+#   Leaving the choice in candidate-writable code would bind nothing in particular,
+#   since ancestry alone is satisfied by *any* older commit -- a rewritten corpus
+#   could re-point itself at whichever ancestor made the dual-run easiest to pass.
 # * WHETHER that commit is real history is decided outside the candidate tree, by
 #   requiring the runner-injected ``DPS_BASELINE_COMMIT`` to descend from it.  A
 #   commit the candidate planted on its own branch is an ancestor of HEAD but
@@ -133,13 +139,7 @@ def _trusted_git_executable() -> str:
 # scripts/release.sh, which passes --base HEAD), "descends from the frozen commit"
 # is checked against a value the candidate controls.  Local runs were never the
 # authority; CI is, and there the base sha comes from GitHub's own view of the PR.
-# Changing FROZEN_BASELINE_COMMIT is a one-line diff that also requires re-freezing
-# every fixture blob to the new commit's real bytes, which is what a rebase onto a
-# new base legitimately does.
 BASELINE_COMMIT_ENV = "DPS_BASELINE_COMMIT"
-# The pre-migration commit this batch froze its corpus from.  Rebasing the batch
-# onto a new base means re-freezing the fixtures and updating this line together.
-FROZEN_BASELINE_COMMIT = "8f63593d4f262ec1496b05300da75a71b86eaab4"
 _FULL_COMMIT_SHA = re.compile(r"\A[0-9a-f]{40}\Z")
 
 
@@ -975,6 +975,42 @@ class BaselineAuthorityFailClosedTest(unittest.TestCase):
         self.assertEqual(
             FROZEN_BASELINE_COMMIT,
             _load_json(FIXTURES / "provenance.json")["baseline_commit"],
+        )
+
+    def test_the_frozen_constant_lives_in_a_trust_anchored_file(self) -> None:
+        # The whole protection is that changing which commit the corpus anchors to
+        # invalidates the candidate trust anchor.  That holds only while the constant
+        # is defined in a CANDIDATE_TRUST_PATHS file and this module merely imports
+        # it; a local redefinition here would silently return the choice to
+        # candidate-writable code, where any older ancestor would do.
+        runner = ROOT / "Tools" / "ci" / "run_phase0_gate.py"
+        gate_source = (ROOT / "Tools" / "ci" / "run_candidate_gate.py").read_text(encoding="utf-8")
+        resolver_source = (
+            ROOT
+            / "Modules"
+            / "factory-instruction-resolver"
+            / "src"
+            / "instruction_resolver.py"
+        ).read_text(encoding="utf-8")
+        for source, label in ((gate_source, "run_candidate_gate"), (resolver_source, "instruction_resolver")):
+            self.assertIn(
+                '"Tools/ci/run_phase0_gate.py"',
+                source,
+                "{0} must keep the runner byte-bound, or the frozen baseline stops "
+                "being anchored".format(label),
+            )
+
+        module_source = Path(__file__).read_text(encoding="utf-8")
+        self.assertNotIn(
+            "\nFROZEN_BASELINE_COMMIT =",
+            module_source,
+            "this module must import the frozen baseline, never define its own",
+        )
+        self.assertIn("R0B_FROZEN_BASELINE_COMMIT", runner.read_text(encoding="utf-8"))
+        self.assertNotIn(
+            FROZEN_BASELINE_COMMIT,
+            module_source,
+            "the commit id must not be duplicated outside the trust-anchored file",
         )
 
     def test_the_frozen_commit_is_accepted_and_returned(self) -> None:

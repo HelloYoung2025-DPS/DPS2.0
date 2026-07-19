@@ -274,6 +274,17 @@ def in_process_check(check_id: str, operation: Any) -> Dict[str, Any]:
         )
 
 
+# The pre-migration commit the R0-B dual-run froze its corpus from.  It lives here
+# rather than beside the fixtures because this file is in CANDIDATE_TRUST_PATHS:
+# its bytes are bound into the candidate trust anchor, so re-pointing the corpus at
+# a different commit invalidates that anchor instead of being a quiet data edit.
+# Naming it in the test module would have left the choice of "which commit" in
+# candidate-writable code, where ancestry alone is satisfied by any older commit.
+# Rebasing the batch onto a new base means re-freezing the fixtures and updating
+# this line together.
+R0B_FROZEN_BASELINE_COMMIT = "8f63593d4f262ec1496b05300da75a71b86eaab4"
+
+
 def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
     minimum_adversarial_tests = 137
     required_inventory = {
@@ -386,6 +397,7 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         "test_a_baseline_older_than_the_corpus_fails_closed",
         "test_provenance_repointed_at_another_ancestor_fails_closed",
         "test_the_frozen_constant_is_what_the_corpus_declares",
+        "test_the_frozen_constant_lives_in_a_trust_anchored_file",
         "test_the_frozen_commit_is_accepted_and_returned",
         # The injected baseline is the *current* base tip, so it moves.  Naming this
         # keeps the gate from silently regressing to an equality check that would
