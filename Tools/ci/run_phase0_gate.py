@@ -274,7 +274,7 @@ def in_process_check(check_id: str, operation: Any) -> Dict[str, Any]:
         )
 
 
-def run_phase0_unittests() -> Dict[str, Any]:
+def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
     minimum_adversarial_tests = 137
     required_inventory = {
         "test_missing_standard_module_layout_is_rejected",
@@ -375,6 +375,16 @@ def run_phase0_unittests() -> Dict[str, Any]:
         # validator for both dual-run sides stays sound and fail-closed.
         "test_frozen_fixtures_equal_the_baseline_commit_blobs",
         "test_receipt_validator_is_unchanged_in_this_batch",
+        # Which commit those anchors bind to must come from this runner, never from
+        # a file the candidate change can rewrite.  Naming the fail-closed cases
+        # here keeps the external baseline authority itself load-bearing.
+        "test_absent_injection_fails_closed",
+        "test_empty_injection_fails_closed",
+        "test_revision_expressions_are_refused",
+        "test_unknown_commit_fails_closed",
+        "test_commit_outside_head_ancestry_fails_closed",
+        "test_provenance_disagreeing_with_the_injection_fails_closed",
+        "test_matching_injection_is_accepted",
     }
     command = [
         sys.executable,
@@ -388,7 +398,17 @@ def run_phase0_unittests() -> Dict[str, Any]:
         "-p",
         "test_*.py",
     ]
-    result = run_command(command, ROOT, timeout_seconds=180)
+    # The R0-B dual-run anchors refuse to take the baseline commit from the
+    # candidate tree, so this runner supplies the one it resolved itself (--base,
+    # or DPS_BASELINE_COMMIT / GITHUB_BASE_SHA via resolve_baseline).  When
+    # baseline resolution failed there is no authority to pass on and the anchors
+    # fail closed rather than fall back to an inherited value.
+    suite_environment = dict(os.environ)
+    if baseline:
+        suite_environment["DPS_BASELINE_COMMIT"] = baseline
+    else:
+        suite_environment.pop("DPS_BASELINE_COMMIT", None)
+    result = run_command(command, ROOT, timeout_seconds=180, env=suite_environment)
     check = check_from_command("phase0-adversarial-unit-tests", True, result)
     executed, summary_reason = _executed_test_count(
         TrustedInvocation(command, "python-unittest", minimum_adversarial_tests),
@@ -2527,7 +2547,7 @@ def _run_phase0_gate(
             )
         )
 
-    checks.append(run_phase0_unittests())
+    checks.append(run_phase0_unittests(baseline))
     checks.append(run_external_gate_unittests())
     checks.append(run_locked_solution_build(ROOT))
     checks.extend(run_required_module_static_tests(ROOT))

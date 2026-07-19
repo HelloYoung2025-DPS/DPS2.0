@@ -25,12 +25,14 @@ import ast
 import copy
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from typing import Any, Dict, List, Mapping
+from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -94,6 +96,77 @@ def _trusted_git_executable() -> str:
     ):
         raise AssertionError("locked /usr/bin/git is missing or unsafe")
     return str(LOCKED_GIT)
+
+
+# Finding 3 (baseline authority): the anchors below must not learn *which* commit
+# is the baseline from a file the candidate change can rewrite.  ``provenance.json``
+# lives in the same commit as the fixtures it describes, so a change that rewrote
+# both the fixtures and the recorded baseline_commit would still anchor to itself.
+# The baseline commit is therefore taken from the runner-injected
+# ``DPS_BASELINE_COMMIT`` -- the channel static-ci.yml already supplies and
+# run_phase0_gate.resolve_baseline already reads -- and ``provenance.json`` is
+# demoted from authority to a declaration that must agree with it exactly.  With
+# no injection there is no baseline authority at all, so the anchors fail closed
+# instead of silently self-certifying.
+BASELINE_COMMIT_ENV = "DPS_BASELINE_COMMIT"
+_FULL_COMMIT_SHA = re.compile(r"\A[0-9a-f]{40}\Z")
+
+
+def _run_trusted_git(*args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [_trusted_git_executable(), *args],
+        cwd=str(ROOT),
+        capture_output=True,
+        check=False,
+    )
+
+
+def _assert_well_formed_commit(raw: Any) -> str:
+    if raw is None:
+        raise AssertionError(
+            "{0} is not set; the baseline commit has no external authority and the "
+            "dual-run anchors cannot be trusted -- the runner must inject it".format(
+                BASELINE_COMMIT_ENV
+            )
+        )
+    value = str(raw).strip()
+    if not _FULL_COMMIT_SHA.match(value):
+        raise AssertionError(
+            "{0}={1!r} is not a full 40-hex commit id; revisions such as HEAD or "
+            "refs are candidate-influenceable and are refused".format(BASELINE_COMMIT_ENV, raw)
+        )
+    return value
+
+
+def _assert_commit_is_ancestor_of_head(commit: str) -> None:
+    resolved = _run_trusted_git("rev-parse", "--verify", "--quiet", commit + "^{commit}")
+    if resolved.returncode != 0:
+        raise AssertionError(
+            "injected baseline commit {0} does not exist in this repository".format(commit)
+        )
+    ancestry = _run_trusted_git("merge-base", "--is-ancestor", commit, "HEAD")
+    if ancestry.returncode != 0:
+        raise AssertionError(
+            "injected baseline commit {0} is not an ancestor of HEAD; the frozen "
+            "corpus would not be this branch's pre-migration state".format(commit)
+        )
+
+
+def _assert_provenance_declares(commit: str) -> None:
+    declared = _load_json(FIXTURES / "provenance.json").get("baseline_commit")
+    if declared != commit:
+        raise AssertionError(
+            "provenance.json declares baseline_commit {0!r} but the runner injected "
+            "{1!r}; the frozen fixtures do not describe the commit the gate anchors "
+            "to".format(declared, commit)
+        )
+
+
+def _require_injected_baseline_commit() -> str:
+    commit = _assert_well_formed_commit(os.environ.get(BASELINE_COMMIT_ENV))
+    _assert_commit_is_ancestor_of_head(commit)
+    _assert_provenance_declares(commit)
+    return commit
 
 
 def _baseline_manifest_paths() -> List[Path]:
@@ -664,7 +737,10 @@ class BaselineCommitAnchoringTest(unittest.TestCase):
 
     * the frozen fixtures really are the pre-migration bytes -- anchored to the
       immutable baseline commit blob, not merely to a digest recorded beside them
-      in ``provenance.json``, which an attacker could rewrite in the same change;
+      in ``provenance.json``, which an attacker could rewrite in the same change.
+      Which commit that is comes from the runner-injected ``DPS_BASELINE_COMMIT``
+      and never from the candidate tree; ``provenance.json`` only has to agree
+      with it (see ``_require_injected_baseline_commit``);
     * the validator *core* is unchanged since that baseline.  4.2(5) adds
       per-schemaVersion dispatch to ``phase0.py``, so the file as a whole changes
       legitimately; what must stay frozen is ``validate_json_schema`` itself, so
@@ -675,7 +751,7 @@ class BaselineCommitAnchoringTest(unittest.TestCase):
     """
 
     def setUp(self) -> None:
-        self.baseline_commit = _load_json(FIXTURES / "provenance.json")["baseline_commit"]
+        self.baseline_commit = _require_injected_baseline_commit()
 
     def test_frozen_fixtures_equal_the_baseline_commit_blobs(self) -> None:
         frozen = {
@@ -720,6 +796,113 @@ class BaselineCommitAnchoringTest(unittest.TestCase):
         )
 
 
+class BaselineAuthorityFailClosedTest(unittest.TestCase):
+    """Finding 3: prove the baseline authority is *external* and fails closed.
+
+    The anchoring test above is only as strong as where it learns the baseline
+    commit from.  These cases drive ``_require_injected_baseline_commit`` directly
+    and assert that every way of removing, weakening or contradicting the runner
+    injection raises rather than silently anchoring to something the candidate
+    controls.  Without them a future edit could quietly restore the self-anchoring
+    ``provenance.json`` read and every anchor above would still report green.
+    """
+
+    @staticmethod
+    def _with_injection(value: Any):
+        environment = dict(os.environ)
+        environment.pop(BASELINE_COMMIT_ENV, None)
+        if value is not None:
+            environment[BASELINE_COMMIT_ENV] = value
+        return mock.patch.dict(os.environ, environment, clear=True)
+
+    def _head_commit(self) -> str:
+        resolved = _run_trusted_git("rev-parse", "--verify", "HEAD^{commit}")
+        self.assertEqual(0, resolved.returncode, resolved.stderr.decode("utf-8", "replace"))
+        return resolved.stdout.decode("ascii").strip()
+
+    def _unreferenced_commit(self) -> str:
+        """A real commit object that is not on HEAD's ancestry."""
+
+        tree = _run_trusted_git("hash-object", "-t", "tree", "-w", "--stdin")
+        self.assertEqual(0, tree.returncode, tree.stderr.decode("utf-8", "replace"))
+        created = subprocess.run(
+            [
+                _trusted_git_executable(),
+                "commit-tree",
+                tree.stdout.decode("ascii").strip(),
+                "-m",
+                "r0b baseline-authority ancestry probe",
+            ],
+            cwd=str(ROOT),
+            input=b"",
+            capture_output=True,
+            check=False,
+            env=dict(
+                os.environ,
+                GIT_AUTHOR_NAME="dps-test",
+                GIT_AUTHOR_EMAIL="dps-test@invalid",
+                GIT_AUTHOR_DATE="1700000000 +0000",
+                GIT_COMMITTER_NAME="dps-test",
+                GIT_COMMITTER_EMAIL="dps-test@invalid",
+                GIT_COMMITTER_DATE="1700000000 +0000",
+            ),
+        )
+        self.assertEqual(0, created.returncode, created.stderr.decode("utf-8", "replace"))
+        return created.stdout.decode("ascii").strip()
+
+    def test_absent_injection_fails_closed(self) -> None:
+        with self._with_injection(None):
+            with self.assertRaises(AssertionError) as raised:
+                _require_injected_baseline_commit()
+        self.assertIn(BASELINE_COMMIT_ENV, str(raised.exception))
+
+    def test_empty_injection_fails_closed(self) -> None:
+        with self._with_injection("   "):
+            with self.assertRaises(AssertionError):
+                _require_injected_baseline_commit()
+
+    def test_revision_expressions_are_refused(self) -> None:
+        # "HEAD" or a branch name would resolve through candidate-writable refs,
+        # so only a full immutable object id is accepted.
+        for expression in ("HEAD", "main", "8f63593", "8F63593D4F262EC1496B05300DA75A71B86EAAB4"):
+            with self.subTest(expression=expression):
+                with self._with_injection(expression):
+                    with self.assertRaises(AssertionError):
+                        _require_injected_baseline_commit()
+
+    def test_unknown_commit_fails_closed(self) -> None:
+        with self._with_injection("0" * 40):
+            with self.assertRaises(AssertionError) as raised:
+                _require_injected_baseline_commit()
+        self.assertIn("does not exist", str(raised.exception))
+
+    def test_commit_outside_head_ancestry_fails_closed(self) -> None:
+        stranger = self._unreferenced_commit()
+        with self._with_injection(stranger):
+            with self.assertRaises(AssertionError) as raised:
+                _require_injected_baseline_commit()
+        self.assertIn("not an ancestor of HEAD", str(raised.exception))
+
+    def test_provenance_disagreeing_with_the_injection_fails_closed(self) -> None:
+        # HEAD is a real ancestor of itself, so this isolates the last check:
+        # the frozen corpus must describe exactly the injected baseline.
+        head = self._head_commit()
+        self.assertNotEqual(
+            head,
+            _load_json(FIXTURES / "provenance.json")["baseline_commit"],
+            "precondition: HEAD must differ from the declared baseline",
+        )
+        with self._with_injection(head):
+            with self.assertRaises(AssertionError) as raised:
+                _require_injected_baseline_commit()
+        self.assertIn("provenance.json declares", str(raised.exception))
+
+    def test_matching_injection_is_accepted(self) -> None:
+        declared = _load_json(FIXTURES / "provenance.json")["baseline_commit"]
+        with self._with_injection(declared):
+            self.assertEqual(declared, _require_injected_baseline_commit())
+
+
 class GitAnchoringTrustBoundaryTest(unittest.TestCase):
     """Finding 2: the baseline anchors must not trust a PATH-selectable bare git.
     They adopt the repository's locked-git boundary (run_candidate_gate's
@@ -737,7 +920,7 @@ class GitAnchoringTrustBoundaryTest(unittest.TestCase):
         # anchors call the locked /usr/bin/git rather than resolving "git" from
         # PATH, _git_blob still returns the real baseline blob, not the hostile
         # output -- the fail-closed proof, not a mere PATH-dependency note.
-        baseline_commit = _load_json(FIXTURES / "provenance.json")["baseline_commit"]
+        baseline_commit = _require_injected_baseline_commit()
         with tempfile.TemporaryDirectory() as poisoned_dir:
             hostile = Path(poisoned_dir) / "git"
             hostile.write_text("#!/bin/sh\necho HOSTILE-GIT-OUTPUT\n", encoding="utf-8")
