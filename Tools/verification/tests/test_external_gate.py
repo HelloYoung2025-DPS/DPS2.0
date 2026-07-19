@@ -1027,7 +1027,7 @@ class Fixture:
 
         base_raw = self.artifact_path.read_bytes()
         self.evidence_path = self.root / "f9-evidence.json"
-        self.evidence["schema_version"] = "dps.scale-verification-input/v1"
+        self.evidence["schema_version"] = "dps.scale-verification-input/v2"
         self.evidence["evidence_id"] = "external-f9-evidence-0001"
         self.evidence["environment"] = {
             "environment_id": "env_scale_lab_01",
@@ -3491,6 +3491,17 @@ class F9ExternalGateTests(unittest.TestCase):
         self.assertEqual("manifest_schema_not_pinned", decision.reason_code)
         self.assertNotEqual(0, decision.exit_code)
 
+    def test_f9_rejects_the_superseded_v1_input_major(self) -> None:
+        # manifest_schema_artifacts is a breaking requirement, so it landed as a new
+        # major rather than being tightened into v1 in place.  The gate must refuse
+        # the old identifier outright -- a v1 reader would have no manifest schema
+        # to validate against, which is the pre-R0-B hole itself.
+        self.fixture.evidence["schema_version"] = "dps.scale-verification-input/v1"
+        self.fixture.reseal()
+        decision = self.decision()
+        self.assertNotEqual(ELIGIBLE, decision.status)
+        self.assertNotEqual(0, decision.exit_code)
+
     def test_f9_requires_the_schema_of_every_supported_major(self) -> None:
         rollout = self.fixture.evidence["payload"]["module_rollout_lines"]
         rollout["manifest_schema_artifacts"] = [
@@ -3664,6 +3675,55 @@ class F9ExternalGateTests(unittest.TestCase):
         self.assertNotEqual(0, decision.exit_code)
 
 
+class F9InputMajorMigrationTests(unittest.TestCase):
+    """RebuildPlan 3.3: additive within a major, breaking changes take a new major.
+
+    R0-B's F9 input change is breaking, so v1 must survive untouched while v2
+    carries the new requirement.  Tightening v1 in place would have been the same
+    class of governance exception this batch's own dps.module/v2 bump exists to
+    avoid taking.
+    """
+
+    VERIFICATION = Path(__file__).resolve().parents[3] / "governance" / "verification"
+
+    def test_the_executable_gate_targets_the_v2_input(self) -> None:
+        spec = external_gate_module.STAGE_SPECS["f9"]
+        self.assertEqual("dps.scale-verification-input/v2", spec["schema_version"])
+        self.assertEqual("f9-scale-input.v2.schema.json", spec["schema"])
+
+    def test_v1_is_retained_unchanged_and_carries_neither_the_new_key_nor_the_v2_id(self) -> None:
+        v1 = json.loads((self.VERIFICATION / "f9-scale-input.v1.schema.json").read_text(encoding="utf-8"))
+        rollout = v1["allOf"][1]["properties"]["payload"]["properties"]["module_rollout_lines"]
+        self.assertNotIn("manifest_schema_artifacts", rollout["required"])
+        self.assertNotIn("manifest_schema_artifacts", rollout["properties"])
+        self.assertEqual(
+            "dps.scale-verification-input/v1",
+            v1["allOf"][1]["properties"]["schema_version"]["const"],
+        )
+
+    def test_v2_is_v1_plus_exactly_the_manifest_schema_binding(self) -> None:
+        v1 = json.loads((self.VERIFICATION / "f9-scale-input.v1.schema.json").read_text(encoding="utf-8"))
+        v2 = json.loads((self.VERIFICATION / "f9-scale-input.v2.schema.json").read_text(encoding="utf-8"))
+        v1_rollout = v1["allOf"][1]["properties"]["payload"]["properties"]["module_rollout_lines"]
+        v2_rollout = v2["allOf"][1]["properties"]["payload"]["properties"]["module_rollout_lines"]
+        self.assertEqual(
+            {"manifest_schema_artifacts"},
+            set(v2_rollout["required"]) - set(v1_rollout["required"]),
+        )
+        self.assertEqual(
+            {"manifest_schema_artifacts"},
+            set(v2_rollout["properties"]) - set(v1_rollout["properties"]),
+        )
+        # Nothing else drifted while the file was copied forward.
+        v1["allOf"][1]["properties"]["schema_version"]["const"] = "dps.scale-verification-input/v2"
+        v1["$id"] = v2["$id"]
+        v1_rollout["required"] = v2_rollout["required"]
+        v1_rollout["properties"]["manifest_schema_artifacts"] = v2_rollout["properties"][
+            "manifest_schema_artifacts"
+        ]
+        self.assertEqual(v1, v2)
+
+
 class ModuleManifestSchemaDispatchTests(unittest.TestCase):
     """The per-major dispatch and the fail-closed limits of the subset evaluator.
 
@@ -3828,7 +3888,7 @@ class StagePayloadTests(unittest.TestCase):
                 "runner_sbom_sha256",
             },
             "f8-canary-input.v1.schema.json": {"environment_id", "os_family"},
-            "f9-scale-input.v1.schema.json": {"environment_id", "os_family"},
+            "f9-scale-input.v2.schema.json": {"environment_id", "os_family"},
         }
         for filename, keys in expected.items():
             with self.subTest(filename=filename):
@@ -3872,7 +3932,7 @@ class StagePayloadTests(unittest.TestCase):
 
     def test_f9_schema_requires_signed_canary_and_bom_dependency_graph_bindings(self) -> None:
         verification_root = Path(__file__).resolve().parents[3] / "governance" / "verification"
-        schema = json.loads((verification_root / "f9-scale-input.v1.schema.json").read_text(encoding="utf-8"))
+        schema = json.loads((verification_root / "f9-scale-input.v2.schema.json").read_text(encoding="utf-8"))
         payload = schema["allOf"][1]["properties"]["payload"]
         self.assertIn("canary_prerequisite", payload["required"])
         self.assertIn("module_rollout_lines", payload["required"])

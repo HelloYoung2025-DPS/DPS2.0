@@ -112,10 +112,17 @@ STAGE_SPECS: dict[str, dict[str, Any]] = {
         "verification_level": "CANARY_VERIFIED",
         "schema": "f8-canary-input.v1.schema.json",
     },
+    # R0-B strengthened the F9 input: it must now bind the module manifest schema
+    # of every supported major, so the gate can hold each signed manifest to the
+    # rules of the version it declares.  That is a breaking requirement, and
+    # RebuildPlan 3.3 allows only additive change within a major, so it lands as
+    # dps.scale-verification-input/v2.  The v1 schema file stays byte-stable for
+    # historical verification and is rejected by this executable gate, exactly as
+    # f7-device-gbrain-input v1/v2 are.
     "f9": {
-        "schema_version": "dps.scale-verification-input/v1",
+        "schema_version": "dps.scale-verification-input/v2",
         "verification_level": "SCALE_VERIFIED",
-        "schema": "f9-scale-input.v1.schema.json",
+        "schema": "f9-scale-input.v2.schema.json",
     },
 }
 

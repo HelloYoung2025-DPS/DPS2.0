@@ -107,26 +107,39 @@ def _trusted_git_executable() -> str:
 # channel static-ci.yml already supplies from GitHub's own view of the base, and
 # run_phase0_gate.resolve_baseline already reads.  But that value is a *moving*
 # pointer: it is the current base branch tip, not this batch's frozen corpus
-# commit, and it legitimately changes every time the base advances.  Requiring the
-# two to be equal would make the anchors pass only while the base happened to sit
-# on the frozen commit, and go red on the next unrelated merge -- a gate that
-# expires is not a gate.
+# commit, and it legitimately changes every time the base advances.
 #
-# So the relation checked is ancestry, not equality: the commit ``provenance.json``
-# declares must already be in the history of the injected base.  That is stable
-# forever (an ancestor stays an ancestor as the base advances) and it is what makes
-# the declaration trustworthy -- a commit the candidate planted on its own branch
-# is an ancestor of HEAD but never of the base the runner names, so the
-# self-anchoring rewrite this check exists to stop still fails closed.
+# Two separate things are therefore required of the baseline, and neither alone
+# is enough:
+#
+# * WHICH commit is a constant of this batch -- ``FROZEN_BASELINE_COMMIT`` below.
+#   It is the single place the corpus commit is named.  Deriving it from the
+#   injected value instead would bind nothing in particular: ancestry alone is
+#   satisfied by *any* older commit, so a rewritten corpus could quietly re-point
+#   itself at whichever ancestor made the dual-run easiest to pass.
+# * WHETHER that commit is real history is decided outside the candidate tree, by
+#   requiring the runner-injected ``DPS_BASELINE_COMMIT`` to descend from it.  A
+#   commit the candidate planted on its own branch is an ancestor of HEAD but
+#   never of the base the runner names, so the self-anchoring rewrite this check
+#   exists to stop still fails closed.
+#
+# Ancestry rather than equality on that second point is deliberate.
+# ``DPS_BASELINE_COMMIT`` is a *moving* pointer -- the current base tip, and on
+# push events ``github.event.before`` -- so requiring equality would make these
+# anchors pass only while the base happened to sit on the frozen commit and go red
+# on the next unrelated merge. A gate that expires is not a gate.
 #
 # Honest limit: when the caller supplies the baseline itself (a local run, or
-# scripts/release.sh, which passes --base HEAD), "in the history of the base"
-# degrades to "in the history of HEAD", which the candidate does control.  Local
-# runs were never the authority; CI is, and there the base sha comes from GitHub.
-# The residual weakness in CI is that a PR could declare an *older* genuine base
-# ancestor and re-freeze the fixtures to that commit's real bytes; that is a
-# visible diff and still anchors to a real pre-migration state.
+# scripts/release.sh, which passes --base HEAD), "descends from the frozen commit"
+# is checked against a value the candidate controls.  Local runs were never the
+# authority; CI is, and there the base sha comes from GitHub's own view of the PR.
+# Changing FROZEN_BASELINE_COMMIT is a one-line diff that also requires re-freezing
+# every fixture blob to the new commit's real bytes, which is what a rebase onto a
+# new base legitimately does.
 BASELINE_COMMIT_ENV = "DPS_BASELINE_COMMIT"
+# The pre-migration commit this batch froze its corpus from.  Rebasing the batch
+# onto a new base means re-freezing the fixtures and updating this line together.
+FROZEN_BASELINE_COMMIT = "8f63593d4f262ec1496b05300da75a71b86eaab4"
 _FULL_COMMIT_SHA = re.compile(r"\A[0-9a-f]{40}\Z")
 
 
@@ -174,24 +187,30 @@ def _require_injected_baseline_commit() -> str:
     injected = _assert_well_formed_commit(os.environ.get(BASELINE_COMMIT_ENV), BASELINE_COMMIT_ENV)
     _assert_commit_exists(injected, "injected baseline")
 
-    declared = _assert_well_formed_commit(
-        _load_json(FIXTURES / "provenance.json").get("baseline_commit"),
-        "provenance.json baseline_commit",
-    )
-    _assert_commit_exists(declared, "declared baseline")
+    frozen = _assert_well_formed_commit(FROZEN_BASELINE_COMMIT, "FROZEN_BASELINE_COMMIT")
+    _assert_commit_exists(frozen, "frozen baseline")
+
+    declared = _load_json(FIXTURES / "provenance.json").get("baseline_commit")
+    if declared != frozen:
+        raise AssertionError(
+            "provenance.json declares baseline_commit {0!r}, but this batch is frozen "
+            "at {1!r}; the corpus cannot re-point itself at a different commit".format(
+                declared, frozen
+            )
+        )
     _assert_is_ancestor(
-        declared,
+        frozen,
         injected,
-        "provenance.json declares a baseline that is not in the history of the "
-        "runner-supplied base, so the frozen corpus is not a state this branch "
-        "actually migrated from",
+        "the runner-supplied base does not descend from the frozen baseline, so "
+        "nothing outside the candidate tree vouches for it being real pre-migration "
+        "history",
     )
     _assert_is_ancestor(
-        declared,
+        frozen,
         "HEAD",
-        "the declared baseline is not in this branch's own history",
+        "the frozen baseline is not in this branch's own history",
     )
-    return declared
+    return frozen
 
 
 def _baseline_manifest_paths() -> List[Path]:
@@ -926,35 +945,41 @@ class BaselineAuthorityFailClosedTest(unittest.TestCase):
         with self._with_injection(stranger):
             with self.assertRaises(AssertionError) as raised:
                 _require_injected_baseline_commit()
-        self.assertIn("not in the history of the runner-supplied base", str(raised.exception))
+        self.assertIn("does not descend from the frozen baseline", str(raised.exception))
 
     def test_a_baseline_older_than_the_corpus_fails_closed(self) -> None:
         # An ancestor of the frozen commit is a real commit and an ancestor of HEAD,
         # so only the direction of the ancestry check rejects it.
-        declared = _load_json(FIXTURES / "provenance.json")["baseline_commit"]
-        older = self._parent_commit(declared)
+        older = self._parent_commit(FROZEN_BASELINE_COMMIT)
         with self._with_injection(older):
             with self.assertRaises(AssertionError) as raised:
                 _require_injected_baseline_commit()
-        self.assertIn("not in the history of the runner-supplied base", str(raised.exception))
+        self.assertIn("does not descend from the frozen baseline", str(raised.exception))
 
-    def test_a_malformed_provenance_declaration_fails_closed(self) -> None:
-        # provenance.json is no longer the authority, but it is still parsed; a
-        # declaration that is not a full object id must not be smuggled into git.
-        declared = _load_json(FIXTURES / "provenance.json")["baseline_commit"]
-        with self._with_injection(declared):
+    def test_provenance_repointed_at_another_ancestor_fails_closed(self) -> None:
+        # The ancestry relation alone is satisfied by *any* older commit.  Without
+        # the frozen constant, a rewritten corpus could re-point itself at whichever
+        # genuine ancestor made the dual-run easiest to pass, and every check would
+        # still be green.  This is the case that binds it to one commit.
+        older = self._parent_commit(FROZEN_BASELINE_COMMIT)
+        with self._with_injection(self._head_commit()):
             with mock.patch(
                 __name__ + "._load_json",
-                return_value={"baseline_commit": "HEAD"},
+                return_value={"baseline_commit": older},
             ):
                 with self.assertRaises(AssertionError) as raised:
                     _require_injected_baseline_commit()
-        self.assertIn("provenance.json baseline_commit", str(raised.exception))
+        self.assertIn("this batch is frozen at", str(raised.exception))
+
+    def test_the_frozen_constant_is_what_the_corpus_declares(self) -> None:
+        self.assertEqual(
+            FROZEN_BASELINE_COMMIT,
+            _load_json(FIXTURES / "provenance.json")["baseline_commit"],
+        )
 
     def test_the_frozen_commit_is_accepted_and_returned(self) -> None:
-        declared = _load_json(FIXTURES / "provenance.json")["baseline_commit"]
-        with self._with_injection(declared):
-            self.assertEqual(declared, _require_injected_baseline_commit())
+        with self._with_injection(FROZEN_BASELINE_COMMIT):
+            self.assertEqual(FROZEN_BASELINE_COMMIT, _require_injected_baseline_commit())
 
     def test_a_base_that_has_advanced_past_the_corpus_is_still_accepted(self) -> None:
         # The regression this relation exists to prevent: DPS_BASELINE_COMMIT is the
@@ -963,12 +988,11 @@ class BaselineAuthorityFailClosedTest(unittest.TestCase):
         # anchors would go red on the next unrelated merge.  Any descendant of the
         # frozen commit must keep them green -- HEAD itself is one, which is also
         # why scripts/release.sh (--base HEAD) no longer breaks them.
-        declared = _load_json(FIXTURES / "provenance.json")["baseline_commit"]
-        for descendant in (self._head_commit(), self._child_of(declared)):
+        for descendant in (self._head_commit(), self._child_of(FROZEN_BASELINE_COMMIT)):
             with self.subTest(baseline=descendant):
-                self.assertNotEqual(declared, descendant)
+                self.assertNotEqual(FROZEN_BASELINE_COMMIT, descendant)
                 with self._with_injection(descendant):
-                    self.assertEqual(declared, _require_injected_baseline_commit())
+                    self.assertEqual(FROZEN_BASELINE_COMMIT, _require_injected_baseline_commit())
 
 
 class GitAnchoringTrustBoundaryTest(unittest.TestCase):
