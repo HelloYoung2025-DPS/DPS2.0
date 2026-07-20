@@ -53,7 +53,7 @@
 按 Docs/RebuildPlan_重构计划书.md 施工批次：R0-C Release BOM 权威迁移（§4.3）。
 开工前先核对 dps2 远程已合入 PR：前序批次（R0-B）未合入则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次，退出条件以 §10 M1B 行为准。上一批证据以 dps2 最新已合入 PR 及其门禁/外审记录为准，自行获取；若上一合入批次触碰候选门禁信任根且尚无合入后正式 clean 证据，先在当前 HEAD 以 --base <其合入提交> 按 §4.5 第 2 步补跑门禁取证，再开工本批。
 注意：本批触碰候选门禁信任根（Tools/ci），按 §4.5 两段式取证；Release BOM 由仓外 signer 签发，模型与候选代码不得持签名私钥。本批收口须注册单一永久 required check `release-binding.composition-gate`（§12 release-binding-composition 行；当前阶段断言=可执行证明生产 publish/dispatch 入口实际不可用）；评估器本体由前置的独立引导治理发布供给并外部锚定——收口前核验其四件套（owner 合入提交、外部摘要锚、见证账本创世记录、独立外审证据），缺一即 R0-C 不得收口；本批不得交付或改动评估器，只交付被测负向状态。收口时 ruleset 完成 required 注册并绑定专用 App integration ID 后，必须在代表性 PR/merge-group 上实测签发者冒充负测：预期专用 App 的报告可满足该 required check，其他 App、用户、commit status API 与 Actions workflow 的同名结果均不能满足；证据绑定 ruleset 标识、修订版本与本批精确合入提交——该负测是 §10 M1B 硬退出条件，缺它 M1B 不得关闭。
-完成后：跑 required 门禁、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准。若本批触碰候选门禁信任根：我确认合入后不结束会话，按 §4.5 第 2 步在合入提交的后继提交上取正式 clean 证据（main 暂无后继提交时，先开一个空提交 PR 作证据锚、经我合入后再取证），结果贴回本批 PR，完成后本批才算关闭。
+完成后：跑 required 门禁、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准。若本批触碰候选门禁信任根：我确认合入后不结束会话，按 §4.5 第 2 步在合入提交的后继提交上取正式 clean 证据（main 暂无后继提交时，先开一个空提交 PR 作证据锚、经我合入后再取证），结果贴回本批 PR。合入后收口阶段还必须完成注册后冒充负测（绑定本批精确合入提交与生效 ruleset 标识/修订，见上），并把一份机器可核验的 **M1B 收口回执**贴回本批 PR——回执逐项载明并链接：required 注册与 integration ID 绑定证据、注册后冒充负测证据、T2A 四件套与 App 可运转证据引用、§4.5 第 2 步 clean 证据锚点；回执齐全本批才算关闭，后续批次（T3 起）以该回执为开工预检对象。
 ```
 
 ### T2A · composition-gate 评估器引导发布（R0-C 收口硬前置，独立信任根批次）
@@ -69,7 +69,7 @@
 
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：R0-D 删除 11 个 factory 模块（§4.4）。
-开工前先核对 dps2 远程已合入 PR：前序批次（R0-B、R0-C）未合入则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次：只删 §4.4 列出的 11 个目录及其专属引用（catalog、Manifest、schema、DAG、compatibility、候选测试 policy、CODEOWNERS、CI、README、operations），不得删除已迁出的 receipt/BOM/回滚能力。退出条件以 §10 M1C 行为准（含 module-impact suite 与 merge queue 验证）。上一批证据以 dps2 最新已合入 PR 及其门禁/外审记录为准，自行获取；若上一合入批次触碰候选门禁信任根且尚无合入后正式 clean 证据，先在当前 HEAD 以 --base <其合入提交> 按 §4.5 第 2 步补跑门禁取证，再开工本批。
+开工前先核对 dps2 远程已合入 PR：前序批次（R0-B、R0-C）未合入则停下告诉我；还必须核验 R0-C PR 上的 M1B 收口回执逐项齐全且锚点真实可核验——required 注册与 integration ID 绑定证据、注册后冒充负测证据（绑定 R0-C 精确合入提交）、T2A 四件套与 App 可运转证据、§4.5 clean 证据，缺任一或无法核验即停下告诉我（仅"R0-C 已合入"不足以开工——冒充负测只能在合入提交存在后完成，不核回执就开工会让 M1B 未闭合时进入破坏性删除）；本批次已合入则告诉我该用哪个模板。范围只做本批次：只删 §4.4 列出的 11 个目录及其专属引用（catalog、Manifest、schema、DAG、compatibility、候选测试 policy、CODEOWNERS、CI、README、operations），不得删除已迁出的 receipt/BOM/回滚能力。退出条件以 §10 M1C 行为准（含 module-impact suite 与 merge queue 验证）。上一批证据以 dps2 最新已合入 PR 及其门禁/外审记录为准，自行获取；若上一合入批次触碰候选门禁信任根且尚无合入后正式 clean 证据，先在当前 HEAD 以 --base <其合入提交> 按 §4.5 第 2 步补跑门禁取证，再开工本批。
 注意：本批删除多个信任根文件，按 §4.5 两段式取证。这是高危批次，批次收尾外审用 adversarial-review。
 完成后：跑 required 门禁、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准。若本批触碰候选门禁信任根：我确认合入后不结束会话，按 §4.5 第 2 步在合入提交的后继提交上取正式 clean 证据（main 暂无后继提交时，先开一个空提交 PR 作证据锚、经我合入后再取证），结果贴回本批 PR，完成后本批才算关闭。
 ```
