@@ -202,7 +202,7 @@
       "agents": "Modules/gbrain-projector/AGENTS.md",
       "lifecycle": "proposed",
       "runtimeState": "proposed",
-      "riskTier": "R2"
+      "riskTier": "R3"
     },
     {
       "id": "interest-reducer",

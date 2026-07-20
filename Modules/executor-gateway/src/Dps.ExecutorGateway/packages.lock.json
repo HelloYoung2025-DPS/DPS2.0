@@ -5,9 +5,6 @@
       "dps.commandorchestrator.contracts": {
         "type": "Project"
       },
-      "dps.controlplanehost.contracts": {
-        "type": "Project"
-      },
       "dps.executorgateway.contracts": {
         "type": "Project"
       },
