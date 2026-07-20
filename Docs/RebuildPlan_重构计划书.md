@@ -182,7 +182,7 @@ Release BOM 由仓外用户/KMS release signer 签发。模型、候选代码和
 
 - M1B/R0-C 交付：持久化 active release binding 权威（durable truth store）、外部 signer 合同、激活/撤销/回滚版本化 receipt，以及 policy 与 gateway 消费路径的**合同层同源证明**——严格定义为 contract/版本/corpus 对齐证据（两条消费路径绑定同一合同与 major、共享 corpus 钉死同一 generation/token 三元组）。该证据**不能也不声称**证明两条路径在运行时消费同一 authority 实例（合同层证据无法区分一个共享 durable reader 与两个各自背书的 reader）；"同一个 composition-fixed reader"的**运行时同实例义务显式移交 §10 M4 退出行承接**，R0-C 仅按合同层语义验收，该义务不得在里程碑间蒸发。
 - 生产 composition root、对跨模块实现引用门禁（Tools/ci phase0 生产 ProjectReference 规则）的任何调整、以及真实进程组装接线，均属 §10 M4 交付；R0-C 批次不得实施，也不得以 tests 工程组装宣称生产接线。
-- M4 完成前，active release binding 运行真相的消费组装不具备生产资格：涉及模块保持 `releaseEligible=false`，且须有**可执行的负向门**证明生产 publish/dispatch 入口实际不可用（不得仅以 manifest 元数据自证；该证明由单一永久 required check `release-binding.composition-gate` 承载，随 R0-C 收口阶段交付、注册进 required 清单并列为 §10 M1B 退出条件——缺此门 M1B 不得关闭；该 check 的外部 ruleset 登记 M4 前后不变，入口可用后其断言自动切换为同实例集成门，见 §12 release-binding-composition 行）；生产发布路径 fail-closed。
+- M4 完成前，active release binding 运行真相的消费组装不具备生产资格：涉及模块保持 `releaseEligible=false`，且须有**可执行的负向门**证明生产 publish/dispatch 入口实际不可用（不得仅以 manifest 元数据自证；该证明由单一永久 required check `release-binding.composition-gate` 承载，随 R0-C 收口阶段交付、注册进 required 清单并列为 §10 M1B 退出条件——缺此门 M1B 不得关闭；该 check 的外部 ruleset 登记（含唯一受信签发身份绑定——非该身份报告的同名 PASS 不作数）M4 前后不变；期望断言模式由 owner 签名的 rollout epoch 决定而非候选状态，check 输出附实际模式（M1B 阶段 epoch=NEGATIVE），见 §12 release-binding-composition 行）；生产发布路径 fail-closed。
 - 本边界只能经独立治理 PR 修订、独立外审、由仓库所有者亲自合入；实施批次的 PR 不得引用其自身改动为本边界放行。
 
 ### 4.4 R0-D 删除 11 个模块
@@ -420,7 +420,7 @@ flowchart LR
 | M1C | 11 个 factory 目录和专属引用删除 | 无悬空 owner/consumer/schema，代码净减少，完整静态门与 module-impact suite PASS；外部 merge queue（§15 条目 1）已配置并以模拟并行冲突及 merge HEAD 重跑验证 |
 | M2 | Persona 投影、memory v3、interest v2、planner 行为分布与 session nonce 参数采样、Soul 隔离 | 双 Soul 正反例（含固定输入下行为分布差异）、换绑、删除传播、golden vectors PASS |
 | M3 | app package、operation.compiled v2、edge handoff v2、独立 Legacy 入口、唯一 ActionExecutor、视觉提案链 | 旧入口不可达；未知/空/partial fail closed；信封 delay/typing/trajectory 参数在携带对应参数的 step 上消费生效、越界即拒绝，均有可执行测试；两种非 IG fixture 与 visual-security suite PASS |
-| M4 | composition root、attempt/receipt、postcondition、session+command reliability snapshot、kill switch | 端到端 PostgreSQL + native fixture，两套 300 窗口语义与 kill-notify suite PASS；并承接 §4.3 移交的同实例义务：required check `release-binding.composition-gate`（§12，外部 ruleset 不变）在 publish/dispatch 入口可用状态下强制 same-instance 断言——policy-approval 与 executor-gateway 由同一 active-binding provider 实例生产组合，集成测试覆盖 activation/revocation/rollback、generation/token 一致性、restart 与并发读全部 PASS；本批附转换测试与证据，证明 merge-head 在不变 ruleset 下通过该门 |
+| M4 | composition root、attempt/receipt、postcondition、session+command reliability snapshot、kill switch | 端到端 PostgreSQL + native fixture，两套 300 窗口语义与 kill-notify suite PASS；并承接 §4.3 移交的同实例义务：required check `release-binding.composition-gate`（§12，外部 ruleset 与签发者绑定不变）以 **attested mode=SAME_INSTANCE** 通过——owner 先签 rollout epoch 切换期望模式，断言覆盖设备域五元组 `(device_binding_id, release_bom_sha256, generation, token digest, status)`、activation/revocation/rollback、restart、并发读与并发双设备隔离负例全部 PASS；本批附转换测试与证据，证明 merge-head 在不变 ruleset、不变签发者绑定下以 SAME_INSTANCE 模式通过该门 |
 | M5 | macOS AVD + Parallels + ZennoDroid 模拟环境 | 原始 evidence 标记 `SIMULATION`；不提升 Windows/DEVICE 等级 |
 | M6 | 目标 Windows、授权设备、受限 canary | 仅由对应可执行门逐级签发既有 evidence level |
 
@@ -453,7 +453,7 @@ Parallels/ZennoDroid 探针至少记录：目标 ZennoDroid 版本、.NET Framew
 | visual-security | prompt injection、截图 capability、敏感内容脱敏、模型不能直驱动作 |
 | reliability | attempt/分母真值、session+command 双 300 窗口、双 1,000 样本统计门、分层、排除率、重放/崩溃窗口 |
 | kill-notify | runtime kill、工程 freeze、租约停止、未授权清除请求拒绝且冻结保持、通知 outbox/ACK、失败保持冻结 |
-| release-binding-composition | 单一永久 required check `release-binding.composition-gate`（R0-C 收口注册，进外部 ruleset 后 M4 前后保持不变——required checks/ruleset 属仓库外部控制面，Git 提交不能也不需要原子改它）：runner 按候选状态执行互斥断言——生产 publish/dispatch 入口不可用时，验证该不可用性（可执行负向证明，非 manifest 元数据自证）；一旦入口可用，强制 same-instance 集成断言（policy-approval 与 executor-gateway 由同一 active-binding provider 实例生产组合，activation/revocation/rollback、generation/token 一致性、restart、并发读）。断言选择逻辑在受锚信任根内、候选代码不可自改判定；M4 批次须附转换测试与证据，证明其 merge-head 在不变 ruleset 下通过该门 |
+| release-binding-composition | 单一永久 required check `release-binding.composition-gate`（R0-C 收口注册，进外部 ruleset 后 M4 前后保持不变——required checks/ruleset 属仓库外部控制面，Git 提交不能也不需要原子改它）：runner 执行互斥断言且**期望模式不取自候选状态**：期望模式（`NEGATIVE` / `SAME_INSTANCE`）由受保护控制面的签名 rollout epoch 决定（owner 掌握、候选不可写，形如 /opt 受保护路径下的签名声明），check 输出必须载明实际运行的断言模式并随证据制品可追溯；epoch 声明 `SAME_INSTANCE` 后，`NEGATIVE` 模式的 PASS 不再有效。`NEGATIVE`：可执行证明生产 publish/dispatch 入口不可用——任何可部署或可配置启用的入口（即使默认关闭/feature-flag 关闭）一律视为可用，仅当入口不存在于可部署制品时才允许 NEGATIVE PASS。`SAME_INSTANCE`：policy-approval 与 executor-gateway 由同一 active-binding provider 实例生产组合，断言覆盖精确设备域五元组 `(device_binding_id, release_bom_sha256, generation, token digest, status)`，含 activation/revocation/rollback、restart、并发读，以及**并发双设备负例**——缓存行为、缺失/错误 scope 读取、任一状态转换均不得跨设备边界返回他设备的 BOM/token。断言选择逻辑在受锚信任根内、候选代码不可自改判定。**可信签发者与名称同钉**：外部 ruleset 登记该 check 时必须绑定唯一受信签发身份（GitHub ruleset 的 check 来源 App/受保护 runner），仅该身份报告的 `release-binding.composition-gate` 状态有效——候选或任何其他身份报告的同名 PASS 一律不作数；runner 运行于候选不可写的受保护环境，其证据制品（含 --base 门禁输出与判定输入摘要）随状态可追溯。M4 批次须附转换测试与证据，证明其 merge-head 在不变 ruleset、不变签发者绑定下通过该门 |
 | simulation | AVD/Parallels 环境标记与原始制品，不冒充 Windows/DEVICE |
 | windows-device | 目标 ZennoDroid/ADB/真实授权设备；当前预期 `NOT_RUN` |
 
