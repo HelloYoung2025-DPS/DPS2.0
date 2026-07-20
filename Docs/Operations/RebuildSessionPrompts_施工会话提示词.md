@@ -52,7 +52,7 @@
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：R0-C Release BOM 权威迁移（§4.3）。
 开工前先核对 dps2 远程已合入 PR：前序批次（R0-B）未合入则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次，退出条件以 §10 M1B 行为准。上一批证据以 dps2 最新已合入 PR 及其门禁/外审记录为准，自行获取；若上一合入批次触碰候选门禁信任根且尚无合入后正式 clean 证据，先在当前 HEAD 以 --base <其合入提交> 按 §4.5 第 2 步补跑门禁取证，再开工本批。
-注意：本批触碰候选门禁信任根（Tools/ci），按 §4.5 两段式取证；Release BOM 由仓外 signer 签发，模型与候选代码不得持签名私钥。
+注意：本批触碰候选门禁信任根（Tools/ci），按 §4.5 两段式取证；Release BOM 由仓外 signer 签发，模型与候选代码不得持签名私钥。本批收口须交付并注册 required check `release-binding.negative-gate`（§12 release-binding-composition 行：可执行证明生产 publish/dispatch 入口实际不可用），缺此门 M1B 不得关闭。
 完成后：跑 required 门禁、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准。若本批触碰候选门禁信任根：我确认合入后不结束会话，按 §4.5 第 2 步在合入提交的后继提交上取正式 clean 证据（main 暂无后继提交时，先开一个空提交 PR 作证据锚、经我合入后再取证），结果贴回本批 PR，完成后本批才算关闭。
 ```
 
@@ -157,8 +157,8 @@
 
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：M4 组合与滚动门（§8/§9）。
-开工前先核对 dps2 已合入 PR：M2、M3 未全部合入、或 M2/M3 收口审计（T13）的裁决不是可核验的 PASS（未完成、FAIL/UNAVAILABLE、记录不一致或无法核验、有未决 critical，均属非 PASS，一律停），则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次：composition root（含 §4.3 交付边界移交的同实例义务：policy-approval 与 executor-gateway 由同一 active-binding provider 实例生产组合，集成测试覆盖 activation/revocation/rollback、generation/token 一致性、restart 与并发读；该门 PASS 后作废 §4.3 负向门）、attempt/receipt/eligibility 合同、session+command 双 300 滚动门、runtime kill switch 与工程 freeze、通知 outbox。退出条件以 §10 M4 行为准（含 kill-notify suite 的未授权清除负例与 active-binding 同实例组装门）。上一批证据以 dps2 最新已合入 PR 为准，自行获取；若上一合入批次触碰候选门禁信任根（含 catalog/DAG/compatibility 等合同登记文件）且尚无合入后正式 clean 证据，先在当前 HEAD 以 --base <其合入提交> 按 §4.5 第 2 步补跑门禁取证，再开工本批。
-完成后：跑 required 门禁（reliability 与 kill-notify suite）、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准。若本批触碰候选门禁信任根：我确认合入后不结束会话，按 §4.5 第 2 步在合入提交的后继提交上取正式 clean 证据（main 暂无后继提交时，先开一个空提交 PR 作证据锚、经我合入后再取证），结果贴回本批 PR，完成后本批才算关闭。
+开工前先核对 dps2 已合入 PR：M2、M3 未全部合入、或 M2/M3 收口审计（T13）的裁决不是可核验的 PASS（未完成、FAIL/UNAVAILABLE、记录不一致或无法核验、有未决 critical，均属非 PASS，一律停），则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次：composition root（含 §4.3 交付边界移交的同实例义务：注册 required check `release-binding.same-instance-gate`——policy-approval 与 executor-gateway 由同一 active-binding provider 实例生产组合，集成测试覆盖 activation/revocation/rollback、generation/token 一致性、restart 与并发读；并在本批同一合入提交上以其原子替换 `release-binding.negative-gate`，不得出现两门皆缺的窗口，见 §12 release-binding-composition 行）、attempt/receipt/eligibility 合同、session+command 双 300 滚动门、runtime kill switch 与工程 freeze、通知 outbox。退出条件以 §10 M4 行为准（含 kill-notify suite 的未授权清除负例与 `release-binding.same-instance-gate`）。上一批证据以 dps2 最新已合入 PR 为准，自行获取；若上一合入批次触碰候选门禁信任根（含 catalog/DAG/compatibility 等合同登记文件）且尚无合入后正式 clean 证据，先在当前 HEAD 以 --base <其合入提交> 按 §4.5 第 2 步补跑门禁取证，再开工本批。
+完成后：跑 required 门禁（reliability、kill-notify 与 release-binding.same-instance-gate）、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准。若本批触碰候选门禁信任根：我确认合入后不结束会话，按 §4.5 第 2 步在合入提交的后继提交上取正式 clean 证据（main 暂无后继提交时，先开一个空提交 PR 作证据锚、经我合入后再取证），结果贴回本批 PR，完成后本批才算关闭。
 ```
 
 ### T15 · WP Windows/Zenno 探针（M0 后任意时点可插入，只探测不改产品码）
