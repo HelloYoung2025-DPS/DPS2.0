@@ -274,7 +274,18 @@ def in_process_check(check_id: str, operation: Any) -> Dict[str, Any]:
         )
 
 
-def run_phase0_unittests() -> Dict[str, Any]:
+# The pre-migration commit the R0-B dual-run froze its corpus from.  It lives here
+# rather than beside the fixtures because this file is in CANDIDATE_TRUST_PATHS:
+# its bytes are bound into the candidate trust anchor, so re-pointing the corpus at
+# a different commit invalidates that anchor instead of being a quiet data edit.
+# Naming it in the test module would have left the choice of "which commit" in
+# candidate-writable code, where ancestry alone is satisfied by any older commit.
+# Rebasing the batch onto a new base means re-freezing the fixtures and updating
+# this line together.
+R0B_FROZEN_BASELINE_COMMIT = "8f63593d4f262ec1496b05300da75a71b86eaab4"
+
+
+def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
     minimum_adversarial_tests = 137
     required_inventory = {
         "test_missing_standard_module_layout_is_rejected",
@@ -354,6 +365,65 @@ def run_phase0_unittests() -> Dict[str, Any]:
         "test_weak_receipt_empty_suites_forgery_is_rejected",
         "test_contract_policy_is_exactly_the_required_contract_inventory",
         "test_integration_policy_is_exactly_the_required_integration_inventory",
+        # RebuildPlan 4.2.3 old/new dual-run for the R0-B receipt migration.  Naming
+        # these here makes the frozen migration corpus load-bearing: deleting or
+        # renaming it fails this gate instead of silently shrinking coverage.
+        "test_every_frozen_file_matches_its_recorded_digest",
+        "test_old_schema_rejects_all_34_current_manifests",
+        "test_new_schema_rejects_all_34_baseline_manifests",
+        "test_reintroducing_the_factory_resolver_breaks_the_new_gate",
+        "test_stale_receipt_is_rejected_after_a_manifest_edit",
+        # The attack corpus is only evidence while these hold: the corpus file
+        # cannot be neutered into no-op mutations or weakened verdicts, because the
+        # expectations are pinned in test code rather than read from the corpus.
+        "test_corpus_declares_exactly_the_pinned_attack_classes",
+        "test_declared_expectations_match_the_pinned_verdicts",
+        "test_every_rejecting_sample_actually_mutates_its_base",
+        "test_pinned_attack_verdicts_hold_against_both_schemas",
+        # RebuildPlan 4.2.3 requires freezing the old validator, not just the old
+        # schema.  These anchor the frozen corpus to the immutable baseline commit
+        # blob and prove the validator is unchanged, so reusing the current
+        # validator for both dual-run sides stays sound and fail-closed.
+        "test_frozen_fixtures_equal_the_baseline_commit_blobs",
+        "test_receipt_validator_is_unchanged_in_this_batch",
+        # Which commit those anchors bind to must come from this runner, never from
+        # a file the candidate change can rewrite.  Naming the fail-closed cases
+        # here keeps the external baseline authority itself load-bearing.
+        "test_absent_injection_fails_closed",
+        "test_empty_injection_fails_closed",
+        "test_revision_expressions_are_refused",
+        "test_unknown_commit_fails_closed",
+        "test_a_baseline_that_does_not_descend_from_the_corpus_fails_closed",
+        "test_a_baseline_older_than_the_corpus_fails_closed",
+        "test_provenance_repointed_at_another_ancestor_fails_closed",
+        "test_the_frozen_constant_is_what_the_corpus_declares",
+        "test_every_new_trust_bearing_artifact_is_byte_bound",
+        # A breaking shape takes a new identity, so the URI that named the
+        # pre-migration schema must keep naming it.
+        "test_each_major_keeps_its_own_schema_identity",
+        # Which majors exist is decided by the registry in phase0, not by whatever
+        # module-manifest*.schema.json a candidate leaves on disk.
+        "test_a_planted_schema_cannot_introduce_a_major_of_its_own",
+        "test_a_registered_schema_may_not_relabel_its_major",
+        # const alone is compared with Python equality, where 1 == True, so the v2
+        # boolean fields bind ``type`` where the const lives.
+        "test_v2_boolean_consts_refuse_numeric_impostors",
+        "test_v2_release_eligibility_const_is_type_bound",
+        # Draft 2020-12 calls 1.0 an integer; the hand-rolled evaluator must not be
+        # stricter than the reference it is pinned against.
+        "test_integral_floats_satisfy_integer_exactly_as_draft_2020_12_says",
+        "test_the_frozen_commit_is_accepted_and_returned",
+        # The injected baseline is the *current* base tip, so it moves.  Naming this
+        # keeps the gate from silently regressing to an equality check that would
+        # pass today and fail on the next unrelated merge.
+        "test_a_base_that_has_advanced_past_the_corpus_is_still_accepted",
+        # F9 now holds every signed manifest to the exact schema of its declared
+        # major, using a stdlib evaluator external_gate had to hand-roll.  These
+        # keep that evaluator pinned to a reference Draft 2020-12 implementation
+        # instead of trusting it because it was written carefully.
+        "test_the_live_corpus_is_accepted_by_both_implementations",
+        "test_the_subset_evaluator_agrees_with_draft_2020_12_on_every_mutation",
+        "test_the_mutations_are_real_rejections_and_not_no_ops",
     }
     command = [
         sys.executable,
@@ -367,7 +437,17 @@ def run_phase0_unittests() -> Dict[str, Any]:
         "-p",
         "test_*.py",
     ]
-    result = run_command(command, ROOT, timeout_seconds=180)
+    # The R0-B dual-run anchors refuse to take the baseline commit from the
+    # candidate tree, so this runner supplies the one it resolved itself (--base,
+    # or DPS_BASELINE_COMMIT / GITHUB_BASE_SHA via resolve_baseline).  When
+    # baseline resolution failed there is no authority to pass on and the anchors
+    # fail closed rather than fall back to an inherited value.
+    suite_environment = dict(os.environ)
+    if baseline:
+        suite_environment["DPS_BASELINE_COMMIT"] = baseline
+    else:
+        suite_environment.pop("DPS_BASELINE_COMMIT", None)
+    result = run_command(command, ROOT, timeout_seconds=180, env=suite_environment)
     check = check_from_command("phase0-adversarial-unit-tests", True, result)
     executed, summary_reason = _executed_test_count(
         TrustedInvocation(command, "python-unittest", minimum_adversarial_tests),
@@ -2506,7 +2586,7 @@ def _run_phase0_gate(
             )
         )
 
-    checks.append(run_phase0_unittests())
+    checks.append(run_phase0_unittests(baseline))
     checks.append(run_external_gate_unittests())
     checks.append(run_locked_solution_build(ROOT))
     checks.extend(run_required_module_static_tests(ROOT))

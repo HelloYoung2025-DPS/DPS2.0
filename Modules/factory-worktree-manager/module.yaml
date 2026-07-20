@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "dps.module/v1",
+  "schemaVersion": "dps.module/v2",
   "module": {"id": "factory-worktree-manager", "name": "Factory Worktree Manager", "version": "0.1.0", "description": "Plans one-writer worktrees and owns external transactional leases, path locks, and monotonically fenced authority.", "lifecycle": "proposed", "runtimeState": "proposed", "releaseEligible": false, "riskTier": "R3", "ownerId": "dps-ai-factory"},
   "paths": {"actualRoot": "Modules/factory-worktree-manager", "canonicalRoot": "modules/factory-worktree-manager", "owned": ["Modules/factory-worktree-manager/**"], "excluded": [], "runtimeData": ["external Factory lease database outside the repository"]},
   "artifacts": [
@@ -45,5 +45,5 @@
   "compatibility": {"policyRef": "governance/policies/compatibility-policy.yaml", "track": "factory", "moduleMajor": 0, "supportedContractMajors": {"instruction.receipt": [1], "module.change.plan": [1], "worktree.plan": [1], "worktree.lease": [1]}, "unknownMajorBehavior": "reject", "missingMajorBehavior": "reject", "unknownModeBehavior": "reject", "missingModeBehavior": "reject"},
   "rollout": {"featureFlag": "factory_worktree_manager_v1", "canary": "temporary non-production repositories with real detached worktrees, external leases, and merge-head retests", "rollback": "revoke active leases, stop materialization, retain commits and fencing history, and route to the previous signed manager", "killSwitch": "factory_revoke_all_worktree_leases"},
   "deviceGates": {"requiresWindows": false, "requiresZennoDroid": false, "requiresAdb": false, "minimumVerification": "INTEGRATION_VERIFIED"},
-  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true, "resolver": "factory-instruction-resolver"}
+  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true}
 }

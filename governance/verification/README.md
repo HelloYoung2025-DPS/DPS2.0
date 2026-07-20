@@ -7,7 +7,7 @@ The four stage input schemas are:
 - `f6-windows-zenno-input.v1.schema.json`
 - `f7-device-gbrain-input.v3.schema.json`
 - `f8-canary-input.v1.schema.json`
-- `f9-scale-input.v1.schema.json`
+- `f9-scale-input.v2.schema.json`
 
 F7 also consumes:
 
@@ -34,6 +34,22 @@ compatibility-group release. F9 therefore requires a separately signed
 observation for every N/N, N/N-1, N-1/N, and N-1/N-1 combination of every
 eligible runtime row. Missing, duplicated, skipped, partial, not-run, stale,
 or independently unverifiable observations fail closed.
+
+`f9-scale-input.v1.schema.json` is retained only for historical verification and
+is rejected by the executable gate. R0-B required the F9 input to bind the module
+manifest schema of every supported major through `manifest_schema_artifacts`, so
+the gate can hold each signed manifest to the rules of the version it declares
+rather than trusting the declared version string. That is a breaking requirement:
+an older v1 envelope does not carry the field. RebuildPlan 3.3 allows only
+additive change within a major, so the strengthened shape is published as
+`dps.scale-verification-input/v2` and v1 stays byte-stable.
+
+There is deliberately no v1 reader. A reader that accepted envelopes without
+`manifest_schema_artifacts` would have no schema to validate manifests against,
+which is byte-for-byte the pre-R0-B path that could return ELIGIBLE for a
+manifest violating its own declared major. Retention here means the file exists
+for reading old evidence, and the gate refuses it — the same treatment
+`f7-device-gbrain-input` v1 and v2 receive.
 
 `f7-device-gbrain-input.v1.schema.json` and v2 are historical only and are
 rejected by the executable gate. F7 v3 binds one current signed F6 prerequisite

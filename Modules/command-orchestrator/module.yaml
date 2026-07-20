@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "dps.module/v1",
+  "schemaVersion": "dps.module/v2",
   "module": {"id": "command-orchestrator", "name": "Command Orchestrator", "version": "0.2.0", "description": "Owns scoped command idempotency, database-clock leases, bounded retry, recovery, Policy-signed dispatch authorization relay, and verified receipt state.", "lifecycle": "proposed", "runtimeState": "proposed", "releaseEligible": false, "riskTier": "R3", "ownerId": "dps-control-plane"},
   "paths": {"actualRoot": "Modules/command-orchestrator", "canonicalRoot": "modules/command-orchestrator", "owned": ["Modules/command-orchestrator/**"], "excluded": [], "runtimeData": []},
   "artifacts": [
@@ -48,5 +48,5 @@
   "compatibility": {"policyRef": "governance/policies/compatibility-policy.yaml", "track": "modern", "moduleMajor": 0, "supportedContractMajors": {"operation.compiled": [1], "command.dispatch": [1], "execution.authorization": [1], "command.receipt": [1], "command.receipt.signed": [1]}, "unknownMajorBehavior": "reject", "missingMajorBehavior": "reject", "unknownModeBehavior": "reject", "missingModeBehavior": "reject"},
   "rollout": {"featureFlag": "command_orchestrator_v1", "canary": "shadow state transitions, then synthetic fixture, then human-approved bounded device cohort", "rollback": "stop new leases, drain known outcomes, quarantine unknown outcomes, and route future work to previous signed BOM", "killSwitch": "kill_command_orchestrator"},
   "deviceGates": {"requiresWindows": false, "requiresZennoDroid": false, "requiresAdb": false, "minimumVerification": "INTEGRATION_VERIFIED"},
-  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true, "resolver": "factory-instruction-resolver"}
+  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true}
 }

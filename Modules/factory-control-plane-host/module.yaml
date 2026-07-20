@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "dps.module/v1",
+  "schemaVersion": "dps.module/v2",
   "module": {
     "id": "factory-control-plane-host",
     "name": "DPS AI Factory Control Plane Host",
@@ -150,5 +150,5 @@
     "killSwitch": "factory_disable_control_plane_host blocks intake fences held-fence continuation and provider calls before and after invocation"
   },
   "deviceGates": {"requiresWindows": false, "requiresZennoDroid": false, "requiresAdb": false, "minimumVerification": "INTEGRATION_VERIFIED"},
-  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.1.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true, "resolver": "factory-instruction-resolver"}
+  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.1.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true}
 }

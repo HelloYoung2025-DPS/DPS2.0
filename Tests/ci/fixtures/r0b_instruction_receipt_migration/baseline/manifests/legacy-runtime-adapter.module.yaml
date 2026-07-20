@@ -1,0 +1,236 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {
+    "id": "legacy-runtime-adapter",
+    "name": "Legacy Runtime Adapter",
+    "version": "0.0.2-legacy",
+    "description": "Fail-closed transitional boundary for the existing ZennoDroid runtime while the modern authorization bridge is absent.",
+    "lifecycle": "transitional",
+    "runtimeState": "legacy-active",
+    "releaseEligible": false,
+    "riskTier": "R3",
+    "ownerId": "dps-platform"
+  },
+  "paths": {
+    "actualRoot": "Modules/legacy-runtime-adapter",
+    "canonicalRoot": "modules/legacy-runtime-adapter",
+    "owned": [
+      "Modules/legacy-runtime-adapter/**",
+      "Core/**",
+      "Modules/Core/**",
+      "Modules/Decision/**",
+      "Modules/Persona/**",
+      "Modules/Report/**",
+      "Modules/README.md",
+      "Modules/DailyUpdate.cs",
+      "Modules/Extension.cs",
+      "Modules/Initializer.cs",
+      "Modules/Main.cs",
+      "Modules/Maintenance.cs",
+      "Modules/MemoryManager.cs",
+      "Modules/PersonaCreate.cs",
+      "Modules/ReportGen.cs",
+      "Modules/RuleEngine.cs",
+      "Modules/SessionRunner.cs",
+      "Modules/StateSaver.cs",
+      "Modules/WeeklyEvolve.cs",
+      "ZDProjects/**",
+      "Extensions/**",
+      "Config/**",
+      "Configs/Manifests/**",
+      "Data/**",
+      "Tools/app_onboarder/**",
+      "Tests/playwright_dps_test.js"
+    ],
+    "excluded": [],
+    "runtimeData": [
+      "Screenshots/ADB/**"
+    ]
+  },
+  "artifacts": [
+    {
+      "id": "dps.legacy-runtime",
+      "kind": "legacy-source-set",
+      "status": "proposed",
+      "build": null,
+      "versioning": "legacy"
+    }
+  ],
+  "runtime": {
+    "track": "legacy-zennodroid",
+    "language": "C# 5 compatible",
+    "target": "unprobed ZennoDroid host",
+    "processBoundary": "legacy-host",
+    "entrypoints": [
+      "ZDProjects/Initializer_OwnCode.cs",
+      "ZDProjects/Main_OwnCode.cs",
+      "ZDProjects/SessionRunner_OwnCode.cs",
+      "ZDProjects/DPS_Init_OwnCode.cs",
+      "ZDProjects/DPS_DecideAction_OwnCode.cs",
+      "ZDProjects/DPS_CheckResult_OwnCode.cs",
+      "ZDProjects/DPS_Finalize_OwnCode.cs"
+    ],
+    "toolchainStatus": "unverified"
+  },
+  "contracts": {
+    "provided": [],
+    "consumed": []
+  },
+  "communication": {
+    "inbound": [],
+    "outbound": []
+  },
+  "dependencies": [],
+  "permissions": {
+    "allowed": [
+      "authorized ZennoDroid runtime",
+      "authorized ADB device access"
+    ],
+    "denied": [
+      "GBrain admin credentials",
+      "unrestricted AI decisions",
+      "unauthorized platform side effects",
+      "writable Step DSL as execution authority",
+      "direct device recovery Shell or key injection",
+      "unverified interaction or spoken-memory projection",
+      "runtime-configurable wrapper gate",
+      "variable project-root source loading for any future bridge",
+      "unsigned CodeDom or reflection module loading"
+    ],
+    "productionApproval": "human-required"
+  },
+  "data": {
+    "ownedStores": [
+      "legacy filesystem state pending extraction"
+    ],
+    "readModels": [],
+    "privacyClasses": [
+      "personal",
+      "sensitive"
+    ],
+    "retention": "legacy behavior is unverified; no new retention claim",
+    "export": "legacy export paths remain unverified",
+    "correction": "legacy correction paths remain unverified",
+    "deletion": "legacy deletion paths remain unverified"
+  },
+  "security": {
+    "trustBoundaries": [
+      "ZennoDroid project boundary",
+      "ADB boundary",
+      "legacy configuration boundary"
+    ],
+    "secretScopes": [],
+    "untrustedInputs": [
+      "OCR",
+      "UI XML",
+      "screen text",
+      "posts",
+      "comments",
+      "configuration"
+    ],
+    "failClosedOn": [
+      "unknown action",
+      "unknown selector",
+      "unknown contract version",
+      "unverified result"
+    ],
+    "policyIds": [
+      "SOUL-ISO-001",
+      "CMD-IDEMP-001",
+      "RESULT-VERIFY-001",
+      "GBRAIN-READBACK-001",
+      "EDGE-NORESTART-001"
+    ]
+  },
+  "tests": {
+    "requiredOutcome": "PASS",
+    "failureOutcomes": [
+      "FAIL",
+      "SKIP",
+      "PARTIAL",
+      "NOT_RUN",
+      "INFRA_ERROR",
+      "NOT_APPLICABLE"
+    ],
+    "suites": [
+      {
+        "id": "legacy-runtime-adapter.static",
+        "type": "static",
+        "required": true,
+        "command": ".venv/bin/python -I Modules/legacy-runtime-adapter/operations/strangler/verify_sessionrunner_baseline.py --root .",
+        "environment": "Independent trusted-runner-created repository .venv with CPython 3.12.13 in isolated mode; evidence binds interpreter SHA-256, exact argv/environment/raw output/exit plus DPS_LEGACY_BASELINE_ANCHOR from an independently controlled read-only provider",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "legacy-runtime-adapter.byte-baseline-adversarial",
+        "type": "unit",
+        "required": true,
+        "command": ".venv/bin/python -I Modules/legacy-runtime-adapter/tests/test_legacy_byte_baseline.py",
+        "environment": "Independent trusted-runner-created repository .venv with CPython 3.12.13 in isolated mode; evidence binds interpreter SHA-256 and exact argv/environment/raw output/exit; 79-file/12-repair temporary Git repositories only",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "legacy-runtime-adapter.fail-closed-p0",
+        "type": "static",
+        "required": true,
+        "command": ".venv/bin/python -I Modules/legacy-runtime-adapter/tests/test_sessionrunner_fail_closed_p0.py",
+        "environment": "Independent trusted-runner-created repository .venv with CPython 3.12.13; evidence binds interpreter SHA-256 and exact argv/environment/raw output/exit; read-only SessionRunner source regressions",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "legacy-runtime-adapter.wrapper-orchestrator-p0",
+        "type": "static",
+        "required": true,
+        "command": ".venv/bin/python -I Modules/legacy-runtime-adapter/tests/test_legacy_wrapper_and_orchestrator_p0.py",
+        "environment": "Independent trusted-runner-created repository .venv with CPython 3.12.13; evidence binds interpreter SHA-256 and exact argv/environment/raw output/exit; read-only wrapper and SmartOrchestrator source regressions",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "legacy-runtime-adapter.windows",
+        "type": "windows",
+        "required": true,
+        "command": null,
+        "environment": "target Windows with ZennoDroid",
+        "evidenceLevel": "WINDOWS_VERIFIED"
+      },
+      {
+        "id": "legacy-runtime-adapter.device",
+        "type": "device",
+        "required": true,
+        "command": null,
+        "environment": "authorized non-production Android device",
+        "evidenceLevel": "DEVICE_VERIFIED"
+      }
+    ]
+  },
+  "compatibility": {
+    "policyRef": "governance/policies/compatibility-policy.yaml",
+    "track": "legacy",
+    "moduleMajor": 0,
+    "supportedContractMajors": {},
+    "unknownMajorBehavior": "reject",
+    "missingMajorBehavior": "reject",
+    "unknownModeBehavior": "reject",
+    "missingModeBehavior": "reject"
+  },
+  "rollout": {
+    "featureFlag": "compile-time LEGACY_DISABLE_NEW_COMMANDS=true in every production wrapper",
+    "canary": "no command execution rollout before independent review plus Windows and device gates",
+    "rollback": "keep legacy_disable_new_commands active and route only to a previously verified safe signed BOM; never restore the unsafe pre-containment execution path",
+    "killSwitch": "legacy_disable_new_commands"
+  },
+  "deviceGates": {
+    "requiresWindows": true,
+    "requiresZennoDroid": true,
+    "requiresAdb": true,
+    "minimumVerification": "DEVICE_VERIFIED"
+  },
+  "agents": {
+    "spec": "dps.agents/v1",
+    "policyVersion": "1.0.0",
+    "instructionsFile": "AGENTS.md",
+    "manifestFile": "module.yaml",
+    "receiptRequired": true,
+    "resolver": "factory-instruction-resolver"
+  }
+}

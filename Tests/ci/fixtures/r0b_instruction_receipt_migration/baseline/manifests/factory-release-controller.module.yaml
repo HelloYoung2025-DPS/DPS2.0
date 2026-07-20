@@ -1,0 +1,362 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {
+    "id": "factory-release-controller",
+    "name": "Factory Release Controller",
+    "version": "0.2.0",
+    "description": "Host-commanded rollout v2 state machine with strict wire/receipt semantics and externally anchored replay; frozen v1 contracts are deprecated quarantine-only and have no runtime route.",
+    "lifecycle": "proposed",
+    "runtimeState": "proposed",
+    "releaseEligible": false,
+    "riskTier": "R3",
+    "ownerId": "dps-ai-factory"
+  },
+  "paths": {
+    "actualRoot": "Modules/factory-release-controller",
+    "canonicalRoot": "modules/factory-release-controller",
+    "owned": ["Modules/factory-release-controller/**"],
+    "excluded": [],
+    "runtimeData": []
+  },
+  "artifacts": [
+    {
+      "id": "dps.factory-release-controller",
+      "kind": "service",
+      "status": "proposed",
+      "build": "python3.12 -m compileall -q Modules/factory-release-controller/src",
+      "versioning": "semver"
+    },
+    {
+      "id": "dps.factory-release-controller.contracts",
+      "kind": "contract-pack",
+      "status": "proposed",
+      "build": null,
+      "versioning": "semver"
+    }
+  ],
+  "runtime": {
+    "track": "modern-service",
+    "language": "Python 3.12",
+    "target": "cpython-3.12",
+    "processBoundary": "out-of-process",
+    "entrypoints": [
+      "Modules/factory-release-controller/src/release_controller.py",
+      "Modules/factory-release-controller/src/candidate_bom_validator.py"
+    ],
+    "toolchainStatus": "proposed"
+  },
+  "contracts": {
+    "provided": [
+      {
+        "contractId": "rollout.command",
+        "major": 1,
+        "source": "Modules/factory-release-controller/contracts/provided/rollout.command.v1.schema.json",
+        "status": "deprecated",
+        "mode": "quarantine-only",
+        "ownerModule": "factory-release-controller"
+      },
+      {
+        "contractId": "rollout.command",
+        "major": 2,
+        "source": "Modules/factory-release-controller/contracts/provided/rollout.command.v2.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "factory-release-controller"
+      },
+      {
+        "contractId": "rollout.event",
+        "major": 1,
+        "source": "Modules/factory-release-controller/contracts/provided/rollout.event.v1.schema.json",
+        "status": "deprecated",
+        "mode": "quarantine-only",
+        "ownerModule": "factory-release-controller"
+      },
+      {
+        "contractId": "rollout.event",
+        "major": 2,
+        "source": "Modules/factory-release-controller/contracts/provided/rollout.event.v2.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "factory-release-controller"
+      },
+      {
+        "contractId": "release.bom.native.stop.authority.trust",
+        "major": 1,
+        "source": "Modules/factory-release-controller/contracts/provided/release.bom.native.stop.authority.trust.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "factory-release-controller"
+      }
+    ],
+    "consumed": [
+      {
+        "contractId": "merge.decision",
+        "major": 1,
+        "source": "Modules/factory-merge-controller/contracts/provided/merge.decision.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "factory-merge-controller"
+      },
+      {
+        "contractId": "artifact.descriptor",
+        "major": 1,
+        "source": "Modules/factory-artifact-builder/contracts/provided/artifact.descriptor.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "factory-artifact-builder"
+      },
+      {
+        "contractId": "artifact.build.request",
+        "major": 1,
+        "source": "Modules/factory-artifact-builder/contracts/provided/artifact.build.request.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "factory-artifact-builder"
+      },
+      {
+        "contractId": "upgrade.event",
+        "major": 1,
+        "source": "Modules/factory-evidence-ledger/contracts/provided/upgrade.event.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "factory-evidence-ledger"
+      },
+      {
+        "contractId": "upgrade.event.append",
+        "major": 1,
+        "source": "Modules/factory-evidence-ledger/contracts/provided/upgrade.event.append.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "factory-evidence-ledger"
+      },
+      {
+        "contractId": "rollback.request",
+        "major": 1,
+        "source": "Modules/factory-rollback-controller/contracts/provided/rollback.request.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "factory-rollback-controller"
+      }
+    ]
+  },
+  "communication": {
+    "inbound": [
+      {
+        "peerModule": "factory-control-plane-host",
+        "contractId": "rollout.command",
+        "major": 2,
+        "direction": "inbound",
+        "transport": "command",
+        "timeoutMs": 5000,
+        "retryPolicy": "same-upgrade-id-and-idempotency-key",
+        "idempotencyKey": "upgrade_id:from_state:to_state",
+        "authScope": "factory:release:transition",
+        "failureMode": "reject-illegal-or-unauthorized-transition"
+      },
+      {
+        "peerModule": "factory-merge-controller",
+        "contractId": "merge.decision",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "receipt",
+        "timeoutMs": 5000,
+        "retryPolicy": "at-least-once-by-decision-id",
+        "idempotencyKey": "decision_id",
+        "authScope": "factory:release:evidence",
+        "failureMode": "remain-before-candidate-verified"
+      },
+      {
+        "peerModule": "factory-artifact-builder",
+        "contractId": "artifact.descriptor",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "receipt",
+        "timeoutMs": 5000,
+        "retryPolicy": "at-least-once-by-artifact-sha256",
+        "idempotencyKey": "artifact_sha256",
+        "authScope": "factory:release:evidence",
+        "failureMode": "remain-before-candidate-built"
+      },
+      {
+        "peerModule": "factory-evidence-ledger",
+        "contractId": "upgrade.event",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "event",
+        "timeoutMs": 5000,
+        "retryPolicy": "ordered-replay-from-last-sequence",
+        "idempotencyKey": "event_id",
+        "authScope": "factory:evidence:read",
+        "failureMode": "recover-state-by-event-replay"
+      }
+    ],
+    "outbound": [
+      {
+        "peerModule": "factory-artifact-builder",
+        "contractId": "artifact.build.request",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "command",
+        "timeoutMs": 5000,
+        "retryPolicy": "at-least-once-by-build-id",
+        "idempotencyKey": "build_id",
+        "authScope": "factory:artifact:build",
+        "failureMode": "remain-before-candidate-built"
+      },
+      {
+        "peerModule": "factory-evidence-ledger",
+        "contractId": "upgrade.event.append",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "command",
+        "timeoutMs": 5000,
+        "retryPolicy": "at-least-once-same-idempotency-key",
+        "idempotencyKey": "upgrade_id:transition_index",
+        "authScope": "factory:evidence:append",
+        "failureMode": "do-not-advance-without-durable-event"
+      },
+      {
+        "peerModule": "factory-rollback-controller",
+        "contractId": "rollout.event",
+        "major": 2,
+        "direction": "outbound",
+        "transport": "event",
+        "timeoutMs": 5000,
+        "retryPolicy": "at-least-once-by-rollout-event-id",
+        "idempotencyKey": "rollout_event_id",
+        "authScope": "factory:rollback:request",
+        "failureMode": "stop-routing-and-retry"
+      },
+      {
+        "peerModule": "factory-rollback-controller",
+        "contractId": "rollback.request",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "command",
+        "timeoutMs": 5000,
+        "retryPolicy": "at-least-once-by-rollback-id-and-request-hash",
+        "idempotencyKey": "rollback_id:request_sha256",
+        "authScope": "factory:rollback:request",
+        "failureMode": "remain-rollback-required-and-retry"
+      },
+      {
+        "peerModule": "factory-control-plane-host",
+        "contractId": "rollout.event",
+        "major": 2,
+        "direction": "outbound",
+        "transport": "event",
+        "timeoutMs": 5000,
+        "retryPolicy": "same-rollout-event-id",
+        "idempotencyKey": "rollout_event_id",
+        "authScope": "factory:host:release",
+        "failureMode": "stop-on-digest-or-approval-drift"
+      },
+      {
+        "peerModule": "factory-control-plane-host",
+        "contractId": "release.bom.native.stop.authority.trust",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "receipt",
+        "timeoutMs": 5000,
+        "retryPolicy": "same-receipt-id-and-payload-sha256",
+        "idempotencyKey": "receipt_id:release_bom_sha256",
+        "authScope": "factory:host:native.stop.authority.trust",
+        "failureMode": "host-must-not-activate-bom-without-verified-trust-receipt"
+      }
+    ]
+  },
+  "dependencies": [
+    {"moduleId": "factory-merge-controller", "versionRange": ">=0.1.0 <1.0.0", "required": true, "reason": "merge-head decision"},
+    {"moduleId": "factory-artifact-builder", "versionRange": ">=0.1.0 <1.0.0", "required": true, "reason": "immutable artifact descriptor"},
+    {"moduleId": "factory-evidence-ledger", "versionRange": ">=0.1.0 <1.0.0", "required": true, "reason": "durable rollout state recovery"}
+  ],
+  "permissions": {
+    "allowed": ["verify externally signed BOM through injected trust service", "emit a signed public native-stop authority trust receipt bound to the exact Release BOM", "advance declared rollout states", "request bounded rollback"],
+    "denied": ["route rollout v1 into runtime", "consume raw upgrade intent", "normalize an invalid receipt into acceptance", "derive a trusted ledger anchor from replay input", "emit raw private keys secrets or activation tokens", "accept caller-supplied risk", "sign own BOM", "self-approve R2 or R3", "execute production shell", "hold production secret", "allow shadow side effects"],
+    "productionApproval": "human-required"
+  },
+  "data": {
+    "ownedStores": [],
+    "readModels": ["proposed rollout state rebuild from a fully validated upgrade.event stream only after an independently authenticated ledger head provider is wired; public recovery is currently WAITING_EXTERNAL"],
+    "privacyClasses": ["internal"],
+    "retention": "rollout state is event-sourced in factory-evidence-ledger",
+    "export": "ordered rollout.event/v2 JSON, signed BOM reference, and public native-stop authority trust receipt containing only key/digest/signature proof",
+    "correction": "append a compensating or rollback state event",
+    "deletion": "no personal payload is accepted"
+  },
+  "security": {
+    "trustBoundaries": ["frozen rollout v1 classifier to quarantine-only sink", "strict active rollout v2 wire and receipt boundary", "future independently authenticated factory-evidence-ledger stream-head provider; public recovery disabled until wired", "external signature verifier", "human approval boundary", "artifact digest boundary", "kill-switch boundary"],
+    "secretScopes": [],
+    "untrustedInputs": ["rollout command bytes", "receipt references", "raw upgrade intent", "replayed ledger events", "untrusted or locally derived ledger anchors", "native-stop authority and route/challenge authority sets before exact digest and signature verification", "BOM", "artifact descriptor", "shadow report", "approval claims", "simulation faults"],
+    "failClosedOn": ["rollout v1 runtime attempt", "unknown rollout or native-stop trust contract major", "unknown rollout major or mode", "unknown command producer", "duplicate or invalid JSON", "noncanonical upgrade identity or UTC time", "raw upgrade intent", "unknown receipt kind", "receipt separator or case ambiguity", "empty or excessive receipt references", "receipt reference drift", "invalid receipt-set digest", "native-stop trust receipt producer digest generation authority-set or signature mismatch", "raw private key secret or activation token material", "boolean float or negative side-effect count", "public recovery while authenticated external ledger provider is WAITING_EXTERNAL", "locally forged or recomputed ledger head", "missing malformed stale or mismatched authenticated external ledger anchor", "invalid replay semantics after local hash recomputation", "unknown state", "invalid signature", "digest drift", "missing approval", "role overlap", "shadow side effect", "unarmed kill switch"],
+    "policyIds": ["SOUL-ISO-001", "CMD-IDEMP-001", "RESULT-VERIFY-001", "GBRAIN-READBACK-001", "EDGE-NORESTART-001"]
+  },
+  "tests": {
+    "requiredOutcome": "PASS",
+    "failureOutcomes": ["FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"],
+    "suites": [
+      {
+        "id": "factory-release-controller.unit",
+        "type": "unit",
+        "required": true,
+        "command": "PYTHONPATH=Modules/factory-release-controller/src python3.12 -m unittest discover -s Modules/factory-release-controller/tests -p 'test_release_controller.py'",
+        "environment": "Python 3.12 stdlib; injected unit trust verifier and external-anchor fixture; strict active v2 wire/replay attacks plus frozen v1 quarantine rejection",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "factory-release-controller.candidate-gate",
+        "type": "unit",
+        "required": true,
+        "command": "PYTHONPATH=Modules/factory-release-controller/src python3.12 -m unittest discover -s Modules/factory-release-controller/tests -p 'test_candidate_bom_validator.py'",
+        "environment": "Python 3.12 stdlib; RSA-PSS and fixed deployed-anchor adversarial tests",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "factory-release-controller.contract",
+        "type": "contract",
+        "required": true,
+        "command": "PYTHONPATH=Modules/factory-release-controller/src python3.12 -m unittest discover -s Modules/factory-release-controller/tests -p 'test_contracts.py'",
+        "environment": "Python 3.12 and jsonschema from root requirements-ci.txt hash lock; v1 byte freeze/quarantine plus active v2 positive and adversarial instances",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "factory-release-controller.simulation",
+        "type": "integration",
+        "required": true,
+        "command": "PYTHONPATH=Modules/factory-release-controller/src python3.12 -m unittest Modules/factory-release-controller/tests/test_fleet_simulation.py",
+        "environment": "pure deterministic simulation; evidence kind SIMULATION; no real devices or production side effects",
+        "evidenceLevel": "INTEGRATION_VERIFIED"
+      }
+    ]
+  },
+  "compatibility": {
+    "policyRef": "governance/policies/compatibility-policy.yaml",
+    "track": "factory",
+    "moduleMajor": 0,
+    "supportedContractMajors": {"rollout.command": [1, 2], "rollout.event": [1, 2], "release.bom.native.stop.authority.trust": [1], "rollback.request": [1], "merge.decision": [1], "artifact.build.request": [1], "artifact.descriptor": [1], "upgrade.event": [1], "upgrade.event.append": [1]},
+    "unknownMajorBehavior": "reject",
+    "missingMajorBehavior": "reject",
+    "unknownModeBehavior": "reject",
+    "missingModeBehavior": "reject"
+  },
+  "rollout": {
+    "featureFlag": "factory_release_controller_v2",
+    "canary": "simulation then shadow using identical digest, then separately human-approved bounded canary",
+    "rollback": "emit ROLLBACK_REQUIRED on v2, stop routing, and delegate versioned plan execution to rollback controller; v1 never becomes a fallback",
+    "killSwitch": "kill_factory_release"
+  },
+  "deviceGates": {
+    "requiresWindows": false,
+    "requiresZennoDroid": false,
+    "requiresAdb": false,
+    "minimumVerification": "INTEGRATION_VERIFIED"
+  },
+  "agents": {
+    "spec": "dps.agents/v1",
+    "policyVersion": "1.0.0",
+    "instructionsFile": "AGENTS.md",
+    "manifestFile": "module.yaml",
+    "receiptRequired": true,
+    "resolver": "factory-instruction-resolver"
+  }
+}

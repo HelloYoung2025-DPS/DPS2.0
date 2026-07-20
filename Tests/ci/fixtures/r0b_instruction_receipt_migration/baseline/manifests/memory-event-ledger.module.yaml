@@ -1,0 +1,373 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {
+    "id": "memory-event-ledger",
+    "name": "Memory Event Ledger",
+    "version": "0.2.0",
+    "description": "Capability-sealed append-only MemoryEvent v2 ledger with v1 quarantine, conflict isolation, chain replay, and transactional outbox.",
+    "lifecycle": "proposed",
+    "runtimeState": "proposed",
+    "releaseEligible": false,
+    "riskTier": "R2",
+    "ownerId": "dps-platform"
+  },
+  "paths": {
+    "actualRoot": "Modules/memory-event-ledger",
+    "canonicalRoot": "modules/memory-event-ledger",
+    "owned": [
+      "Modules/memory-event-ledger/**"
+    ],
+    "excluded": [],
+    "runtimeData": []
+  },
+  "artifacts": [
+    {
+      "id": "dps.memory-event-ledger",
+      "kind": "assembly",
+      "status": "proposed",
+      "build": "scripts/dotnet-pinned.sh restore Modules/memory-event-ledger/src --locked-mode && scripts/dotnet-pinned.sh build Modules/memory-event-ledger/src --configuration Release --no-restore",
+      "versioning": "semver"
+    },
+    {
+      "id": "dps.memory-event-ledger.contracts",
+      "kind": "contract-pack",
+      "status": "proposed",
+      "build": "scripts/dotnet-pinned.sh restore Modules/memory-event-ledger/contracts --locked-mode && scripts/dotnet-pinned.sh build Modules/memory-event-ledger/contracts --configuration Release --no-restore",
+      "versioning": "semver"
+    }
+  ],
+  "runtime": {
+    "track": "modern-service",
+    "language": "C# 14",
+    "target": "net10.0",
+    "processBoundary": "modular-monolith",
+    "entrypoints": [],
+    "toolchainStatus": "proposed"
+  },
+  "contracts": {
+    "provided": [
+      {
+        "contractId": "memory.event",
+        "major": 1,
+        "source": "Modules/memory-event-ledger/contracts/provided/memory.event.v1.schema.json",
+        "status": "proposed",
+        "mode": "quarantine-only",
+        "ownerModule": "memory-event-ledger"
+      },
+      {
+        "contractId": "memory.outbox",
+        "major": 1,
+        "source": "Modules/memory-event-ledger/contracts/provided/memory.outbox.v1.schema.json",
+        "status": "proposed",
+        "mode": "quarantine-only",
+        "ownerModule": "memory-event-ledger"
+      },
+      {
+        "contractId": "memory.append.request",
+        "major": 2,
+        "source": "Modules/memory-event-ledger/contracts/provided/memory.append.request.v2.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "memory-event-ledger"
+      },
+      {
+        "contractId": "memory.event",
+        "major": 2,
+        "source": "Modules/memory-event-ledger/contracts/provided/memory.event.v2.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "memory-event-ledger"
+      },
+      {
+        "contractId": "memory.outbox",
+        "major": 2,
+        "source": "Modules/memory-event-ledger/contracts/provided/memory.outbox.v2.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "memory-event-ledger"
+      }
+    ],
+    "consumed": [
+      {
+        "contractId": "soul.resolved",
+        "major": 1,
+        "source": "Modules/soul-registry/contracts/provided/soul.resolved.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "soul-registry"
+      },
+      {
+        "contractId": "command.receipt.signed",
+        "major": 1,
+        "source": "Modules/command-orchestrator/contracts/provided/command.receipt.signed.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "command-orchestrator"
+      }
+    ]
+  },
+  "communication": {
+    "inbound": [
+      {
+        "peerModule": "control-plane-host",
+        "contractId": "memory.append.request",
+        "major": 2,
+        "direction": "inbound",
+        "transport": "in-process-api",
+        "timeoutMs": 5000,
+        "retryPolicy": "same-event-id-and-exact-canonical-receipt-only",
+        "idempotencyKey": "event_id:trace_id:idempotency_key",
+        "authScope": "memory-event-ledger:prepare",
+        "failureMode": "public-request-is-untrusted-and-never-authorizes-without-both-fixed-capabilities"
+      },
+      {
+        "peerModule": "soul-registry",
+        "contractId": "soul.resolved",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "in-process-api",
+        "timeoutMs": 5000,
+        "retryPolicy": "bounded-exponential-with-jitter",
+        "idempotencyKey": "trace_id:idempotency_key",
+        "authScope": "module:soul-registry",
+        "failureMode": "fail-closed-and-record-evidence"
+      },
+      {
+        "peerModule": "executor-gateway",
+        "contractId": "command.receipt.signed",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "receipt",
+        "timeoutMs": 5000,
+        "retryPolicy": "identical-signed-receipt-only",
+        "idempotencyKey": "command_id:receipt_id:event_id",
+        "authScope": "memory-event-ledger:verified-observation",
+        "failureMode": "unknown-failed-stale-revoked-or-unbound-receipt-fails-closed"
+      }
+    ],
+    "outbound": [
+      {
+        "peerModule": "interest-reducer",
+        "contractId": "memory.event",
+        "major": 2,
+        "direction": "outbound",
+        "transport": "event",
+        "timeoutMs": 5000,
+        "retryPolicy": "bounded-exponential-with-jitter",
+        "idempotencyKey": "trace_id:idempotency_key",
+        "authScope": "module:interest-reducer",
+        "failureMode": "fail-closed-and-record-evidence"
+      },
+      {
+        "peerModule": "gbrain-projector",
+        "contractId": "memory.event",
+        "major": 2,
+        "direction": "outbound",
+        "transport": "event",
+        "timeoutMs": 5000,
+        "retryPolicy": "bounded-exponential-with-jitter",
+        "idempotencyKey": "trace_id:idempotency_key",
+        "authScope": "module:gbrain-projector",
+        "failureMode": "fail-closed-and-record-evidence"
+      },
+      {
+        "peerModule": "evidence-service",
+        "contractId": "memory.event",
+        "major": 2,
+        "direction": "outbound",
+        "transport": "receipt",
+        "timeoutMs": 5000,
+        "retryPolicy": "bounded-exponential-with-jitter",
+        "idempotencyKey": "trace_id:idempotency_key",
+        "authScope": "module:evidence-service",
+        "failureMode": "fail-closed-and-record-evidence"
+      }
+    ]
+  },
+  "dependencies": [
+    {
+      "moduleId": "soul-registry",
+      "versionRange": ">=0.1.0 <1.0.0",
+      "required": true,
+      "reason": "validated immutable Soul context"
+    },
+    {
+      "moduleId": "command-orchestrator",
+      "versionRange": ">=0.2.0 <1.0.0",
+      "required": true,
+      "reason": "owner of the canonical signed command receipt protocol"
+    },
+    {
+      "moduleId": "executor-gateway",
+      "versionRange": ">=0.1.0 <1.0.0",
+      "required": true,
+      "reason": "independent signer of native and postcondition verified observation receipts"
+    }
+  ],
+  "permissions": {
+    "allowed": [
+      "postgresql:memory_ledger",
+      "transactional-outbox"
+      ,"fixed-authority sealed capabilities",
+      "strict PostgreSQL SECURITY DEFINER runtime API"
+    ],
+    "denied": [
+      "cross-Soul query",
+      "direct GBrain network",
+      "device command",
+      "production shell"
+      ,"caller-selected trust roots",
+      "caller-constructed Soul or observation authorization",
+      "direct runtime table DML or TRUNCATE"
+    ],
+    "productionApproval": "human-required"
+  },
+  "data": {
+    "ownedStores": [
+      "postgresql:memory_ledger.memory_events",
+      "postgresql:memory_ledger.outbox",
+      "postgresql:memory_ledger.quarantine"
+      ,"postgresql:memory_ledger.memory_events_v2",
+      "postgresql:memory_ledger.soul_heads_v2",
+      "postgresql:memory_ledger.outbox_v2",
+      "postgresql:memory_ledger.outbox_delivery_v2",
+      "postgresql:memory_ledger.quarantine_v2",
+      "postgresql:memory_ledger.privacy_tombstones_v2",
+      "postgresql:memory_ledger.correction_links_v2"
+    ],
+    "readModels": [
+      "events-by-soul",
+      "pending-outbox"
+    ],
+    "privacyClasses": [
+      "personal",
+      "sensitive"
+    ],
+    "retention": "append-only subject to audited privacy erasure policy",
+    "export": "ordered Soul-scoped event export",
+    "correction": "append an independently approved correction link and replacement event; v2 runtime cannot write correction authority records",
+    "deletion": "append independently approved per-event or per-Soul tombstones, then rebuild projections; no physical runtime delete"
+  },
+  "security": {
+    "trustBoundaries": [
+      "fixed non-public Soul current-resolution authority source",
+      "fixed P-256 executor receipt verifier",
+      "reference-identity capability seals that cannot be reconstructed from DTOs or JSON",
+      "256-bit runtime database capability plus distinct admin/runtime roles"
+    ],
+    "secretScopes": [
+      "memory-event-ledger-db"
+    ],
+    "untrustedInputs": [
+      "contract payloads",
+      "stored text",
+      "timestamps"
+      ,"public soul.resolved/v1 DTOs",
+      "caller-set memory.event/v1 observation.verified",
+      "signed receipt JSON before exact canonical and signature validation",
+      "interest signal text and numeric bounds"
+    ],
+    "failClosedOn": [
+      "unknown contract major",
+      "invalid identity scope",
+      "missing evidence",
+      "database error"
+      ,"stale, expired, equal-expiry, revoked, wrong-role, wrong-audience, wrong-key, or replaced authority result",
+      "cross-Soul, device, account, trace, idempotency, event, content, or postcondition binding mismatch",
+      "UNKNOWN_OUTCOME, spoken, acted, or non-observation result code",
+      "missing production Soul capability provider or Release-BOM-pinned receipt root"
+    ],
+    "policyIds": [
+      "SOUL-ISO-001",
+      "CMD-IDEMP-001",
+      "RESULT-VERIFY-001",
+      "GBRAIN-READBACK-001",
+      "EDGE-NORESTART-001"
+    ]
+  },
+  "tests": {
+    "requiredOutcome": "PASS",
+    "failureOutcomes": [
+      "FAIL",
+      "SKIP",
+      "PARTIAL",
+      "NOT_RUN",
+      "INFRA_ERROR",
+      "NOT_APPLICABLE"
+    ],
+    "suites": [
+      {
+        "id": "memory-event-ledger.unit",
+        "type": "unit",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/memory-event-ledger/tests --locked-mode && scripts/dotnet-pinned.sh test --project Modules/memory-event-ledger/tests --configuration Release --no-restore --filter-trait Category=Unit --minimum-expected-tests 5 --fail-skips on",
+        "environment": "macos-or-hosted fixed in-process P-256 and sealed-capability fakes; no production trust-root claim",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "memory-event-ledger.contract",
+        "type": "contract",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/memory-event-ledger/tests --locked-mode && scripts/dotnet-pinned.sh test --project Modules/memory-event-ledger/tests --configuration Release --no-restore --filter-trait Category=Contract --minimum-expected-tests 13 --fail-skips on",
+        "environment": "macos-or-hosted exact canonical raw receipt attacks and migration source checks; no PostgreSQL claim",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "memory-event-ledger.integration",
+        "type": "integration",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/memory-event-ledger/tests --locked-mode && scripts/dotnet-pinned.sh test --project Modules/memory-event-ledger/tests --configuration Release --no-restore --filter-trait Category=Integration --minimum-expected-tests 7 --fail-skips on",
+        "environment": "REAL PostgreSQL 18.4 with distinct bootstrap/admin/runtime roles; DPS_TEST_POSTGRES required and missing infrastructure is INFRA_ERROR/NOT_RUN",
+        "evidenceLevel": "INTEGRATION_VERIFIED"
+      }
+    ]
+  },
+  "compatibility": {
+    "policyRef": "governance/policies/compatibility-policy.yaml",
+    "track": "modern",
+    "moduleMajor": 0,
+    "supportedContractMajors": {
+      "memory.event": [
+        1,
+        2
+      ],
+      "memory.outbox": [
+        1,
+        2
+      ],
+      "memory.append.request": [
+        2
+      ],
+      "soul.resolved": [
+        1
+      ],
+      "command.receipt.signed": [
+        1
+      ]
+    },
+    "unknownMajorBehavior": "reject",
+    "missingMajorBehavior": "reject",
+    "unknownModeBehavior": "reject",
+    "missingModeBehavior": "reject"
+  },
+  "rollout": {
+    "featureFlag": "memory_event_ledger_v2",
+    "canary": "disabled until Soul current-resolution capability and exact receipt trust root are pinned; then synthetic, shadow, bounded Soul cohort",
+    "rollback": "disable v2 routing, retain append-only v2 rows and outbox, and restore previous signed Release BOM; never reactivate v1 append",
+    "killSwitch": "kill_memory_event_ledger_v2"
+  },
+  "deviceGates": {
+    "requiresWindows": false,
+    "requiresZennoDroid": false,
+    "requiresAdb": false,
+    "minimumVerification": "INTEGRATION_VERIFIED"
+  },
+  "agents": {
+    "spec": "dps.agents/v1",
+    "policyVersion": "1.0.0",
+    "instructionsFile": "AGENTS.md",
+    "manifestFile": "module.yaml",
+    "receiptRequired": true,
+    "resolver": "factory-instruction-resolver"
+  }
+}

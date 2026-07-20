@@ -1,0 +1,179 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {
+    "id": "platform-authorization-authority",
+    "name": "Platform Authorization Authority",
+    "version": "0.1.0",
+    "description": "DPS authority that validates untrusted raw platform proof and produces normalized internally signed platform-account authorization evidence.",
+    "lifecycle": "proposed",
+    "runtimeState": "proposed",
+    "releaseEligible": false,
+    "riskTier": "R3",
+    "ownerId": "dps-platform"
+  },
+  "paths": {
+    "actualRoot": "Modules/platform-authorization-authority",
+    "canonicalRoot": "modules/platform-authorization-authority",
+    "owned": ["Modules/platform-authorization-authority/**"],
+    "excluded": [],
+    "runtimeData": []
+  },
+  "artifacts": [
+    {
+      "id": "dps.platform-authorization-authority.contracts",
+      "kind": "contract-pack",
+      "status": "proposed",
+      "build": "scripts/dotnet-pinned.sh restore Modules/platform-authorization-authority/contracts/Dps.PlatformAuthorizationAuthority.Contracts/Dps.PlatformAuthorizationAuthority.Contracts.csproj --locked-mode && scripts/dotnet-pinned.sh build Modules/platform-authorization-authority/contracts/Dps.PlatformAuthorizationAuthority.Contracts/Dps.PlatformAuthorizationAuthority.Contracts.csproj --configuration Release --no-restore",
+      "versioning": "semver"
+    },
+    {
+      "id": "dps.platform-authorization-authority",
+      "kind": "assembly",
+      "status": "proposed",
+      "build": "scripts/dotnet-pinned.sh restore Modules/platform-authorization-authority/src/Dps.PlatformAuthorizationAuthority/Dps.PlatformAuthorizationAuthority.csproj --locked-mode && scripts/dotnet-pinned.sh build Modules/platform-authorization-authority/src/Dps.PlatformAuthorizationAuthority/Dps.PlatformAuthorizationAuthority.csproj --configuration Release --no-restore",
+      "versioning": "semver"
+    }
+  ],
+  "runtime": {
+    "track": "modern-service",
+    "language": "C# 14",
+    "target": "net10.0",
+    "processBoundary": "modular-monolith",
+    "entrypoints": [],
+    "toolchainStatus": "proposed"
+  },
+  "contracts": {
+    "provided": [
+      {
+        "contractId": "platform.account.authorization.evidence",
+        "major": 1,
+        "source": "Modules/platform-authorization-authority/contracts/provided/platform.account.authorization.evidence.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "platform-authorization-authority"
+      }
+    ],
+    "consumed": []
+  },
+  "communication": {
+    "inbound": [],
+    "outbound": [
+      {
+        "peerModule": "platform-account-registry",
+        "contractId": "platform.account.authorization.evidence",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "in-process-api",
+        "timeoutMs": 5000,
+        "retryPolicy": "durable-byte-identical-envelope-replay",
+        "idempotencyKey": "soul_id:device_binding_id:platform_account_id:idempotency_key",
+        "authScope": "module:platform-account-registry",
+        "failureMode": "fail-closed-and-retain-exact-signed-envelope"
+      }
+    ]
+  },
+  "dependencies": [],
+  "permissions": {
+    "allowed": [
+      "validate-untrusted-external-platform-proof",
+      "normalize-platform-authorization-decision",
+      "cryptography:p256-signature-verification",
+      "external-signer:platform-authorization-evidence",
+      "durable-exact-envelope-receipt-store"
+    ],
+    "denied": [
+      "production private key",
+      "caller-selected trust root",
+      "raw platform credential persistence",
+      "platform-account lifecycle mutation",
+      "binding mutation",
+      "device command",
+      "GBrain network",
+      "production shell"
+    ],
+    "productionApproval": "human-required"
+  },
+  "data": {
+    "ownedStores": ["exact signed-envelope receipts through an injected durable store; no repository implementation exists yet"],
+    "readModels": [],
+    "privacyClasses": ["sensitive"],
+    "retention": "raw proof is not retained by the module; a future durable implementation may retain only exact signed envelopes and bounded hashes under an approved audit policy",
+    "export": "export the exact signed evidence envelope and its canonical SHA-256 without raw identifiers or credentials",
+    "correction": "issue a new signed revision under a new scoped idempotency key; never rewrite an issued envelope",
+    "deletion": "delete raw proof immediately after verification and apply approved cryptographic deletion and audit-retention policy to future receipt storage"
+  },
+  "security": {
+    "trustBoundaries": [
+      "untrusted raw external-platform proof to DPS verification boundary",
+      "fixed P-256 issuer root and external production signer",
+      "signed evidence command to platform-account-registry"
+    ],
+    "secretScopes": ["external signer handle only; private key material is forbidden"],
+    "untrustedInputs": ["raw external-platform proof", "platform and scope identifiers", "alias digest metadata", "requested authorization status and revision"],
+    "failClosedOn": [
+      "unknown contract version",
+      "unverified or stale raw proof",
+      "unknown proof verifier",
+      "unknown issuer or key",
+      "invalid P-256 signature",
+      "scope or revision mismatch",
+      "inactive Release BOM or generation",
+      "expired evidence window",
+      "missing durable receipt store",
+      "conflicting idempotency payload"
+    ],
+    "policyIds": ["SOUL-ISO-001", "CMD-IDEMP-001", "RESULT-VERIFY-001", "GBRAIN-READBACK-001", "EDGE-NORESTART-001"]
+  },
+  "tests": {
+    "requiredOutcome": "PASS",
+    "failureOutcomes": ["FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"],
+    "suites": [
+      {
+        "id": "platform-authorization-authority.unit",
+        "type": "unit",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/platform-authorization-authority/tests/Dps.PlatformAuthorizationAuthority.Tests/Dps.PlatformAuthorizationAuthority.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/platform-authorization-authority/tests/Dps.PlatformAuthorizationAuthority.Tests/Dps.PlatformAuthorizationAuthority.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Unit --minimum-expected-tests 15 --fail-skips on",
+        "environment": "macos-or-hosted deterministic unit harness; only test-owned ephemeral keys and an explicitly test-only in-memory receipt store",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "platform-authorization-authority.contract",
+        "type": "contract",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/platform-authorization-authority/tests/Dps.PlatformAuthorizationAuthority.Tests/Dps.PlatformAuthorizationAuthority.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/platform-authorization-authority/tests/Dps.PlatformAuthorizationAuthority.Tests/Dps.PlatformAuthorizationAuthority.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Contract --minimum-expected-tests 14 --fail-skips on",
+        "environment": "macos-or-hosted deterministic contract harness; no production signer or platform network",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      }
+    ]
+  },
+  "compatibility": {
+    "policyRef": "governance/policies/compatibility-policy.yaml",
+    "track": "modern",
+    "moduleMajor": 0,
+    "supportedContractMajors": {"platform.account.authorization.evidence": [1]},
+    "unknownMajorBehavior": "reject",
+    "missingMajorBehavior": "reject",
+    "unknownModeBehavior": "reject",
+    "missingModeBehavior": "reject"
+  },
+  "rollout": {
+    "featureFlag": "platform_authorization_authority_v1",
+    "canary": "synthetic proof verification, then shadow issuance, then a bounded explicitly authorized account cohort",
+    "rollback": "activate kill_platform_authorization_issuance, disable issuance, restore the previous human-approved signed Release BOM, and retain exact issued-envelope receipts without rewriting or resigning them",
+    "killSwitch": "kill_platform_authorization_issuance"
+  },
+  "deviceGates": {
+    "requiresWindows": false,
+    "requiresZennoDroid": false,
+    "requiresAdb": false,
+    "minimumVerification": "CONTRACT_VERIFIED"
+  },
+  "agents": {
+    "spec": "dps.agents/v1",
+    "policyVersion": "1.0.0",
+    "instructionsFile": "AGENTS.md",
+    "manifestFile": "module.yaml",
+    "receiptRequired": true,
+    "resolver": "factory-instruction-resolver"
+  }
+}

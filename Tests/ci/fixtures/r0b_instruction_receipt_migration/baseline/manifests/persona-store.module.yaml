@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {
+    "id": "persona-store",
+    "name": "Persona Store",
+    "version": "0.4.0",
+    "description": "Soul-scoped append-only persona revisions, keyed non-enumerable commitments, exact current reads, and audited live-primary logical deletion backed by PostgreSQL; final cryptographic erasure is not implemented.",
+    "lifecycle": "proposed",
+    "runtimeState": "proposed",
+    "releaseEligible": false,
+    "riskTier": "R2",
+    "ownerId": "dps-soul"
+  },
+  "paths": {"actualRoot": "Modules/persona-store", "canonicalRoot": "modules/persona-store", "owned": ["Modules/persona-store/**"], "excluded": [], "runtimeData": []},
+  "artifacts": [
+    {"id": "dps.persona-store", "kind": "assembly", "status": "proposed", "build": "scripts/dotnet-pinned.sh restore Modules/persona-store/src/Dps.PersonaStore/Dps.PersonaStore.csproj --locked-mode && scripts/dotnet-pinned.sh build Modules/persona-store/src/Dps.PersonaStore/Dps.PersonaStore.csproj --configuration Release --no-restore", "versioning": "semver"},
+    {"id": "dps.persona-store.contracts", "kind": "contract-pack", "status": "proposed", "build": "scripts/dotnet-pinned.sh restore Modules/persona-store/contracts/Dps.PersonaStore.Contracts/Dps.PersonaStore.Contracts.csproj --locked-mode && scripts/dotnet-pinned.sh build Modules/persona-store/contracts/Dps.PersonaStore.Contracts/Dps.PersonaStore.Contracts.csproj --configuration Release --no-restore", "versioning": "semver"}
+  ],
+  "runtime": {"track": "modern-service", "language": "C# 14", "target": "net10.0", "processBoundary": "modular-monolith", "entrypoints": [], "toolchainStatus": "proposed"},
+  "contracts": {
+    "provided": [
+      {"contractId": "persona.revision", "major": 1, "source": "Modules/persona-store/contracts/provided/persona.revision.v1.schema.json", "status": "proposed", "mode": "active", "ownerModule": "persona-store"},
+      {"contractId": "persona.history.export", "major": 1, "source": "Modules/persona-store/contracts/provided/persona.history.export.v1.schema.json", "status": "proposed", "mode": "active", "ownerModule": "persona-store"}
+    ],
+    "consumed": [
+      {"contractId": "identity.binding.mutation.fence", "major": 1, "source": "Modules/binding/contracts/provided/identity.binding.mutation-fence.v1.schema.json", "status": "proposed", "mode": "active", "ownerModule": "binding"},
+      {"contractId": "binding.composition.attestation", "major": 1, "source": "Modules/binding/contracts/provided/binding.composition.attestation.v1.schema.json", "status": "proposed", "mode": "active", "ownerModule": "binding"}
+    ]
+  },
+  "communication": {
+    "inbound": [
+      {"peerModule": "binding", "contractId": "identity.binding.mutation.fence", "major": 1, "direction": "inbound", "transport": "in-process-api", "timeoutMs": 5000, "retryPolicy": "bounded-identical-acquire", "idempotencyKey": "persona-idempotency-key", "authScope": "module:binding", "failureMode": "fail-closed-and-do-not-commit"},
+      {"peerModule": "binding", "contractId": "binding.composition.attestation", "major": 1, "direction": "inbound", "transport": "receipt", "timeoutMs": 5000, "retryPolicy": "none-expired-or-mismatched-attestation", "idempotencyKey": "release-bom:generation", "authScope": "pinned-binding-composition-root", "failureMode": "reject-before-database-access"}
+    ],
+    "outbound": [
+      {"peerModule": "control-plane-host", "contractId": "persona.revision", "major": 1, "direction": "outbound", "transport": "event", "timeoutMs": 5000, "retryPolicy": "outbox-identical-redelivery", "idempotencyKey": "soul_id:persona_revision", "authScope": "module:control-plane-host", "failureMode": "retain-outbox-and-fail-closed"}
+    ]
+  },
+  "dependencies": [{"moduleId": "binding", "versionRange": ">=0.1.0 <1.0.0", "required": true, "reason": "signed fixed-root composition attestation plus binding-owned active mutation fence held through persona commit"}],
+  "permissions": {
+    "allowed": ["postgresql:persona_store", "per-Soul-keyed-persona-commitments", "Soul-scoped-export-correction", "append-only-outbox", "audited-live-primary-logical-deletion"],
+    "denied": ["raw email or phone in public contract", "GBrain credential", "GBrain network", "device command", "cross-module table access", "production shell"],
+    "productionApproval": "human-required"
+  },
+  "data": {
+    "ownedStores": ["postgresql:persona_store.schema_migrations", "postgresql:persona_store.schema_attestations", "postgresql:persona_store.binding_composition_state", "postgresql:persona_store.persona_request_hmac_key_attestations", "postgresql:persona_store.persona_hmac_keys", "postgresql:persona_store.persona_revisions", "postgresql:persona_store.trait_payloads", "postgresql:persona_store.persona_current", "postgresql:persona_store.idempotency_receipts", "postgresql:persona_store.idempotency_quarantine", "postgresql:persona_store.persona_export_receipts", "postgresql:persona_store.persona_export_receipt_quarantine", "postgresql:persona_store.outbox", "postgresql:persona_store.outbox_dispatch_receipts", "postgresql:persona_store.erasure_audit"],
+    "readModels": ["current-persona-by-exact-soul", "persona-revision-history-by-exact-soul", "versioned-retained-raw-trait-history-by-exact-soul"],
+    "privacyClasses": ["personal", "sensitive"],
+    "retention": "live primary payload/key rows are removed by a logical-deletion tombstone; WAL, backups, replicas, caches, exports, and downstream projections remain subject to separate retention and deletion proof",
+    "export": "persona.history.export/v1 binds the exact request to a snapshot tail, HMAC cursor, canonical payload SHA-256, HMAC receipt, and immutable receipt ID; identical replay returns the first sealed export even after later correction or logical deletion, while a new request exports current truth; each retained revision is revalidated against its per-Soul keyed commitment; receipt copies have a separate retention/deletion policy and v1 fails closed above 10000 revisions or a 16-MiB complete wire payload",
+    "correction": "append a superseding revision; prior evidence remains auditable",
+    "deletion": "append LIVE_PRIMARY_LOGICAL_DELETED tombstone semantics and remove trait payload/key rows from the live PostgreSQL primary only; KMS_CRYPTO_ERASURE_NOT_IMPLEMENTED blocks any final-erasure claim until an external KMS destruction receipt and backup/WAL/replica/cache/export/downstream deletion evidence exist"
+  },
+  "security": {
+    "trustBoundaries": ["pinned-root Binding composition attestation and exact fence-client artifact before database access", "binding-owned active mutation fence to persona transaction", "persona values to per-Soul keyed commitment contract", "request-idempotency input to deployment-scoped HMAC secret"],
+    "secretScopes": ["postgresql:persona-store-migrator", "postgresql:persona-store-runtime", "secret:persona-request-hmac-key"],
+    "untrustedInputs": ["persona trait values", "evidence digests", "identity scope", "revision", "timestamps"],
+    "failClosedOn": ["unknown contract major", "unknown producer", "invalid or stale binding composition attestation", "unattested fence implementation", "inactive binding", "unknown trait", "missing evidence", "stale revision", "conflicting idempotency key", "cross-Soul query", "KMS_CRYPTO_ERASURE_NOT_IMPLEMENTED"],
+    "policyIds": ["SOUL-ISO-001", "CMD-IDEMP-001", "RESULT-VERIFY-001", "GBRAIN-READBACK-001", "EDGE-NORESTART-001"]
+  },
+  "tests": {
+    "requiredOutcome": "PASS",
+    "failureOutcomes": ["FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"],
+    "suites": [
+      {"id": "persona-store.unit", "type": "unit", "required": true, "command": "scripts/dotnet-pinned.sh restore Modules/persona-store/tests/Dps.PersonaStore.Tests/Dps.PersonaStore.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/persona-store/tests/Dps.PersonaStore.Tests/Dps.PersonaStore.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Unit --minimum-expected-tests 8 --fail-skips on", "environment": "macos-or-hosted deterministic store", "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"},
+      {"id": "persona-store.contract", "type": "contract", "required": true, "command": "scripts/dotnet-pinned.sh restore Modules/persona-store/tests/Dps.PersonaStore.Tests/Dps.PersonaStore.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/persona-store/tests/Dps.PersonaStore.Tests/Dps.PersonaStore.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Contract --minimum-expected-tests 8 --fail-skips on", "environment": "macos-or-hosted deterministic store plus owner-maintained raw revision/history-export contract corpora, exact 10000-revision and 16-MiB boundaries, and static migration privilege guard", "evidenceLevel": "CONTRACT_VERIFIED"},
+      {"id": "persona-store.schema-contract", "type": "contract", "required": true, "command": "python3.12 -m unittest discover -s Modules/persona-store/tests -p test_persona_revision_schema.py", "environment": "repository .python-version plus hash-locked Draft 2020-12 jsonschema validator", "evidenceLevel": "CONTRACT_VERIFIED"},
+      {"id": "persona-store.integration", "type": "integration", "required": true, "command": "scripts/dotnet-pinned.sh restore Modules/persona-store/tests/Dps.PersonaStore.Tests/Dps.PersonaStore.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/persona-store/tests/Dps.PersonaStore.Tests/Dps.PersonaStore.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Integration --minimum-expected-tests 25 --fail-skips on", "environment": "Exact PostgreSQL 18.4 via DPS_TEST_POSTGRES with separate Persona migrator/runtime roles and disposable schemas; includes immutable export replay, retained-trait HMAC tamper rejection, empty-schema adoption rejection, column-ACL drift, and one real PostgresBindingRegistry mutation-fence/revoke composition test; missing infrastructure fails and port 55434/dps_gbrain_company are rejected", "evidenceLevel": "INTEGRATION_VERIFIED"}
+    ]
+  },
+  "compatibility": {"policyRef": "governance/policies/compatibility-policy.yaml", "track": "modern", "moduleMajor": 0, "supportedContractMajors": {"binding.composition.attestation": [1], "identity.binding.mutation.fence": [1], "persona.history.export": [1], "persona.revision": [1]}, "unknownMajorBehavior": "reject", "missingMajorBehavior": "reject", "unknownModeBehavior": "reject", "missingModeBehavior": "reject"},
+  "rollout": {"featureFlag": "persona_store_v1", "canary": "synthetic then shadow digest comparison then human-approved bounded Soul cohort; KMS_CRYPTO_ERASURE_NOT_IMPLEMENTED forbids any final-erasure acceptance", "rollback": "stop writes and restore previous signed BOM while retaining append-only revisions; never label rollback or live-primary deletion as crypto-erasure", "killSwitch": "kill_persona_store_writes"},
+  "deviceGates": {"requiresWindows": false, "requiresZennoDroid": false, "requiresAdb": false, "minimumVerification": "INTEGRATION_VERIFIED"},
+  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true, "resolver": "factory-instruction-resolver"}
+}

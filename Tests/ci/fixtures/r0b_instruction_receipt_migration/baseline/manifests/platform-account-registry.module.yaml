@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {
+    "id": "platform-account-registry",
+    "name": "Platform Account Registry",
+    "version": "0.4.0",
+    "description": "Stable platform-account aliases that consume authority-owned pinned-root evidence, preserve lifecycle revision truth, and own binding reservation leases.",
+    "lifecycle": "proposed",
+    "runtimeState": "proposed",
+    "releaseEligible": false,
+    "riskTier": "R3",
+    "ownerId": "dps-platform"
+  },
+  "paths": {"actualRoot": "Modules/platform-account-registry", "canonicalRoot": "modules/platform-account-registry", "owned": ["Modules/platform-account-registry/**"], "excluded": [], "runtimeData": []},
+  "artifacts": [
+    {"id": "dps.platform-account-registry", "kind": "assembly", "status": "proposed", "build": "scripts/dotnet-pinned.sh restore Modules/platform-account-registry/src/Dps.PlatformAccountRegistry/Dps.PlatformAccountRegistry.csproj --locked-mode && scripts/dotnet-pinned.sh build Modules/platform-account-registry/src/Dps.PlatformAccountRegistry/Dps.PlatformAccountRegistry.csproj --configuration Release --no-restore", "versioning": "semver"},
+    {"id": "dps.platform-account-registry.contracts", "kind": "contract-pack", "status": "proposed", "build": "scripts/dotnet-pinned.sh restore Modules/platform-account-registry/contracts/Dps.PlatformAccountRegistry.Contracts/Dps.PlatformAccountRegistry.Contracts.csproj --locked-mode && scripts/dotnet-pinned.sh build Modules/platform-account-registry/contracts/Dps.PlatformAccountRegistry.Contracts/Dps.PlatformAccountRegistry.Contracts.csproj --configuration Release --no-restore", "versioning": "semver"}
+  ],
+  "runtime": {"track": "modern-service", "language": "C# 14", "target": "net10.0", "processBoundary": "modular-monolith", "entrypoints": [], "toolchainStatus": "proposed"},
+  "contracts": {
+    "provided": [
+      {"contractId": "platform.account.authorized", "major": 1, "source": "Modules/platform-account-registry/contracts/provided/platform.account.authorized.v1.schema.json", "status": "proposed", "mode": "active", "ownerModule": "platform-account-registry"},
+      {"contractId": "platform.account.binding.reservation", "major": 1, "source": "Modules/platform-account-registry/contracts/provided/platform.account.binding.reservation.v1.schema.json", "status": "proposed", "mode": "active", "ownerModule": "platform-account-registry"}
+    ],
+    "consumed": [
+      {"contractId": "platform.account.authorization.evidence", "major": 1, "source": "Modules/platform-authorization-authority/contracts/provided/platform.account.authorization.evidence.v1.schema.json", "status": "proposed", "mode": "active", "ownerModule": "platform-authorization-authority"}
+    ]
+  },
+  "communication": {
+    "inbound": [
+      {"peerModule": "platform-authorization-authority", "contractId": "platform.account.authorization.evidence", "major": 1, "direction": "inbound", "transport": "in-process-api", "timeoutMs": 5000, "retryPolicy": "durable-byte-identical-envelope-replay", "idempotencyKey": "soul_id:device_binding_id:platform_account_id:idempotency_key", "authScope": "module:platform-authorization-authority", "failureMode": "fail-closed-on-invalid-or-conflicting-signed-envelope"}
+    ],
+    "outbound": [
+      {"peerModule": "binding", "contractId": "platform.account.authorized", "major": 1, "direction": "outbound", "transport": "read-only-query", "timeoutMs": 5000, "retryPolicy": "bounded-exponential-with-jitter", "idempotencyKey": "trace_id:idempotency_key", "authScope": "module:binding", "failureMode": "fail-closed"},
+      {"peerModule": "binding", "contractId": "platform.account.binding.reservation", "major": 1, "direction": "outbound", "transport": "in-process-api", "timeoutMs": 5000, "retryPolicy": "same-reservation-id-exact-scope", "idempotencyKey": "reservation_id:state", "authScope": "module:binding", "failureMode": "fail-closed-and-retain-provider-reservation"},
+      {"peerModule": "control-plane-host", "contractId": "platform.account.authorized", "major": 1, "direction": "outbound", "transport": "event", "timeoutMs": 5000, "retryPolicy": "outbox-identical-redelivery", "idempotencyKey": "soul_id:device_binding_id:platform_account_id:idempotency_key", "authScope": "module:control-plane-host", "failureMode": "retain-outbox-and-fail-closed"}
+    ]
+  },
+  "dependencies": [
+    {"moduleId": "platform-authorization-authority", "versionRange": ">=0.1.0 <1.0.0", "required": true, "reason": "consume the uniquely owned normalized signed platform-authorization evidence contract and canonicalizer"}
+  ],
+  "permissions": {
+    "allowed": ["postgresql:platform_account_registry", "cryptography:sha256-account-alias", "cryptography:p256-signed-authorization-evidence"],
+    "denied": ["raw email or phone persistence", "platform credentials", "platform action", "Soul ownership", "device command", "GBrain network", "production shell"],
+    "productionApproval": "human-required"
+  },
+  "data": {
+    "ownedStores": ["postgresql:platform_account_registry.accounts", "postgresql:platform_account_registry.authorization_revisions", "postgresql:platform_account_registry.binding_reservations", "postgresql:platform_account_registry.mutation_receipts", "postgresql:platform_account_registry.outbox", "postgresql:platform_account_registry.module_schema_migrations", "postgresql:platform_account_registry.release_generation_state"],
+    "readModels": ["authorized-account-by-id", "account-by-alias-digest"],
+    "privacyClasses": ["personal", "sensitive"],
+    "retention": "until revocation, verified deletion, and audit retention expire",
+    "export": "export account status and hashed aliases without credentials or raw identifiers",
+    "correction": "append an authorization revision and revoke superseded aliases",
+    "deletion": "revoke first, then erase alias mappings after active binding checks"
+  },
+  "security": {
+    "trustBoundaries": ["versioned module API", "hashed platform alias boundary", "platform-authorization-authority signed envelope", "fixed P-256 authorization authority root"],
+    "secretScopes": [],
+    "untrustedInputs": ["platform name", "alias digest", "signed authorization evidence envelope"],
+    "failClosedOn": ["unknown contract version", "unknown evidence issuer", "invalid or expired evidence signature", "evidence scope mismatch", "authorization evidence not bound to the active Release BOM generation", "release generation rollback or equivocation", "applied migration digest mismatch", "alias collision", "revoked authorization", "stale revision", "conflicting idempotency key", "effective binding reservation"],
+    "policyIds": ["SOUL-ISO-001", "CMD-IDEMP-001", "RESULT-VERIFY-001", "GBRAIN-READBACK-001", "EDGE-NORESTART-001"]
+  },
+  "tests": {
+    "requiredOutcome": "PASS",
+    "failureOutcomes": ["FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"],
+    "suites": [
+      {"id": "platform-account-registry.unit", "type": "unit", "required": true, "command": "scripts/dotnet-pinned.sh restore Modules/platform-account-registry/tests/Dps.PlatformAccountRegistry.Tests/Dps.PlatformAccountRegistry.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/platform-account-registry/tests/Dps.PlatformAccountRegistry.Tests/Dps.PlatformAccountRegistry.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Unit --minimum-expected-tests 9 --fail-skips on", "environment": "macos-or-hosted deterministic store", "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"},
+      {"id": "platform-account-registry.contract", "type": "contract", "required": true, "command": "scripts/dotnet-pinned.sh restore Modules/platform-account-registry/tests/Dps.PlatformAccountRegistry.Tests/Dps.PlatformAccountRegistry.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/platform-account-registry/tests/Dps.PlatformAccountRegistry.Tests/Dps.PlatformAccountRegistry.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Contract --minimum-expected-tests 5 --fail-skips on", "environment": "macos-or-hosted deterministic store", "evidenceLevel": "CONTRACT_VERIFIED"},
+      {"id": "platform-account-registry.integration", "type": "integration", "required": true, "command": "scripts/dotnet-pinned.sh restore Modules/platform-account-registry/tests/Dps.PlatformAccountRegistry.Tests/Dps.PlatformAccountRegistry.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/platform-account-registry/tests/Dps.PlatformAccountRegistry.Tests/Dps.PlatformAccountRegistry.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Integration --minimum-expected-tests 15 --fail-skips on", "environment": "PostgreSQL 18.4 local integration with DPS_TEST_POSTGRES; isolated disposable schema; no platform network", "evidenceLevel": "INTEGRATION_VERIFIED"}
+    ]
+  },
+  "compatibility": {"policyRef": "governance/policies/compatibility-policy.yaml", "track": "modern", "moduleMajor": 0, "supportedContractMajors": {"platform.account.authorized": [1], "platform.account.authorization.evidence": [1], "platform.account.binding.reservation": [1]}, "unknownMajorBehavior": "reject", "missingMajorBehavior": "reject", "unknownModeBehavior": "reject", "missingModeBehavior": "reject"},
+  "rollout": {"featureFlag": "platform_account_registry_v1", "canary": "synthetic then shadow then bounded explicitly authorized account cohort", "rollback": "stop authorization changes and restore previous signed BOM while preserving revision history", "killSwitch": "kill_platform_account_registry_writes"},
+  "deviceGates": {"requiresWindows": false, "requiresZennoDroid": false, "requiresAdb": false, "minimumVerification": "INTEGRATION_VERIFIED"},
+  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true, "resolver": "factory-instruction-resolver"}
+}

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "dps.module/v1",
+  "schemaVersion": "dps.module/v2",
   "module": {"id": "factory-trusted-runner", "name": "Factory Trusted Runner", "version": "0.1.0", "description": "Runs exact trusted argv without a shell, verifies fencing, and emits fail-closed hashed test evidence.", "lifecycle": "proposed", "runtimeState": "proposed", "releaseEligible": false, "riskTier": "R3", "ownerId": "dps-ai-factory"},
   "paths": {"actualRoot": "Modules/factory-trusted-runner", "canonicalRoot": "modules/factory-trusted-runner", "owned": ["Modules/factory-trusted-runner/**"], "excluded": [], "runtimeData": ["external isolated runner workspace and evidence store"]},
   "artifacts": [
@@ -38,5 +38,5 @@
   "compatibility": {"policyRef": "governance/policies/compatibility-policy.yaml", "track": "factory", "moduleMajor": 0, "supportedContractMajors": {"instruction.receipt": [1], "worktree.plan": [1], "worktree.lease": [1], "merge.request": [1], "trusted.test.result": [1]}, "unknownMajorBehavior": "reject", "missingMajorBehavior": "reject", "unknownModeBehavior": "reject", "missingModeBehavior": "reject"},
   "rollout": {"featureFlag": "factory_trusted_runner_v1", "canary": "synthetic fixture execution only before separately approved isolated shadow", "rollback": "disable new execution and route to the previous signed runner while retaining evidence hashes", "killSwitch": "factory_disable_trusted_execution"},
   "deviceGates": {"requiresWindows": false, "requiresZennoDroid": false, "requiresAdb": false, "minimumVerification": "CONTRACT_VERIFIED"},
-  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true, "resolver": "factory-instruction-resolver"}
+  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true}
 }

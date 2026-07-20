@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "dps.module/v1",
+  "schemaVersion": "dps.module/v2",
   "module": {
     "id": "persona-store",
     "name": "Persona Store",
@@ -71,5 +71,5 @@
   "compatibility": {"policyRef": "governance/policies/compatibility-policy.yaml", "track": "modern", "moduleMajor": 0, "supportedContractMajors": {"binding.composition.attestation": [1], "identity.binding.mutation.fence": [1], "persona.history.export": [1], "persona.revision": [1]}, "unknownMajorBehavior": "reject", "missingMajorBehavior": "reject", "unknownModeBehavior": "reject", "missingModeBehavior": "reject"},
   "rollout": {"featureFlag": "persona_store_v1", "canary": "synthetic then shadow digest comparison then human-approved bounded Soul cohort; KMS_CRYPTO_ERASURE_NOT_IMPLEMENTED forbids any final-erasure acceptance", "rollback": "stop writes and restore previous signed BOM while retaining append-only revisions; never label rollback or live-primary deletion as crypto-erasure", "killSwitch": "kill_persona_store_writes"},
   "deviceGates": {"requiresWindows": false, "requiresZennoDroid": false, "requiresAdb": false, "minimumVerification": "INTEGRATION_VERIFIED"},
-  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true, "resolver": "factory-instruction-resolver"}
+  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true}
 }

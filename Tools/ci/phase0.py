@@ -1085,32 +1085,113 @@ def discover_registered_module_dirs(root: Path) -> List[Path]:
     return registered
 
 
-def find_manifest_schema(root: Path) -> Optional[Path]:
-    candidates = (
-        "governance/schemas/module-manifest.schema.json",
-        "governance/schemas/module.schema.json",
-        "governance/module-manifest.schema.json",
-        "Governance/schemas/module-manifest.schema.json",
-        "Governance/schemas/module.schema.json",
-    )
-    for candidate in candidates:
-        path = root / candidate
-        if path.is_file():
-            return path
-    matches = sorted(
-        path
-        for base in (root / "governance", root / "Governance")
-        if base.is_dir()
-        for path in base.rglob("*.schema.json")
-        if "module" in path.name.casefold() and "manifest" in path.name.casefold()
-    )
-    return matches[0] if matches else None
+# The exact set of module manifest majors this gate implements, and the file each
+# one lives in.  Discovering majors by globbing module-manifest*.schema.json and
+# believing whatever schemaVersion.const each file declared made the supported set
+# candidate-defined: dropping in a permissive module-manifest.v999.schema.json and
+# switching a manifest to dps.module/v999 passed validation with the whole agents
+# block removed.  A major is supported because it is named here -- in a file bound
+# into the candidate trust anchor -- not because a schema file exists.
+SUPPORTED_MANIFEST_SCHEMA_FILES: Dict[str, str] = {
+    "dps.module/v1": "module-manifest.v1.schema.json",
+    "dps.module/v2": "module-manifest.schema.json",
+}
+
+
+_MANIFEST_MAJOR_BY_FILE: Dict[str, str] = {
+    name: major for major, name in SUPPORTED_MANIFEST_SCHEMA_FILES.items()
+}
+
+
+def _manifest_schema_directory(root: Path) -> Optional[Path]:
+    for base_name in ("governance", "Governance"):
+        base = root / base_name / "schemas"
+        if base.is_dir():
+            return base
+    return None
+
+
+def _manifest_schema_paths(root: Path) -> List[Path]:
+    """The schema file of every supported major, in registry order.
+
+    R0-B publishes ``dps.module/v2`` (resolver removed) beside the retained
+    ``dps.module/v1`` (resolver-bearing), so the gate loads both and dispatches
+    per manifest rather than pinning one "current" schema -- but only these two.
+    """
+    base = _manifest_schema_directory(root)
+    if base is None:
+        fallbacks = (
+            root / "governance" / "module-manifest.schema.json",
+            root / "Governance" / "schemas" / "module.schema.json",
+        )
+        return [path for path in fallbacks if path.is_file()]
+    return [base / name for name in SUPPORTED_MANIFEST_SCHEMA_FILES.values()]
+
+
+def load_manifest_schemas(root: Path) -> Dict[str, Mapping[str, Any]]:
+    """Load module-manifest schemas keyed by the major each one pins.
+
+    Each schema self-declares its major via ``schemaVersion.const``; a manifest
+    is validated against the schema whose const matches its own declared
+    ``schemaVersion``.  Unknown or missing majors fail closed in
+    ``_load_module_record`` rather than silently reusing another major's rules.
+    """
+    schemas: Dict[str, Mapping[str, Any]] = {}
+    base = _manifest_schema_directory(root)
+    if base is not None:
+        # An unregistered module-manifest*.schema.json is refused rather than
+        # ignored: leaving it on disk is how a candidate would try to introduce a
+        # major of its own, and a silently skipped file looks identical to one the
+        # gate understood.
+        expected = set(SUPPORTED_MANIFEST_SCHEMA_FILES.values())
+        unexpected = sorted(
+            path.name for path in base.glob("module-manifest*.schema.json") if path.name not in expected
+        )
+        if unexpected:
+            raise Phase0Error(
+                "unregistered module manifest schema files: " + ", ".join(unexpected)
+            )
+    for path in _manifest_schema_paths(root):
+        try:
+            value = json.loads(path.read_text(encoding="utf-8-sig"))
+        except Exception as exc:
+            raise Phase0Error(
+                "invalid module manifest schema {0}: {1}".format(relative(root, path), exc)
+            )
+        if not isinstance(value, dict):
+            raise Phase0Error(
+                "module manifest schema {0} root is not an object".format(relative(root, path))
+            )
+        properties = value.get("properties")
+        version_schema = properties.get("schemaVersion") if isinstance(properties, dict) else None
+        const = version_schema.get("const") if isinstance(version_schema, dict) else None
+        if not isinstance(const, str):
+            raise Phase0Error(
+                "module manifest schema {0} does not pin a schemaVersion const".format(
+                    relative(root, path)
+                )
+            )
+        if const in schemas:
+            raise Phase0Error("duplicate module manifest schema major " + const)
+        expected_major = _MANIFEST_MAJOR_BY_FILE.get(path.name)
+        if expected_major is not None and const != expected_major:
+            raise Phase0Error(
+                "module manifest schema {0} declares major {1}, expected {2}".format(
+                    relative(root, path), const, expected_major
+                )
+            )
+        schemas[const] = value
+    if base is not None and set(schemas) != set(SUPPORTED_MANIFEST_SCHEMA_FILES):
+        raise Phase0Error(
+            "module manifest majors on disk do not match the supported registry"
+        )
+    return schemas
 
 
 def _load_module_record(
     root: Path,
     module_root: Path,
-    schema: Optional[Mapping[str, Any]],
+    schemas: Optional[Mapping[str, Mapping[str, Any]]],
 ) -> ModuleRecord:
     agents_path = module_root / "AGENTS.md"
     manifest_path = module_root / "module.yaml"
@@ -1182,8 +1263,18 @@ def _load_module_record(
         )
 
     manifest = load_json_compatible_yaml(manifest_path)
-    if schema is not None:
-        schema_errors = validate_json_schema(manifest, schema)
+    if schemas:
+        declared = manifest.get("schemaVersion")
+        if not isinstance(declared, str) or declared not in schemas:
+            raise Phase0Error(
+                "module manifest {0} declares unknown or missing schemaVersion {1!r}; "
+                "supported majors: {2}".format(
+                    relative(root, manifest_path),
+                    declared,
+                    ", ".join(sorted(schemas)) or "(none)",
+                )
+            )
+        schema_errors = validate_json_schema(manifest, schemas[declared])
         if schema_errors:
             raise Phase0Error(
                 "invalid module manifest {0}: {1}".format(
@@ -2983,19 +3074,13 @@ def validate_governance(root: Path, require_schema: bool = True) -> Dict[str, An
     except Phase0Error as exc:
         errors.append(str(exc))
 
-    schema_path = find_manifest_schema(root)
-    schema: Optional[Dict[str, Any]] = None
-    if schema_path is None:
-        if require_schema:
-            errors.append("module manifest JSON Schema is required")
-    else:
-        try:
-            schema_value = json.loads(schema_path.read_text(encoding="utf-8-sig"))
-            if not isinstance(schema_value, dict):
-                raise ValueError("schema root is not an object")
-            schema = schema_value
-        except Exception as exc:
-            errors.append("invalid module manifest schema: {0}".format(exc))
+    schemas: Dict[str, Mapping[str, Any]] = {}
+    try:
+        schemas = dict(load_manifest_schemas(root))
+    except Phase0Error as exc:
+        errors.append(str(exc))
+    if not schemas and require_schema:
+        errors.append("module manifest JSON Schema is required")
 
     try:
         registered_dirs = discover_registered_module_dirs(root)
@@ -3006,7 +3091,7 @@ def validate_governance(root: Path, require_schema: bool = True) -> Dict[str, An
     records: Dict[str, ModuleRecord] = {}
     for module_root in registered_dirs:
         try:
-            record = _load_module_record(root, module_root, schema)
+            record = _load_module_record(root, module_root, schemas or None)
             if record.module_id in records:
                 errors.append("duplicate module id: " + record.module_id)
             else:
@@ -3318,7 +3403,7 @@ def validate_governance(root: Path, require_schema: bool = True) -> Dict[str, An
         "modules_directory": MODULES_DIRECTORY,
         "module_count": len(records),
         "modules": sorted(records),
-        "manifest_schema": relative(root, schema_path) if schema_path else None,
+        "manifest_schemas": sorted(relative(root, path) for path in _manifest_schema_paths(root)),
         "dependency_dag": {
             module_id: sorted(record.dependencies)
             for module_id, record in sorted(records.items())

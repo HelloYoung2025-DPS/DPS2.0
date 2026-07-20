@@ -1,0 +1,47 @@
+{
+  "corpus": "dps.r0b-instruction-receipt-migration-attack-corpus/v1",
+  "purpose": "Minimal adversarial manifest variants for the RebuildPlan section 4.2.3 old/new dual-run. Each sample is applied to the agents block of both the frozen baseline manifest and the current manifest of the base module, so the same defect is judged by the old schema and the new schema independently.",
+  "base_module": "binding",
+  "samples": [
+    {
+      "id": "unknown-field",
+      "reason": "An unrecognised key inside the agents block must fail closed under both schemas because agents is additionalProperties: false in both.",
+      "mutation": {"set": {"resolverHint": "factory-instruction-resolver"}},
+      "old_schema_expectation": "reject",
+      "new_schema_expectation": "reject",
+      "expected_error_substring": "resolverHint"
+    },
+    {
+      "id": "legacy-resolver",
+      "reason": "A resolver field carrying a non-factory value violates the old const and is an unknown property under the new schema, so both must reject it.",
+      "mutation": {"set": {"resolver": "shadow-instruction-resolver"}},
+      "old_schema_expectation": "reject",
+      "new_schema_expectation": "reject",
+      "expected_error_substring": "resolver"
+    },
+    {
+      "id": "legacy-resolver-reintroduced",
+      "reason": "Re-adding the exact factory resolver const is the migration regression this batch exists to prevent. It is accepted by the old schema by construction (the old schema requires it) and must be rejected by the new schema. Recorded asymmetrically on purpose: claiming a both-reject here would be false.",
+      "mutation": {"set": {"resolver": "factory-instruction-resolver"}},
+      "old_schema_expectation": "accept",
+      "new_schema_expectation": "reject",
+      "expected_error_substring": "resolver"
+    },
+    {
+      "id": "missing-receiptRequired",
+      "reason": "receiptRequired is listed in agents.required by both schemas, so dropping it must fail closed on both sides of the migration.",
+      "mutation": {"remove": ["receiptRequired"]},
+      "old_schema_expectation": "reject",
+      "new_schema_expectation": "reject",
+      "expected_error_substring": "receiptRequired"
+    },
+    {
+      "id": "false-receiptRequired",
+      "reason": "receiptRequired is {\"const\": true} in both schemas. RebuildPlan 4.2.2 keeps receiptRequired=true across the migration, so a false value must never be accepted.",
+      "mutation": {"set": {"receiptRequired": false}},
+      "old_schema_expectation": "reject",
+      "new_schema_expectation": "reject",
+      "expected_error_substring": "receiptRequired"
+    }
+  ]
+}

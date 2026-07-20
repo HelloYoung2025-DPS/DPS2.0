@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "dps.module/v1",
+  "schemaVersion": "dps.module/v2",
   "module": {
     "id": "control-plane-host",
     "name": "DPS Control Plane Host",
@@ -89,5 +89,5 @@
   "compatibility": {"policyRef": "governance/policies/compatibility-policy.yaml", "track": "modern", "moduleMajor": 0, "supportedContractMajors": {"device.registered": [1], "platform.account.authorized": [1], "identity.binding": [1], "persona.revision": [1], "soul.memory.readback": [1], "control.plane.receipt": [1], "action.execution.promotion": [1], "approval.submission.reconciliation": [1], "approval.submission.recovery": [1], "approval.submission.state": [1]}, "unknownMajorBehavior": "reject", "missingMajorBehavior": "reject", "unknownModeBehavior": "reject", "missingModeBehavior": "reject"},
   "rollout": {"featureFlag": "control_plane_host_v1", "canary": "synthetic then shadow truth comparison then human-approved bounded cohort", "rollback": "stop ingest, retain truth journal, and route to the prior signed BOM", "killSwitch": "kill_control_plane_ingest"},
   "deviceGates": {"requiresWindows": false, "requiresZennoDroid": false, "requiresAdb": false, "minimumVerification": "INTEGRATION_VERIFIED"},
-  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true, "resolver": "factory-instruction-resolver"}
+  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true}
 }

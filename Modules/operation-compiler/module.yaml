@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "dps.module/v1",
+  "schemaVersion": "dps.module/v2",
   "module": {"id": "operation-compiler", "name": "Operation Compiler", "version": "0.3.0", "description": "Compiles deterministic approved actions into allowlisted operations and steps under a fixed deadline with late-outcome quarantine.", "lifecycle": "proposed", "runtimeState": "proposed", "releaseEligible": false, "riskTier": "R3", "ownerId": "dps-control-plane"},
   "paths": {"actualRoot": "Modules/operation-compiler", "canonicalRoot": "modules/operation-compiler", "owned": ["Modules/operation-compiler/**"], "excluded": [], "runtimeData": []},
   "artifacts": [
@@ -27,5 +27,5 @@
   "compatibility": {"policyRef": "governance/policies/compatibility-policy.yaml", "track": "modern", "moduleMajor": 0, "supportedContractMajors": {"approval.decision": [1], "operation.compiled": [1]}, "unknownMajorBehavior": "reject", "missingMajorBehavior": "reject", "unknownModeBehavior": "reject", "missingModeBehavior": "reject"},
   "rollout": {"featureFlag": "operation_compiler_v1", "canary": "shadow compile and compare before bounded human-approved canary", "rollback": "disable flag and restore previous signed Release BOM", "killSwitch": "kill_operation_compiler"},
   "deviceGates": {"requiresWindows": false, "requiresZennoDroid": false, "requiresAdb": false, "minimumVerification": "INTEGRATION_VERIFIED"},
-  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true, "resolver": "factory-instruction-resolver"}
+  "agents": {"spec": "dps.agents/v1", "policyVersion": "1.0.0", "instructionsFile": "AGENTS.md", "manifestFile": "module.yaml", "receiptRequired": true}
 }

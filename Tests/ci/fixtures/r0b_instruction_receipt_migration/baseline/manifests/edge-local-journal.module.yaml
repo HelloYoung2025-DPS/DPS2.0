@@ -1,0 +1,228 @@
+{
+  "schemaVersion": "dps.module/v1",
+  "module": {
+    "id": "edge-local-journal",
+    "name": "Edge Local Journal",
+    "version": "0.2.0",
+    "description": "Checksum-chained local recovery journal and independent durable-drain attestation authority for Windows Edge.",
+    "lifecycle": "proposed",
+    "runtimeState": "proposed",
+    "releaseEligible": false,
+    "riskTier": "R3",
+    "ownerId": "dps-edge"
+  },
+  "paths": {
+    "actualRoot": "Modules/edge-local-journal",
+    "canonicalRoot": "modules/edge-local-journal",
+    "owned": ["Modules/edge-local-journal/**"],
+    "excluded": [],
+    "runtimeData": [
+      "edge-journal/process-*/*.jsonl",
+      "edge-journal/process-*/*.crash-tail",
+      "edge-journal/process-*/*.writer.lock",
+      "edge-journal/process-*/*.append-intent.lock",
+      "edge-journal/process-*/*.append-intent.*.json",
+      "edge-journal/process-*/*.quarantine.json",
+      "edge-journal/process-*/*.released-quarantine.*.json"
+    ]
+  },
+  "artifacts": [
+    {
+      "id": "dps.edge-local-journal",
+      "kind": "assembly",
+      "status": "buildable",
+      "build": "bash Modules/edge-local-journal/operations/build.sh",
+      "versioning": "semver"
+    },
+    {
+      "id": "dps.edge-local-journal.contracts",
+      "kind": "contract-pack",
+      "status": "buildable",
+      "build": "bash scripts/dotnet-pinned.sh build Modules/edge-local-journal/contracts/provided/Dps.EdgeLocalJournal.Contracts/Dps.EdgeLocalJournal.Contracts.csproj --configuration Release --no-restore",
+      "versioning": "semver"
+    }
+  ],
+  "runtime": {
+    "track": "modern-service",
+    "language": "C# 14",
+    "target": "net10.0",
+    "processBoundary": "modular-monolith",
+    "entrypoints": ["Modules/edge-local-journal/src/Dps.EdgeLocalJournal.csproj"],
+    "toolchainStatus": "verified"
+  },
+  "contracts": {
+    "provided": [
+      {
+        "contractId": "edge.journal.append",
+        "major": 1,
+        "source": "Modules/edge-local-journal/contracts/provided/edge.journal.append.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "edge-local-journal"
+      },
+      {
+        "contractId": "edge.journal.receipt",
+        "major": 1,
+        "source": "Modules/edge-local-journal/contracts/provided/edge.journal.receipt.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "edge-local-journal"
+      },
+      {
+        "contractId": "edge.journal.drain.attestation",
+        "major": 1,
+        "source": "Modules/edge-local-journal/contracts/provided/edge.journal.drain.attestation.v1.schema.json",
+        "status": "proposed",
+        "mode": "active",
+        "ownerModule": "edge-local-journal"
+      }
+    ],
+    "consumed": []
+  },
+  "communication": {
+    "inbound": [
+      {
+        "peerModule": "windows-edge-worker",
+        "contractId": "edge.journal.append",
+        "major": 1,
+        "direction": "inbound",
+        "transport": "command",
+        "timeoutMs": 5000,
+        "retryPolicy": "caller-retries-only-before-durable-receipt",
+        "idempotencyKey": "entry_id",
+        "authScope": "module:windows-edge-worker",
+        "failureMode": "fail-closed-and-preserve-journal"
+      }
+    ],
+    "outbound": [
+      {
+        "peerModule": "windows-edge-worker",
+        "contractId": "edge.journal.receipt",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "receipt",
+        "timeoutMs": 5000,
+        "retryPolicy": "none; returned only after durable flush",
+        "idempotencyKey": "entry_id",
+        "authScope": "module:windows-edge-worker",
+        "failureMode": "fail-closed-and-preserve-journal"
+      },
+      {
+        "peerModule": "windows-edge-supervisor",
+        "contractId": "edge.journal.drain.attestation",
+        "major": 1,
+        "direction": "outbound",
+        "transport": "in-process-api",
+        "timeoutMs": 5000,
+        "retryPolicy": "new request_id only after stable-state re-read",
+        "idempotencyKey": "request_id",
+        "authScope": "module:windows-edge-supervisor",
+        "failureMode": "fail-closed-no-attestation"
+      }
+    ]
+  },
+  "dependencies": [],
+  "permissions": {
+    "allowed": ["filesystem:edge-journal", "checksum:sha256", "signature:rsa-pss-sha256", "os-file-identity:read"],
+    "denied": ["device action", "production approval", "gbrain access", "arbitrary shell"],
+    "productionApproval": "human-required"
+  },
+  "data": {
+    "ownedStores": ["filesystem:edge-journal"],
+    "readModels": ["journal-by-entry-id", "journal-by-command-id"],
+    "privacyClasses": ["internal", "personal"],
+    "retention": "bounded local recovery window with signed release policy",
+    "export": "checksum-verified redacted journal stream",
+    "correction": "append a superseding record; never rewrite committed records",
+    "deletion": "expire payloads after reconciliation while retaining non-identifying integrity proof"
+  },
+  "security": {
+    "trustBoundaries": ["local authenticated Edge process boundary", "durable filesystem boundary"],
+    "secretScopes": ["externally-injected:journal-drain-attestation-private-key"],
+    "untrustedInputs": ["journal payload JSON", "entry identifiers", "recovered file bytes"],
+    "failClosedOn": [
+      "unknown contract major",
+      "unknown checksum encoding",
+      "checksum mismatch",
+      "sequence gap",
+      "hard journal size limit",
+      "persistent quarantine marker",
+      "conflicting duplicate",
+      "missing or invalid Journal signing authority",
+      "stale append intent or concurrent append",
+      "journal path replacement, symlink or reparse point",
+      "journal inode, volume/file-index, length, bytes or head change",
+      "opaque Worker receipt-wire digest, owner receipt, Release BOM or protected-policy mismatch",
+      "expired Journal proof"
+    ],
+    "policyIds": ["SOUL-ISO-001", "CMD-IDEMP-001", "RESULT-VERIFY-001", "EDGE-NORESTART-001"]
+  },
+  "tests": {
+    "requiredOutcome": "PASS",
+    "failureOutcomes": ["FAIL", "SKIP", "PARTIAL", "NOT_RUN", "INFRA_ERROR", "NOT_APPLICABLE"],
+    "suites": [
+      {
+        "id": "edge-local-journal.unit",
+        "type": "unit",
+        "required": true,
+        "command": "bash Modules/edge-local-journal/operations/test.sh Unit",
+        "environment": "macos or Windows with .NET 10; exact minimum 6",
+        "evidenceLevel": "REPOSITORY_STATIC_VERIFIED"
+      },
+      {
+        "id": "edge-local-journal.contract",
+        "type": "contract",
+        "required": true,
+        "command": "bash Modules/edge-local-journal/operations/test.sh Contract",
+        "environment": "macos or Windows with .NET 10",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "edge-local-journal.contract-schema",
+        "type": "contract",
+        "required": true,
+        "command": "python3.12 -m unittest discover -s Modules/edge-local-journal/tests -p test_contract_schemas.py",
+        "environment": "repository-pinned Python 3.12.13 with locked jsonschema; provider-owned 48-case append/receipt/drain-attestation corpora, independent Worker-wire correlation, strict journal IDs, length-prefixed checksum profile, exact UTC and raw Int64 boundaries",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "edge-local-journal.recovery-simulation",
+        "type": "integration",
+        "required": true,
+        "command": "bash Modules/edge-local-journal/operations/test.sh Integration",
+        "environment": "isolated temporary filesystem and real second-process append/replacement/symlink/gate-rebind/kill-window execution; exact minimum 7",
+        "evidenceLevel": "INTEGRATION_VERIFIED"
+      }
+    ]
+  },
+  "compatibility": {
+    "policyRef": "governance/policies/compatibility-policy.yaml",
+    "track": "modern",
+    "moduleMajor": 0,
+    "supportedContractMajors": {"edge.journal.append": [1], "edge.journal.receipt": [1], "edge.journal.drain.attestation": [1]},
+    "unknownMajorBehavior": "reject",
+    "missingMajorBehavior": "reject",
+    "unknownModeBehavior": "reject",
+    "missingModeBehavior": "reject"
+  },
+  "rollout": {
+    "featureFlag": "edge_local_journal_v1",
+    "canary": "synthetic journal then one non-production Edge host then bounded device cohort",
+    "rollback": "route to the previous compatible binary without deleting committed journal records; a checksum-format downgrade is rejected and requires the documented offline migration path",
+    "killSwitch": "kill_edge_command_intake"
+  },
+  "deviceGates": {
+    "requiresWindows": false,
+    "requiresZennoDroid": false,
+    "requiresAdb": false,
+    "minimumVerification": "INTEGRATION_VERIFIED"
+  },
+  "agents": {
+    "spec": "dps.agents/v1",
+    "policyVersion": "1.0.0",
+    "instructionsFile": "AGENTS.md",
+    "manifestFile": "module.yaml",
+    "receiptRequired": true,
+    "resolver": "factory-instruction-resolver"
+  }
+}

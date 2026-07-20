@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "dps.module/v1",
+  "schemaVersion": "dps.module/v2",
   "module": {
     "id": "interest-reducer",
     "name": "Interest Reducer",
@@ -238,7 +238,6 @@
     "policyVersion": "1.0.0",
     "instructionsFile": "AGENTS.md",
     "manifestFile": "module.yaml",
-    "receiptRequired": true,
-    "resolver": "factory-instruction-resolver"
+    "receiptRequired": true
   }
 }
