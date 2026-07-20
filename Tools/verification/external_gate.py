@@ -5130,6 +5130,14 @@ def _json_type_name(value: Any) -> str:
         return "boolean"
     if isinstance(value, int):
         return "integer"
+    if isinstance(value, Decimal):
+        # Manifests are re-decoded losslessly for validation (parse_float=Decimal),
+        # because binary floats round: the raw text 1.0000000000000000000000000001
+        # decodes to the float 1.0, which would satisfy {"type": "integer"} even
+        # though the SIGNED bytes carry a non-integer.  Only the exact decimal
+        # value can answer the integer question honestly.  (NaN/Infinity cannot
+        # reach here; _decode_json_object rejects non-JSON numeric constants.)
+        return "integer" if value == value.to_integral_value() else "number"
     if isinstance(value, float):
         # Draft 2020-12 defines "integer" by VALUE, not by encoding: any number with a
         # zero fractional part is an integer, so 1.0 satisfies {"type": "integer"} while
@@ -5155,7 +5163,9 @@ def _json_equal(left: Any, right: Any) -> bool:
         return set(left) == set(right) and all(_json_equal(left[key], right[key]) for key in left)
     if isinstance(left, list) and isinstance(right, list):
         return len(left) == len(right) and all(_json_equal(a, b) for a, b in zip(left, right))
-    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+    if isinstance(left, (int, float, Decimal)) and isinstance(right, (int, float, Decimal)):
+        # Decimal('1.0') == 1 == 1.0: one number, however it was encoded, so
+        # const/enum/uniqueItems agree with the reference across encodings.
         return left == right
     return type(left) is type(right) and left == right
 
@@ -5569,8 +5579,17 @@ def _validate_f9_rollout_lines(
         schema_version = manifest.get("schemaVersion")
         if schema_version not in manifest_schemas:
             _fail("unknown_manifest_version", f"F9 manifest for {module_id} has an unsupported schema version")
+        # Validate a LOSSLESS re-decode of the digest-checked signed bytes: float
+        # parsing rounds (1.0000000000000000000000000001 becomes 1.0), so the lossy
+        # document can satisfy {"type": "integer"} while the signed bytes do not.
+        # Downstream consumers keep the float decode; only the schema verdict needs
+        # the exact values.
         _validate_manifest_against_schema(
-            manifest,
+            _decode_json_object(
+                raw_artifacts[artifact_id]["bytes"],
+                f"module manifest {module_id}",
+                preserve_decimals=True,
+            ),
             manifest_schemas[schema_version],
             f"F9 manifest for {module_id}",
         )

@@ -2797,10 +2797,11 @@ class F9ExternalGateTests(unittest.TestCase):
         combination["raw_evidence_sha256"] = digest
         self.replace_execution_artifact(artifact)
 
-    def replace_manifest(self, binding: dict, manifest: dict) -> None:
-        rollout = self.fixture.evidence["payload"]["module_rollout_lines"]
+    def replace_manifest_bytes(self, binding: dict, raw: bytes) -> None:
+        # Byte-level, not dict-level: some regressions only exist in the raw text
+        # (a fractional number that float parsing rounds away cannot survive a
+        # round-trip through json.dumps).
         metadata = self.raw_metadata(binding["raw_artifact_id"])
-        raw = canonical_bytes(manifest)
         digest = hashlib.sha256(raw).hexdigest()
         Path(metadata["path"]).write_bytes(raw)
         metadata["sha256"] = digest
@@ -2813,6 +2814,9 @@ class F9ExternalGateTests(unittest.TestCase):
         )
         module["manifest_sha256"] = digest
         self.rewrite_bom_and_receipt()
+
+    def replace_manifest(self, binding: dict, manifest: dict) -> None:
+        self.replace_manifest_bytes(binding, canonical_bytes(manifest))
 
     def replace_first_manifest(self, manifest: dict) -> None:
         rollout = self.fixture.evidence["payload"]["module_rollout_lines"]
@@ -3460,6 +3464,35 @@ class F9ExternalGateTests(unittest.TestCase):
         self.assertEqual("manifest_schema_violation", decision.reason_code)
         self.assertNotEqual(0, decision.exit_code)
 
+    def test_f9_rejects_a_fractional_contract_major_that_float_rounding_hides(self) -> None:
+        # The raw text 1.0000000000000000000000000001 is a valid JSON number that
+        # is NOT an integer, but float parsing rounds it to 1.0 -- so validating
+        # the lossy decode would accept a signed manifest whose actual bytes
+        # violate {"type": "integer"}.  F9 must judge the exact signed value.
+        # (The premise needs a field whose value is >= 1: a tiny fraction added
+        # to 0 stays representable as 1e-28 and never rounds away.)
+        manifest = self.first_manifest()
+        self.assertEqual(1, manifest["contracts"]["provided"][0]["major"])
+        raw = canonical_bytes(manifest)
+        needle = b'"major":1'
+        self.assertIn(needle, raw)
+        tampered = raw.replace(needle, b'"major":1.0000000000000000000000000001', 1)
+        # Premise: the float decode really does round the tampered literal back
+        # to 1.0; without that, this test would not be probing the gap.
+        self.assertEqual(1.0, json.loads('1.0000000000000000000000000001'))
+        self.replace_manifest_bytes(
+            self.fixture.evidence["payload"]["module_rollout_lines"]["manifest_artifacts"][0],
+            tampered,
+        )
+        decision = self.decision()
+        self.assertEqual("manifest_schema_violation", decision.reason_code)
+        self.assertNotEqual(0, decision.exit_code)
+        # The acceptance direction (raw "1.0" is an integer by value and must
+        # stay accepted) is proved directly against the evaluator in
+        # ModuleManifestSchemaDispatchTests: byte-editing this envelope fixture
+        # trips its downstream compatibility-BOM bookkeeping before the schema
+        # verdict can be observed in isolation.
+
     def test_f9_dispatches_v1_manifests_to_the_v1_schema(self) -> None:
         # The dispatch is only real if the two majors disagree somewhere.  This
         # document is accepted on the v2 side of the fixture (the ELIGIBLE case
@@ -3739,6 +3772,35 @@ class ModuleManifestSchemaDispatchTests(unittest.TestCase):
 
     def validate(self, manifest: dict, filename: str) -> None:
         external_gate_module._validate_manifest_against_schema(manifest, self.schema(filename), "probe manifest")
+
+    def test_lossless_decode_judges_integers_by_exact_signed_value(self) -> None:
+        # Draft 2020-12 defines "integer" by mathematical value (a zero fractional
+        # part), and F9 validates a parse_float=Decimal re-decode of the signed
+        # bytes.  Three raw encodings of a contract major, judged on their exact
+        # values: 1 and 1.0 are integers; the fractional literal is not, even
+        # though binary float parsing would round it to 1.0 and hide the
+        # violation (the end-to-end proof of that attack lives in
+        # test_f9_rejects_a_fractional_contract_major_that_float_rounding_hides).
+        manifest = synthetic_module_manifest("windows-edge-worker", [])
+        raw = canonical_bytes(manifest)
+        needle = b'"moduleMajor":0'
+        self.assertIn(needle, raw)
+        for literal, is_integer in (
+            (b'"moduleMajor":0', True),
+            (b'"moduleMajor":0.0', True),
+            (b'"moduleMajor":0.0000000000000000000000000001', False),
+            (b'"moduleMajor":0.5', False),
+        ):
+            with self.subTest(literal=literal):
+                document = external_gate_module._decode_json_object(
+                    raw.replace(needle, literal, 1), "probe manifest", preserve_decimals=True
+                )
+                if is_integer:
+                    self.validate(document, "module-manifest.schema.json")
+                else:
+                    with self.assertRaises(external_gate_module.ExternalGateError) as raised:
+                        self.validate(document, "module-manifest.schema.json")
+                    self.assertEqual("manifest_schema_violation", raised.exception.code)
 
     def test_the_pinned_digests_are_the_real_schema_bytes_for_every_major(self) -> None:
         # If these drift, F9 would reject every honest envelope; if they were
