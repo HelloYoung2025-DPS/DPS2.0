@@ -1,7 +1,9 @@
 import base64
+import contextlib
 import copy
 import hashlib
 import importlib.util
+import io
 import json
 import subprocess
 import sys
@@ -534,6 +536,49 @@ class BomFixture:
         )
 
 
+class ReleaseCliEntryTests(unittest.TestCase):
+    """TODAY-reachable behaviour of the actual release entry, main().
+
+    scripts/release.sh invokes exactly this function; these tests pin what it
+    does now, without pretending to be the owner-blocked happy path."""
+
+    def test_the_cli_refuses_to_start_without_the_receipt_argument(self) -> None:
+        # The argument release.sh forgot to pass until R0-C: argparse must hard-exit.
+        with tempfile.TemporaryDirectory() as bundle:
+            with contextlib.redirect_stderr(io.StringIO()) as stderr:
+                with self.assertRaises(SystemExit) as raised:
+                    SUBJECT.main([
+                        "--bundle-root", bundle,
+                        "--bom", "bom.json",
+                        "--previous-bom", "previous.json",
+                        "--schema-sha256", "0" * 64,
+                    ])
+        self.assertEqual(2, raised.exception.code)
+        self.assertIn("--native-stop-trust-receipt", stderr.getvalue())
+
+    def test_the_cli_reports_the_dead_policy_as_a_structured_fail(self) -> None:
+        # With a complete argv the entry gets past argparse and dies on the
+        # unprovisioned deployed policy -- as a JSON FAIL on stdout with exit 1,
+        # not a traceback.  This is the exact behaviour release.sh sees today.
+        schema_sha = hashlib.sha256(
+            (ROOT / "governance" / "schemas" / "release-bom.schema.json").read_bytes()
+        ).hexdigest()
+        with tempfile.TemporaryDirectory() as bundle:
+            with contextlib.redirect_stdout(io.StringIO()) as stdout:
+                exit_code = SUBJECT.main([
+                    "--repo-root", str(ROOT),
+                    "--bundle-root", bundle,
+                    "--bom", "bom.json",
+                    "--previous-bom", "previous.json",
+                    "--native-stop-trust-receipt", "receipt.json",
+                    "--schema-sha256", schema_sha,
+                ])
+        self.assertEqual(1, exit_code)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual("FAIL", payload["result"])
+        self.assertIn("native_stop_trust_signer_identities", payload["reason"])
+
+
 class MigrationFidelityTests(unittest.TestCase):
     """R0-C moved the validator; until R0-D deletes the module-side original,
     nothing may drift between the two copies except the three declared edits
@@ -596,8 +641,18 @@ class MigrationFidelityTests(unittest.TestCase):
         # and the external review's finding that a gate must not convert total
         # release-path unavailability into positive evidence.  The gate design
         # forbids skip/expectedFailure outputs, so an honest plain failure is
-        # the only mechanism left.  When the owner provisions the policy this
-        # test goes green and becomes the real coverage for the entry.
+        # the only mechanism left.
+        #
+        # Scope of this test when it eventually goes green: constructor
+        # instantiation ONLY.  That is the tripwire, not the coverage -- the
+        # release entry is main() end to end (argparse -> construct -> validate
+        # a signed BOM against a bundle and receipt), and its happy path cannot
+        # be exercised until the owner-provisioned policy exists, because the
+        # CLI accepts no policy override by design and fixtures cannot be
+        # signed against keys that do not exist yet.  When this turns green,
+        # the completion criterion is an end-to-end main() happy-path test with
+        # a signed fixture BOM; the CLI's TODAY-reachable behaviour is covered
+        # by ReleaseCliEntryTests below.
         schema_sha = hashlib.sha256(
             (ROOT / "governance" / "schemas" / "release-bom.schema.json").read_bytes()
         ).hexdigest()

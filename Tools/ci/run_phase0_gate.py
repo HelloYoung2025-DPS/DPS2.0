@@ -450,9 +450,13 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         "test_the_operational_anchor_entry_behaves_identically_in_both_copies",
         # DELIBERATE VISIBLE RED until the owner provisions the native-stop
         # signer in the deployed policy: the release entry is dead, and a gate
-        # must not certify that state as success.  Goes green -- and becomes the
-        # real coverage -- once the policy carries the signer group and key.
+        # must not certify that state as success.  When it goes green it proves
+        # constructor instantiation only -- the completion criterion is then an
+        # end-to-end main() happy-path test with a signed fixture BOM.
         "test_the_operational_anchor_entry_constructs_the_release_validator",
+        # TODAY-reachable behaviour of the actual CLI entry release.sh invokes.
+        "test_the_cli_refuses_to_start_without_the_receipt_argument",
+        "test_the_cli_reports_the_dead_policy_as_a_structured_fail",
     }
     command = [
         sys.executable,
