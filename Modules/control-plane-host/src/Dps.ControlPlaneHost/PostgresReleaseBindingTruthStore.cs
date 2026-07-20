@@ -227,6 +227,7 @@ public sealed class PostgresReleaseBindingTruthStore
     private readonly string _expectedDatabase;
     private readonly int _expectedPort;
     private readonly string _qualifiedJournal;
+    private readonly string _qualifiedFences;
     private readonly string _qualifiedAppend;
     private readonly string _qualifiedCommitFence;
 
@@ -241,8 +242,25 @@ public sealed class PostgresReleaseBindingTruthStore
         _options = options;
         var quotedSchema = new NpgsqlCommandBuilder().QuoteIdentifier(options.SchemaName);
         _qualifiedJournal = quotedSchema + ".release_binding_journal";
+        _qualifiedFences = quotedSchema + ".release_binding_recovery_fences";
         _qualifiedAppend = quotedSchema + ".append_release_binding_record";
         _qualifiedCommitFence = quotedSchema + ".commit_release_binding_recovery_fence";
+    }
+
+    internal async Task<long> CountJournalAsync(CancellationToken cancellationToken = default)
+        => await CountAsync(_qualifiedJournal, cancellationToken);
+
+    internal async Task<long> CountRecoveryFencesAsync(
+        CancellationToken cancellationToken = default)
+        => await CountAsync(_qualifiedFences, cancellationToken);
+
+    private async Task<long> CountAsync(string qualifiedTable, CancellationToken cancellationToken)
+    {
+        await using var connection = await OpenVerifiedAsync(cancellationToken);
+        await using var command = Command($"SELECT count(*) FROM {qualifiedTable}", connection);
+        return Convert.ToInt64(
+            await command.ExecuteScalarAsync(cancellationToken),
+            System.Globalization.CultureInfo.InvariantCulture);
     }
 
     public void Append(ReleaseBindingTruthRecord record)
