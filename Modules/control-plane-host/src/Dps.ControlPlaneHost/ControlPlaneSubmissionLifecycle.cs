@@ -593,9 +593,39 @@ public sealed class ControlPlaneSubmissionLifecycleProducer : IDisposable
             "internal",
             ZeroSignature);
 
-        return await SignRecoveryAsync(
+        var envelope = await SignRecoveryAsync(
             unsigned,
             cancellationToken).ConfigureAwait(false);
+
+        // Post-signing re-verification (TOCTOU narrowing, not closure): the
+        // human recovery signer is an awaited external authority, so the
+        // active binding can change while the signature is produced. Re-read
+        // the facts source and require the exact first-read
+        // (sha256, generation) pair; any change — including the active
+        // binding disappearing — refuses the already-signed envelope
+        // fail-closed instead of releasing it. This narrows the race window
+        // to the instants around this re-read; atomic closure requires
+        // binding revision fencing that ties recovery acceptance to the
+        // durable policy transfer, which belongs to the same later batch as
+        // the durable CAS truth store and the composition root.
+        if (!_releaseBomFactsSource.TryReadActiveFacts(
+                state.DeviceBindingId,
+                out var recheckedReleaseBomSha256,
+                out var recheckedReleaseBomGeneration))
+        {
+            throw new UnauthorizedAccessException(
+                "Recovery requires an active release binding for the device; none is active.");
+        }
+        if (!ControlPlaneSubmissionStateConsumer.FixedDigestEquals(
+                recheckedReleaseBomSha256,
+                activeReleaseBomSha256)
+            || recheckedReleaseBomGeneration != activeReleaseBomGeneration)
+        {
+            throw new UnauthorizedAccessException(
+                "Recovery next release BOM facts do not match the live active release binding.");
+        }
+
+        return envelope;
     }
 
     public void Dispose()

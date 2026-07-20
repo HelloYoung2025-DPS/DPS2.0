@@ -283,6 +283,63 @@ public sealed class ControlPlaneSubmissionLifecycleTests
                 null!));
     }
 
+    [Fact, Trait("Category", "Unit")]
+    public async Task RecoveryRefusesTheSignedEnvelopeWhenTheBindingChangesDuringSigning()
+    {
+        using var fixture = new Fixture();
+        var pending = fixture.ConsumePending();
+        var reconciliation = await fixture.Producer.CreateReconciliationAsync(
+            pending,
+            ReconciliationRequest(),
+            TestContext.Current.CancellationToken);
+        var reconciled = fixture.ConsumeReconciled(pending.Value, reconciliation);
+        var request = RecoveryRequest();
+
+        // TOCTOU narrowing: the first facts read passes, then the binding
+        // changes while the producer awaits the human signer. The post-signing
+        // re-verification must refuse the already-signed envelope fail-closed.
+        var reader = new MutableLifecycleBindingReader { Binding = ActiveBinding() };
+        var signer = new TestRecoverySigner(fixture.RecoveryKey)
+        {
+            // Case 1: a new BOM is activated during signing.
+            WhileSigning = () => reader.Binding =
+                ActiveBinding(generation: 9, releaseBomSha256: new string('e', 64))
+        };
+        using var producer = new ControlPlaneSubmissionLifecycleProducer(
+            fixture.ReconciliationSigner,
+            signer,
+            fixture.Consumer.AuthorityFingerprintSha256,
+            new PolicyBoundReleaseBomFactsSource(reader));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            producer.CreateRecoveryAsync(
+                reconciled,
+                reconciliation,
+                request,
+                TestContext.Current.CancellationToken));
+        Assert.Equal(1, signer.CallCount);
+
+        // Case 2: the binding is revoked (no active binding) during signing.
+        reader.Binding = ActiveBinding();
+        signer.WhileSigning = () => reader.Binding = null;
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            producer.CreateRecoveryAsync(
+                reconciled,
+                reconciliation,
+                request,
+                TestContext.Current.CancellationToken));
+
+        // Regression: with a stable binding the happy path still signs.
+        reader.Binding = ActiveBinding();
+        signer.WhileSigning = null;
+        var envelope = await producer.CreateRecoveryAsync(
+            reconciled,
+            reconciliation,
+            request,
+            TestContext.Current.CancellationToken);
+        Assert.Equal(Bom, envelope.Value.NextReleaseBomSha256);
+        Assert.Equal(8, envelope.Value.NextReleaseBomGeneration);
+    }
+
     [Fact, Trait("Category", "Contract")]
     public async Task CoordinatorExecutesSeparatedProducerPortAndConsumerRoundTrip()
     {
@@ -633,22 +690,27 @@ public sealed class ControlPlaneSubmissionLifecycleTests
         bool absent = false)
         => new(new FixedLifecycleBindingReader(absent
             ? null
-            : new ActiveReleaseBindingV1(
-                "1.0.0",
-                "active.release.binding/v1",
-                "control-plane-host",
-                Binding,
-                releaseBomSha256 ?? Bom,
-                generation,
-                7,
-                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-                "66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925",
-                "active",
-                "deployed-release-controller",
-                "deployed-controller-key-v1",
-                new string('d', 64),
-                new DateTimeOffset(2026, 7, 14, 0, 0, 0, TimeSpan.Zero),
-                "receipt_99999999999999999999999999999999")));
+            : ActiveBinding(generation, releaseBomSha256)));
+
+    private static ActiveReleaseBindingV1 ActiveBinding(
+        long generation = 8,
+        string? releaseBomSha256 = null)
+        => new(
+            "1.0.0",
+            "active.release.binding/v1",
+            "control-plane-host",
+            Binding,
+            releaseBomSha256 ?? Bom,
+            generation,
+            7,
+            "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+            "66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925",
+            "active",
+            "deployed-release-controller",
+            "deployed-controller-key-v1",
+            new string('d', 64),
+            new DateTimeOffset(2026, 7, 14, 0, 0, 0, TimeSpan.Zero),
+            "receipt_99999999999999999999999999999999");
 
     private sealed class FixedLifecycleBindingReader : IActiveReleaseBindingReader
     {
@@ -662,6 +724,17 @@ public sealed class ControlPlaneSubmissionLifecycleTests
         public bool TryReadActive(string deviceBindingId, out ActiveReleaseBindingV1? binding)
         {
             binding = _binding;
+            return binding is not null;
+        }
+    }
+
+    private sealed class MutableLifecycleBindingReader : IActiveReleaseBindingReader
+    {
+        internal ActiveReleaseBindingV1? Binding { get; set; }
+
+        public bool TryReadActive(string deviceBindingId, out ActiveReleaseBindingV1? binding)
+        {
+            binding = Binding;
             return binding is not null;
         }
     }
@@ -859,6 +932,13 @@ public sealed class ControlPlaneSubmissionLifecycleTests
 
         internal int CallCount { get; private set; }
 
+        /// <summary>
+        /// Runs while the producer awaits the human recovery signer — the
+        /// exact window the post-signing facts re-verification narrows.
+        /// Tests use it to change the active binding mid-signature.
+        /// </summary>
+        internal Action? WhileSigning { get; set; }
+
         public byte[] ExportSubjectPublicKeyInfo()
             => _key.ExportSubjectPublicKeyInfo();
 
@@ -875,6 +955,7 @@ public sealed class ControlPlaneSubmissionLifecycleTests
                 ApprovalSubmissionRecoveryV1.CurrentAuthScope,
                 unsignedRecovery.AuthScope);
             Assert.StartsWith("human_", unsignedRecovery.HumanApprovalId);
+            WhileSigning?.Invoke();
             lock (_gate)
             {
                 CallCount++;
