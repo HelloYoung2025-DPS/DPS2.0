@@ -16,7 +16,7 @@
 
 ## 执行顺序（依赖 DAG，手动挑批次照此；T 编号只是模板索引，不是执行顺序）
 
-- **R0 段严格串行**：R0-B(T1) → 评估器引导发布(T2A) → R0-C(T2) → R0-D(T3) → M1 收口审计(T4)。（T2 施工可先行，但其收口硬前置 = T2A 已由 owner 合入并完成外部锚定。）
+- **R0 段严格串行**：R0-B(T1) → 评估器引导发布(T2A) → R0-C(T2) → R0-D 过渡清单治理批次(T2B) → R0-D(T3) → M1 收口审计(T4)。（T2 施工可先行，但其收口硬前置 = T2A 已由 owner 合入并完成外部锚定；T3 开工硬前置 = T2B 清单已 owner 授权、外部锚定并并入回执。）
 - **M1C 合入且 T4 无未决 critical 后**，两轨并行、各轨内部按序：M2 轨 T5→T6→T7→T8；M3 轨 T9→T10→T11→T12。（⚠️ 并行轨的安全并行合并编排属 R0 后 §9.1 专门批次、尚未建成；到达本段时若该批次未就绪，退化为串行推进——见外审机制 §三-5。）
 - **跨轨/探针前置**（前置未满足不得开工，模板自带前置门会自行停下）：T15(WP 探针) 先于 T10(M3-2)；T10(M3-2) 先于 T8(M2-4)。故 M3 轨就绪序为 T9→**T15**→T10→T11→T12，且 **T8 必须等 T10 合入后才可开**。
 - **汇合段串行**：T13(M2/M3 收口审计) → T14(M4) → T16(M5) → T17(M6)。
@@ -65,11 +65,19 @@
 完成后：对精确 diff 走独立 Codex adversarial review 至明确 PASS；开独立 PR 到 dps2，PR 记录捆绑包摘要清单与外审作业标识；停下等我亲自合入并完成外部锚定（受保护路径 + 见证账本创世记录）。**硬退出条件还包括专用 App 的可运转证据（缺一 T2A 不算完成、不得回 T2）**：专用 GitHub App 已仓外部署并安装到本仓库、权限最小化、运行环境候选不可写、**签发凭据与候选执行面隔离已实证**（候选评估在无 App 凭据/无 Checks 与见证仓访问/无宿主敏感挂载/默认无出网的临时沙箱内执行，签发由独立服务经单向认证结果通道完成，候选读凭据/调 Checks API/篡改结果通道/逃逸 worker 四项攻击测试均失败，见 §12）、具备 merge-group 触发能力、已成功签发至少一次（非 required 的）`release-binding.composition-gate` check、integration ID 经核验记录——GitHub ruleset 只有在预期来源 App 已安装且近期提交过该 check 后才能绑定来源，先注册后部署要么死锁要么开放冒充面。T2A 只验证专用 App 能在目标仓库签发该 check；同名冒充负测不在 T2A 执行（ruleset 尚未注册、没有合入接受判定面，此时的"负测"证明不了未来配置正确），移至 T2 完成 required 注册与 integration ID 绑定之后实测（见 T2 模板与 §12/§10 M1B）。全部证据齐全后 T2 方可收口；T2 收口核验四件套+App 可运转证据须绑定本批的精确合入提交。
 ```
 
+### T2B · R0-D 过渡清单治理批次（T3 硬前置）
+
+```text
+按 Docs/RebuildPlan_重构计划书.md §12 release-binding-composition 行（R0-D 过渡清单条款）施工独立批次：构造并锚定 R0-D 过渡清单。
+开工前核对：R0-C(T2) 已合入且 m1b-closure 回执已落见证账本，缺任一则停。
+范围只做本批次：在隔离分支上按 §4.4 构造 canonical T3 合入结果树（只删 11 个 factory 目录及其专属引用，不合入）；据此生成过渡清单——固定路径全集，逐路径列允许的精确删除/改写、前置摘要（收口提交处的 Git tree entry (mode,type,OID)）与后置期望摘要（canonical 结果树 entry）；清单本体开独立 PR。完成后：对清单精确 diff 走独立 Codex adversarial review 至明确 PASS；停下等我亲自授权合入并完成外部锚定（受保护路径锚 + 见证账本记录）；随后由专用 App 以签名 supersession 把清单摘要并入 m1b-closure 回执。本批不删任何 factory 文件、不改受证路径、不动评估器与 Tools/ci；canonical 结果树只作清单推导输入。
+```
+
 ### T3 · R0-D 删除 11 个 factory 模块
 
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：R0-D 删除 11 个 factory 模块（§4.4）。
-开工前先核对 dps2 远程已合入 PR：前序批次（R0-B、R0-C）未合入则停下告诉我；还必须核验**见证账本上的 m1b-closure 回执记录**（权威对象是账本记录而非 PR 文本；PR 上的哈希只作索引）：记录存在、schema 版本正确、绑定的 R0-C 合入提交/ruleset 标识与修订/integration ID/各证据摘要逐项可解引用，缺任一或无法核验即停下告诉我（仅"R0-C 已合入"不足以开工——冒充负测只能在合入提交存在后完成，账本无回执时 composition-gate 对本批删除 diff 本就必须 FAIL）；开删除工作前先实测该执法负例：在无回执或字段错配状态下提交触及 factory 路径的试探 diff，required check 必须 FAIL，实测记录随本批证据存档；本批次已合入则告诉我该用哪个模板。范围只做本批次：只删 §4.4 列出的 11 个目录及其专属引用（catalog、Manifest、schema、DAG、compatibility、候选测试 policy、CODEOWNERS、CI、README、operations），不得删除已迁出的 receipt/BOM/回滚能力。退出条件以 §10 M1C 行为准（含 module-impact suite 与 merge queue 验证）。上一批证据以 dps2 最新已合入 PR 及其门禁/外审记录为准，自行获取；若上一合入批次触碰候选门禁信任根且尚无合入后正式 clean 证据，先在当前 HEAD 以 --base <其合入提交> 按 §4.5 第 2 步补跑门禁取证，再开工本批。
+开工前先核对 dps2 远程已合入 PR：前序批次（R0-B、R0-C）未合入则停下告诉我；还必须核验**见证账本上的 m1b-closure 回执记录**（权威对象是账本记录而非 PR 文本；PR 上的哈希只作索引）：记录存在、schema 版本正确、绑定的 R0-C 合入提交/ruleset 标识与修订/integration ID/各证据摘要逐项可解引用、且回执已含 T2B 的 supersession（owner 授权并外部锚定的 R0-D 过渡清单摘要——缺清单即 T2B 未完成，本批不得开工），缺任一或无法核验即停下告诉我（仅"R0-C 已合入"不足以开工——冒充负测只能在合入提交存在后完成，账本无回执时 composition-gate 对本批删除 diff 本就必须 FAIL）；开删除工作前先实测该执法负例：在无回执或字段错配状态下提交触及 factory 路径的试探 diff，required check 必须 FAIL，实测记录随本批证据存档；本批次已合入则告诉我该用哪个模板。范围只做本批次：只删 §4.4 列出的 11 个目录及其专属引用（catalog、Manifest、schema、DAG、compatibility、候选测试 policy、CODEOWNERS、CI、README、operations），不得删除已迁出的 receipt/BOM/回滚能力。退出条件以 §10 M1C 行为准（含 module-impact suite 与 merge queue 验证）。上一批证据以 dps2 最新已合入 PR 及其门禁/外审记录为准，自行获取；若上一合入批次触碰候选门禁信任根且尚无合入后正式 clean 证据，先在当前 HEAD 以 --base <其合入提交> 按 §4.5 第 2 步补跑门禁取证，再开工本批。
 注意：本批删除多个信任根文件，按 §4.5 两段式取证。这是高危批次，批次收尾外审用 adversarial-review。
 完成后：跑 required 门禁、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准。若本批触碰候选门禁信任根：我确认合入后不结束会话，按 §4.5 第 2 步在合入提交的后继提交上取正式 clean 证据（main 暂无后继提交时，先开一个空提交 PR 作证据锚、经我合入后再取证），结果贴回本批 PR，完成后本批才算关闭。
 ```
