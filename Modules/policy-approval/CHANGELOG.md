@@ -1,5 +1,9 @@
 # Policy Approval changelog
 
+## 0.7.0 - Proposed
+
+- Consume control-plane-host `active.release.binding/v1` through the composition-fixed `IActiveReleaseBindingReader` port: add the constructor-fixed read-only `ActiveReleaseBomTruthReader`, the sole submission-lifecycle-side source of active Release BOM truth (release_bom_sha256, runtime activation generation, execution token), failing closed on absent, non-active, foreign-device, or shape-invalid bindings. Prove the pinned shared-corpus triple against the identical executor-gateway assertion and raise the Unit floor to 15; single-instance runtime composition remains a later batch.
+
 ## 0.6.0 - Proposed
 
 - Remove every Policy-local `native.stop.proof` and `native.stop.challenge` DTO, Schema, Corpus, NuGet Pack item, and EmbeddedResource. Executor Gateway remains the unique registered native-stop owner; Policy has no copied fallback contract source.

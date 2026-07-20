@@ -1629,6 +1629,37 @@ public sealed class VerifiedExecutorGatewayTests
         }
     }
 
+    private sealed class SharedConcurrentSubmissionAuthority
+    {
+        private int _firstInsertClaimed;
+        private int _firstInsertCount;
+        private int _nativeCallbackCount;
+
+        public int FirstInsertCount => Volatile.Read(ref _firstInsertCount);
+        public int NativeCallbackCount => Volatile.Read(ref _nativeCallbackCount);
+
+        public bool TryClaimFirstInsert()
+        {
+            if (Interlocked.CompareExchange(ref _firstInsertClaimed, 1, 0) != 0) return false;
+            Interlocked.Increment(ref _firstInsertCount);
+            return true;
+        }
+
+        public void RecordNativeCallback() => Interlocked.Increment(ref _nativeCallbackCount);
+    }
+
+    private sealed class ConcurrentAcquireBarrier(int participantCount)
+    {
+        private readonly TaskCompletionSource<bool> _released = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _remaining = participantCount;
+
+        public Task ArriveAsync(CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Decrement(ref _remaining) <= 0) _released.TrySetResult(true);
+            return _released.Task.WaitAsync(cancellationToken);
+        }
+    }
+
     private sealed class FakeApprovalExecutionFenceProvider(
         Func<ApprovalExecutionFenceRequestV1, ApprovalExecutionFenceRequestV1>? requestMutation = null,
         Func<ApprovalExecutionFenceV1, ApprovalExecutionFenceV1>? fenceMutation = null,
@@ -1646,7 +1677,9 @@ public sealed class VerifiedExecutorGatewayTests
         Func<Exception>? afterPendingFailure = null,
         bool retainThrows = false,
         bool existingUnknown = false,
-        bool invokeCallbackTwice = false) : IApprovalExecutionFenceProvider
+        bool invokeCallbackTwice = false,
+        SharedConcurrentSubmissionAuthority? sharedAuthority = null,
+        ConcurrentAcquireBarrier? acquireBarrier = null) : IApprovalExecutionFenceProvider
     {
         public FakeApprovalExecutionFenceLease? LastLease { get; private set; }
         public void DropLastLeaseReference() => LastLease = null;
@@ -1702,7 +1735,7 @@ public sealed class VerifiedExecutorGatewayTests
                 guardedResultMutation,
                 unknownMutation, retentionMutation, beginMaySubmit, revalidationFails, disposalFails,
                 blockAfterTerminal, afterPendingFailure, retainThrows, existingUnknown,
-                invokeCallbackTwice);
+                invokeCallbackTwice, sharedAuthority, acquireBarrier);
             return Task.FromResult<IApprovalExecutionFenceLease>(LastLease);
         }
     }
@@ -1727,7 +1760,9 @@ public sealed class VerifiedExecutorGatewayTests
         Func<Exception>? afterPendingFailure,
         bool retainThrows,
         bool existingUnknown,
-        bool invokeCallbackTwice) : IApprovalExecutionFenceLease
+        bool invokeCallbackTwice,
+        SharedConcurrentSubmissionAuthority? sharedAuthority,
+        ConcurrentAcquireBarrier? acquireBarrier) : IApprovalExecutionFenceLease
     {
         private static readonly string LifecycleSignature = Convert.ToBase64String(new byte[64]);
         private static readonly ConcurrentDictionary<Guid, object[]> ProcessGuardian = new();
@@ -1775,7 +1810,14 @@ public sealed class VerifiedExecutorGatewayTests
             cancellationToken.ThrowIfCancellationRequested();
             await _crossCommitGuard.WaitAsync(cancellationToken);
             _guardHeld = true;
-            if (!beginMaySubmit)
+            var maySubmit = beginMaySubmit;
+            if (sharedAuthority is not null)
+            {
+                if (acquireBarrier is not null)
+                    await acquireBarrier.ArriveAsync(cancellationToken);
+                maySubmit = maySubmit && sharedAuthority.TryClaimFirstInsert();
+            }
+            if (!maySubmit)
             {
                 var existingPending = CreateSubmissionPending(cancellationToken, markInserted: false);
                 VerifiedSubmissionUnknownAuthorization? unknown = null;
@@ -1803,6 +1845,7 @@ public sealed class VerifiedExecutorGatewayTests
             if (afterPendingFailure is not null)
                 throw afterPendingFailure();
             NativeCallbackCount++;
+            sharedAuthority?.RecordNativeCallback();
             var callbackResult = await callback(pending, cancellationToken);
             if (invokeCallbackTwice)
             {

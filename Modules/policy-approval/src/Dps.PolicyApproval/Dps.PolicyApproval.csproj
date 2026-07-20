@@ -1,10 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><AssemblyName>Dps.PolicyApproval</AssemblyName><RootNamespace>Dps.PolicyApproval</RootNamespace><PackageId>Dps.PolicyApproval</PackageId><Version>0.6.0</Version></PropertyGroup>
+  <PropertyGroup><AssemblyName>Dps.PolicyApproval</AssemblyName><RootNamespace>Dps.PolicyApproval</RootNamespace><PackageId>Dps.PolicyApproval</PackageId><Version>0.7.0</Version></PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="Dps.PolicyApproval.Tests" />
     <PackageReference Include="Npgsql" />
     <ProjectReference Include="../../contracts/provided/Dps.PolicyApproval.Contracts/Dps.PolicyApproval.Contracts.csproj" />
     <ProjectReference Include="../../../planner/contracts/provided/Dps.Planner.Contracts/Dps.Planner.Contracts.csproj" />
+    <ProjectReference Include="../../../control-plane-host/contracts/Dps.ControlPlaneHost.Contracts/Dps.ControlPlaneHost.Contracts.csproj" />
     <EmbeddedResource Include="../../migrations/001_create_policy_approval.sql" />
     <EmbeddedResource Include="../../migrations/002_configure_policy_runtime_role.sql" />
     <EmbeddedResource Include="../../migrations/003_create_submission_lifecycle.sql" />
