@@ -1,0 +1,20 @@
+namespace Dps.ControlPlaneHost.Contracts;
+
+/// <summary>
+/// Composition-fixed read-only port over the active Release BOM binding
+/// runtime truth owned by control-plane-host. The composition root injects
+/// the single authoritative implementation; callers (policy-approval and
+/// executor-gateway consumers) cannot provide bindings, generations, tokens,
+/// or status themselves and must fail closed whenever no active binding is
+/// readable. The port intentionally has no write surface.
+/// </summary>
+public interface IActiveReleaseBindingReader
+{
+    /// <summary>
+    /// Reads the current ACTIVE binding for one device. Returns false —
+    /// fail-closed for the caller — when the device is unknown or its
+    /// binding is not in the active status (previous or revoked bindings,
+    /// including their execution tokens, are never exposed).
+    /// </summary>
+    bool TryReadActive(string deviceBindingId, out ActiveReleaseBindingV1? binding);
+}

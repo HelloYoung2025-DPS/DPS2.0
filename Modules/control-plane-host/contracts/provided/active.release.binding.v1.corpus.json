@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "dps.contract-corpus/v1",
+  "contractId": "active.release.binding/v1",
+  "base": {
+    "schema_version": "1.0.0",
+    "contract_id": "active.release.binding/v1",
+    "producer_module": "control-plane-host",
+    "device_binding_id": "db_11111111111111111111111111111111",
+    "release_bom_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "generation": 1,
+    "execution_token": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "status": "active",
+    "signer_identity": "deployed-release-controller",
+    "signer_key_id": "deployed-controller-key-v1",
+    "bom_signature_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "activated_at": "2026-07-14T00:00:00Z",
+    "receipt_id": "receipt_88888888888888888888888888888888"
+  },
+  "cases": [
+    {"id": "valid", "schemaValid": true, "codecValid": true, "patch": {}, "remove": []},
+    {"id": "additional-field", "schemaValid": false, "codecValid": false, "patch": {"unexpected": true}, "remove": []},
+    {"id": "unknown-major", "schemaValid": false, "codecValid": false, "patch": {"schema_version": "2.0.0"}, "remove": []},
+    {"id": "wrong-contract-id", "schemaValid": false, "codecValid": false, "patch": {"contract_id": "active.release.binding/v2"}, "remove": []},
+    {"id": "wrong-producer", "schemaValid": false, "codecValid": false, "patch": {"producer_module": "executor-gateway"}, "remove": []},
+    {"id": "uppercase-device-binding", "schemaValid": false, "codecValid": false, "patch": {"device_binding_id": "db_1111111111111111111111111111111A"}, "remove": []},
+    {"id": "short-bom-digest", "schemaValid": false, "codecValid": false, "patch": {"release_bom_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}, "remove": []},
+    {"id": "zero-generation", "schemaValid": false, "codecValid": false, "patch": {"generation": 0}, "remove": []},
+    {"id": "fractional-generation", "schemaValid": false, "codecValid": false, "patch": {"generation": 1.5}, "remove": []},
+    {"id": "uppercase-token", "schemaValid": false, "codecValid": false, "patch": {"execution_token": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC"}, "remove": []},
+    {"id": "unknown-status", "schemaValid": false, "codecValid": false, "patch": {"status": "pending"}, "remove": []},
+    {"id": "empty-signer-identity", "schemaValid": false, "codecValid": false, "patch": {"signer_identity": ""}, "remove": []},
+    {"id": "trailing-newline-signer-key", "schemaValid": false, "codecValid": false, "patch": {"signer_key_id": "deployed-controller-key-v1\n"}, "remove": []},
+    {"id": "uppercase-signature-hash", "schemaValid": false, "codecValid": false, "patch": {"bom_signature_sha256": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD"}, "remove": []},
+    {"id": "offset-not-zulu", "schemaValid": false, "codecValid": false, "patch": {"activated_at": "2026-07-14T00:00:00+00:00"}, "remove": []},
+    {"id": "missing-receipt-id", "schemaValid": false, "codecValid": false, "patch": {}, "remove": ["receipt_id"]}
+  ]
+}
