@@ -103,7 +103,10 @@ public sealed class ActiveReleaseBindingAuthorityTests
                 ["key_id"] = keyIdOverride ?? KeyId,
                 ["value"] = Convert.ToBase64String(signature)
             };
-            return Encoding.UTF8.GetBytes(payload.ToJsonString());
+            // The authority only accepts the canonical sorted compact wire,
+            // so the fixture emits exactly that encoding.
+            using var fullDocument = JsonDocument.Parse(payload.ToJsonString());
+            return ReleaseBomCanonicalJson.Serialize(fullDocument.RootElement);
         }
 
         public void Dispose() => Rsa.Dispose();
@@ -843,5 +846,150 @@ public sealed class ActiveReleaseBindingAuthorityTests
         Assert.Equal(receipts[0], receipts[1]);
         Assert.Single(authority.ReadReceipts(Device));
         Assert.Single(store.LoadAll());
+    }
+
+    // ----- second adversarial review: F1-F3 regressions -----
+
+    [Fact, Trait("Category", "Unit")]
+    public void StaleRollbackReplayAfterLaterActivationNeverReportsStaleSuccess()
+    {
+        using var signer = new TestSigner();
+        var authority = Authority(signer);
+        var (first, firstToken) = MakeBom(signer, "bom-a", 1, null);
+        authority.Activate(Device, first, firstToken);
+        var (second, secondToken) = MakeBom(signer, "bom-b", 2, first);
+        authority.Activate(Device, second, secondToken);
+        var staleRollback = authority.Rollback(Device, firstToken);
+        // A newer BOM supersedes the rolled-back binding (and legitimately
+        // demotes it to previous again).
+        var (third, thirdToken) = MakeBom(signer, "bom-c", 3, first);
+        authority.Activate(Device, third, thirdToken);
+
+        // The identical rollback request digest exists, but its recorded
+        // postcondition is no longer the current truth: it is NOT treated
+        // as a replay. Here a fresh, truthful rollback is still possible
+        // (bom-a was re-demoted to previous), so the authority performs a
+        // NEW transition instead of echoing the stale generation-3 receipt.
+        var freshRollback = authority.Rollback(Device, firstToken);
+        Assert.NotEqual(staleRollback, freshRollback);
+        Assert.Equal(5, freshRollback.To.Generation);
+        Assert.Equal(Sha256Hex(third), freshRollback.From!.ReleaseBomSha256);
+        Assert.True(authority.TryReadActive(Device, out var binding));
+        Assert.Equal(Sha256Hex(first), binding!.ReleaseBomSha256);
+        Assert.Equal(5, binding.Generation);
+
+        // Now exhaust every rollback path: revoke the active binding and
+        // activate over the revocation (which drops the previous slot).
+        authority.Revoke(Device, 5);
+        var (fourth, fourthToken) = MakeBom(signer, "bom-d", 4, first);
+        authority.Activate(Device, fourth, fourthToken);
+
+        // The old rollback digest still hits the idempotency map, but its
+        // postcondition is stale and no previous slot survives: fail-closed,
+        // never a fake success while bom-d stays active.
+        Assert.Throws<ActiveReleaseBindingException>(
+            () => authority.Rollback(Device, firstToken));
+        Assert.True(authority.TryReadActive(Device, out var final));
+        Assert.Equal(Sha256Hex(fourth), final!.ReleaseBomSha256);
+        Assert.Equal(6, final.Generation);
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public void ReencodedSignedBomVariantsAreRejected()
+    {
+        using var signer = new TestSigner();
+        var authority = Authority(signer);
+        var (bom, token) = MakeBom(signer, "bom-1", 1, null);
+
+        // Same signed payload, fields re-ordered (compact but unsorted).
+        var reordered = new JsonObject();
+        foreach (var pair in JsonNode.Parse(bom)!.AsObject().ToArray().Reverse())
+        {
+            reordered[pair.Key] = pair.Value?.DeepClone();
+        }
+        Assert.Throws<ActiveReleaseBindingException>(() => authority.Activate(
+            Device, Encoding.UTF8.GetBytes(reordered.ToJsonString()), token));
+
+        // Same signed payload with whitespace (indented re-encoding).
+        var indented = JsonNode.Parse(bom)!.ToJsonString(
+            new JsonSerializerOptions { WriteIndented = true });
+        Assert.Throws<ActiveReleaseBindingException>(() => authority.Activate(
+            Device, Encoding.UTF8.GetBytes(indented), token));
+
+        // Signature value with an embedded newline: base64 decoding ignores
+        // whitespace so the signature still verifies; only the canonical
+        // base64 re-encoding check rejects it.
+        var mutated = JsonNode.Parse(bom)!.AsObject();
+        var signatureObject = mutated["signature"]!.AsObject();
+        signatureObject["value"] =
+            signatureObject["value"]!.GetValue<string>().Insert(10, "\n");
+        using var mutatedDocument = JsonDocument.Parse(mutated.ToJsonString());
+        var newlineVariant = ReleaseBomCanonicalJson.Serialize(mutatedDocument.RootElement);
+        Assert.Throws<ActiveReleaseBindingException>(
+            () => authority.Activate(Device, newlineVariant, token));
+
+        // Zero state residue, and the true canonical wire still activates.
+        Assert.False(authority.TryReadActive(Device, out _));
+        Assert.Empty(authority.ReadReceipts(Device));
+        authority.Activate(Device, bom, token);
+        Assert.True(authority.TryReadActive(Device, out _));
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public void TamperedRecoveryBindingsRefuseService()
+    {
+        using var signer = new TestSigner();
+        var store = new InMemoryReleaseBindingTruthStore();
+        var authority = Authority(signer, store);
+        var (first, firstToken) = MakeBom(signer, "bom-1", 1, null);
+        authority.Activate(Device, first, firstToken);
+        var (second, secondToken) = MakeBom(signer, "bom-2", 2, first);
+        authority.Activate(Device, second, secondToken);
+        var records = store.LoadAll();
+        var head = records[0];
+
+        // 1. Current binding digest no longer matches the recorded BOM.
+        Assert.Throws<ActiveReleaseBindingException>(() => Authority(
+            signer,
+            new FrozenTruthStore([head with
+            {
+                CurrentBinding = head.CurrentBinding with { ReleaseBomSha256 = new string('f', 64) }
+            }])));
+        // 2. Signer identity swapped under the same signed BOM.
+        Assert.Throws<ActiveReleaseBindingException>(() => Authority(
+            signer,
+            new FrozenTruthStore([head with
+            {
+                CurrentBinding = head.CurrentBinding with { SignerIdentity = "stranger-controller" }
+            }])));
+        // 3. Execution token swapped for a self-consistent but uncommitted one.
+        var evilToken = Token("evil");
+        var evilTokenSha = Convert.ToHexStringLower(
+            SHA256.HashData(Convert.FromBase64String(evilToken)));
+        Assert.Throws<ActiveReleaseBindingException>(() => Authority(
+            signer,
+            new FrozenTruthStore([head with
+            {
+                CurrentBinding = head.CurrentBinding with
+                {
+                    ExecutionTokenBase64 = evilToken,
+                    ActivationTokenSha256 = evilTokenSha
+                }
+            }])));
+        // 4. Previous binding dropped from an activation over an active one.
+        Assert.Throws<ActiveReleaseBindingException>(() => Authority(
+            signer,
+            new FrozenTruthStore([records[0], records[1] with { PreviousBinding = null }])));
+        // 5. Recorded signed BOM bytes tampered.
+        var tamperedBytes = head.SignedBomBytes!.ToArray();
+        tamperedBytes[^20] ^= 0x01;
+        Assert.Throws<ActiveReleaseBindingException>(() => Authority(
+            signer,
+            new FrozenTruthStore([head with { SignedBomBytes = tamperedBytes }])));
+
+        // The untampered journal still recovers.
+        var recovered = Authority(signer, new FrozenTruthStore(records));
+        Assert.True(recovered.TryReadActive(Device, out var binding));
+        Assert.Equal(Sha256Hex(second), binding!.ReleaseBomSha256);
     }
 }

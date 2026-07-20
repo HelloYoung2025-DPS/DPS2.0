@@ -170,6 +170,7 @@ public sealed class ActiveReleaseBindingContractTests
             ["key_id"] = keyId,
             ["value"] = Convert.ToBase64String(signature)
         };
-        return (Encoding.UTF8.GetBytes(payload.ToJsonString()), token);
+        using var fullDocument = JsonDocument.Parse(payload.ToJsonString());
+        return (ReleaseBomCanonicalJson.Serialize(fullDocument.RootElement), token);
     }
 }

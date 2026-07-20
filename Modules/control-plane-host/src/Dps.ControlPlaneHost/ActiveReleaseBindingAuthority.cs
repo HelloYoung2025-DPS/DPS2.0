@@ -122,6 +122,11 @@ public sealed record ReleaseBomTrustKey(
 /// <summary>
 /// One appended truth record: the receipt of a transition plus the full
 /// post-transition device snapshot needed to recover the authority.
+/// SignedBomBytes carries the exact canonical signed Release BOM the
+/// transition activated (activation and rollback); it is null only for
+/// revocation. Recovery re-runs the full signature and token binding over
+/// these bytes, so a journal cannot smuggle a binding that no signed BOM
+/// backs.
 /// </summary>
 public sealed record ReleaseBindingTruthRecord(
     string DeviceBindingId,
@@ -129,7 +134,8 @@ public sealed record ReleaseBindingTruthRecord(
     ActiveReleaseBindingV1 CurrentBinding,
     ActiveReleaseBindingV1? PreviousBinding,
     long LastActivationSignerGeneration,
-    string RequestSha256);
+    string RequestSha256,
+    byte[]? SignedBomBytes);
 
 /// <summary>
 /// Append-only truth store for release binding transitions. The authority
@@ -219,6 +225,8 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
     {
         public ActiveReleaseBindingV1? Current;
         public ActiveReleaseBindingV1? Previous;
+        public byte[]? CurrentBomBytes;
+        public byte[]? PreviousBomBytes;
         public long RuntimeGeneration;
         public long Sequence;
         public long LastActivationSignerGeneration;
@@ -303,12 +311,19 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
         var requestSha256 = RequestHash(
             "dps.release.binding.activate/v1", signedBomBytes, executionTokenBase64);
 
+        var bomBytesCopy = signedBomBytes.ToArray();
+
         lock (_gate)
         {
             var state = _devices.TryGetValue(deviceBindingId, out var existing)
                 ? existing
                 : new DeviceState();
-            if (state.RequestReceipts.TryGetValue(requestSha256, out var replayed))
+            // A digest hit alone is not a replay: the original receipt's
+            // postcondition must still be the device's current truth,
+            // otherwise the state has moved on and returning the old receipt
+            // would report a success that no longer holds.
+            if (state.RequestReceipts.TryGetValue(requestSha256, out var replayed)
+                && IsReplayPostconditionIntact(replayed, state))
             {
                 return replayed;
             }
@@ -377,10 +392,12 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
 
             state.RuntimeGeneration = generation;
             state.Previous = demoted;
+            state.PreviousBomBytes = demoted is not null ? state.CurrentBomBytes : null;
             state.Current = binding;
+            state.CurrentBomBytes = bomBytesCopy;
             state.Sequence = receipt.Sequence;
             state.LastActivationSignerGeneration = facts.SignerGeneration;
-            Commit(deviceBindingId, state, receipt, requestSha256);
+            Commit(deviceBindingId, state, receipt, requestSha256, bomBytesCopy);
             return receipt;
         }
     }
@@ -395,7 +412,8 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
                 [],
                 deviceBindingId + "\n" + generation.ToString(CultureInfo.InvariantCulture));
             if (_devices.TryGetValue(deviceBindingId, out var state)
-                && state.RequestReceipts.TryGetValue(requestSha256, out var replayed))
+                && state.RequestReceipts.TryGetValue(requestSha256, out var replayed)
+                && IsReplayPostconditionIntact(replayed, state))
             {
                 return replayed;
             }
@@ -419,7 +437,7 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
 
             state.Current = active with { Status = "revoked" };
             state.Sequence = receipt.Sequence;
-            Commit(deviceBindingId, state, receipt, requestSha256);
+            Commit(deviceBindingId, state, receipt, requestSha256, signedBomBytes: null);
             return receipt;
         }
     }
@@ -438,8 +456,15 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
                 "dps.release.binding.rollback/v1",
                 [],
                 deviceBindingId + "\n" + executionTokenBase64);
+            // A digest hit alone is NOT a replay: a later activation may have
+            // superseded the rolled-back binding, and reporting the stale
+            // rollback as success would lie about the active BOM. Only when
+            // the original receipt's postcondition is still the current truth
+            // is this an idempotent replay; otherwise fall through to the
+            // normal fail-closed path (the previous slot is spent).
             if (_devices.TryGetValue(deviceBindingId, out var state)
-                && state.RequestReceipts.TryGetValue(requestSha256, out var replayed))
+                && state.RequestReceipts.TryGetValue(requestSha256, out var replayed)
+                && IsReplayPostconditionIntact(replayed, state))
             {
                 return replayed;
             }
@@ -454,6 +479,8 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
             }
             var abandoned = state.Current
                 ?? throw new ActiveReleaseBindingException("rollback requires a current binding to abandon");
+            var restoredBomBytes = state.PreviousBomBytes
+                ?? throw new ActiveReleaseBindingException("previous signed BOM bytes are missing");
             var generation = checked(state.RuntimeGeneration + 1);
             var now = RequireUtc(_utcNow());
             // Runtime generation stays strictly monotonic; the signer ordinal
@@ -487,18 +514,29 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
 
             state.RuntimeGeneration = generation;
             state.Current = binding;
+            state.CurrentBomBytes = restoredBomBytes;
             state.Previous = null;
+            state.PreviousBomBytes = null;
             state.Sequence = receipt.Sequence;
-            Commit(deviceBindingId, state, receipt, requestSha256);
+            Commit(deviceBindingId, state, receipt, requestSha256, restoredBomBytes);
             return receipt;
         }
     }
+
+    private static bool IsReplayPostconditionIntact(
+        ReleaseBindingReceiptV1 receipt,
+        DeviceState state)
+        => state.Current is { } current
+           && string.Equals(current.ReleaseBomSha256, receipt.To.ReleaseBomSha256, StringComparison.Ordinal)
+           && current.Generation == receipt.To.Generation
+           && string.Equals(current.Status, receipt.To.Status, StringComparison.Ordinal);
 
     private void Commit(
         string deviceBindingId,
         DeviceState state,
         ReleaseBindingReceiptV1 receipt,
-        string requestSha256)
+        string requestSha256,
+        byte[]? signedBomBytes)
     {
         state.Receipts.Add(receipt);
         state.RequestReceipts[requestSha256] = receipt;
@@ -509,7 +547,8 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
             state.Current!,
             state.Previous,
             state.LastActivationSignerGeneration,
-            requestSha256));
+            requestSha256,
+            signedBomBytes));
     }
 
     private void RecoverFromStore()
@@ -523,17 +562,23 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
             }
             var receipt = record.Receipt
                 ?? throw new ActiveReleaseBindingException("truth store record has no receipt");
+            var current = record.CurrentBinding
+                ?? throw new ActiveReleaseBindingException("truth store record has no current binding");
             receipt.Validate();
-            record.CurrentBinding.Validate();
+            current.Validate();
             record.PreviousBinding?.Validate();
             if (!string.Equals(receipt.DeviceBindingId, record.DeviceBindingId, StringComparison.Ordinal)
-                || !string.Equals(record.CurrentBinding.DeviceBindingId, record.DeviceBindingId, StringComparison.Ordinal))
+                || !string.Equals(current.DeviceBindingId, record.DeviceBindingId, StringComparison.Ordinal))
             {
                 throw new ActiveReleaseBindingException("truth store record device identity fork");
             }
             var state = _devices.TryGetValue(record.DeviceBindingId, out var existing)
                 ? existing
                 : new DeviceState();
+            var priorCurrent = state.Current;
+            var priorPrevious = state.Previous;
+            var priorCurrentBytes = state.CurrentBomBytes;
+            var priorPreviousBytes = state.PreviousBomBytes;
             if (receipt.Sequence != state.Sequence + 1)
             {
                 throw new ActiveReleaseBindingException(
@@ -556,32 +601,133 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
                 "activation" or "rollback" => state.RuntimeGeneration + 1,
                 _ => state.RuntimeGeneration
             };
+            // receipt.To must BE the recorded post-transition binding.
             if (receipt.To.Generation != expectedRuntimeGeneration
-                || record.CurrentBinding.Generation != expectedRuntimeGeneration)
+                || current.Generation != expectedRuntimeGeneration
+                || !string.Equals(receipt.To.ReleaseBomSha256, current.ReleaseBomSha256, StringComparison.Ordinal)
+                || !string.Equals(receipt.To.Status, current.Status, StringComparison.Ordinal))
             {
                 throw new ActiveReleaseBindingException(
-                    "truth store journal runtime generation regressed or forked");
+                    "truth store journal receipt endpoint and binding diverge");
             }
-            if (receipt.ReceiptKind == "activation")
+            // receipt.From must be the projection of the prior record's
+            // current binding; the very first record has no predecessor.
+            if (priorCurrent is null)
             {
-                if (record.CurrentBinding.ReleaseBomGeneration <= state.LastActivationSignerGeneration
-                    || record.LastActivationSignerGeneration != record.CurrentBinding.ReleaseBomGeneration)
+                if (receipt.From is not null)
                 {
                     throw new ActiveReleaseBindingException(
-                        "truth store journal signer generation regressed on activation");
+                        "truth store journal first record cannot have a from endpoint");
                 }
             }
-            else if (record.LastActivationSignerGeneration != state.LastActivationSignerGeneration)
+            else if (receipt.From is null
+                || !string.Equals(receipt.From.ReleaseBomSha256, priorCurrent.ReleaseBomSha256, StringComparison.Ordinal)
+                || receipt.From.Generation != priorCurrent.Generation)
             {
                 throw new ActiveReleaseBindingException(
-                    "truth store journal mutated the signer ordinal outside activation");
+                    "truth store journal from endpoint does not project the prior binding");
             }
-            if (string.IsNullOrEmpty(record.RequestSha256)
-                || !state.RequestReceipts.TryAdd(record.RequestSha256, receipt))
+            switch (receipt.ReceiptKind)
             {
-                throw new ActiveReleaseBindingException("truth store journal request digest fork");
+                case "activation":
+                {
+                    var facts = RequireRecordedSignedBom(record, current);
+                    if (facts.SignerGeneration <= state.LastActivationSignerGeneration
+                        || record.LastActivationSignerGeneration != facts.SignerGeneration)
+                    {
+                        throw new ActiveReleaseBindingException(
+                            "truth store journal signer generation regressed on activation");
+                    }
+                    if (priorCurrent is { Status: "active" })
+                    {
+                        // Activation over an active binding demotes it.
+                        if (!string.Equals(receipt.From!.Status, "previous", StringComparison.Ordinal)
+                            || record.PreviousBinding != priorCurrent with { Status = "previous" })
+                        {
+                            throw new ActiveReleaseBindingException(
+                                "truth store journal previous binding does not match the demoted active");
+                        }
+                        state.PreviousBomBytes = priorCurrentBytes;
+                    }
+                    else
+                    {
+                        // First activation or activation over a revoked
+                        // binding: no rollback path survives.
+                        if ((priorCurrent is not null
+                                && !string.Equals(receipt.From!.Status, priorCurrent.Status, StringComparison.Ordinal))
+                            || record.PreviousBinding is not null)
+                        {
+                            throw new ActiveReleaseBindingException(
+                                "truth store journal resurrects a rollback path across revocation");
+                        }
+                        state.PreviousBomBytes = null;
+                    }
+                    if (!string.Equals(receipt.ReceiptId, current.ReceiptId, StringComparison.Ordinal))
+                    {
+                        throw new ActiveReleaseBindingException(
+                            "truth store journal binding receipt identity fork");
+                    }
+                    state.CurrentBomBytes = record.SignedBomBytes;
+                    break;
+                }
+                case "revocation":
+                {
+                    if (record.SignedBomBytes is not null)
+                    {
+                        throw new ActiveReleaseBindingException(
+                            "truth store journal revocation must not carry signed BOM bytes");
+                    }
+                    if (priorCurrent is not { Status: "active" }
+                        || !string.Equals(receipt.From!.Status, "active", StringComparison.Ordinal)
+                        || current != priorCurrent with { Status = "revoked" }
+                        || record.PreviousBinding != priorPrevious
+                        || record.LastActivationSignerGeneration != state.LastActivationSignerGeneration)
+                    {
+                        throw new ActiveReleaseBindingException(
+                            "truth store journal revocation does not follow from the prior state");
+                    }
+                    break;
+                }
+                case "rollback":
+                {
+                    var facts = RequireRecordedSignedBom(record, current);
+                    if (priorPreviousBytes is null
+                        || record.SignedBomBytes is null
+                        || !record.SignedBomBytes.AsSpan().SequenceEqual(priorPreviousBytes)
+                        || priorPrevious is not { Status: "previous" }
+                        || !string.Equals(current.ReleaseBomSha256, priorPrevious.ReleaseBomSha256, StringComparison.Ordinal)
+                        || current.ReleaseBomGeneration != priorPrevious.ReleaseBomGeneration
+                        || !string.Equals(receipt.From!.Status, "revoked", StringComparison.Ordinal)
+                        || record.PreviousBinding is not null
+                        || record.LastActivationSignerGeneration != state.LastActivationSignerGeneration
+                        || facts.SignerGeneration != priorPrevious.ReleaseBomGeneration)
+                    {
+                        throw new ActiveReleaseBindingException(
+                            "truth store journal rollback does not target the recorded previous BOM");
+                    }
+                    if (!string.Equals(receipt.ReceiptId, current.ReceiptId, StringComparison.Ordinal))
+                    {
+                        throw new ActiveReleaseBindingException(
+                            "truth store journal binding receipt identity fork");
+                    }
+                    state.CurrentBomBytes = record.SignedBomBytes;
+                    state.PreviousBomBytes = null;
+                    break;
+                }
+                default:
+                    throw new ActiveReleaseBindingException("truth store journal receipt kind is unknown");
             }
-            state.Current = record.CurrentBinding;
+            if (string.IsNullOrEmpty(record.RequestSha256))
+            {
+                throw new ActiveReleaseBindingException("truth store journal request digest is missing");
+            }
+            // Mirror runtime semantics: a later legitimate transition with
+            // the same request digest (e.g. rolling back to the same BOM
+            // twice across an intervening activation) supersedes the older
+            // idempotency entry. Duplicated or forked records are already
+            // rejected by the sequence and receipt-identity checks above.
+            state.RequestReceipts[record.RequestSha256] = receipt;
+            state.Current = current;
             state.Previous = record.PreviousBinding;
             state.RuntimeGeneration = expectedRuntimeGeneration;
             state.Sequence = receipt.Sequence;
@@ -589,6 +735,39 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
             state.Receipts.Add(receipt);
             _devices[record.DeviceBindingId] = state;
         }
+    }
+
+    /// <summary>
+    /// Recovery cross-binding: an activation or rollback record must carry
+    /// the exact canonical signed BOM it activated, and the recorded binding
+    /// must be exactly what verifying those bytes yields — full RSA-PSS
+    /// verification, digest, signer ordinal, committed token digest, signer
+    /// identity/key, and signature digest all re-checked.
+    /// </summary>
+    private SignedBomFacts RequireRecordedSignedBom(
+        ReleaseBindingTruthRecord record,
+        ActiveReleaseBindingV1 binding)
+    {
+        if (record.SignedBomBytes is null || record.SignedBomBytes.Length == 0)
+        {
+            throw new ActiveReleaseBindingException(
+                "truth store journal record has no signed BOM bytes to re-verify");
+        }
+        var facts = VerifySignedBom(record.SignedBomBytes);
+        if (!string.Equals(
+                binding.ReleaseBomSha256,
+                Convert.ToHexStringLower(SHA256.HashData(record.SignedBomBytes)),
+                StringComparison.Ordinal)
+            || binding.ReleaseBomGeneration != facts.SignerGeneration
+            || !string.Equals(binding.ActivationTokenSha256, facts.ActivationTokenSha256, StringComparison.Ordinal)
+            || !string.Equals(binding.SignerIdentity, facts.Key.Identity, StringComparison.Ordinal)
+            || !string.Equals(binding.SignerKeyId, facts.Key.KeyId, StringComparison.Ordinal)
+            || !string.Equals(binding.BomSignatureSha256, facts.SignatureSha256, StringComparison.Ordinal))
+        {
+            throw new ActiveReleaseBindingException(
+                "truth store journal binding is not backed by its recorded signed BOM");
+        }
+        return facts;
     }
 
     private ReleaseBindingReceiptV1 BuildReceipt(
@@ -710,6 +889,18 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
             {
                 throw new ActiveReleaseBindingException("signed release BOM must be one JSON object");
             }
+            // Re-encoding defense: the caller's bytes must BE the one
+            // canonical wire (sorted keys, compact separators, canonical
+            // escaping, signature object included). Otherwise the digest the
+            // binding publishes (sha256 of the exact input bytes) would
+            // decouple from the signature, letting equivalent re-encodings
+            // of one signed payload mint distinct release_bom_sha256 values.
+            var canonicalWire = ReleaseBomCanonicalJson.Serialize(root);
+            if (!signedBomBytes.SequenceEqual(canonicalWire))
+            {
+                throw new ActiveReleaseBindingException(
+                    "signed release BOM must be the canonical sorted compact wire");
+            }
             var observed = new HashSet<string>(StringComparer.Ordinal);
             foreach (var property in root.EnumerateObject())
             {
@@ -807,14 +998,21 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
             {
                 throw new ActiveReleaseBindingException("BOM signature key is not trusted for bom");
             }
+            var signatureValue = ReadSignatureField("value");
             byte[] signatureBytes;
             try
             {
-                signatureBytes = Convert.FromBase64String(ReadSignatureField("value"));
+                signatureBytes = Convert.FromBase64String(signatureValue);
             }
             catch (FormatException exception)
             {
                 throw new ActiveReleaseBindingException("BOM signature value is not valid base64", exception);
+            }
+            // Base64 decoding tolerates embedded whitespace; only the one
+            // canonical re-encoding of the raw signature bytes is accepted.
+            if (!string.Equals(Convert.ToBase64String(signatureBytes), signatureValue, StringComparison.Ordinal))
+            {
+                throw new ActiveReleaseBindingException("BOM signature value is not canonical base64");
             }
             var payloadCanonical = ReleaseBomCanonicalJson.SerializeObjectWithout(root, "signature");
             var message = new byte[SignatureDomain.Length + payloadCanonical.Length];
