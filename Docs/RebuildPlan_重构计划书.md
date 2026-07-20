@@ -182,7 +182,7 @@ Release BOM 由仓外用户/KMS release signer 签发。模型、候选代码和
 
 - M1B/R0-C 交付：持久化 active release binding 权威（durable truth store）、外部 signer 合同、激活/撤销/回滚版本化 receipt，以及 policy 与 gateway 消费路径的**合同层同源证明**——严格定义为 contract/版本/corpus 对齐证据（两条消费路径绑定同一合同与 major、共享 corpus 钉死同一 generation/token 三元组）。该证据**不能也不声称**证明两条路径在运行时消费同一 authority 实例（合同层证据无法区分一个共享 durable reader 与两个各自背书的 reader）；"同一个 composition-fixed reader"的**运行时同实例义务显式移交 §10 M4 退出行承接**，R0-C 仅按合同层语义验收，该义务不得在里程碑间蒸发。
 - 生产 composition root、对跨模块实现引用门禁（Tools/ci phase0 生产 ProjectReference 规则）的任何调整、以及真实进程组装接线，均属 §10 M4 交付；R0-C 批次不得实施，也不得以 tests 工程组装宣称生产接线。
-- M4 完成前，active release binding 运行真相的消费组装不具备生产资格：涉及模块保持 `releaseEligible=false`，且须有**可执行的负向门**证明生产 publish/dispatch 入口实际不可用（不得仅以 manifest 元数据自证；该负向门随 R0-C 收口阶段交付进 required 清单，M4 同实例组装门 PASS 后同批作废）；生产发布路径 fail-closed。
+- M4 完成前，active release binding 运行真相的消费组装不具备生产资格：涉及模块保持 `releaseEligible=false`，且须有**可执行的负向门**证明生产 publish/dispatch 入口实际不可用（不得仅以 manifest 元数据自证；该负向门随 R0-C 收口阶段交付、注册进 required 清单，并列为 §10 M1B 退出条件——缺此门 M1B 不得关闭；M4 同实例组装门 PASS 后同批作废）；生产发布路径 fail-closed。
 - 本边界只能经独立治理 PR 修订、独立外审、由仓库所有者亲自合入；实施批次的 PR 不得引用其自身改动为本边界放行。
 
 ### 4.4 R0-D 删除 11 个模块
@@ -416,7 +416,7 @@ flowchart LR
 |---|---|---|
 | M0 | 干净基线、固定工具链、current/proposed/verified 清单 | 保留侧 required baseline 可复现，仓库保护规则已启用 |
 | M1A | receipt schema/Manifest/validator 迁移 | 固定旧门与新门对攻击语料均 PASS，独立批准 |
-| M1B | 普通 candidate BOM validator、active release binding（durable truth store）、外部 signer 合同 | policy 与 gateway 按合同层同源证明读同一 generation/token（生产进程接线属 M4，见 §4.3 交付边界），回滚/撤销测试 PASS |
+| M1B | 普通 candidate BOM validator、active release binding（durable truth store）、外部 signer 合同 | policy 与 gateway 按合同层同源证明读同一 generation/token（生产进程接线属 M4，见 §4.3 交付边界），回滚/撤销测试 PASS；§4.3 可执行负向门（生产 publish/dispatch 入口不可用）已注册进 required 清单并 PASS——缺此门 M1B 不得关闭 |
 | M1C | 11 个 factory 目录和专属引用删除 | 无悬空 owner/consumer/schema，代码净减少，完整静态门与 module-impact suite PASS；外部 merge queue（§15 条目 1）已配置并以模拟并行冲突及 merge HEAD 重跑验证 |
 | M2 | Persona 投影、memory v3、interest v2、planner 行为分布与 session nonce 参数采样、Soul 隔离 | 双 Soul 正反例（含固定输入下行为分布差异）、换绑、删除传播、golden vectors PASS |
 | M3 | app package、operation.compiled v2、edge handoff v2、独立 Legacy 入口、唯一 ActionExecutor、视觉提案链 | 旧入口不可达；未知/空/partial fail closed；信封 delay/typing/trajectory 参数在携带对应参数的 step 上消费生效、越界即拒绝，均有可执行测试；两种非 IG fixture 与 visual-security suite PASS |
