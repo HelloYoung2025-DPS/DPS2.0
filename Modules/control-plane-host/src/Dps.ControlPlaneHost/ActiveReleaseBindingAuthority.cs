@@ -17,6 +17,53 @@ public sealed class ActiveReleaseBindingException : Exception
 }
 
 /// <summary>
+/// Wire facts about the signed Release BOM this authority activates.
+/// RequiredTopLevelFields is dual-pinned with
+/// Tools/ci/candidate_bom_validator.py::_BOM_FIELDS (a python test in
+/// Tests/ci extracts both literals and asserts set equality); change either
+/// side only together with the other.
+/// </summary>
+public static class ReleaseBomWireContract
+{
+    public const string SchemaVersion = "dps.release-bom/v1";
+    // Matches candidate_bom_validator._validate_exact_shape(expected_status="SIGNED"):
+    // the runtime activates exactly the signed candidate wire status.
+    public const string ExpectedStatus = "SIGNED";
+    public const int ExecutionTokenSizeBytes = 32;
+
+    public static readonly IReadOnlySet<string> RequiredTopLevelFields = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "schema_version",
+        "bom_id",
+        "status",
+        "integration_commit",
+        "created_at",
+        "release_bom_generation",
+        "activation_token_sha256",
+        "modules",
+        "instruction_hashes",
+        "contracts",
+        "database_versions",
+        "dependency_dag_sha256",
+        "compatibility_matrix_sha256",
+        "feature_flags",
+        "kill_switches",
+        "ai_toolchain",
+        "evidence",
+        "risk",
+        "release_approval",
+        "rollout",
+        "rollback",
+        "previous_stable_bom",
+        "previous_stable_bom_sha256",
+        "native_stop_authorities",
+        "device_route_assignment_authorities",
+        "native_stop_challenge_authorities",
+        "signature"
+    };
+}
+
+/// <summary>
 /// One trusted Release BOM signing key parsed from the deployed release trust
 /// policy: purpose "bom", algorithm "rsa-pss-sha256" only.
 /// </summary>
@@ -73,32 +120,94 @@ public sealed record ReleaseBomTrustKey(
 }
 
 /// <summary>
-/// Source of opaque 256-bit execution tokens (lowercase 64-hex). Tokens must
-/// be a pure function of nothing observable: never derived from BOM bytes,
-/// device ids, generations, or clock values.
+/// One appended truth record: the receipt of a transition plus the full
+/// post-transition device snapshot needed to recover the authority.
 /// </summary>
-public interface IExecutionTokenSource
+public sealed record ReleaseBindingTruthRecord(
+    string DeviceBindingId,
+    ReleaseBindingReceiptV1 Receipt,
+    ActiveReleaseBindingV1 CurrentBinding,
+    ActiveReleaseBindingV1? PreviousBinding,
+    long LastActivationSignerGeneration,
+    string RequestSha256);
+
+/// <summary>
+/// Append-only truth store for release binding transitions. The authority
+/// appends one record per successful transition and loads the full journal
+/// at construction to recover state. NOTE: only a deterministic in-memory
+/// implementation exists in this batch; a durable PostgreSQL adapter is a
+/// registered obligation for a later batch — nothing is persisted across
+/// process death yet.
+/// </summary>
+public interface IReleaseBindingTruthStore
 {
-    string NextToken();
+    void Append(ReleaseBindingTruthRecord record);
+    IReadOnlyList<ReleaseBindingTruthRecord> LoadAll();
 }
 
 /// <summary>
-/// Proposed production token source backed by the platform CSPRNG. Not wired
-/// into any composition root yet (runtime assembly is a later milestone).
+/// Deterministic in-memory truth store for tests and restart-recovery tests.
+/// Not durable: process death loses the journal.
 /// </summary>
-public sealed class CryptoRandomExecutionTokenSource : IExecutionTokenSource
+public sealed class InMemoryReleaseBindingTruthStore : IReleaseBindingTruthStore
 {
-    public string NextToken()
-        => Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
+    private readonly Lock _gate = new();
+    private readonly List<ReleaseBindingTruthRecord> _records = [];
+
+    public void Append(ReleaseBindingTruthRecord record)
+    {
+        ArgumentNullException.ThrowIfNull(record);
+        lock (_gate)
+        {
+            _records.Add(record);
+        }
+    }
+
+    public IReadOnlyList<ReleaseBindingTruthRecord> LoadAll()
+    {
+        lock (_gate)
+        {
+            return [.. _records];
+        }
+    }
 }
 
 /// <summary>
 /// Deterministic in-process authority for the per-device active Release BOM
-/// binding (active.release.binding/v1). Verifies the out-of-repo RSA-PSS
-/// signature on every candidate BOM against the injected trust policy keys,
-/// keeps a monotonic generation and an opaque execution token per device,
-/// and emits a versioned release.binding.receipt/v1 for every activation,
-/// revocation, and rollback. No IO, no ambient time, fail-closed everywhere.
+/// binding (active.release.binding/v1).
+///
+/// Activation performs the ACTIVATION-SAFETY SUBSET of signed Release BOM
+/// validation — the full candidate validation (module artifacts, evidence,
+/// approvals, authority rotation, lineage against git) is the job of the
+/// Tools/ci candidate gate and is intentionally NOT repeated here. The
+/// subset enforced on every Activate is exactly:
+///   1. strict JSON parse; top-level field set identical to
+///      candidate_bom_validator._BOM_FIELDS (missing or extra fields reject);
+///   2. schema_version == "dps.release-bom/v1" and status == "SIGNED"
+///      (candidate_bom_validator._validate_exact_shape, line 1581);
+///   3. release_bom_generation positive int64 and activation_token_sha256
+///      64-hex (candidate_bom_validator lines 1199-1208);
+///   4. RSA-PSS-SHA256 signature over
+///      b"dps-release-bom/v1\n" + canonical_bytes(BOM without signature)
+///      against the injected purpose="bom" trust keys;
+///   5. the caller-presented execution token is canonical Base64 for exactly
+///      32 bytes and sha256(token) == BOM.activation_token_sha256 — the
+///      token is pre-committed by the out-of-repo signer, never minted here;
+///   6. signer-ordinal anti-rollback: release_bom_generation strictly
+///      greater than the last activation's for this device (Rollback may
+///      revert the ordinal, Activate never may);
+///   7. previous_stable_bom_sha256 chain: equal to the current binding's
+///      ReleaseBomSha256 when the device has binding history, and JSON null
+///      (together with previous_stable_bom null) when it has none —
+///      mirroring candidate_bom_validator._validate_previous_bom lines
+///      3210-3215 where a null previous id requires a null previous sha
+///      (bootstrap shape).
+///
+/// State is recovered from the injected truth store at construction: the
+/// journal is replayed with sequence/generation/receipt-identity
+/// verification and any fork or regression refuses service. All public
+/// members share one lock; byte-identical re-submissions return the original
+/// receipt without state change and conflicting re-submissions fail closed.
 /// </summary>
 public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
 {
@@ -108,25 +217,29 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
 
     private sealed class DeviceState
     {
-        public ActiveReleaseBindingV1? Active;
+        public ActiveReleaseBindingV1? Current;
         public ActiveReleaseBindingV1? Previous;
-        public long Generation;
+        public long RuntimeGeneration;
         public long Sequence;
+        public long LastActivationSignerGeneration;
         public readonly List<ReleaseBindingReceiptV1> Receipts = [];
+        public readonly Dictionary<string, ReleaseBindingReceiptV1> RequestReceipts =
+            new(StringComparer.Ordinal);
     }
 
+    private readonly Lock _gate = new();
     private readonly IReadOnlyDictionary<string, ReleaseBomTrustKey> _keys;
-    private readonly IExecutionTokenSource _tokens;
+    private readonly IReleaseBindingTruthStore _store;
     private readonly Func<DateTimeOffset> _utcNow;
     private readonly Dictionary<string, DeviceState> _devices = new(StringComparer.Ordinal);
 
     public ActiveReleaseBindingAuthority(
         IReadOnlyList<ReleaseBomTrustKey> bomKeys,
-        IExecutionTokenSource tokenSource,
+        IReleaseBindingTruthStore store,
         Func<DateTimeOffset> utcNow)
     {
         ArgumentNullException.ThrowIfNull(bomKeys);
-        ArgumentNullException.ThrowIfNull(tokenSource);
+        ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(utcNow);
         if (bomKeys.Count == 0)
         {
@@ -141,162 +254,341 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
             }
         }
         _keys = keys;
-        _tokens = tokenSource;
+        _store = store;
         _utcNow = utcNow;
+        RecoverFromStore();
     }
 
     public bool TryReadActive(string deviceBindingId, out ActiveReleaseBindingV1? binding)
     {
-        binding = null;
-        if (deviceBindingId is null
-            || !_devices.TryGetValue(deviceBindingId, out var state)
-            || state.Active is not { Status: "active" } active)
+        lock (_gate)
         {
-            return false;
+            binding = null;
+            if (deviceBindingId is null
+                || !_devices.TryGetValue(deviceBindingId, out var state)
+                || state.Current is not { Status: "active" } active)
+            {
+                return false;
+            }
+            binding = active;
+            return true;
         }
-        binding = active;
-        return true;
     }
 
     public IReadOnlyList<ReleaseBindingReceiptV1> ReadReceipts(string deviceBindingId)
     {
-        ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
-        return _devices.TryGetValue(deviceBindingId, out var state)
-            ? state.Receipts.AsReadOnly()
-            : [];
+        lock (_gate)
+        {
+            ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
+            return _devices.TryGetValue(deviceBindingId, out var state)
+                ? [.. state.Receipts]
+                : [];
+        }
     }
 
-    public ReleaseBindingReceiptV1 Activate(string deviceBindingId, ReadOnlySpan<byte> signedBomBytes)
+    public ReleaseBindingReceiptV1 Activate(
+        string deviceBindingId,
+        ReadOnlySpan<byte> signedBomBytes,
+        string executionTokenBase64)
     {
         ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
-        var (signatureBytes, key) = VerifySignedBom(signedBomBytes);
+        var facts = VerifySignedBom(signedBomBytes);
+        var tokenSha256 = RequireCanonicalTokenSha256(executionTokenBase64);
+        if (!string.Equals(tokenSha256, facts.ActivationTokenSha256, StringComparison.Ordinal))
+        {
+            throw new ActiveReleaseBindingException(
+                "execution token does not match the signer-committed activation_token_sha256");
+        }
         var bomSha256 = Convert.ToHexStringLower(SHA256.HashData(signedBomBytes));
-        var signatureSha256 = Convert.ToHexStringLower(SHA256.HashData(signatureBytes));
+        var requestSha256 = RequestHash(
+            "dps.release.binding.activate/v1", signedBomBytes, executionTokenBase64);
 
-        // Signature verified: mutation may begin. Everything below is
-        // constructed and validated before any state is replaced.
-        var state = _devices.TryGetValue(deviceBindingId, out var existing)
-            ? existing
-            : new DeviceState();
-        var generation = checked(state.Generation + 1);
-        var now = RequireUtc(_utcNow());
-        var binding = new ActiveReleaseBindingV1(
-            SchemaVersion,
-            "active.release.binding/v1",
-            "control-plane-host",
-            deviceBindingId,
-            bomSha256,
-            generation,
-            RequireToken(_tokens.NextToken()),
-            "active",
-            key.Identity,
-            key.KeyId,
-            signatureSha256,
-            now,
-            NextReceiptId(deviceBindingId, state.Sequence + 1));
-        binding.Validate();
+        lock (_gate)
+        {
+            var state = _devices.TryGetValue(deviceBindingId, out var existing)
+                ? existing
+                : new DeviceState();
+            if (state.RequestReceipts.TryGetValue(requestSha256, out var replayed))
+            {
+                return replayed;
+            }
+            if (facts.SignerGeneration <= state.LastActivationSignerGeneration)
+            {
+                throw new ActiveReleaseBindingException(
+                    facts.SignerGeneration == state.LastActivationSignerGeneration
+                        ? "conflicting re-submission: same signer release_bom_generation with different bytes or token"
+                        : "signer release_bom_generation must strictly exceed the last activation (anti-rollback)");
+            }
+            if (state.Current is { } current)
+            {
+                if (!string.Equals(facts.PreviousStableBomSha256, current.ReleaseBomSha256, StringComparison.Ordinal))
+                {
+                    throw new ActiveReleaseBindingException(
+                        "previous_stable_bom_sha256 must equal the device's current binding digest");
+                }
+            }
+            else if (facts.PreviousStableBomSha256 is not null)
+            {
+                throw new ActiveReleaseBindingException(
+                    "previous_stable_bom_sha256 must be null for a device with no binding history");
+            }
 
-        // Only a binding that is still "active" is demoted to "previous" and
-        // stays reachable for rollback. A revoked binding keeps its revoked
-        // status in the receipt trail and never becomes a rollback target;
-        // activating over it also drops any older "previous" so no rollback
-        // path survives across a revocation.
-        var demoted = state.Active is { Status: "active" } priorActive
-            ? priorActive with { Status = "previous" }
-            : null;
-        var receipt = BuildReceipt(
-            "activation",
-            deviceBindingId,
-            state,
-            from: state.Active is null
-                ? null
-                : demoted is not null
-                    ? new ReleaseBindingEndpointV1(demoted.ReleaseBomSha256, demoted.Generation, "previous")
-                    : new ReleaseBindingEndpointV1(
-                        state.Active.ReleaseBomSha256, state.Active.Generation, state.Active.Status),
-            to: new ReleaseBindingEndpointV1(bomSha256, generation, "active"),
-            actorIdentity: key.Identity,
-            occurredAt: now);
+            var generation = checked(state.RuntimeGeneration + 1);
+            var now = RequireUtc(_utcNow());
+            var binding = new ActiveReleaseBindingV1(
+                SchemaVersion,
+                "active.release.binding/v1",
+                "control-plane-host",
+                deviceBindingId,
+                bomSha256,
+                generation,
+                facts.SignerGeneration,
+                executionTokenBase64,
+                facts.ActivationTokenSha256,
+                "active",
+                facts.Key.Identity,
+                facts.Key.KeyId,
+                facts.SignatureSha256,
+                now,
+                NextReceiptId(deviceBindingId, state.Sequence + 1));
+            binding.Validate();
 
-        state.Generation = generation;
-        state.Previous = demoted;
-        state.Active = binding;
-        state.Sequence = receipt.Sequence;
-        state.Receipts.Add(receipt);
-        _devices[deviceBindingId] = state;
-        return receipt;
+            // Only a binding that is still "active" is demoted to "previous"
+            // and stays reachable for rollback. A revoked binding keeps its
+            // revoked status in the receipt trail and never becomes a
+            // rollback target; activating over it also drops any older
+            // "previous" so no rollback path survives across a revocation.
+            var demoted = state.Current is { Status: "active" } priorActive
+                ? priorActive with { Status = "previous" }
+                : null;
+            var receipt = BuildReceipt(
+                "activation",
+                deviceBindingId,
+                state,
+                from: state.Current is null
+                    ? null
+                    : demoted is not null
+                        ? new ReleaseBindingEndpointV1(demoted.ReleaseBomSha256, demoted.Generation, "previous")
+                        : new ReleaseBindingEndpointV1(
+                            state.Current.ReleaseBomSha256, state.Current.Generation, state.Current.Status),
+                to: new ReleaseBindingEndpointV1(bomSha256, generation, "active"),
+                actorIdentity: facts.Key.Identity,
+                occurredAt: now);
+
+            state.RuntimeGeneration = generation;
+            state.Previous = demoted;
+            state.Current = binding;
+            state.Sequence = receipt.Sequence;
+            state.LastActivationSignerGeneration = facts.SignerGeneration;
+            Commit(deviceBindingId, state, receipt, requestSha256);
+            return receipt;
+        }
     }
 
     public ReleaseBindingReceiptV1 Revoke(string deviceBindingId, long generation)
     {
-        ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
-        if (!_devices.TryGetValue(deviceBindingId, out var state)
-            || state.Active is not { Status: "active" } active)
+        lock (_gate)
         {
-            throw new ActiveReleaseBindingException("no active release binding to revoke");
-        }
-        if (generation != active.Generation)
-        {
-            throw new ActiveReleaseBindingException("revocation generation does not match the active binding");
-        }
-        var now = RequireUtc(_utcNow());
-        var receipt = BuildReceipt(
-            "revocation",
-            deviceBindingId,
-            state,
-            from: new ReleaseBindingEndpointV1(active.ReleaseBomSha256, active.Generation, "active"),
-            to: new ReleaseBindingEndpointV1(active.ReleaseBomSha256, active.Generation, "revoked"),
-            actorIdentity: "control-plane-host",
-            occurredAt: now);
+            ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
+            var requestSha256 = RequestHash(
+                "dps.release.binding.revoke/v1",
+                [],
+                deviceBindingId + "\n" + generation.ToString(CultureInfo.InvariantCulture));
+            if (_devices.TryGetValue(deviceBindingId, out var state)
+                && state.RequestReceipts.TryGetValue(requestSha256, out var replayed))
+            {
+                return replayed;
+            }
+            if (state is null || state.Current is not { Status: "active" } active)
+            {
+                throw new ActiveReleaseBindingException("no active release binding to revoke");
+            }
+            if (generation != active.Generation)
+            {
+                throw new ActiveReleaseBindingException("revocation generation does not match the active binding");
+            }
+            var now = RequireUtc(_utcNow());
+            var receipt = BuildReceipt(
+                "revocation",
+                deviceBindingId,
+                state,
+                from: new ReleaseBindingEndpointV1(active.ReleaseBomSha256, active.Generation, "active"),
+                to: new ReleaseBindingEndpointV1(active.ReleaseBomSha256, active.Generation, "revoked"),
+                actorIdentity: "control-plane-host",
+                occurredAt: now);
 
-        state.Active = active with { Status = "revoked" };
-        state.Sequence = receipt.Sequence;
-        state.Receipts.Add(receipt);
-        return receipt;
+            state.Current = active with { Status = "revoked" };
+            state.Sequence = receipt.Sequence;
+            Commit(deviceBindingId, state, receipt, requestSha256);
+            return receipt;
+        }
     }
 
-    public ReleaseBindingReceiptV1 Rollback(string deviceBindingId)
+    public ReleaseBindingReceiptV1 Rollback(string deviceBindingId, string executionTokenBase64)
     {
-        ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
-        if (!_devices.TryGetValue(deviceBindingId, out var state)
-            || state.Previous is not { Status: "previous" } previous)
+        var tokenSha256 = RequireCanonicalTokenSha256(executionTokenBase64);
+        lock (_gate)
         {
-            throw new ActiveReleaseBindingException("no previous signed release binding to roll back to");
-        }
-        var abandoned = state.Active
-            ?? throw new ActiveReleaseBindingException("rollback requires a current binding to abandon");
-        var generation = checked(state.Generation + 1);
-        var now = RequireUtc(_utcNow());
-        var binding = new ActiveReleaseBindingV1(
-            SchemaVersion,
-            "active.release.binding/v1",
-            "control-plane-host",
-            deviceBindingId,
-            previous.ReleaseBomSha256,
-            generation,
-            RequireToken(_tokens.NextToken()),
-            "active",
-            previous.SignerIdentity,
-            previous.SignerKeyId,
-            previous.BomSignatureSha256,
-            now,
-            NextReceiptId(deviceBindingId, state.Sequence + 1));
-        binding.Validate();
-        var receipt = BuildReceipt(
-            "rollback",
-            deviceBindingId,
-            state,
-            from: new ReleaseBindingEndpointV1(abandoned.ReleaseBomSha256, abandoned.Generation, "revoked"),
-            to: new ReleaseBindingEndpointV1(previous.ReleaseBomSha256, generation, "active"),
-            actorIdentity: "control-plane-host",
-            occurredAt: now);
+            ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
+            // The token uniquely commits the rollback target: sha256(token)
+            // must equal the signer's pre-committed activation_token_sha256
+            // of the previous binding, so device + token identifies the
+            // request (the target digest is implied by that commitment).
+            var requestSha256 = RequestHash(
+                "dps.release.binding.rollback/v1",
+                [],
+                deviceBindingId + "\n" + executionTokenBase64);
+            if (_devices.TryGetValue(deviceBindingId, out var state)
+                && state.RequestReceipts.TryGetValue(requestSha256, out var replayed))
+            {
+                return replayed;
+            }
+            if (state is null || state.Previous is not { Status: "previous" } previous)
+            {
+                throw new ActiveReleaseBindingException("no previous signed release binding to roll back to");
+            }
+            if (!string.Equals(tokenSha256, previous.ActivationTokenSha256, StringComparison.Ordinal))
+            {
+                throw new ActiveReleaseBindingException(
+                    "rollback token does not match the previous binding's signer-committed activation_token_sha256");
+            }
+            var abandoned = state.Current
+                ?? throw new ActiveReleaseBindingException("rollback requires a current binding to abandon");
+            var generation = checked(state.RuntimeGeneration + 1);
+            var now = RequireUtc(_utcNow());
+            // Runtime generation stays strictly monotonic; the signer ordinal
+            // (release_bom_generation) legitimately reverts to the previous
+            // BOM's value and the restored binding records it truthfully.
+            var binding = new ActiveReleaseBindingV1(
+                SchemaVersion,
+                "active.release.binding/v1",
+                "control-plane-host",
+                deviceBindingId,
+                previous.ReleaseBomSha256,
+                generation,
+                previous.ReleaseBomGeneration,
+                executionTokenBase64,
+                previous.ActivationTokenSha256,
+                "active",
+                previous.SignerIdentity,
+                previous.SignerKeyId,
+                previous.BomSignatureSha256,
+                now,
+                NextReceiptId(deviceBindingId, state.Sequence + 1));
+            binding.Validate();
+            var receipt = BuildReceipt(
+                "rollback",
+                deviceBindingId,
+                state,
+                from: new ReleaseBindingEndpointV1(abandoned.ReleaseBomSha256, abandoned.Generation, "revoked"),
+                to: new ReleaseBindingEndpointV1(previous.ReleaseBomSha256, generation, "active"),
+                actorIdentity: "control-plane-host",
+                occurredAt: now);
 
-        state.Generation = generation;
-        state.Active = binding;
-        state.Previous = null;
-        state.Sequence = receipt.Sequence;
+            state.RuntimeGeneration = generation;
+            state.Current = binding;
+            state.Previous = null;
+            state.Sequence = receipt.Sequence;
+            Commit(deviceBindingId, state, receipt, requestSha256);
+            return receipt;
+        }
+    }
+
+    private void Commit(
+        string deviceBindingId,
+        DeviceState state,
+        ReleaseBindingReceiptV1 receipt,
+        string requestSha256)
+    {
         state.Receipts.Add(receipt);
-        return receipt;
+        state.RequestReceipts[requestSha256] = receipt;
+        _devices[deviceBindingId] = state;
+        _store.Append(new ReleaseBindingTruthRecord(
+            deviceBindingId,
+            receipt,
+            state.Current!,
+            state.Previous,
+            state.LastActivationSignerGeneration,
+            requestSha256));
+    }
+
+    private void RecoverFromStore()
+    {
+        var seenReceiptIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var record in _store.LoadAll())
+        {
+            if (record is null)
+            {
+                throw new ActiveReleaseBindingException("truth store journal contains a null record");
+            }
+            var receipt = record.Receipt
+                ?? throw new ActiveReleaseBindingException("truth store record has no receipt");
+            receipt.Validate();
+            record.CurrentBinding.Validate();
+            record.PreviousBinding?.Validate();
+            if (!string.Equals(receipt.DeviceBindingId, record.DeviceBindingId, StringComparison.Ordinal)
+                || !string.Equals(record.CurrentBinding.DeviceBindingId, record.DeviceBindingId, StringComparison.Ordinal))
+            {
+                throw new ActiveReleaseBindingException("truth store record device identity fork");
+            }
+            var state = _devices.TryGetValue(record.DeviceBindingId, out var existing)
+                ? existing
+                : new DeviceState();
+            if (receipt.Sequence != state.Sequence + 1)
+            {
+                throw new ActiveReleaseBindingException(
+                    "truth store journal sequence is not contiguous per device");
+            }
+            if (!string.Equals(
+                    receipt.ReceiptId,
+                    NextReceiptId(record.DeviceBindingId, receipt.Sequence),
+                    StringComparison.Ordinal)
+                || !seenReceiptIds.Add(receipt.ReceiptId))
+            {
+                throw new ActiveReleaseBindingException("truth store journal receipt identity fork");
+            }
+            if (!string.Equals(receipt.PayloadSha256, receipt.ComputePayloadSha256(), StringComparison.Ordinal))
+            {
+                throw new ActiveReleaseBindingException("truth store journal receipt payload digest mismatch");
+            }
+            var expectedRuntimeGeneration = receipt.ReceiptKind switch
+            {
+                "activation" or "rollback" => state.RuntimeGeneration + 1,
+                _ => state.RuntimeGeneration
+            };
+            if (receipt.To.Generation != expectedRuntimeGeneration
+                || record.CurrentBinding.Generation != expectedRuntimeGeneration)
+            {
+                throw new ActiveReleaseBindingException(
+                    "truth store journal runtime generation regressed or forked");
+            }
+            if (receipt.ReceiptKind == "activation")
+            {
+                if (record.CurrentBinding.ReleaseBomGeneration <= state.LastActivationSignerGeneration
+                    || record.LastActivationSignerGeneration != record.CurrentBinding.ReleaseBomGeneration)
+                {
+                    throw new ActiveReleaseBindingException(
+                        "truth store journal signer generation regressed on activation");
+                }
+            }
+            else if (record.LastActivationSignerGeneration != state.LastActivationSignerGeneration)
+            {
+                throw new ActiveReleaseBindingException(
+                    "truth store journal mutated the signer ordinal outside activation");
+            }
+            if (string.IsNullOrEmpty(record.RequestSha256)
+                || !state.RequestReceipts.TryAdd(record.RequestSha256, receipt))
+            {
+                throw new ActiveReleaseBindingException("truth store journal request digest fork");
+            }
+            state.Current = record.CurrentBinding;
+            state.Previous = record.PreviousBinding;
+            state.RuntimeGeneration = expectedRuntimeGeneration;
+            state.Sequence = receipt.Sequence;
+            state.LastActivationSignerGeneration = record.LastActivationSignerGeneration;
+            state.Receipts.Add(receipt);
+            _devices[record.DeviceBindingId] = state;
+        }
     }
 
     private ReleaseBindingReceiptV1 BuildReceipt(
@@ -337,10 +629,47 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
         return "receipt_" + Convert.ToHexStringLower(SHA256.HashData(material))[..32];
     }
 
-    private static string RequireToken(string token)
+    private static string RequestHash(string domain, ReadOnlySpan<byte> body, string suffix)
     {
-        ControlContractValidation.RequireSha256(token, nameof(token));
-        return token;
+        var prefix = Encoding.UTF8.GetBytes(domain + "\n");
+        var tail = Encoding.UTF8.GetBytes("\n" + suffix);
+        var material = new byte[prefix.Length + body.Length + tail.Length];
+        prefix.CopyTo(material, 0);
+        body.CopyTo(material.AsSpan(prefix.Length));
+        tail.CopyTo(material.AsSpan(prefix.Length + body.Length));
+        return Convert.ToHexStringLower(SHA256.HashData(material));
+    }
+
+    private static string RequireCanonicalTokenSha256(string executionTokenBase64)
+    {
+        if (string.IsNullOrEmpty(executionTokenBase64))
+        {
+            throw new ActiveReleaseBindingException("execution token is required");
+        }
+        byte[] token;
+        try
+        {
+            token = Convert.FromBase64String(executionTokenBase64);
+        }
+        catch (FormatException exception)
+        {
+            throw new ActiveReleaseBindingException(
+                "execution token must use Base64 encoding", exception);
+        }
+        try
+        {
+            if (token.Length != ReleaseBomWireContract.ExecutionTokenSizeBytes
+                || !string.Equals(Convert.ToBase64String(token), executionTokenBase64, StringComparison.Ordinal))
+            {
+                throw new ActiveReleaseBindingException(
+                    "execution token must be canonical Base64 for exactly 256 opaque bits");
+            }
+            return Convert.ToHexStringLower(SHA256.HashData(token));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(token);
+        }
     }
 
     private static DateTimeOffset RequireUtc(DateTimeOffset value)
@@ -349,8 +678,14 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
         return value;
     }
 
-    private (byte[] SignatureBytes, ReleaseBomTrustKey Key) VerifySignedBom(
-        ReadOnlySpan<byte> signedBomBytes)
+    private sealed record SignedBomFacts(
+        long SignerGeneration,
+        string ActivationTokenSha256,
+        string? PreviousStableBomSha256,
+        string SignatureSha256,
+        ReleaseBomTrustKey Key);
+
+    private SignedBomFacts VerifySignedBom(ReadOnlySpan<byte> signedBomBytes)
     {
         JsonDocument document;
         try
@@ -375,6 +710,76 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
             {
                 throw new ActiveReleaseBindingException("signed release BOM must be one JSON object");
             }
+            var observed = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var property in root.EnumerateObject())
+            {
+                if (!ReleaseBomWireContract.RequiredTopLevelFields.Contains(property.Name))
+                {
+                    throw new ActiveReleaseBindingException(
+                        $"signed release BOM has unknown top-level field '{property.Name}'");
+                }
+                if (!observed.Add(property.Name))
+                {
+                    throw new ActiveReleaseBindingException(
+                        $"signed release BOM duplicates top-level field '{property.Name}'");
+                }
+            }
+            if (!observed.SetEquals(ReleaseBomWireContract.RequiredTopLevelFields))
+            {
+                throw new ActiveReleaseBindingException(
+                    "signed release BOM is missing required top-level fields");
+            }
+            if (root.GetProperty("schema_version").GetString() != ReleaseBomWireContract.SchemaVersion)
+            {
+                throw new ActiveReleaseBindingException(
+                    "signed release BOM schema_version must be dps.release-bom/v1");
+            }
+            if (root.GetProperty("status").GetString() != ReleaseBomWireContract.ExpectedStatus)
+            {
+                throw new ActiveReleaseBindingException(
+                    "signed release BOM status must be SIGNED");
+            }
+            var generationElement = root.GetProperty("release_bom_generation");
+            if (generationElement.ValueKind != JsonValueKind.Number
+                || !generationElement.TryGetInt64(out var signerGeneration)
+                || generationElement.GetRawText().AsSpan().ContainsAny(".eE")
+                || signerGeneration < 1)
+            {
+                throw new ActiveReleaseBindingException(
+                    "release_bom_generation must be a positive signed 64-bit integer");
+            }
+            var activationToken = root.GetProperty("activation_token_sha256");
+            if (activationToken.ValueKind != JsonValueKind.String
+                || !IsLowercaseHex64(activationToken.GetString()!))
+            {
+                throw new ActiveReleaseBindingException("activation_token_sha256 is invalid");
+            }
+            var previousId = root.GetProperty("previous_stable_bom");
+            var previousSha = root.GetProperty("previous_stable_bom_sha256");
+            string? previousStableBomSha256;
+            if (previousId.ValueKind == JsonValueKind.Null)
+            {
+                // candidate_bom_validator._validate_previous_bom (3210-3215):
+                // a null previous id requires a null previous sha.
+                if (previousSha.ValueKind != JsonValueKind.Null)
+                {
+                    throw new ActiveReleaseBindingException(
+                        "previous_stable_bom_sha256 must be null when previous_stable_bom is null");
+                }
+                previousStableBomSha256 = null;
+            }
+            else
+            {
+                if (previousId.ValueKind != JsonValueKind.String
+                    || previousId.GetString()!.Length < 8
+                    || previousSha.ValueKind != JsonValueKind.String
+                    || !IsLowercaseHex64(previousSha.GetString()!))
+                {
+                    throw new ActiveReleaseBindingException("previous stable BOM reference is invalid");
+                }
+                previousStableBomSha256 = previousSha.GetString();
+            }
+
             if (!root.TryGetProperty("signature", out var signature)
                 || signature.ValueKind != JsonValueKind.Object)
             {
@@ -424,9 +829,17 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
             {
                 throw new ActiveReleaseBindingException("bom signature verification failed");
             }
-            return (signatureBytes, key);
+            return new SignedBomFacts(
+                signerGeneration,
+                activationToken.GetString()!,
+                previousStableBomSha256,
+                Convert.ToHexStringLower(SHA256.HashData(signatureBytes)),
+                key);
         }
     }
+
+    private static bool IsLowercaseHex64(string value)
+        => value.Length == 64 && !value.AsSpan().ContainsAnyExcept("0123456789abcdef");
 
     private static byte[] ExponentBytes(int exponent)
     {
