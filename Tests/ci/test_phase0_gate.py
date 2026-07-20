@@ -2448,7 +2448,7 @@ if [[ -n "$phase0_evidence" ]]; then
   phase0_arguments+=(--evidence "$phase0_evidence")
 fi
 "$python_executable" Tools/ci/run_phase0_gate.py "${phase0_arguments[@]}"
-PYTHONPATH="$repo_root/Modules/factory-release-controller/src" "$python_executable" Modules/factory-release-controller/src/candidate_bom_validator.py --repo-root "$repo_root" --bundle-root "$bundle_root" --bom "$bom_path" --previous-bom "$previous_bom_path" --schema-sha256 "$schema_sha256"
+"$python_executable" Tools/ci/candidate_bom_validator.py --repo-root "$repo_root" --bundle-root "$bundle_root" --bom "$bom_path" --previous-bom "$previous_bom_path" --schema-sha256 "$schema_sha256"
 """,
             encoding="utf-8",
         )
@@ -2782,9 +2782,8 @@ if __name__ == "__main__":
     def test_release_missing_candidate_bom_validator_is_rejected(self):
         self.release_path.write_text(
             self.release_path.read_text(encoding="utf-8").replace(
-                'PYTHONPATH="$repo_root/Modules/factory-release-controller/src" '
                 '"$python_executable" '
-                "Modules/factory-release-controller/src/candidate_bom_validator.py "
+                "Tools/ci/candidate_bom_validator.py "
                 '--repo-root "$repo_root" --bundle-root "$bundle_root" '
                 '--bom "$bom_path" --previous-bom "$previous_bom_path" '
                 '--schema-sha256 "$schema_sha256"\n',
@@ -2805,15 +2804,13 @@ if __name__ == "__main__":
                 '"${phase0_arguments[@]}"\n',
             )
             .replace(
-                'PYTHONPATH="$repo_root/Modules/factory-release-controller/src" '
                 '"$python_executable" '
-                "Modules/factory-release-controller/src/candidate_bom_validator.py "
+                "Tools/ci/candidate_bom_validator.py "
                 '--repo-root "$repo_root" --bundle-root "$bundle_root" '
                 '--bom "$bom_path" --previous-bom "$previous_bom_path" '
                 '--schema-sha256 "$schema_sha256"\n',
-                '# PYTHONPATH="$repo_root/Modules/factory-release-controller/src" '
-                '"$python_executable" '
-                "Modules/factory-release-controller/src/candidate_bom_validator.py "
+                '# "$python_executable" '
+                "Tools/ci/candidate_bom_validator.py "
                 '--repo-root "$repo_root" --bundle-root "$bundle_root" '
                 '--bom "$bom_path" --previous-bom "$previous_bom_path" '
                 '--schema-sha256 "$schema_sha256"\n',

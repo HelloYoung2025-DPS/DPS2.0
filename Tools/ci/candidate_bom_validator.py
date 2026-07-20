@@ -7,9 +7,18 @@ signatures, independent evidence, risk approval, and the previous stable BOM.
 R0-C (RebuildPlan 4.3) migrated this validator here from
 Modules/factory-release-controller/src/ -- candidate validation is ordinary
 gate code and must survive that module's R0-D deletion.  It validates only:
-no signing, no deployment, no runtime state.  The module-side original stays
-byte-identical until R0-D removes it; this copy is the authoritative one and
-its code-bound trust policy now lives under governance/policies/.
+no signing, no deployment, no runtime state.  This copy is the one
+scripts/release.sh invokes and the one the Phase 0 CI-integrity allowlist
+pins; its code-bound trust policy lives under governance/policies/.  The
+module-side original stays byte-identical until R0-D removes it.
+
+Known-dead operational entry, blocked on the owner: the deployed trust
+policy predates the native-stop authority code (no
+native_stop_trust_signer_identities group, no native-stop-trust key), so
+from_deployed_anchor -- and therefore the release-script CLI -- cannot
+construct a validator until the owner provisions that signer and re-anchors
+the code-bound digest.  Identical at base, where release.sh invoked the
+module-side copy and died on the same field.
 """
 
 from __future__ import annotations

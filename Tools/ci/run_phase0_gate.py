@@ -447,7 +447,11 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         # green.
         "test_the_trust_policy_bytes_are_identical_in_both_homes",
         "test_the_code_bound_policy_digest_did_not_change_in_migration",
-        "test_the_operational_anchor_entry_fails_identically_in_both_copies",
+        "test_the_operational_anchor_entry_behaves_identically_in_both_copies",
+        # expectedFailure today: flips to unexpected success (a hard red) the
+        # moment the owner provisions the native-stop signer in the deployed
+        # policy, forcing real end-to-end CLI coverage.
+        "test_the_operational_anchor_entry_constructs_the_release_validator",
     }
     command = [
         sys.executable,

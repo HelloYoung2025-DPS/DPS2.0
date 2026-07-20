@@ -131,9 +131,10 @@ if [[ -n "$phase0_evidence" ]]; then
 fi
 "$python_executable" Tools/ci/run_phase0_gate.py "${phase0_arguments[@]}"
 
-PYTHONPATH="$repo_root/Modules/factory-release-controller/src" \
-  "$python_executable" \
-  Modules/factory-release-controller/src/candidate_bom_validator.py \
+# R0-C: candidate BOM validation migrated to Tools/ci (RebuildPlan 4.3); the
+# validator is a single stdlib file, so no PYTHONPATH is needed.
+"$python_executable" \
+  Tools/ci/candidate_bom_validator.py \
   --repo-root "$repo_root" \
   --bundle-root "$bundle_root" \
   --bom "$bom_path" \

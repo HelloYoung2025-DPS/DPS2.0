@@ -558,14 +558,10 @@ class MigrationFidelityTests(unittest.TestCase):
         )
         self.assertEqual(SUBJECT._DEPLOYED_TRUST_POLICY_ID, policy.get("policy_id"))
 
-    def test_the_operational_anchor_entry_fails_identically_in_both_copies(self) -> None:
-        # BASE_PREEXISTING, registered not fixed: the deployed trust policy
-        # artifact lacks native_stop_trust_signer_identities, so
-        # from_deployed_anchor cannot construct a validator -- and no suite
-        # exercised that entry before this one, so the gap was silent.  This
-        # test makes it visible and simultaneously proves the migration did
-        # not alter the behaviour.  Fixing the policy artifact changes the
-        # code-bound digest and is a trust decision reserved to the owner.
+    def test_the_operational_anchor_entry_behaves_identically_in_both_copies(self) -> None:
+        # Migration fidelity only: whatever from_deployed_anchor does, it must do
+        # the same thing in both homes until R0-D deletes the original.  This
+        # test takes NO position on whether the entry works.
         import importlib.util
 
         spec = importlib.util.spec_from_file_location("_dps_module_side_cbv_subject", self.MODULE_SOURCE)
@@ -574,21 +570,35 @@ class MigrationFidelityTests(unittest.TestCase):
         schema_sha = hashlib.sha256(
             (ROOT / "governance" / "schemas" / "release-bom.schema.json").read_bytes()
         ).hexdigest()
-        failures = []
-        for label, subject in (("migrated", SUBJECT), ("original", original)):
+        outcomes = []
+        for subject in (SUBJECT, original):
             with tempfile.TemporaryDirectory() as bundle:
                 try:
                     subject.CandidateBomValidator.from_deployed_anchor(ROOT, bundle, schema_sha)
-                    failures.append((label, None))
+                    outcomes.append(None)
                 except subject.CandidateBomError as exc:
-                    failures.append((label, str(exc)))
-        self.assertEqual(failures[0][1], failures[1][1])
-        self.assertIsNotNone(
-            failures[0][1],
-            "from_deployed_anchor unexpectedly works now -- delete this pin and "
-            "add real coverage for the operational entry",
-        )
-        self.assertIn("native_stop_trust_signer_identities", failures[0][1])
+                    outcomes.append(str(exc))
+        self.assertEqual(outcomes[0], outcomes[1])
+
+    @unittest.expectedFailure
+    def test_the_operational_anchor_entry_constructs_the_release_validator(self) -> None:
+        # BASE_PREEXISTING, blocked on the owner: the deployed trust policy
+        # artifact predates the native-stop authority code and carries neither a
+        # native_stop_trust_signer_identities role group nor any key with the
+        # native-stop-trust purpose.  Provisioning that signer identity and its
+        # single-purpose key, and re-anchoring the code-bound policy digest, is
+        # the owner's out-of-repo trust decision -- no in-repo value can be
+        # derived for it.  Until then the release script's operational entry
+        # cannot construct a validator, exactly as at base (which invoked the
+        # module-side copy and died on the same field).  This test asserts the
+        # WORKING behaviour: it is an expected failure today, and the moment the
+        # owner provisions the policy it flips to an unexpected success, forcing
+        # this decorator's removal and real end-to-end CLI coverage.
+        schema_sha = hashlib.sha256(
+            (ROOT / "governance" / "schemas" / "release-bom.schema.json").read_bytes()
+        ).hexdigest()
+        with tempfile.TemporaryDirectory() as bundle:
+            SUBJECT.CandidateBomValidator.from_deployed_anchor(ROOT, bundle, schema_sha)
 
 
 class CandidateBomValidatorTests(unittest.TestCase):

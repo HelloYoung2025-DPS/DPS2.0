@@ -4361,18 +4361,17 @@ def _release_validation_allowlist_errors(release_text: str) -> List[str]:
             if len(phase0) == 1 and phase0[0] == expected:
                 continue
 
+        # R0-C: the candidate BOM validator lives in Tools/ci (RebuildPlan 4.3).
+        # It is a single stdlib file, so the invocation carries no PYTHONPATH --
+        # an environment prefix here is now outside the allowlist, not expected.
         candidate = _python_script_invocations(
             line,
-            "Modules/factory-release-controller/src/candidate_bom_validator.py",
+            "Tools/ci/candidate_bom_validator.py",
         )
         if candidate:
-            raw_tokens = _shell_tokens(line)
-            expected_environment = (
-                "PYTHONPATH=$repo_root/Modules/factory-release-controller/src"
-            )
             expected = [
                 candidate[0][0],
-                "Modules/factory-release-controller/src/candidate_bom_validator.py",
+                "Tools/ci/candidate_bom_validator.py",
                 "--repo-root",
                 "$repo_root",
                 "--bundle-root",
@@ -4386,7 +4385,7 @@ def _release_validation_allowlist_errors(release_text: str) -> List[str]:
             ]
             if (
                 len(candidate) == 1
-                and raw_tokens[:1] == [expected_environment]
+                and _shell_tokens(line) == expected
                 and candidate[0] == expected
             ):
                 continue
@@ -4622,7 +4621,7 @@ def validate_ci_integrity(root: Path) -> Dict[str, Any]:
         errors.append("release validation must actually invoke the unique Phase 0 gate exactly once")
     candidate_validator = _python_script_invocations(
         release_text,
-        "Modules/factory-release-controller/src/candidate_bom_validator.py",
+        "Tools/ci/candidate_bom_validator.py",
     )
     if len(candidate_validator) != 1:
         errors.append("release validation must actually invoke candidate_bom_validator.py exactly once")
