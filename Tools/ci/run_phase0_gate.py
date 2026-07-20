@@ -405,6 +405,13 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         # module-manifest*.schema.json a candidate leaves on disk.
         "test_a_planted_schema_cannot_introduce_a_major_of_its_own",
         "test_a_registered_schema_may_not_relabel_its_major",
+        # const alone is compared with Python equality, where 1 == True, so the v2
+        # boolean fields bind ``type`` where the const lives.
+        "test_v2_boolean_consts_refuse_numeric_impostors",
+        "test_v2_release_eligibility_const_is_type_bound",
+        # Draft 2020-12 calls 1.0 an integer; the hand-rolled evaluator must not be
+        # stricter than the reference it is pinned against.
+        "test_integral_floats_satisfy_integer_exactly_as_draft_2020_12_says",
         "test_the_frozen_commit_is_accepted_and_returned",
         # The injected baseline is the *current* base tip, so it moves.  Naming this
         # keeps the gate from silently regressing to an equality check that would

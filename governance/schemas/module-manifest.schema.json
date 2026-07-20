@@ -321,7 +321,7 @@
         "policyVersion": { "$ref": "#/$defs/semver" },
         "instructionsFile": { "const": "AGENTS.md" },
         "manifestFile": { "const": "module.yaml" },
-        "receiptRequired": { "const": true }
+        "receiptRequired": { "type": "boolean", "const": true }
       }
     }
   },
@@ -331,7 +331,7 @@
         "properties": { "module": { "properties": { "lifecycle": { "const": "proposed" } } } }
       },
       "then": {
-        "properties": { "module": { "properties": { "releaseEligible": { "const": false } } } }
+        "properties": { "module": { "properties": { "releaseEligible": { "type": "boolean", "const": false } } } }
       }
     }
   ],

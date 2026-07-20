@@ -93,7 +93,7 @@ STALE_CANDIDATE_GBRAIN_SOURCE_BINDING_V1_DTO_SHA256 = "161661959fc77100c40e9b000
 # Changing either schema is therefore a deliberate, reviewable edit of this file.
 MODULE_MANIFEST_SCHEMA_SHA256 = {
     "dps.module/v1": "65d9f0b2654db0884b3bfef45edc3a211ea0aedf9b7eabe11921838b0b1be5a7",
-    "dps.module/v2": "4c08cc856a10879121f83507a728823a1b23791d54bdbe2491df2608e0e4a121",
+    "dps.module/v2": "4bc4d69c3f0951c4e1b10bcd614ee56d65a22b03e5a6b18cd31c34e2eedbd38c",
 }
 
 STAGE_SPECS: dict[str, dict[str, Any]] = {
@@ -5131,7 +5131,12 @@ def _json_type_name(value: Any) -> str:
     if isinstance(value, int):
         return "integer"
     if isinstance(value, float):
-        return "number"
+        # Draft 2020-12 defines "integer" by VALUE, not by encoding: any number with a
+        # zero fractional part is an integer, so 1.0 satisfies {"type": "integer"} while
+        # 1.5 does not.  Reporting every float as "number" made this evaluator stricter
+        # than the reference implementation it is pinned against.  (is_integer() is False
+        # for inf/nan, so those still fall through to "number".)
+        return "integer" if value.is_integer() else "number"
     if isinstance(value, str):
         return "string"
     if isinstance(value, list):

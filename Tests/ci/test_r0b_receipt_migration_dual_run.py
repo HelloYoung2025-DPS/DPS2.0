@@ -147,6 +147,10 @@ def _run_trusted_git(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         [_trusted_git_executable(), *args],
         cwd=str(ROOT),
+        # No trusted-git call here takes input; DEVNULL makes that explicit and
+        # keeps ``hash-object --stdin`` (which wants the EMPTY tree) from waiting
+        # forever on an inherited stdin that some runners keep open.
+        stdin=subprocess.DEVNULL,
         capture_output=True,
         check=False,
     )
@@ -325,8 +329,19 @@ class SchemaRuleChangeTest(unittest.TestCase):
                 agents = schema["properties"]["agents"]
                 self.assertFalse(agents["additionalProperties"])
                 # RebuildPlan 4.2.2: receiptRequired=true survives the migration.
-                self.assertEqual({"const": True}, agents["properties"]["receiptRequired"])
+                receipt_required = agents["properties"]["receiptRequired"]
+                self.assertIs(True, receipt_required["const"])
                 self.assertIn("receiptRequired", agents["required"])
+                # The two majors deliberately differ here.  v1 is frozen at its
+                # published bytes, so it keeps the bare const.  v2 additionally binds
+                # ``type`` because const alone is compared with Python equality, under
+                # which 1 == True (see test_v2_boolean_consts_refuse_numeric_impostors).
+                expected = (
+                    {"const": True}
+                    if label == "old"
+                    else {"type": "boolean", "const": True}
+                )
+                self.assertEqual(expected, receipt_required)
 
 
 class DualRunAcceptanceMatrixTest(unittest.TestCase):
@@ -1149,6 +1164,56 @@ class MajorCoexistenceDispatchTest(unittest.TestCase):
 
     def _a_live_manifest(self) -> Dict[str, Any]:
         return copy.deepcopy(next(iter(sorted(self.live_manifests.items())))[1])
+
+    def test_v2_boolean_consts_refuse_numeric_impostors(self) -> None:
+        # phase0's validator compares const with Python ``!=`` (Tools/ci/phase0.py:665),
+        # and in Python ``1 == True``.  So {"const": true} ALONE accepted
+        # receiptRequired: 1 and 1.0 -- a manifest could declare receipts required
+        # with a value that is not a boolean at all, and the gate read it as true.
+        # The fix is declared in the v2 schema rather than in the shared validator:
+        # ``type`` is checked by _schema_type_matches (phase0.py:608), which does
+        # ``isinstance(value, bool)`` and therefore refuses ints outright.
+        # This is exercised against the LIVE v2 schema, so deleting the type
+        # declaration turns this red.
+        manifest = self._a_live_manifest()
+        self.assertEqual("dps.module/v2", manifest["schemaVersion"])
+        schema = self.dispatch["dps.module/v2"]
+        self.assertEqual([], phase0.validate_json_schema(manifest, schema, schema, "live"))
+
+        for impostor in (1, 1.0, 0, 0.0, "true"):
+            with self.subTest(receiptRequired=impostor):
+                candidate = copy.deepcopy(manifest)
+                candidate["agents"]["receiptRequired"] = impostor
+                self.assertNotEqual(
+                    [],
+                    phase0.validate_json_schema(candidate, schema, schema, "live"),
+                    "a non-boolean receiptRequired was accepted as true",
+                )
+        # The honest value still passes, so the guard is not just refusing everything.
+        honest = copy.deepcopy(manifest)
+        honest["agents"]["receiptRequired"] = True
+        self.assertEqual([], phase0.validate_json_schema(honest, schema, schema, "live"))
+
+    def test_v2_release_eligibility_const_is_type_bound(self) -> None:
+        # Companion to the above for the proposed-lifecycle branch.  Unlike
+        # receiptRequired this one was NOT independently exploitable -- the base
+        # property declaration at module.properties.releaseEligible already says
+        # {"type": "boolean"} -- but the const in the allOf/then branch relied on
+        # that neighbour for its safety.  Binding the type where the const lives
+        # makes the branch self-sufficient.
+        branch = self.live_v2["allOf"][0]["then"]["properties"]["module"]["properties"]["releaseEligible"]
+        self.assertEqual({"type": "boolean", "const": False}, branch)
+
+        schema = self.dispatch["dps.module/v2"]
+        manifest = self._a_live_manifest()
+        manifest["module"]["lifecycle"] = "proposed"
+        for impostor in (0, 0.0, 1, True):
+            with self.subTest(releaseEligible=impostor):
+                candidate = copy.deepcopy(manifest)
+                candidate["module"]["releaseEligible"] = impostor
+                self.assertNotEqual(
+                    [], phase0.validate_json_schema(candidate, schema, schema, "live")
+                )
 
     def test_live_schemas_pin_two_distinct_majors(self) -> None:
         # major-map code-pin (proof-obligation 9): reverting either major fails here.

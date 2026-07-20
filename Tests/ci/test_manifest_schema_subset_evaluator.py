@@ -48,6 +48,18 @@ def _load_schema(schema_version: str) -> Dict[str, Any]:
     return json.loads((SCHEMAS / SCHEMA_FILES[schema_version]).read_text(encoding="utf-8"))
 
 
+def _first_contract_major(manifest: Dict[str, Any]) -> str:
+    """The first supportedContractMajors key, or KeyError so the mutation is skipped.
+
+    Some manifests declare the block empty; raising KeyError (not StopIteration)
+    is what the runners below already treat as "nothing here to mutate".
+    """
+    keys = list(manifest["compatibility"]["supportedContractMajors"])
+    if not keys:
+        raise KeyError("supportedContractMajors is empty")
+    return keys[0]
+
+
 def _live_manifests() -> List[Tuple[str, Dict[str, Any]]]:
     return [
         (path.parent.name, yaml.safe_load(path.read_text(encoding="utf-8")))
@@ -77,6 +89,23 @@ MUTATIONS: List[Tuple[str, Callable[[Dict[str, Any]], Any]]] = [
     ("duplicate_dependencies", lambda m: m.__setitem__("dependencies", m["dependencies"] * 2)),
     ("compatibility_const", lambda m: m["compatibility"].__setitem__("unknownMajorBehavior", "allow")),
     ("schema_version_const", lambda m: m.__setitem__("schemaVersion", "dps.module/v2" if m["schemaVersion"] == "dps.module/v1" else "dps.module/v1")),
+    ("timeout_maximum", lambda m: m["communication"]["outbound"][0].__setitem__("timeoutMs", 300001)),
+    ("module_major_non_integral", lambda m: m["compatibility"].__setitem__("moduleMajor", 1.5)),
+    ("contract_majors_duplicate", lambda m: m["compatibility"]["supportedContractMajors"].__setitem__(_first_contract_major(m), [1, 1])),
+    # 1 and 1.0 are the SAME number in JSON Schema, so uniqueItems must reject the
+    # pair even though Python would keep them as distinct int/float objects.
+    ("contract_majors_cross_encoding_duplicate", lambda m: m["compatibility"]["supportedContractMajors"].__setitem__(_first_contract_major(m), [1, 1.0])),
+]
+
+
+# Draft 2020-12 defines "integer" by value, not by encoding: 1.0 IS an integer.
+# These are the cases the evaluator must ACCEPT, so they cannot live in MUTATIONS
+# (every entry there must be a real rejection).  Getting this direction wrong is
+# the dangerous one in reverse: the evaluator would reject honest manifests and
+# F9 would fail closed on documents the schema actually permits.
+INTEGRAL_FLOAT_CASES: List[Tuple[str, Callable[[Dict[str, Any]], Any]]] = [
+    ("module_major_integral_float", lambda m: m["compatibility"].__setitem__("moduleMajor", 1.0)),
+    ("contract_majors_integral_float", lambda m: m["compatibility"]["supportedContractMajors"].__setitem__(_first_contract_major(m), [1.0])),
 ]
 
 
@@ -130,6 +159,36 @@ class ManifestSchemaEvaluatorDifferentialTest(unittest.TestCase):
             "the vocabulary it stands for is not actually compared",
         )
         self.assertGreater(compared, 100)
+
+    def test_integral_floats_satisfy_integer_exactly_as_draft_2020_12_says(self) -> None:
+        # The evaluator reported every float as "number", so {"type": "integer"}
+        # rejected 1.0 -- stricter than the reference it is pinned against, which
+        # would have made F9 fail closed on manifests the schema permits.  Both
+        # directions are asserted here: 1.0 is accepted, 1.5 is still refused
+        # (the latter also rides in MUTATIONS, so agreement is checked twice).
+        manifests = _live_manifests()
+        exercised: set[str] = set()
+        for module_id, base in manifests:
+            schema = _load_schema(base["schemaVersion"])
+            for name, mutate in INTEGRAL_FLOAT_CASES:
+                mutated = copy.deepcopy(base)
+                try:
+                    mutate(mutated)
+                except (KeyError, IndexError):
+                    continue
+                exercised.add(name)
+                with self.subTest(module=module_id, case=name):
+                    self.assertTrue(
+                        self._reference_accepts(mutated, schema),
+                        "premise check: Draft 2020-12 must accept this, otherwise the "
+                        "case proves nothing about the evaluator",
+                    )
+                    self.assertTrue(
+                        self._subset_accepts(mutated, schema),
+                        "the stdlib evaluator rejects an integral float that Draft "
+                        "2020-12 accepts as an integer",
+                    )
+        self.assertEqual({name for name, _ in INTEGRAL_FLOAT_CASES}, exercised)
 
     def test_the_mutations_are_real_rejections_and_not_no_ops(self) -> None:
         # A mutation set that quietly stopped changing anything would make the
