@@ -43,7 +43,12 @@ public sealed record ReleaseBindingReceiptV1(
     [property: JsonPropertyName("actor_identity")] string ActorIdentity,
     [property: JsonPropertyName("occurred_at")] DateTimeOffset OccurredAt,
     [property: JsonPropertyName("payload_sha256")] string PayloadSha256,
-    [property: JsonPropertyName("receipt_id")] string ReceiptId)
+    [property: JsonPropertyName("receipt_id")] string ReceiptId,
+    [property: JsonPropertyName("soul_id")] string? SoulId,
+    [property: JsonPropertyName("platform_account_id")] string? PlatformAccountId,
+    [property: JsonPropertyName("trace_id")] string? TraceId,
+    [property: JsonPropertyName("idempotency_key")] string? IdempotencyKey,
+    [property: JsonPropertyName("privacy_class")] string PrivacyClass)
 {
     public void Validate()
     {
@@ -51,6 +56,14 @@ public sealed record ReleaseBindingReceiptV1(
         ControlContractValidation.RequireExact(ContractId, "release.binding.receipt/v1", nameof(ContractId));
         ControlContractValidation.RequireExact(ProducerModule, "control-plane-host", nameof(ProducerModule));
         ControlContractValidation.RequireDeviceBindingId(DeviceBindingId);
+        // Common envelope semantics: device-scoped runtime truth carries the
+        // soul/account/trace/idempotency identities as explicit null and a
+        // fixed "internal" privacy class.
+        ReleaseBindingValidation.RequireExplicitNull(SoulId, nameof(SoulId));
+        ReleaseBindingValidation.RequireExplicitNull(PlatformAccountId, nameof(PlatformAccountId));
+        ReleaseBindingValidation.RequireExplicitNull(TraceId, nameof(TraceId));
+        ReleaseBindingValidation.RequireExplicitNull(IdempotencyKey, nameof(IdempotencyKey));
+        ControlContractValidation.RequireExact(PrivacyClass, "internal", nameof(PrivacyClass));
         From?.Validate();
         ArgumentNullException.ThrowIfNull(To);
         To.Validate();
@@ -93,22 +106,30 @@ public sealed record ReleaseBindingReceiptV1(
     /// </summary>
     public string ComputePayloadSha256()
     {
-        var builder = new StringBuilder(512);
+        var builder = new StringBuilder(640);
         builder.Append("{\"actor_identity\":\"").Append(ActorIdentity)
             .Append("\",\"contract_id\":\"").Append(ContractId)
             .Append("\",\"device_binding_id\":\"").Append(DeviceBindingId)
             .Append("\",\"from\":").Append(FormatEndpoint(From))
+            .Append(",\"idempotency_key\":").Append(FormatNullableString(IdempotencyKey))
             .Append(",\"occurred_at\":\"").Append(FormatUtc(OccurredAt))
+            .Append("\",\"platform_account_id\":").Append(FormatNullableString(PlatformAccountId))
+            .Append(",\"privacy_class\":\"").Append(PrivacyClass)
             .Append("\",\"producer_module\":\"").Append(ProducerModule)
             .Append("\",\"receipt_id\":\"").Append(ReceiptId)
             .Append("\",\"receipt_kind\":\"").Append(ReceiptKind)
             .Append("\",\"schema_version\":\"").Append(SchemaVersion)
             .Append("\",\"sequence\":").Append(Sequence.ToString(CultureInfo.InvariantCulture))
+            .Append(",\"soul_id\":").Append(FormatNullableString(SoulId))
             .Append(",\"to\":").Append(FormatEndpoint(To))
+            .Append(",\"trace_id\":").Append(FormatNullableString(TraceId))
             .Append('}');
         var digest = SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString()));
         return Convert.ToHexStringLower(digest);
     }
+
+    private static string FormatNullableString(string? value)
+        => value is null ? "null" : "\"" + value + "\"";
 
     private static string FormatEndpoint(ReleaseBindingEndpointV1? endpoint)
         => endpoint is null
@@ -136,9 +157,10 @@ public static class ReleaseBindingReceiptV1Codec
     public const int MaximumPayloadBytes = 16 * 1024;
     private static readonly HashSet<string> ExactFields = new(StringComparer.Ordinal)
     {
-        "schema_version", "contract_id", "producer_module", "receipt_kind",
-        "device_binding_id", "from", "to", "sequence", "actor_identity",
-        "occurred_at", "payload_sha256", "receipt_id"
+        "schema_version", "contract_id", "producer_module", "soul_id",
+        "platform_account_id", "trace_id", "idempotency_key", "privacy_class",
+        "receipt_kind", "device_binding_id", "from", "to", "sequence",
+        "actor_identity", "occurred_at", "payload_sha256", "receipt_id"
     };
     private static readonly HashSet<string> EndpointFields = new(StringComparer.Ordinal)
     {
@@ -158,6 +180,11 @@ public static class ReleaseBindingReceiptV1Codec
             writer.WriteString("schema_version", value.SchemaVersion);
             writer.WriteString("contract_id", value.ContractId);
             writer.WriteString("producer_module", value.ProducerModule);
+            ReleaseBindingWire.WriteNullableString(writer, "soul_id", value.SoulId);
+            ReleaseBindingWire.WriteNullableString(writer, "platform_account_id", value.PlatformAccountId);
+            ReleaseBindingWire.WriteNullableString(writer, "trace_id", value.TraceId);
+            ReleaseBindingWire.WriteNullableString(writer, "idempotency_key", value.IdempotencyKey);
+            writer.WriteString("privacy_class", value.PrivacyClass);
             writer.WriteString("receipt_kind", value.ReceiptKind);
             writer.WriteString("device_binding_id", value.DeviceBindingId);
             WriteEndpoint(writer, "from", value.From);
@@ -197,7 +224,12 @@ public static class ReleaseBindingReceiptV1Codec
             ReleaseBindingWire.ReadString(fields, "actor_identity"),
             ReleaseBindingWire.ReadWireUtc(fields, "occurred_at"),
             ReleaseBindingWire.ReadString(fields, "payload_sha256"),
-            ReleaseBindingWire.ReadString(fields, "receipt_id"));
+            ReleaseBindingWire.ReadString(fields, "receipt_id"),
+            ReleaseBindingWire.ReadNullableString(fields, "soul_id"),
+            ReleaseBindingWire.ReadNullableString(fields, "platform_account_id"),
+            ReleaseBindingWire.ReadNullableString(fields, "trace_id"),
+            ReleaseBindingWire.ReadNullableString(fields, "idempotency_key"),
+            ReleaseBindingWire.ReadString(fields, "privacy_class"));
         receipt.Validate();
         var canonicalPayload = Serialize(receipt);
         try

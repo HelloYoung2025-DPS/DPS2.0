@@ -710,7 +710,13 @@ public sealed class ControlPlaneSubmissionLifecycleTests
             "deployed-controller-key-v1",
             new string('d', 64),
             new DateTimeOffset(2026, 7, 14, 0, 0, 0, TimeSpan.Zero),
-            "receipt_99999999999999999999999999999999");
+            "receipt_99999999999999999999999999999999",
+            SoulId: null,
+            PlatformAccountId: null,
+            TraceId: null,
+            IdempotencyKey: null,
+            OccurredAt: new DateTimeOffset(2026, 7, 14, 0, 0, 0, TimeSpan.Zero),
+            PrivacyClass: "internal");
 
     private sealed class FixedLifecycleBindingReader : IActiveReleaseBindingReader
     {

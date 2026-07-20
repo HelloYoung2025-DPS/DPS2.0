@@ -31,7 +31,13 @@ public sealed record ActiveReleaseBindingV1(
     [property: JsonPropertyName("signer_key_id")] string SignerKeyId,
     [property: JsonPropertyName("bom_signature_sha256")] string BomSignatureSha256,
     [property: JsonPropertyName("activated_at")] DateTimeOffset ActivatedAt,
-    [property: JsonPropertyName("receipt_id")] string ReceiptId)
+    [property: JsonPropertyName("receipt_id")] string ReceiptId,
+    [property: JsonPropertyName("soul_id")] string? SoulId,
+    [property: JsonPropertyName("platform_account_id")] string? PlatformAccountId,
+    [property: JsonPropertyName("trace_id")] string? TraceId,
+    [property: JsonPropertyName("idempotency_key")] string? IdempotencyKey,
+    [property: JsonPropertyName("occurred_at")] DateTimeOffset OccurredAt,
+    [property: JsonPropertyName("privacy_class")] string PrivacyClass)
 {
     public const int ExecutionTokenSizeBytes = 32;
 
@@ -41,6 +47,23 @@ public sealed record ActiveReleaseBindingV1(
         ControlContractValidation.RequireExact(ContractId, "active.release.binding/v1", nameof(ContractId));
         ControlContractValidation.RequireExact(ProducerModule, "control-plane-host", nameof(ProducerModule));
         ControlContractValidation.RequireDeviceBindingId(DeviceBindingId);
+        // Common envelope semantics: this is device-scoped runtime truth, so
+        // the soul/account/trace/idempotency identities are explicit null
+        // (never a missing field), privacy_class is fixed to "internal", and
+        // occurred_at is the authority's injected-clock time — by
+        // construction the same instant as activated_at.
+        ReleaseBindingValidation.RequireExplicitNull(SoulId, nameof(SoulId));
+        ReleaseBindingValidation.RequireExplicitNull(PlatformAccountId, nameof(PlatformAccountId));
+        ReleaseBindingValidation.RequireExplicitNull(TraceId, nameof(TraceId));
+        ReleaseBindingValidation.RequireExplicitNull(IdempotencyKey, nameof(IdempotencyKey));
+        ControlContractValidation.RequireUtc(OccurredAt, nameof(OccurredAt));
+        if (OccurredAt != ActivatedAt)
+        {
+            throw new ArgumentException(
+                "occurred_at must equal activated_at for the active release binding.",
+                nameof(OccurredAt));
+        }
+        ControlContractValidation.RequireExact(PrivacyClass, "internal", nameof(PrivacyClass));
         ControlContractValidation.RequireSha256(ReleaseBomSha256, nameof(ReleaseBomSha256));
         ReleaseBindingValidation.RequirePositive(Generation, nameof(Generation));
         ReleaseBindingValidation.RequirePositive(ReleaseBomGeneration, nameof(ReleaseBomGeneration));
@@ -61,7 +84,7 @@ public sealed record ActiveReleaseBindingV1(
     /// Value-based record equality still covers ExecutionTokenBase64.
     /// </summary>
     public override string ToString()
-        => $"{nameof(ActiveReleaseBindingV1)} {{ SchemaVersion = {SchemaVersion}, ContractId = {ContractId}, ProducerModule = {ProducerModule}, DeviceBindingId = {DeviceBindingId}, ReleaseBomSha256 = {ReleaseBomSha256}, Generation = {Generation}, ReleaseBomGeneration = {ReleaseBomGeneration}, ExecutionTokenBase64 = [REDACTED], ActivationTokenSha256 = {ActivationTokenSha256}, Status = {Status}, SignerIdentity = {SignerIdentity}, SignerKeyId = {SignerKeyId}, BomSignatureSha256 = {BomSignatureSha256}, ActivatedAt = {ActivatedAt:O}, ReceiptId = {ReceiptId} }}";
+        => $"{nameof(ActiveReleaseBindingV1)} {{ SchemaVersion = {SchemaVersion}, ContractId = {ContractId}, ProducerModule = {ProducerModule}, SoulId = {SoulId ?? "null"}, DeviceBindingId = {DeviceBindingId}, PlatformAccountId = {PlatformAccountId ?? "null"}, TraceId = {TraceId ?? "null"}, IdempotencyKey = {IdempotencyKey ?? "null"}, OccurredAt = {OccurredAt:O}, PrivacyClass = {PrivacyClass}, ReleaseBomSha256 = {ReleaseBomSha256}, Generation = {Generation}, ReleaseBomGeneration = {ReleaseBomGeneration}, ExecutionTokenBase64 = [REDACTED], ActivationTokenSha256 = {ActivationTokenSha256}, Status = {Status}, SignerIdentity = {SignerIdentity}, SignerKeyId = {SignerKeyId}, BomSignatureSha256 = {BomSignatureSha256}, ActivatedAt = {ActivatedAt:O}, ReceiptId = {ReceiptId} }}";
 
     private void RequireSignerCommittedToken()
     {
@@ -112,7 +135,9 @@ public static class ActiveReleaseBindingV1Codec
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
     private static readonly HashSet<string> ExactFields = new(StringComparer.Ordinal)
     {
-        "schema_version", "contract_id", "producer_module", "device_binding_id",
+        "schema_version", "contract_id", "producer_module", "soul_id",
+        "device_binding_id", "platform_account_id", "trace_id",
+        "idempotency_key", "occurred_at", "privacy_class",
         "release_bom_sha256", "generation", "release_bom_generation",
         "execution_token", "activation_token_sha256", "status",
         "signer_identity", "signer_key_id", "bom_signature_sha256",
@@ -132,7 +157,13 @@ public static class ActiveReleaseBindingV1Codec
             writer.WriteString("schema_version", value.SchemaVersion);
             writer.WriteString("contract_id", value.ContractId);
             writer.WriteString("producer_module", value.ProducerModule);
+            ReleaseBindingWire.WriteNullableString(writer, "soul_id", value.SoulId);
             writer.WriteString("device_binding_id", value.DeviceBindingId);
+            ReleaseBindingWire.WriteNullableString(writer, "platform_account_id", value.PlatformAccountId);
+            ReleaseBindingWire.WriteNullableString(writer, "trace_id", value.TraceId);
+            ReleaseBindingWire.WriteNullableString(writer, "idempotency_key", value.IdempotencyKey);
+            writer.WriteString("occurred_at", ReleaseBindingWire.FormatWireUtc(value.OccurredAt));
+            writer.WriteString("privacy_class", value.PrivacyClass);
             writer.WriteString("release_bom_sha256", value.ReleaseBomSha256);
             writer.WriteNumber("generation", value.Generation);
             writer.WriteNumber("release_bom_generation", value.ReleaseBomGeneration);
@@ -176,7 +207,13 @@ public static class ActiveReleaseBindingV1Codec
             ReleaseBindingWire.ReadString(fields, "signer_key_id"),
             ReleaseBindingWire.ReadString(fields, "bom_signature_sha256"),
             ReleaseBindingWire.ReadWireUtc(fields, "activated_at"),
-            ReleaseBindingWire.ReadString(fields, "receipt_id"));
+            ReleaseBindingWire.ReadString(fields, "receipt_id"),
+            ReleaseBindingWire.ReadNullableString(fields, "soul_id"),
+            ReleaseBindingWire.ReadNullableString(fields, "platform_account_id"),
+            ReleaseBindingWire.ReadNullableString(fields, "trace_id"),
+            ReleaseBindingWire.ReadNullableString(fields, "idempotency_key"),
+            ReleaseBindingWire.ReadWireUtc(fields, "occurred_at"),
+            ReleaseBindingWire.ReadString(fields, "privacy_class"));
         binding.Validate();
         var canonicalPayload = Serialize(binding);
         try
@@ -275,6 +312,31 @@ public static class ReleaseBindingWire
             ?? throw new ArgumentException($"Field '{name}' is null.");
     }
 
+    public static string? ReadNullableString(
+        IReadOnlyDictionary<string, JsonElement> fields,
+        string name)
+    {
+        var value = fields[name];
+        return value.ValueKind switch
+        {
+            JsonValueKind.Null => null,
+            JsonValueKind.String => value.GetString(),
+            _ => throw new ArgumentException($"Field '{name}' must be a string or null.")
+        };
+    }
+
+    public static void WriteNullableString(Utf8JsonWriter writer, string name, string? value)
+    {
+        if (value is null)
+        {
+            writer.WriteNull(name);
+        }
+        else
+        {
+            writer.WriteString(name, value);
+        }
+    }
+
     public static long ReadInt64(JsonElement value, string name)
     {
         if (value.ValueKind != JsonValueKind.Number
@@ -335,6 +397,19 @@ public static class ReleaseBindingValidation
         if (!Statuses.Contains(value, StringComparer.Ordinal))
         {
             throw new ArgumentException("Invalid release binding status.", nameof(value));
+        }
+    }
+
+    /// <summary>
+    /// Device-scoped runtime truth carries the common envelope identity
+    /// fields as explicit null (never a missing field, never a value).
+    /// </summary>
+    public static void RequireExplicitNull(string? value, string name)
+    {
+        if (value is not null)
+        {
+            throw new ArgumentException(
+                $"{name} must be explicit null on device-scoped release binding truth.", name);
         }
     }
 

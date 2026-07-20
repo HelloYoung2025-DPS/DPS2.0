@@ -1140,12 +1140,16 @@ public sealed class ActiveReleaseBindingAuthorityTests
         var binding = new ActiveReleaseBindingV1(
             "1.0.0", "active.release.binding/v1", "control-plane-host",
             device, bomSha, runtimeGeneration, signerGeneration, token, activationTokenSha,
-            "active", signer.Identity, signer.KeyId, signatureSha, Now, receiptId);
+            "active", signer.Identity, signer.KeyId, signatureSha, Now, receiptId,
+            SoulId: null, PlatformAccountId: null, TraceId: null, IdempotencyKey: null,
+            OccurredAt: Now, PrivacyClass: "internal");
         var unhashed = new ReleaseBindingReceiptV1(
             "1.0.0", "release.binding.receipt/v1", "control-plane-host",
             "activation", device, from,
             new ReleaseBindingEndpointV1(bomSha, runtimeGeneration, "active"),
-            sequence, signer.Identity, Now, new string('0', 64), receiptId);
+            sequence, signer.Identity, Now, new string('0', 64), receiptId,
+            SoulId: null, PlatformAccountId: null, TraceId: null, IdempotencyKey: null,
+            PrivacyClass: "internal");
         var receipt = unhashed with { PayloadSha256 = unhashed.ComputePayloadSha256() };
         return new ReleaseBindingTruthRecord(
             device, receipt, binding, previousBinding, signerGeneration,

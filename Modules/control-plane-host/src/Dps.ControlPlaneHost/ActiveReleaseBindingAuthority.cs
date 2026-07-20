@@ -385,7 +385,16 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
                 facts.Key.KeyId,
                 facts.SignatureSha256,
                 now,
-                NextReceiptId(deviceBindingId, state.Sequence + 1));
+                NextReceiptId(deviceBindingId, state.Sequence + 1),
+                // Device-scoped truth: identity envelope fields are explicit
+                // null; occurred_at is the same injected-clock instant as
+                // activated_at; privacy class is fixed.
+                SoulId: null,
+                PlatformAccountId: null,
+                TraceId: null,
+                IdempotencyKey: null,
+                OccurredAt: now,
+                PrivacyClass: "internal");
             binding.Validate();
 
             // Only a binding that is still "active" is demoted to "previous"
@@ -534,7 +543,13 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
                 previous.SignerKeyId,
                 previous.BomSignatureSha256,
                 now,
-                NextReceiptId(deviceBindingId, state.Sequence + 1));
+                NextReceiptId(deviceBindingId, state.Sequence + 1),
+                SoulId: null,
+                PlatformAccountId: null,
+                TraceId: null,
+                IdempotencyKey: null,
+                OccurredAt: now,
+                PrivacyClass: "internal");
             binding.Validate();
             var receipt = BuildReceipt(
                 "rollback",
@@ -836,7 +851,14 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
             actorIdentity,
             occurredAt,
             new string('0', 64),
-            NextReceiptId(deviceBindingId, sequence));
+            NextReceiptId(deviceBindingId, sequence),
+            // Device-scoped truth: identity envelope explicit null, fixed
+            // "internal" privacy class (see contract Validate).
+            SoulId: null,
+            PlatformAccountId: null,
+            TraceId: null,
+            IdempotencyKey: null,
+            PrivacyClass: "internal");
         var receipt = unhashed with { PayloadSha256 = unhashed.ComputePayloadSha256() };
         receipt.Validate();
         return receipt;
