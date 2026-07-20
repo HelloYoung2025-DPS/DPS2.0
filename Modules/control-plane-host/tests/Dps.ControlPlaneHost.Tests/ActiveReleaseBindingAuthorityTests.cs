@@ -335,6 +335,48 @@ public sealed class ActiveReleaseBindingAuthorityTests
     }
 
     [Fact, Trait("Category", "Unit")]
+    public void ActivationOverRevokedRecordsRevokedFromAndNeverLaundersItToPrevious()
+    {
+        using var signer = new TestSigner();
+        var authority = Authority(signer);
+        authority.Activate(Device, signer.SignBom("bom-1"));
+        var second = authority.Activate(Device, signer.SignBom("bom-2"));
+        authority.Revoke(Device, second.To.Generation);
+
+        var receipt = authority.Activate(Device, signer.SignBom("bom-3"));
+
+        // The receipt tells the truth: the prior binding stays revoked, it is
+        // not demoted to "previous".
+        Assert.NotNull(receipt.From);
+        Assert.Equal("revoked", receipt.From!.Status);
+        Assert.Equal(2, receipt.From.Generation);
+        // No rollback path survives across a revocation: neither the revoked
+        // bom-2 nor the older bom-1 is reachable.
+        Assert.Throws<ActiveReleaseBindingException>(() => authority.Rollback(Device));
+        Assert.True(authority.TryReadActive(Device, out var binding));
+        Assert.Equal(3, binding!.Generation);
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public void RollbackAwayFromRevokedActiveRestoresTheTruePrevious()
+    {
+        using var signer = new TestSigner();
+        var authority = Authority(signer);
+        var firstBom = signer.SignBom("bom-1");
+        authority.Activate(Device, firstBom);
+        var second = authority.Activate(Device, signer.SignBom("bom-2"));
+        authority.Revoke(Device, second.To.Generation);
+
+        var receipt = authority.Rollback(Device);
+
+        Assert.Equal("revoked", receipt.From!.Status);
+        Assert.True(authority.TryReadActive(Device, out var binding));
+        Assert.Equal(Convert.ToHexStringLower(
+            System.Security.Cryptography.SHA256.HashData(firstBom)), binding!.ReleaseBomSha256);
+        Assert.Equal(3, binding.Generation);
+    }
+
+    [Fact, Trait("Category", "Unit")]
     public void GenerationIsStrictlyMonotonicAcrossManyActivations()
     {
         using var signer = new TestSigner();

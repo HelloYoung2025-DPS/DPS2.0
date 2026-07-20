@@ -24,7 +24,7 @@
     {
       "properties": {
         "receipt_kind": {"const": "activation"},
-        "from": {"anyOf": [{"type": "null"}, {"properties": {"status": {"const": "previous"}}}]},
+        "from": {"anyOf": [{"type": "null"}, {"properties": {"status": {"enum": ["previous", "revoked"]}}}]},
         "to": {"properties": {"status": {"const": "active"}}}
       }
     },

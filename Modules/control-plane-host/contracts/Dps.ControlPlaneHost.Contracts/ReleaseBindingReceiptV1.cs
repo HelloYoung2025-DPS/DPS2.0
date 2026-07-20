@@ -26,7 +26,9 @@ public sealed record ReleaseBindingEndpointV1(
 /// Release BOM binding. Mirrors
 /// contracts/provided/release.binding.receipt.v1.schema.json. From is null
 /// only for a first activation (explicit nullable shape, never a missing
-/// field on the wire).
+/// field on the wire). An activation over a revoked binding records that
+/// binding as from with status "revoked"; it never becomes "previous" and
+/// is never a rollback target.
 /// </summary>
 public sealed record ReleaseBindingReceiptV1(
     [property: JsonPropertyName("schema_version")] string SchemaVersion,
@@ -58,7 +60,7 @@ public sealed record ReleaseBindingReceiptV1(
         ControlContractValidation.RequireHex(ReceiptId, "receipt_", 32, nameof(ReceiptId));
         switch (ReceiptKind)
         {
-            case "activation" when From is null or { Status: "previous" } && To.Status == "active":
+            case "activation" when From is null or { Status: "previous" } or { Status: "revoked" } && To.Status == "active":
             case "revocation" when From is { Status: "active" } && To.Status == "revoked":
             case "rollback" when From is { Status: "revoked" } && To.Status == "active":
                 break;

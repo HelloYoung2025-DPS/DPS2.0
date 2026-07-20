@@ -131,6 +131,8 @@ EXPECTED_CASE_IDS = {
     "release.binding.receipt/v1": {
         "valid-activation-null-from",
         "valid-activation-previous-from",
+        "valid-activation-revoked-from",
+        "activation-from-active",
         "valid-revocation",
         "valid-rollback",
         "additional-field",

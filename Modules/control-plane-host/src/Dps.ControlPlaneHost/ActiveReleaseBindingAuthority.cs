@@ -196,16 +196,24 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
             NextReceiptId(deviceBindingId, state.Sequence + 1));
         binding.Validate();
 
-        var demoted = state.Active is null
-            ? null
-            : state.Active with { Status = "previous" };
+        // Only a binding that is still "active" is demoted to "previous" and
+        // stays reachable for rollback. A revoked binding keeps its revoked
+        // status in the receipt trail and never becomes a rollback target;
+        // activating over it also drops any older "previous" so no rollback
+        // path survives across a revocation.
+        var demoted = state.Active is { Status: "active" } priorActive
+            ? priorActive with { Status = "previous" }
+            : null;
         var receipt = BuildReceipt(
             "activation",
             deviceBindingId,
             state,
-            from: demoted is null
+            from: state.Active is null
                 ? null
-                : new ReleaseBindingEndpointV1(demoted.ReleaseBomSha256, demoted.Generation, "previous"),
+                : demoted is not null
+                    ? new ReleaseBindingEndpointV1(demoted.ReleaseBomSha256, demoted.Generation, "previous")
+                    : new ReleaseBindingEndpointV1(
+                        state.Active.ReleaseBomSha256, state.Active.Generation, state.Active.Status),
             to: new ReleaseBindingEndpointV1(bomSha256, generation, "active"),
             actorIdentity: key.Identity,
             occurredAt: now);
