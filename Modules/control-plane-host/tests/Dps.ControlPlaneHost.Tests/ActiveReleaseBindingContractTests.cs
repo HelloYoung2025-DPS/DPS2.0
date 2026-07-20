@@ -75,6 +75,52 @@ public sealed class ActiveReleaseBindingContractTests
         }
     }
 
+    private sealed class PinnedBindingReader(ActiveReleaseBindingV1 binding) : IActiveReleaseBindingReader
+    {
+        public bool TryReadActive(string deviceBindingId, out ActiveReleaseBindingV1? read)
+        {
+            read = binding;
+            return true;
+        }
+    }
+
+    [Fact, Trait("Category", "Contract")]
+    public void PolicyFactsSourceServesThePinnedSharedCorpusTriple()
+    {
+        // The same shared corpus valid case both consumers pin: the policy
+        // lifecycle wire (ApprovalSubmissionLifecycleV1.ReleaseBomSha256 /
+        // ReleaseBomGeneration) must carry exactly what the executor-gateway
+        // wire (ActiveReleaseBomBindingV1) carries.
+        var assembly = typeof(ActiveReleaseBindingV1).Assembly;
+        var resourceName = Assert.Single(
+            assembly.GetManifestResourceNames(),
+            static name => name.EndsWith(
+                "active.release.binding.v1.corpus.json", StringComparison.Ordinal));
+        using var stream = Assert.IsAssignableFrom<Stream>(
+            assembly.GetManifestResourceStream(resourceName));
+        var root = Assert.IsType<JsonObject>(JsonNode.Parse(stream));
+        var baseline = Assert.IsType<JsonObject>(root["base"]);
+        var binding = ActiveReleaseBindingV1Codec.Deserialize(
+            JsonSerializer.SerializeToUtf8Bytes(baseline));
+
+        var source = new PolicyBoundReleaseBomFactsSource(new PinnedBindingReader(binding));
+        Assert.True(source.TryReadActiveFacts(
+            binding.DeviceBindingId, out var sha, out var generation));
+
+        // Pinned values shared with the executor-gateway adapter tests.
+        Assert.Equal(new string('b', 64), sha);
+        // release_bom_generation on the policy lifecycle wire is the
+        // ANTI-ROLLBACK runtime activation ordinal — the same value the
+        // gateway's ActiveReleaseBomBindingV1.Generation carries (its
+        // contract mandates "monotonic generation anti-rollback"), which
+        // the signer ordinal cannot satisfy because rollback legitimately
+        // reverts it. The corpus valid case separates the two: runtime
+        // generation 1 versus signer release_bom_generation 7.
+        Assert.Equal(1, generation);
+        Assert.Equal(7, binding.ReleaseBomGeneration);
+        Assert.NotEqual(binding.ReleaseBomGeneration, generation);
+    }
+
     private static void AssertCorpusCodec(
         string schemaSuffix,
         string corpusSuffix,

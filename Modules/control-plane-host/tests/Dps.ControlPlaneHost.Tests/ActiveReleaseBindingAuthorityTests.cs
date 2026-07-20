@@ -992,4 +992,209 @@ public sealed class ActiveReleaseBindingAuthorityTests
         Assert.True(recovered.TryReadActive(Device, out var binding));
         Assert.Equal(Sha256Hex(second), binding!.ReleaseBomSha256);
     }
+
+    // ----- third adversarial review: F1-F4 regressions -----
+
+    private sealed class FailingAppendStore : IReleaseBindingTruthStore
+    {
+        private readonly InMemoryReleaseBindingTruthStore _inner = new();
+        public bool FailNextAppend { get; set; }
+
+        public void Append(ReleaseBindingTruthRecord record)
+        {
+            if (FailNextAppend)
+            {
+                throw new InvalidOperationException("truth store append refused");
+            }
+            _inner.Append(record);
+        }
+
+        public IReadOnlyList<ReleaseBindingTruthRecord> LoadAll() => _inner.LoadAll();
+    }
+
+    private sealed class FixedBindingReader(ActiveReleaseBindingV1? binding) : IActiveReleaseBindingReader
+    {
+        public bool TryReadActive(string deviceBindingId, out ActiveReleaseBindingV1? read)
+        {
+            read = binding;
+            return binding is not null;
+        }
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public void AppendFailureLeavesZeroVisibleChange()
+    {
+        using var signer = new TestSigner();
+        var store = new FailingAppendStore { FailNextAppend = true };
+        var authority = new ActiveReleaseBindingAuthority([signer.TrustKey], store, () => Now);
+        var (bom, token) = MakeBom(signer, "bom-1", 1, null);
+
+        // Append fails: nothing is published anywhere.
+        Assert.Throws<InvalidOperationException>(() => authority.Activate(Device, bom, token));
+        Assert.False(authority.TryReadActive(Device, out _));
+        Assert.Empty(authority.ReadReceipts(Device));
+        Assert.Empty(store.LoadAll());
+
+        // The idempotency table is unpolluted: the identical request now
+        // succeeds as a first-time activation.
+        store.FailNextAppend = false;
+        var receipt = authority.Activate(Device, bom, token);
+        Assert.Equal(1, receipt.To.Generation);
+        Assert.Single(authority.ReadReceipts(Device));
+        Assert.Single(store.LoadAll());
+
+        // Same discipline on revocation: a failed append leaves the binding
+        // active and a later revoke still works.
+        store.FailNextAppend = true;
+        Assert.Throws<InvalidOperationException>(() => authority.Revoke(Device, 1));
+        Assert.True(authority.TryReadActive(Device, out var stillActive));
+        Assert.Equal("active", stillActive!.Status);
+        store.FailNextAppend = false;
+        authority.Revoke(Device, 1);
+        Assert.False(authority.TryReadActive(Device, out _));
+    }
+
+    private static string ForgedReceiptId(string device, long sequence)
+        => "receipt_" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
+            "dps.release.binding.receipt/v1\n" + device + "\n" + sequence)))[..32];
+
+    /// <summary>
+    /// Builds a journal activation record from a VALIDLY SIGNED BOM whose
+    /// receipt/binding pass every structural and cryptographic recovery
+    /// check — only the previous-chain invariant can reject it.
+    /// </summary>
+    private static ReleaseBindingTruthRecord ForgeActivationRecord(
+        TestSigner signer,
+        string device,
+        long sequence,
+        long runtimeGeneration,
+        byte[] bomBytes,
+        string token,
+        ReleaseBindingEndpointV1? from,
+        ActiveReleaseBindingV1? previousBinding)
+    {
+        using var document = JsonDocument.Parse(bomBytes);
+        var root = document.RootElement;
+        var signerGeneration = root.GetProperty("release_bom_generation").GetInt64();
+        var activationTokenSha = root.GetProperty("activation_token_sha256").GetString()!;
+        var signatureSha = Convert.ToHexStringLower(SHA256.HashData(Convert.FromBase64String(
+            root.GetProperty("signature").GetProperty("value").GetString()!)));
+        var bomSha = Sha256Hex(bomBytes);
+        var receiptId = ForgedReceiptId(device, sequence);
+        var binding = new ActiveReleaseBindingV1(
+            "1.0.0", "active.release.binding/v1", "control-plane-host",
+            device, bomSha, runtimeGeneration, signerGeneration, token, activationTokenSha,
+            "active", signer.Identity, signer.KeyId, signatureSha, Now, receiptId);
+        var unhashed = new ReleaseBindingReceiptV1(
+            "1.0.0", "release.binding.receipt/v1", "control-plane-host",
+            "activation", device, from,
+            new ReleaseBindingEndpointV1(bomSha, runtimeGeneration, "active"),
+            sequence, signer.Identity, Now, new string('0', 64), receiptId);
+        var receipt = unhashed with { PayloadSha256 = unhashed.ComputePayloadSha256() };
+        return new ReleaseBindingTruthRecord(
+            device, receipt, binding, previousBinding, signerGeneration,
+            Sha256Hex(Encoding.UTF8.GetBytes("forged:" + device + ":" + sequence)), bomBytes);
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public void RecoveryRejectsValidlySignedBomsAtTheWrongChainPosition()
+    {
+        using var signer = new TestSigner();
+
+        // 1. Bootstrap: a signed BOM carrying a non-null previous chain
+        //    journaled as the device's first activation.
+        var chained = signer.SignBom("bom-x", 1, Token("bom-x"), new string('e', 64));
+        var bootstrapForgery = ForgeActivationRecord(
+            signer, Device, sequence: 1, runtimeGeneration: 1, chained, Token("bom-x"),
+            from: null, previousBinding: null);
+        Assert.Throws<ActiveReleaseBindingException>(
+            () => Authority(signer, new FrozenTruthStore([bootstrapForgery])));
+
+        // 2. Mid-chain: second activation whose signed chain digest is not
+        //    the prior binding's digest.
+        var store = new InMemoryReleaseBindingTruthStore();
+        var live = Authority(signer, store);
+        var (first, firstToken) = MakeBom(signer, "bom-1", 1, null);
+        live.Activate(Device, first, firstToken);
+        var records = store.LoadAll();
+        var wrongChain = signer.SignBom("bom-2x", 2, Token("bom-2x"), new string('e', 64));
+        var midChainForgery = ForgeActivationRecord(
+            signer, Device, sequence: 2, runtimeGeneration: 2, wrongChain, Token("bom-2x"),
+            from: new ReleaseBindingEndpointV1(Sha256Hex(first), 1, "previous"),
+            previousBinding: records[0].CurrentBinding with { Status = "previous" });
+        Assert.Throws<ActiveReleaseBindingException>(
+            () => Authority(signer, new FrozenTruthStore([records[0], midChainForgery])));
+
+        // 3. After revocation: activation-over-revoked journaled with a
+        //    bootstrap-shaped (null-chain) signed BOM.
+        live.Revoke(Device, 1);
+        var afterRevoke = store.LoadAll();
+        var nullChain = signer.SignBom("bom-3", 2, Token("bom-3"), null);
+        var revokeForgery = ForgeActivationRecord(
+            signer, Device, sequence: 3, runtimeGeneration: 2, nullChain, Token("bom-3"),
+            from: new ReleaseBindingEndpointV1(Sha256Hex(first), 1, "revoked"),
+            previousBinding: null);
+        Assert.Throws<ActiveReleaseBindingException>(
+            () => Authority(signer, new FrozenTruthStore([.. afterRevoke, revokeForgery])));
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public void FloatFeatureFlagsActivateButReencodedFloatFailsSignature()
+    {
+        using var signer = new TestSigner();
+        var authority = Authority(signer);
+        var token = Token("bom-float");
+        var bom = signer.SignBom(
+            "bom-float", 1, token, null,
+            mutateBeforeSign: static payload =>
+                payload["feature_flags"] = new JsonObject { ["shadow_ratio"] = 0.5 });
+
+        // The 5e-1 re-encoding survives the canonical round trip (raw-text
+        // pass-through) but is not the byte sequence the signer signed.
+        var reencoded = Encoding.UTF8.GetBytes(
+            Encoding.UTF8.GetString(bom).Replace("0.5", "5e-1"));
+        Assert.Throws<ActiveReleaseBindingException>(
+            () => authority.Activate(Device, reencoded, token));
+        Assert.False(authority.TryReadActive(Device, out _));
+        Assert.Empty(authority.ReadReceipts(Device));
+
+        // The legally signed float BOM activates.
+        var receipt = authority.Activate(Device, bom, token);
+        Assert.Equal(1, receipt.To.Generation);
+        Assert.True(authority.TryReadActive(Device, out var binding));
+        Assert.Equal(Sha256Hex(bom), binding!.ReleaseBomSha256);
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public void PolicyFactsSourceFailsClosed()
+    {
+        // Absent binding reads false.
+        var emptySource = new PolicyBoundReleaseBomFactsSource(new FixedBindingReader(null));
+        Assert.False(emptySource.TryReadActiveFacts(Device, out _, out _));
+
+        using var signer = new TestSigner();
+        var store = new InMemoryReleaseBindingTruthStore();
+        var authority = Authority(signer, store);
+        var (bom, token) = MakeBom(signer, "bom-1", 1, null);
+        authority.Activate(Device, bom, token);
+        Assert.True(authority.TryReadActive(Device, out var binding));
+
+        // Non-active binding throws instead of being served.
+        var demoted = new PolicyBoundReleaseBomFactsSource(
+            new FixedBindingReader(binding! with { Status = "previous" }));
+        Assert.Throws<ActiveReleaseBindingException>(
+            () => demoted.TryReadActiveFacts(Device, out _, out _));
+
+        // Foreign-device binding throws.
+        var foreign = new PolicyBoundReleaseBomFactsSource(new FixedBindingReader(binding));
+        Assert.Throws<ActiveReleaseBindingException>(
+            () => foreign.TryReadActiveFacts(OtherDevice, out _, out _));
+
+        // The composition-fixed path against the real authority serves the
+        // runtime activation ordinal.
+        var source = new PolicyBoundReleaseBomFactsSource(authority);
+        Assert.True(source.TryReadActiveFacts(Device, out var sha, out var generation));
+        Assert.Equal(binding!.ReleaseBomSha256, sha);
+        Assert.Equal(binding.Generation, generation);
+    }
 }

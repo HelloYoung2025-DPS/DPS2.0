@@ -390,6 +390,14 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
                 actorIdentity: facts.Key.Identity,
                 occurredAt: now);
 
+            // Durability first: the immutable candidate (binding + receipt +
+            // record) is fully built, appended to the truth store, and only
+            // a successful append is ever published. An Append failure
+            // leaves zero visible change on the read and idempotency
+            // surfaces.
+            _store.Append(new ReleaseBindingTruthRecord(
+                deviceBindingId, receipt, binding, demoted,
+                facts.SignerGeneration, requestSha256, bomBytesCopy));
             state.RuntimeGeneration = generation;
             state.Previous = demoted;
             state.PreviousBomBytes = demoted is not null ? state.CurrentBomBytes : null;
@@ -397,7 +405,7 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
             state.CurrentBomBytes = bomBytesCopy;
             state.Sequence = receipt.Sequence;
             state.LastActivationSignerGeneration = facts.SignerGeneration;
-            Commit(deviceBindingId, state, receipt, requestSha256, bomBytesCopy);
+            Publish(deviceBindingId, state, receipt, requestSha256);
             return receipt;
         }
     }
@@ -435,9 +443,14 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
                 actorIdentity: "control-plane-host",
                 occurredAt: now);
 
-            state.Current = active with { Status = "revoked" };
+            var revoked = active with { Status = "revoked" };
+            // Durability first (see Activate): append, then publish.
+            _store.Append(new ReleaseBindingTruthRecord(
+                deviceBindingId, receipt, revoked, state.Previous,
+                state.LastActivationSignerGeneration, requestSha256, SignedBomBytes: null));
+            state.Current = revoked;
             state.Sequence = receipt.Sequence;
-            Commit(deviceBindingId, state, receipt, requestSha256, signedBomBytes: null);
+            Publish(deviceBindingId, state, receipt, requestSha256);
             return receipt;
         }
     }
@@ -512,13 +525,17 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
                 actorIdentity: "control-plane-host",
                 occurredAt: now);
 
+            // Durability first (see Activate): append, then publish.
+            _store.Append(new ReleaseBindingTruthRecord(
+                deviceBindingId, receipt, binding, PreviousBinding: null,
+                state.LastActivationSignerGeneration, requestSha256, restoredBomBytes));
             state.RuntimeGeneration = generation;
             state.Current = binding;
             state.CurrentBomBytes = restoredBomBytes;
             state.Previous = null;
             state.PreviousBomBytes = null;
             state.Sequence = receipt.Sequence;
-            Commit(deviceBindingId, state, receipt, requestSha256, restoredBomBytes);
+            Publish(deviceBindingId, state, receipt, requestSha256);
             return receipt;
         }
     }
@@ -531,24 +548,15 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
            && current.Generation == receipt.To.Generation
            && string.Equals(current.Status, receipt.To.Status, StringComparison.Ordinal);
 
-    private void Commit(
+    private void Publish(
         string deviceBindingId,
         DeviceState state,
         ReleaseBindingReceiptV1 receipt,
-        string requestSha256,
-        byte[]? signedBomBytes)
+        string requestSha256)
     {
         state.Receipts.Add(receipt);
         state.RequestReceipts[requestSha256] = receipt;
         _devices[deviceBindingId] = state;
-        _store.Append(new ReleaseBindingTruthRecord(
-            deviceBindingId,
-            receipt,
-            state.Current!,
-            state.Previous,
-            state.LastActivationSignerGeneration,
-            requestSha256,
-            signedBomBytes));
     }
 
     private void RecoverFromStore()
@@ -637,6 +645,23 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
                     {
                         throw new ActiveReleaseBindingException(
                             "truth store journal signer generation regressed on activation");
+                    }
+                    // Live Activate previous-chain invariant, replayed
+                    // verbatim: a device with binding history (active or
+                    // revoked alike) requires the BOM to chain to the
+                    // current binding digest; a first activation requires
+                    // an explicit null chain. Without this, a validly
+                    // signed BOM from another chain position could be
+                    // journaled into a position live Activate would refuse.
+                    if (priorCurrent is null
+                        ? facts.PreviousStableBomSha256 is not null
+                        : !string.Equals(
+                            facts.PreviousStableBomSha256,
+                            priorCurrent.ReleaseBomSha256,
+                            StringComparison.Ordinal))
+                    {
+                        throw new ActiveReleaseBindingException(
+                            "truth store journal activation breaks the previous stable BOM chain");
                     }
                     if (priorCurrent is { Status: "active" })
                     {
@@ -1060,9 +1085,9 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
 /// Canonical JSON identical to the python reference
 /// Tools/ci/candidate_bom_validator.py::canonical_bytes — json.dumps with
 /// sort_keys=True, separators=(",", ":"), ensure_ascii=False, UTF-8 encoded.
-/// Only null, bool, integer, string, array, and object values are accepted;
-/// non-integer numbers fail closed because the reference wire never carries
-/// them for signed Release BOM payloads.
+/// Integers render invariantly; non-integer numbers pass through as raw
+/// text (the signature round trip pins the single signed encoding — see
+/// the number case below).
 /// </summary>
 public static class ReleaseBomCanonicalJson
 {
@@ -1128,12 +1153,26 @@ public static class ReleaseBomCanonicalJson
                 builder.Append("false");
                 break;
             case JsonValueKind.Number:
-                if (!value.TryGetInt64(out var integer)
-                    || value.GetRawText().AsSpan().ContainsAny(".eE"))
+                if (value.TryGetInt64(out var integer)
+                    && !value.GetRawText().AsSpan().ContainsAny(".eE"))
                 {
-                    throw new ActiveReleaseBindingException("canonical JSON only carries integers");
+                    builder.Append(integer.ToString(CultureInfo.InvariantCulture));
                 }
-                builder.Append(integer.ToString(CultureInfo.InvariantCulture));
+                else
+                {
+                    // Non-integer numbers (legal e.g. as float feature
+                    // flags, admitted by candidate_bom_validator.py:1684)
+                    // pass through as their exact raw text. Uniqueness is
+                    // guaranteed end-to-end by the signature: the verified
+                    // message is THIS canonical serialization and the input
+                    // bytes must equal it byte-for-byte, so a re-encoded
+                    // float (0.5 -> 5e-1) survives the round-trip check but
+                    // changes the message away from the bytes the signer
+                    // actually signed and fails RSA-PSS verification. The
+                    // published digest therefore always names the single
+                    // signed encoding.
+                    builder.Append(value.GetRawText());
+                }
                 break;
             case JsonValueKind.String:
                 WriteString(builder, value.GetString()!);
