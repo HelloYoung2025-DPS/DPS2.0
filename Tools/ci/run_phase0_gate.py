@@ -448,11 +448,11 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         "test_the_trust_policy_bytes_are_identical_in_both_homes",
         "test_the_code_bound_policy_digest_did_not_change_in_migration",
         "test_the_operational_anchor_entry_behaves_identically_in_both_copies",
-        # Exact-error pin (the gate forbids skip/expectedFailure outputs): holds
-        # only while the deployed policy lacks the native-stop signer group, and
-        # turns red the moment the owner provisions it, forcing real end-to-end
-        # CLI coverage.
-        "test_the_operational_anchor_entry_is_blocked_on_exactly_the_missing_signer_group",
+        # DELIBERATE VISIBLE RED until the owner provisions the native-stop
+        # signer in the deployed policy: the release entry is dead, and a gate
+        # must not certify that state as success.  Goes green -- and becomes the
+        # real coverage -- once the policy carries the signer group and key.
+        "test_the_operational_anchor_entry_constructs_the_release_validator",
     }
     command = [
         sys.executable,
