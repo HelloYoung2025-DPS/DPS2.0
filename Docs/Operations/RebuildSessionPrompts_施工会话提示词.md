@@ -52,7 +52,7 @@
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：R0-C Release BOM 权威迁移（§4.3）。
 开工前先核对 dps2 远程已合入 PR：前序批次（R0-B）未合入则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次，退出条件以 §10 M1B 行为准。上一批证据以 dps2 最新已合入 PR 及其门禁/外审记录为准，自行获取；若上一合入批次触碰候选门禁信任根且尚无合入后正式 clean 证据，先在当前 HEAD 以 --base <其合入提交> 按 §4.5 第 2 步补跑门禁取证，再开工本批。
-注意：本批触碰候选门禁信任根（Tools/ci），按 §4.5 两段式取证；Release BOM 由仓外 signer 签发，模型与候选代码不得持签名私钥。本批收口须交付并注册单一永久 required check `release-binding.composition-gate`（§12 release-binding-composition 行；当前阶段断言=可执行证明生产 publish/dispatch 入口实际不可用），且 NEGATIVE 与 SAME_INSTANCE 两种断言的评估器、语料与制品检查逻辑须一并钉入专用 App 的候选不可写捆绑包（M4 只交付被测制品、不得改评估器），缺此门 M1B 不得关闭。
+注意：本批触碰候选门禁信任根（Tools/ci），按 §4.5 两段式取证；Release BOM 由仓外 signer 签发，模型与候选代码不得持签名私钥。本批收口须注册单一永久 required check `release-binding.composition-gate`（§12 release-binding-composition 行；当前阶段断言=可执行证明生产 publish/dispatch 入口实际不可用）；评估器本体由前置的独立引导治理发布供给并外部锚定，本批不得交付或改动评估器，只交付被测负向状态；缺此门 M1B 不得关闭。
 完成后：跑 required 门禁、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准。若本批触碰候选门禁信任根：我确认合入后不结束会话，按 §4.5 第 2 步在合入提交的后继提交上取正式 clean 证据（main 暂无后继提交时，先开一个空提交 PR 作证据锚、经我合入后再取证），结果贴回本批 PR，完成后本批才算关闭。
 ```
 
