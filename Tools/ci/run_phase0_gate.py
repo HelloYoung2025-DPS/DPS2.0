@@ -424,6 +424,30 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         "test_the_live_corpus_is_accepted_by_both_implementations",
         "test_the_subset_evaluator_agrees_with_draft_2020_12_on_every_mutation",
         "test_the_mutations_are_real_rejections_and_not_no_ops",
+        # R0-C: the candidate Release BOM validator migrated into Tools/ci
+        # (RebuildPlan 4.3) -- its suite came with it and is trust-bearing for
+        # the same reason the file is byte-bound: an emptied body must not
+        # keep reading as green.
+        "test_full_signed_bom_three_authorities_and_external_receipt_pass",
+        "test_missing_or_tampered_external_receipt_fails_closed",
+        "test_unpublished_hyphenated_trust_contract_identity_is_rejected",
+        "test_worker_authority_must_match_manifest_descriptor_artifact",
+        "test_route_authority_must_match_supervisor_artifact",
+        "test_challenge_authority_must_match_policy_artifact",
+        "test_three_runtime_key_roles_are_pairwise_distinct",
+        "test_native_stop_v1_scope_or_contract_is_rejected",
+        "test_timestamp_uses_100ns_exact_z_and_2020_lower_bound",
+        "test_same_native_spki_cannot_move_worker_incarnation_across_boms",
+        "test_artifact_provenance_and_evidence_tampering_fail_closed",
+        "test_duplicate_receipt_member_and_old_mixed_shape_fail_closed",
+        "test_policy_roles_and_key_purposes_are_separated",
+        # Migration-fidelity pins: the module-side original may not drift from
+        # the Tools/ci copy before R0-D deletes it, and the pre-existing dead
+        # from_deployed_anchor entry stays visibly registered, not silently
+        # green.
+        "test_the_trust_policy_bytes_are_identical_in_both_homes",
+        "test_the_code_bound_policy_digest_did_not_change_in_migration",
+        "test_the_operational_anchor_entry_fails_identically_in_both_copies",
     }
     command = [
         sys.executable,
