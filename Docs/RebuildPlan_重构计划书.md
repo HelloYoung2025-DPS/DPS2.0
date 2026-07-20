@@ -147,6 +147,13 @@ brain-to-hand 的唯一交接合同采用 `edge.bridge.exchange/v2`：由 `zenno
 4. required check 只有 `PASS` 才算通过；`SKIP/PARTIAL/NOT_RUN/INFRA_ERROR/NOT_APPLICABLE` 均阻断。
 5. 在合入第一个实现 PR（§16）前，目标仓库保护规则先行生效：main 禁直推/强推，required checks 绑定第 4 条门禁语义，启用 merge queue（平台不可用时，以 required up-to-date 加串行合入提供 §3.3 的 merge-HEAD 同等语义作为过渡）；所有权见 §15 条目 1，配置结果作为 M0 证据记录。
 
+6. 过渡合入条款（存量红治理期，对第 4-5 条的限定）：在 main 的 required 检查存在已登记 `BASE_PREEXISTING` 存量失败期间，同时满足以下全部条件的批次，可由仓库所有者亲自执行管理员合入，不受第 4 条全绿语义阻断：
+   - 在冻结的精确合入 HEAD 上生成了正式门禁证据，其 required 失败集合是已登记存量清单的子集（零新增失败、零恶化），且每条存量失败均已登记归属批次；
+   - 该精确 HEAD 已通过对抗式外部审查，针对本批次新增字节的发现已全部处置完毕；
+   - 若批次触碰 §11 受保护字节，anchor 已按 §11 重签（anchor_id 重算一致）并经独立校验；
+   - 合入由仓库所有者亲自执行，并在 PR 中记录证据文件引用、存量红清单版本与外审作业标识。
+   main 的 required 检查全部转绿后，本条款自动失效并恢复第 4 条全绿语义，无需再次修订。AI 会话不得援引本条款自行合入或代为合入；合入动作永远专属所有者。
+
 ### 4.2 R0-B 指令 receipt 迁移
 
 当前所有模块 Manifest 的 `agents.resolver` 都指向 `factory-instruction-resolver`。目标不是换一个同名工厂，而是：
