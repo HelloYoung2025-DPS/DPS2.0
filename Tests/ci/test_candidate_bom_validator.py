@@ -580,25 +580,40 @@ class MigrationFidelityTests(unittest.TestCase):
                     outcomes.append(str(exc))
         self.assertEqual(outcomes[0], outcomes[1])
 
-    @unittest.expectedFailure
-    def test_the_operational_anchor_entry_constructs_the_release_validator(self) -> None:
+    def test_the_operational_anchor_entry_is_blocked_on_exactly_the_missing_signer_group(self) -> None:
         # BASE_PREEXISTING, blocked on the owner: the deployed trust policy
         # artifact predates the native-stop authority code and carries neither a
         # native_stop_trust_signer_identities role group nor any key with the
         # native-stop-trust purpose.  Provisioning that signer identity and its
         # single-purpose key, and re-anchoring the code-bound policy digest, is
         # the owner's out-of-repo trust decision -- no in-repo value can be
-        # derived for it.  Until then the release script's operational entry
-        # cannot construct a validator, exactly as at base (which invoked the
-        # module-side copy and died on the same field).  This test asserts the
-        # WORKING behaviour: it is an expected failure today, and the moment the
-        # owner provisions the policy it flips to an unexpected success, forcing
-        # this decorator's removal and real end-to-end CLI coverage.
+        # derived for it.  Identical at base, where release.sh invoked the
+        # module-side copy and died on the same field.
+        #
+        # Mechanism note: the Phase 0 gate forbids skip/expectedFailure outputs
+        # outright (run_phase0_gate._forbidden_output_reason), so within an
+        # all-green-suite constraint this exact-error pin is the drift detector:
+        # the assertions below hold ONLY for the currently documented dead state.
+        # The moment the owner provisions the policy (or anything else changes
+        # this entry's behaviour), this test turns red and must be replaced by
+        # real end-to-end CLI coverage -- it cannot silently keep passing.
         schema_sha = hashlib.sha256(
             (ROOT / "governance" / "schemas" / "release-bom.schema.json").read_bytes()
         ).hexdigest()
         with tempfile.TemporaryDirectory() as bundle:
-            SUBJECT.CandidateBomValidator.from_deployed_anchor(ROOT, bundle, schema_sha)
+            with self.assertRaises(SUBJECT.CandidateBomError) as raised:
+                SUBJECT.CandidateBomValidator.from_deployed_anchor(ROOT, bundle, schema_sha)
+        self.assertEqual(
+            "release trust policy has invalid fields: missing=native_stop_trust_signer_identities",
+            str(raised.exception),
+        )
+        policy = json.loads(self.MIGRATED_POLICY.read_bytes())
+        self.assertNotIn("native_stop_trust_signer_identities", policy)
+        self.assertFalse(
+            [key for key in policy["keys"] if "native-stop-trust" in key["purposes"]],
+            "the policy now carries a native-stop-trust key: provision is done, "
+            "replace this pin with real end-to-end CLI coverage",
+        )
 
 
 class CandidateBomValidatorTests(unittest.TestCase):

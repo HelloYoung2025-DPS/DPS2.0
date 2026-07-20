@@ -8,6 +8,7 @@ Usage:
     --bundle-root PATH \
     --bom PATH \
     --previous-bom PATH \
+    --native-stop-trust-receipt PATH \
     --schema-sha256 HEX \
     [--phase0-evidence PATH]
 
@@ -21,6 +22,7 @@ EOF
 bundle_root=""
 bom_path=""
 previous_bom_path=""
+native_stop_trust_receipt_path=""
 schema_sha256=""
 phase0_evidence=""
 
@@ -36,6 +38,10 @@ while (($#)); do
       ;;
     --previous-bom)
       previous_bom_path="${2:-}"
+      shift 2
+      ;;
+    --native-stop-trust-receipt)
+      native_stop_trust_receipt_path="${2:-}"
       shift 2
       ;;
     --schema-sha256)
@@ -62,6 +68,7 @@ for value in \
   "$bundle_root" \
   "$bom_path" \
   "$previous_bom_path" \
+  "$native_stop_trust_receipt_path" \
   "$schema_sha256"; do
   if [[ -z "$value" ]]; then
     echo "All required release validation arguments must be supplied." >&2
@@ -139,6 +146,7 @@ fi
   --bundle-root "$bundle_root" \
   --bom "$bom_path" \
   --previous-bom "$previous_bom_path" \
+  --native-stop-trust-receipt "$native_stop_trust_receipt_path" \
   --schema-sha256 "$schema_sha256"
 
 echo "Release candidate validation passed for $head_commit."

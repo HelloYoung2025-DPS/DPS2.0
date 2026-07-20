@@ -4380,6 +4380,8 @@ def _release_validation_allowlist_errors(release_text: str) -> List[str]:
                 "$bom_path",
                 "--previous-bom",
                 "$previous_bom_path",
+                "--native-stop-trust-receipt",
+                "$native_stop_trust_receipt_path",
                 "--schema-sha256",
                 "$schema_sha256",
             ]
