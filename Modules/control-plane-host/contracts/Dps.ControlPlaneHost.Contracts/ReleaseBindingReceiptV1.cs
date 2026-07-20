@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Dps.ControlPlaneHost.Contracts;
@@ -106,4 +107,136 @@ public sealed record ReleaseBindingReceiptV1(
     private static string FormatUtc(DateTimeOffset value)
         => value.ToUniversalTime()
             .ToString("yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'", CultureInfo.InvariantCulture);
+}
+
+/// <summary>
+/// Strict codec for release.binding.receipt/v1, mirroring
+/// ControlPlaneReceiptV1Codec: strict UTF-8, exact snake_case field set
+/// (including the nested transition endpoints), explicit null shape for
+/// from, canonical wire equality on read, exact Zulu timestamps, and a byte
+/// budget. Note the wire is declaration-ordered; the payload_sha256
+/// commitment separately uses the repository's sorted-key canonical JSON
+/// (see ComputePayloadSha256) — two deliberately distinct profiles.
+/// </summary>
+public static class ReleaseBindingReceiptV1Codec
+{
+    public const int MaximumPayloadBytes = 16 * 1024;
+    private static readonly HashSet<string> ExactFields = new(StringComparer.Ordinal)
+    {
+        "schema_version", "contract_id", "producer_module", "receipt_kind",
+        "device_binding_id", "from", "to", "sequence", "actor_identity",
+        "occurred_at", "payload_sha256", "receipt_id"
+    };
+    private static readonly HashSet<string> EndpointFields = new(StringComparer.Ordinal)
+    {
+        "release_bom_sha256", "generation", "status"
+    };
+
+    public static byte[] Serialize(ReleaseBindingReceiptV1 value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        value.Validate();
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(
+                   stream,
+                   new JsonWriterOptions { Indented = false, SkipValidation = false }))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("schema_version", value.SchemaVersion);
+            writer.WriteString("contract_id", value.ContractId);
+            writer.WriteString("producer_module", value.ProducerModule);
+            writer.WriteString("receipt_kind", value.ReceiptKind);
+            writer.WriteString("device_binding_id", value.DeviceBindingId);
+            WriteEndpoint(writer, "from", value.From);
+            WriteEndpoint(writer, "to", value.To);
+            writer.WriteNumber("sequence", value.Sequence);
+            writer.WriteString("actor_identity", value.ActorIdentity);
+            writer.WriteString("occurred_at", ReleaseBindingWire.FormatWireUtc(value.OccurredAt));
+            writer.WriteString("payload_sha256", value.PayloadSha256);
+            writer.WriteString("receipt_id", value.ReceiptId);
+            writer.WriteEndObject();
+        }
+        var payload = stream.ToArray();
+        if (payload.Length > MaximumPayloadBytes)
+        {
+            CryptographicOperations.ZeroMemory(payload);
+            throw new ArgumentException("Release binding receipt exceeds its byte budget.", nameof(value));
+        }
+        return payload;
+    }
+
+    public static ReleaseBindingReceiptV1 Deserialize(ReadOnlySpan<byte> payloadUtf8)
+    {
+        using var document = ReleaseBindingWire.ParseStrict(
+            payloadUtf8, MaximumPayloadBytes, "release binding receipt");
+        var fields = ReleaseBindingWire.ReadExactFields(
+            document.RootElement, ExactFields, "release binding receipt");
+        var receipt = new ReleaseBindingReceiptV1(
+            ReleaseBindingWire.ReadString(fields, "schema_version"),
+            ReleaseBindingWire.ReadString(fields, "contract_id"),
+            ReleaseBindingWire.ReadString(fields, "producer_module"),
+            ReleaseBindingWire.ReadString(fields, "receipt_kind"),
+            ReleaseBindingWire.ReadString(fields, "device_binding_id"),
+            ReadNullableEndpoint(fields["from"], "from"),
+            ReadNullableEndpoint(fields["to"], "to")
+                ?? throw new ArgumentException("Field 'to' must be a transition endpoint."),
+            ReleaseBindingWire.ReadInt64(fields["sequence"], "sequence"),
+            ReleaseBindingWire.ReadString(fields, "actor_identity"),
+            ReleaseBindingWire.ReadWireUtc(fields, "occurred_at"),
+            ReleaseBindingWire.ReadString(fields, "payload_sha256"),
+            ReleaseBindingWire.ReadString(fields, "receipt_id"));
+        receipt.Validate();
+        var canonicalPayload = Serialize(receipt);
+        try
+        {
+            if (!payloadUtf8.SequenceEqual(canonicalPayload))
+            {
+                throw new ArgumentException(
+                    "Release binding receipt is not the canonical snake_case wire.",
+                    nameof(payloadUtf8));
+            }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(canonicalPayload);
+        }
+        return receipt;
+    }
+
+    private static void WriteEndpoint(
+        Utf8JsonWriter writer,
+        string name,
+        ReleaseBindingEndpointV1? endpoint)
+    {
+        if (endpoint is null)
+        {
+            writer.WriteNull(name);
+            return;
+        }
+        writer.WriteStartObject(name);
+        writer.WriteString("release_bom_sha256", endpoint.ReleaseBomSha256);
+        writer.WriteNumber("generation", endpoint.Generation);
+        writer.WriteString("status", endpoint.Status);
+        writer.WriteEndObject();
+    }
+
+    private static ReleaseBindingEndpointV1? ReadNullableEndpoint(JsonElement value, string name)
+    {
+        if (value.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+        if (value.ValueKind != JsonValueKind.Object)
+        {
+            throw new ArgumentException($"Field '{name}' must be null or a transition endpoint.");
+        }
+        var fields = ReleaseBindingWire.ReadExactFields(
+            value, EndpointFields, $"release binding receipt {name} endpoint");
+        var endpoint = new ReleaseBindingEndpointV1(
+            ReleaseBindingWire.ReadString(fields, "release_bom_sha256"),
+            ReleaseBindingWire.ReadInt64(fields["generation"], "generation"),
+            ReleaseBindingWire.ReadString(fields, "status"));
+        endpoint.Validate();
+        return endpoint;
+    }
 }
