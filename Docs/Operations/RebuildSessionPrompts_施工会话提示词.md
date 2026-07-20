@@ -62,7 +62,7 @@
 按 Docs/RebuildPlan_重构计划书.md §12 release-binding-composition 行与 §16 施工顺序，施工独立批次：`release-binding.composition-gate` 评估器引导发布。
 开工前核对 dps2 已合入 PR：R0-B(T1) 未合入则停；本批已合入且已锚定则告诉我直接回 T2 收口。
 范围只做本批次：NEGATIVE 与 SAME_INSTANCE 两种断言的评估器、语料与制品检查逻辑的捆绑包及可再现构建脚本；不可变捆绑包/语料/检查器摘要清单；外部锚定材料（受保护路径锚内容由我落位 + 见证账本创世记录内容）；引导发布自身缺陷时的失败/回滚处置（常规=以新引导发布替换、由本版本授权；恢复=owner 恢复权威路径，见 §12 评估器变更与恢复条款），并在本批一并锚定 owner 恢复权威材料（独立恢复密钥指纹/流程声明）。评估逻辑不得引用候选仓库运行时代码；不改 Tools/ci、不动既有模块、不注册 required check（注册属 T2 收口）。
-完成后：对精确 diff 走独立 Codex adversarial review 至明确 PASS；开独立 PR 到 dps2，PR 记录捆绑包摘要清单与外审作业标识；停下等我亲自合入并完成外部锚定（受保护路径 + 见证账本创世记录）。合入且锚定后 T2 方可收口；T2 收口核验四件套须绑定本批的精确合入提交。
+完成后：对精确 diff 走独立 Codex adversarial review 至明确 PASS；开独立 PR 到 dps2，PR 记录捆绑包摘要清单与外审作业标识；停下等我亲自合入并完成外部锚定（受保护路径 + 见证账本创世记录）。**硬退出条件还包括专用 App 的可运转证据（缺一 T2A 不算完成、不得回 T2）**：专用 GitHub App 已仓外部署并安装到本仓库、权限最小化、运行环境候选不可写、具备 merge-group 触发能力、已成功签发至少一次（非 required 的）`release-binding.composition-gate` check、integration ID 经核验记录、同名冒充负测（他方 App/用户/Actions workflow 报同名 check 不被接受）已实测——GitHub ruleset 只有在预期来源 App 已安装且近期提交过该 check 后才能绑定来源，先注册后部署要么死锁要么开放冒充面。全部证据齐全后 T2 方可收口；T2 收口核验四件套+App 可运转证据须绑定本批的精确合入提交。
 ```
 
 ### T3 · R0-D 删除 11 个 factory 模块
