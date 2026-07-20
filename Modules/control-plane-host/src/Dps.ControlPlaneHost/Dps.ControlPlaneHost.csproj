@@ -16,5 +16,7 @@
   <ItemGroup>
     <EmbeddedResource Include="../../migrations/001_create_control_plane_truth.sql"
                       LogicalName="Dps.ControlPlaneHost.Migrations.001_create_control_plane_truth.sql" />
+    <EmbeddedResource Include="../../migrations/002_create_release_binding_truth.sql"
+                      LogicalName="Dps.ControlPlaneHost.Migrations.002_create_release_binding_truth.sql" />
   </ItemGroup>
 </Project>

@@ -56,26 +56,30 @@ public sealed class ControlPlaneSubmissionLifecycleTests
                 collapsed,
                 collapsed,
                 stateFingerprint,
-                FactsSource()));
+                FactsSource(),
+                Fence()));
         Assert.Throws<InvalidOperationException>(() =>
             new ControlPlaneSubmissionLifecycleProducer(
                 new TestReconciliationSigner(sharedKey),
                 new TestRecoverySigner(sharedKey),
                 stateFingerprint,
-                FactsSource()));
+                FactsSource(),
+                Fence()));
         using var separateRecoveryKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         Assert.Throws<InvalidOperationException>(() =>
             new ControlPlaneSubmissionLifecycleProducer(
                 new TestReconciliationSigner(policyStateKey),
                 new TestRecoverySigner(separateRecoveryKey),
                 stateFingerprint,
-                FactsSource()));
+                FactsSource(),
+                Fence()));
         Assert.Throws<ArgumentNullException>(() =>
             new ControlPlaneSubmissionLifecycleProducer(
                 null!,
                 new TestRecoverySigner(sharedKey),
                 stateFingerprint,
-                FactsSource()));
+                FactsSource(),
+                Fence()));
     }
 
     [Fact, Trait("Category", "Contract")]
@@ -243,7 +247,8 @@ public sealed class ControlPlaneSubmissionLifecycleTests
             fixture.ReconciliationSigner,
             fixture.RecoverySigner,
             fixture.Consumer.AuthorityFingerprintSha256,
-            FactsSource(generation: 9));
+            FactsSource(generation: 9),
+            Fence(generation: 9));
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             divergentGeneration.CreateRecoveryAsync(
                 reconciled,
@@ -255,7 +260,8 @@ public sealed class ControlPlaneSubmissionLifecycleTests
             fixture.ReconciliationSigner,
             fixture.RecoverySigner,
             fixture.Consumer.AuthorityFingerprintSha256,
-            FactsSource(releaseBomSha256: new string('e', 64)));
+            FactsSource(releaseBomSha256: new string('e', 64)),
+            Fence(releaseBomSha256: new string('e', 64)));
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             divergentBom.CreateRecoveryAsync(
                 reconciled,
@@ -267,7 +273,8 @@ public sealed class ControlPlaneSubmissionLifecycleTests
             fixture.ReconciliationSigner,
             fixture.RecoverySigner,
             fixture.Consumer.AuthorityFingerprintSha256,
-            FactsSource(absent: true));
+            FactsSource(absent: true),
+            Fence(absent: true));
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             noActiveBinding.CreateRecoveryAsync(
                 reconciled,
@@ -280,6 +287,15 @@ public sealed class ControlPlaneSubmissionLifecycleTests
                 fixture.ReconciliationSigner,
                 fixture.RecoverySigner,
                 fixture.Consumer.AuthorityFingerprintSha256,
+                null!,
+                Fence()));
+
+        Assert.Throws<ArgumentNullException>(() =>
+            new ControlPlaneSubmissionLifecycleProducer(
+                fixture.ReconciliationSigner,
+                fixture.RecoverySigner,
+                fixture.Consumer.AuthorityFingerprintSha256,
+                FactsSource(),
                 null!));
     }
 
@@ -309,7 +325,8 @@ public sealed class ControlPlaneSubmissionLifecycleTests
             fixture.ReconciliationSigner,
             signer,
             fixture.Consumer.AuthorityFingerprintSha256,
-            new PolicyBoundReleaseBomFactsSource(reader));
+            new PolicyBoundReleaseBomFactsSource(reader),
+            new ReaderBackedRecoveryFenceAuthority(reader));
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             producer.CreateRecoveryAsync(
                 reconciled,
@@ -448,6 +465,7 @@ public sealed class ControlPlaneSubmissionLifecycleTests
                 fixture.RecoverySigner,
                 fixture.Consumer.AuthorityFingerprintSha256,
                 FactsSource(),
+                Fence(),
                 TimeSpan.FromMilliseconds(25));
         var untouchedPort = new ReconciliationPort(fixture.PolicyStateKey);
         var authorityTimeoutCoordinator =
@@ -490,7 +508,8 @@ public sealed class ControlPlaneSubmissionLifecycleTests
                 cancellationRaceSigner,
                 fixture.RecoverySigner,
                 fixture.Consumer.AuthorityFingerprintSha256,
-                FactsSource());
+                FactsSource(),
+                Fence());
         var cancellationRacePort = new ReconciliationPort(fixture.PolicyStateKey);
         var cancellationRaceCoordinator =
             new ControlPlaneSubmissionLifecycleCoordinator(
@@ -541,6 +560,7 @@ public sealed class ControlPlaneSubmissionLifecycleTests
             new TestRecoverySigner(recoveryKey),
             consumer.AuthorityFingerprintSha256,
             FactsSource(),
+            Fence(),
             AttackTimeout(attack));
         if (attack == "key-replacement")
             responder.ReplaceSigningKey(rogueKey);
@@ -590,6 +610,7 @@ public sealed class ControlPlaneSubmissionLifecycleTests
             signer,
             consumer.AuthorityFingerprintSha256,
             FactsSource(),
+            Fence(),
             AttackTimeout(attack));
         if (attack == "key-replacement")
             responder.ReplaceSigningKey(rogueKey);
@@ -691,6 +712,57 @@ public sealed class ControlPlaneSubmissionLifecycleTests
         => new(new FixedLifecycleBindingReader(absent
             ? null
             : ActiveBinding(generation, releaseBomSha256)));
+
+    /// <summary>
+    /// Fixture recovery fence over the same fixed binding facts as
+    /// <see cref="FactsSource"/>: issuance pins journal sequence 1 and the
+    /// reader's live facts; commit re-reads the reader and fails closed on
+    /// any divergence from the issued fence (the in-memory analogue of the
+    /// PostgreSQL commit-side compare-and-set).
+    /// </summary>
+    private static ReaderBackedRecoveryFenceAuthority Fence(
+        long generation = 8,
+        string? releaseBomSha256 = null,
+        bool absent = false)
+        => new(new FixedLifecycleBindingReader(absent
+            ? null
+            : ActiveBinding(generation, releaseBomSha256)));
+
+    private sealed class ReaderBackedRecoveryFenceAuthority(
+        IActiveReleaseBindingReader reader)
+        : IReleaseBindingRecoveryFenceAuthority
+    {
+        internal int CommitCount { get; private set; }
+
+        public ReleaseBindingRecoveryFence IssueRecoveryFence(string deviceBindingId)
+            => reader.TryReadActive(deviceBindingId, out var binding) && binding is not null
+                ? new ReleaseBindingRecoveryFence(
+                    deviceBindingId,
+                    JournalSequence: 1,
+                    binding.ReleaseBomSha256,
+                    binding.Generation)
+                : throw new ActiveReleaseBindingException(
+                    "recovery fence issuance requires an active release binding");
+
+        public void CommitRecoveryFence(
+            ReleaseBindingRecoveryFence fence,
+            Guid recoveryId,
+            string recoveryContentSha256)
+        {
+            if (!reader.TryReadActive(fence.DeviceBindingId, out var binding)
+                || binding is null
+                || !string.Equals(
+                    binding.ReleaseBomSha256,
+                    fence.ReleaseBomSha256,
+                    StringComparison.Ordinal)
+                || binding.Generation != fence.Generation)
+            {
+                throw new ReleaseBindingRecoveryFenceConflictException(
+                    "recovery fence commit conflict: the release binding revision advanced past the issued fence");
+            }
+            CommitCount++;
+        }
+    }
 
     private static ActiveReleaseBindingV1 ActiveBinding(
         long generation = 8,
@@ -1235,7 +1307,8 @@ public sealed class ControlPlaneSubmissionLifecycleTests
                 ReconciliationSigner,
                 RecoverySigner,
                 Consumer.AuthorityFingerprintSha256,
-                FactsSource());
+                FactsSource(),
+                Fence());
         }
 
         internal ECDsa PolicyStateKey { get; }

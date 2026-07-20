@@ -341,17 +341,20 @@ public sealed class ControlPlaneSubmissionLifecycleProducer : IDisposable
     private readonly string _policyStateAuthorityFingerprintSha256;
     private readonly TimeSpan _authorityTimeout;
     private readonly PolicyBoundReleaseBomFactsSource _releaseBomFactsSource;
+    private readonly IReleaseBindingRecoveryFenceAuthority _recoveryFenceAuthority;
 
     public ControlPlaneSubmissionLifecycleProducer(
         IControlPlaneReconciliationSigningAuthority reconciliationSigner,
         IControlPlaneHumanRecoveryApprovalAuthority recoverySigner,
         string policyStateAuthorityFingerprintSha256,
         PolicyBoundReleaseBomFactsSource releaseBomFactsSource,
+        IReleaseBindingRecoveryFenceAuthority recoveryFenceAuthority,
         TimeSpan? authorityTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(reconciliationSigner);
         ArgumentNullException.ThrowIfNull(recoverySigner);
         ArgumentNullException.ThrowIfNull(releaseBomFactsSource);
+        ArgumentNullException.ThrowIfNull(recoveryFenceAuthority);
         if (ReferenceEquals(reconciliationSigner, recoverySigner))
             throw new InvalidOperationException(
                 "Reconciliation and human recovery require separate signing capabilities.");
@@ -370,6 +373,7 @@ public sealed class ControlPlaneSubmissionLifecycleProducer : IDisposable
         _reconciliationSigner = reconciliationSigner;
         _recoverySigner = recoverySigner;
         _releaseBomFactsSource = releaseBomFactsSource;
+        _recoveryFenceAuthority = recoveryFenceAuthority;
         _policyStateAuthorityFingerprintSha256 =
             policyStateAuthorityFingerprintSha256;
         _authorityTimeout = effectiveAuthorityTimeout;
@@ -560,6 +564,22 @@ public sealed class ControlPlaneSubmissionLifecycleProducer : IDisposable
                 "Recovery next release BOM facts do not match the live active release binding.");
         }
 
+        // Database-issued expected-revision fence (F2): the fence pins the
+        // device's release binding journal head at issuance time. Its BOM
+        // facts must be the exact pair the signed recovery wire carries
+        // (NextReleaseBomSha256 / NextReleaseBomGeneration), so the fenced
+        // revision enters the recovery signature content; the journal head
+        // sequence is the commit-side compare-and-set value.
+        var recoveryFence = _recoveryFenceAuthority.IssueRecoveryFence(state.DeviceBindingId);
+        if (!ControlPlaneSubmissionStateConsumer.FixedDigestEquals(
+                recoveryFence.ReleaseBomSha256,
+                activeReleaseBomSha256)
+            || recoveryFence.Generation != activeReleaseBomGeneration)
+        {
+            throw new UnauthorizedAccessException(
+                "Recovery fence facts do not match the live active release binding.");
+        }
+
         var unsigned = new ApprovalSubmissionRecoveryV1(
             ApprovalSubmissionRecoveryV1.CurrentSchemaVersion,
             ApprovalSubmissionRecoveryV1.CurrentContractId,
@@ -597,17 +617,13 @@ public sealed class ControlPlaneSubmissionLifecycleProducer : IDisposable
             unsigned,
             cancellationToken).ConfigureAwait(false);
 
-        // Post-signing re-verification (TOCTOU narrowing, not closure): the
-        // human recovery signer is an awaited external authority, so the
-        // active binding can change while the signature is produced. Re-read
-        // the facts source and require the exact first-read
-        // (sha256, generation) pair; any change — including the active
-        // binding disappearing — refuses the already-signed envelope
-        // fail-closed instead of releasing it. This narrows the race window
-        // to the instants around this re-read; atomic closure requires
-        // binding revision fencing that ties recovery acceptance to the
-        // durable policy transfer, which belongs to the same later batch as
-        // the durable CAS truth store and the composition root.
+        // Post-signing re-verification (cheap first refusal): the human
+        // recovery signer is an awaited external authority, so the active
+        // binding can change while the signature is produced. Re-read the
+        // facts source and require the exact first-read (sha256, generation)
+        // pair; any change — including the active binding disappearing —
+        // refuses the already-signed envelope fail-closed instead of
+        // releasing it.
         if (!_releaseBomFactsSource.TryReadActiveFacts(
                 state.DeviceBindingId,
                 out var recheckedReleaseBomSha256,
@@ -624,6 +640,32 @@ public sealed class ControlPlaneSubmissionLifecycleProducer : IDisposable
             throw new UnauthorizedAccessException(
                 "Recovery next release BOM facts do not match the live active release binding.");
         }
+
+        // Atomic closure (F2): commit the fence in the release binding
+        // journal's own database transaction. The commit re-verifies — under
+        // the same per-device journal lock every binding transition takes —
+        // that the journal head still is the fenced revision, then appends
+        // the fence record. A conflict throws and the signed envelope is
+        // never released. Redelivery of the exact same recovery content
+        // (recovery_id + pre-signature canonical wire digest, deterministic
+        // across re-signing) replays idempotently, so a crash between fence
+        // commit and response resolves by redelivery.
+        var canonicalRecoveryContent =
+            ApprovalSubmissionLifecycleBinding.CanonicalRecoveryBytes(unsigned);
+        string recoveryContentSha256;
+        try
+        {
+            recoveryContentSha256 = Convert.ToHexStringLower(
+                SHA256.HashData(canonicalRecoveryContent));
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(canonicalRecoveryContent);
+        }
+        _recoveryFenceAuthority.CommitRecoveryFence(
+            recoveryFence,
+            request.RecoveryId,
+            recoveryContentSha256);
 
         return envelope;
     }

@@ -47,7 +47,7 @@ public sealed class ActiveReleaseBindingContractTests
             Convert.ToHexStringLower(parameters.Modulus!),
             65537);
         var authority = new ActiveReleaseBindingAuthority(
-            [key], new InMemoryReleaseBindingTruthStore(), () => Now);
+            [key], InMemoryReleaseBindingTruthStore.CreateTestOnly(), () => Now);
 
         var (firstBom, firstToken) = SignBom(rsa, key.KeyId, "bom-1", 1, null);
         authority.Activate(Device, firstBom, firstToken);

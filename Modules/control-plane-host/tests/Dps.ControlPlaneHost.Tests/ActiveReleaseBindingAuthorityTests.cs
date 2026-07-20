@@ -122,7 +122,7 @@ public sealed class ActiveReleaseBindingAuthorityTests
     private static ActiveReleaseBindingAuthority Authority(
         TestSigner signer,
         IReleaseBindingTruthStore? store = null)
-        => new([signer.TrustKey], store ?? new InMemoryReleaseBindingTruthStore(), () => Now);
+        => new([signer.TrustKey], store ?? InMemoryReleaseBindingTruthStore.CreateTestOnly(), () => Now);
 
     private static (byte[] Bom, string Token) MakeBom(
         TestSigner signer,
@@ -428,7 +428,7 @@ public sealed class ActiveReleaseBindingAuthorityTests
         using var document = JsonDocument.Parse(policy.ToJsonString());
         var keys = ReleaseBomTrustKey.FromTrustPolicy(document.RootElement);
         var authority = new ActiveReleaseBindingAuthority(
-            keys, new InMemoryReleaseBindingTruthStore(), () => Now);
+            keys, InMemoryReleaseBindingTruthStore.CreateTestOnly(), () => Now);
 
         var (bom, token) = MakeBom(signer, "bom-1", 1, null);
         authority.Activate(Device, bom, token);
@@ -675,7 +675,7 @@ public sealed class ActiveReleaseBindingAuthorityTests
     public void RecoveryFromStoreRestoresBindingsTokensAndCounters()
     {
         using var signer = new TestSigner();
-        var store = new InMemoryReleaseBindingTruthStore();
+        var store = InMemoryReleaseBindingTruthStore.CreateTestOnly();
         var first = Authority(signer, store);
         var (bom1, token1) = MakeBom(signer, "bom-1", 1, null);
         first.Activate(Device, bom1, token1);
@@ -707,7 +707,7 @@ public sealed class ActiveReleaseBindingAuthorityTests
     public void RecoveryAfterRevokeKeepsReaderClosed()
     {
         using var signer = new TestSigner();
-        var store = new InMemoryReleaseBindingTruthStore();
+        var store = InMemoryReleaseBindingTruthStore.CreateTestOnly();
         var first = Authority(signer, store);
         var (bom, token) = MakeBom(signer, "bom-1", 1, null);
         first.Activate(Device, bom, token);
@@ -723,7 +723,7 @@ public sealed class ActiveReleaseBindingAuthorityTests
     public void ForkedOrRegressedJournalRefusesService()
     {
         using var signer = new TestSigner();
-        var store = new InMemoryReleaseBindingTruthStore();
+        var store = InMemoryReleaseBindingTruthStore.CreateTestOnly();
         var authority = Authority(signer, store);
         var (bom1, token1) = MakeBom(signer, "bom-1", 1, null);
         authority.Activate(Device, bom1, token1);
@@ -754,7 +754,7 @@ public sealed class ActiveReleaseBindingAuthorityTests
     public void IdenticalActivateResubmissionReturnsOriginalReceiptWithoutStateChange()
     {
         using var signer = new TestSigner();
-        var store = new InMemoryReleaseBindingTruthStore();
+        var store = InMemoryReleaseBindingTruthStore.CreateTestOnly();
         var authority = Authority(signer, store);
         var (bom, token) = MakeBom(signer, "bom-1", 1, null);
         var original = authority.Activate(Device, bom, token);
@@ -830,7 +830,7 @@ public sealed class ActiveReleaseBindingAuthorityTests
     public async Task ConcurrentIdenticalActivationsConvergeOnOneReceipt()
     {
         using var signer = new TestSigner();
-        var store = new InMemoryReleaseBindingTruthStore();
+        var store = InMemoryReleaseBindingTruthStore.CreateTestOnly();
         var authority = Authority(signer, store);
         var (bom, token) = MakeBom(signer, "bom-1", 1, null);
 
@@ -941,7 +941,7 @@ public sealed class ActiveReleaseBindingAuthorityTests
     public void TamperedRecoveryBindingsRefuseService()
     {
         using var signer = new TestSigner();
-        var store = new InMemoryReleaseBindingTruthStore();
+        var store = InMemoryReleaseBindingTruthStore.CreateTestOnly();
         var authority = Authority(signer, store);
         var (first, firstToken) = MakeBom(signer, "bom-1", 1, null);
         authority.Activate(Device, first, firstToken);
@@ -1016,7 +1016,7 @@ public sealed class ActiveReleaseBindingAuthorityTests
     public void StoreAppendRejectsForkedOrNonContiguousSequences()
     {
         using var signer = new TestSigner();
-        var store = new InMemoryReleaseBindingTruthStore();
+        var store = InMemoryReleaseBindingTruthStore.CreateTestOnly();
 
         // Two authority instances sharing one store: both see an empty
         // journal, both try to land generation 1 — the second Append is a
@@ -1026,7 +1026,7 @@ public sealed class ActiveReleaseBindingAuthorityTests
         var (leftBom, leftToken) = MakeBom(signer, "bom-1", 1, null);
         left.Activate(Device, leftBom, leftToken);
         var (rightBom, rightToken) = MakeBom(signer, "bom-1b", 1, null);
-        Assert.Throws<ActiveReleaseBindingException>(
+        Assert.Throws<ReleaseBindingTruthConflictException>(
             () => right.Activate(Device, rightBom, rightToken));
 
         // The losing instance made no visible change and the journal holds
@@ -1037,7 +1037,7 @@ public sealed class ActiveReleaseBindingAuthorityTests
         Assert.False(right.TryReadActive(Device, out _));
 
         // Direct store misuse: skipping ahead or replaying a sequence faults.
-        Assert.Throws<ActiveReleaseBindingException>(
+        Assert.Throws<ReleaseBindingTruthConflictException>(
             () => store.Append(record with
             {
                 Receipt = record.Receipt with
@@ -1046,14 +1046,14 @@ public sealed class ActiveReleaseBindingAuthorityTests
                     PayloadSha256 = (record.Receipt with { Sequence = 3 }).ComputePayloadSha256()
                 }
             }));
-        Assert.Throws<ActiveReleaseBindingException>(() => store.Append(record));
+        Assert.Throws<ReleaseBindingTruthConflictException>(() => store.Append(record));
     }
 
     // ----- third adversarial review: F1-F4 regressions -----
 
     private sealed class FailingAppendStore : IReleaseBindingTruthStore
     {
-        private readonly InMemoryReleaseBindingTruthStore _inner = new();
+        private readonly InMemoryReleaseBindingTruthStore _inner = InMemoryReleaseBindingTruthStore.CreateTestOnly();
         public bool FailNextAppend { get; set; }
 
         public void Append(ReleaseBindingTruthRecord record)
@@ -1172,7 +1172,7 @@ public sealed class ActiveReleaseBindingAuthorityTests
 
         // 2. Mid-chain: second activation whose signed chain digest is not
         //    the prior binding's digest.
-        var store = new InMemoryReleaseBindingTruthStore();
+        var store = InMemoryReleaseBindingTruthStore.CreateTestOnly();
         var live = Authority(signer, store);
         var (first, firstToken) = MakeBom(signer, "bom-1", 1, null);
         live.Activate(Device, first, firstToken);
@@ -1233,7 +1233,7 @@ public sealed class ActiveReleaseBindingAuthorityTests
         Assert.False(emptySource.TryReadActiveFacts(Device, out _, out _));
 
         using var signer = new TestSigner();
-        var store = new InMemoryReleaseBindingTruthStore();
+        var store = InMemoryReleaseBindingTruthStore.CreateTestOnly();
         var authority = Authority(signer, store);
         var (bom, token) = MakeBom(signer, "bom-1", 1, null);
         authority.Activate(Device, bom, token);

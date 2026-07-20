@@ -8,9 +8,12 @@ namespace Dps.ControlPlaneHost;
 
 /// <summary>
 /// Raised whenever active release binding material fails a fail-closed check.
-/// No state mutation ever precedes this exception.
+/// No state mutation ever precedes this exception. Derivable only inside
+/// this module for the typed conflict cases
+/// (<see cref="ReleaseBindingTruthConflictException"/>,
+/// <see cref="ReleaseBindingRecoveryFenceConflictException"/>).
 /// </summary>
-public sealed class ActiveReleaseBindingException : Exception
+public class ActiveReleaseBindingException : Exception
 {
     public ActiveReleaseBindingException(string message) : base(message) { }
     public ActiveReleaseBindingException(string message, Exception inner) : base(message, inner) { }
@@ -140,10 +143,10 @@ public sealed record ReleaseBindingTruthRecord(
 /// <summary>
 /// Append-only truth store for release binding transitions. The authority
 /// appends one record per successful transition and loads the full journal
-/// at construction to recover state. NOTE: only a deterministic in-memory
-/// implementation exists in this batch; a durable PostgreSQL adapter is a
-/// registered obligation for a later batch — nothing is persisted across
-/// process death yet.
+/// at construction to recover state. The durable implementation is
+/// <see cref="PostgresReleaseBindingTruthStore"/> (per-device compare-and-set
+/// journal); <see cref="InMemoryReleaseBindingTruthStore"/> is test-only and
+/// cannot be constructed without the explicit test-only factory.
 /// </summary>
 public interface IReleaseBindingTruthStore
 {
@@ -153,12 +156,28 @@ public interface IReleaseBindingTruthStore
 
 /// <summary>
 /// Deterministic in-memory truth store for tests and restart-recovery tests.
-/// Not durable: process death loses the journal.
+/// Not durable: process death loses the journal. TEST-ONLY: the constructor
+/// is private and the single factory is named CreateTestOnly so a production
+/// composition can never silently take the in-memory implementation — any
+/// call site names its test-only nature explicitly.
 /// </summary>
-public sealed class InMemoryReleaseBindingTruthStore : IReleaseBindingTruthStore
+public sealed class InMemoryReleaseBindingTruthStore
+    : IReleaseBindingTruthStore, IReleaseBindingRecoveryFenceAuthority
 {
     private readonly Lock _gate = new();
     private readonly List<ReleaseBindingTruthRecord> _records = [];
+    private readonly Dictionary<Guid, (ReleaseBindingRecoveryFence Fence, string ContentSha256)>
+        _fences = [];
+
+    private InMemoryReleaseBindingTruthStore()
+    {
+    }
+
+    /// <summary>
+    /// The only way to obtain the non-durable in-memory store. Production
+    /// composition must use <see cref="PostgresReleaseBindingTruthStore"/>.
+    /// </summary>
+    public static InMemoryReleaseBindingTruthStore CreateTestOnly() => new();
 
     public void Append(ReleaseBindingTruthRecord record)
     {
@@ -167,22 +186,14 @@ public sealed class InMemoryReleaseBindingTruthStore : IReleaseBindingTruthStore
             ?? throw new ActiveReleaseBindingException("truth store append requires a receipt");
         lock (_gate)
         {
-            // Minimal compare-and-swap guard: the journal accepts only the
-            // exactly-next sequence per device, so two authority instances
-            // sharing one store cannot both land the same generation — the
-            // loser faults instead of silently forking the journal. The
-            // durable PostgreSQL CAS journal remains a later batch.
-            long lastSequence = 0;
-            foreach (var existing in _records)
+            // Compare-and-swap guard mirroring the durable PostgreSQL CAS
+            // journal: the journal accepts only the exactly-next sequence
+            // per device, so two authority instances sharing one store
+            // cannot both land the same generation — the loser faults
+            // instead of silently forking the journal.
+            if (receipt.Sequence != LastSequenceLocked(record.DeviceBindingId) + 1)
             {
-                if (string.Equals(existing.DeviceBindingId, record.DeviceBindingId, StringComparison.Ordinal))
-                {
-                    lastSequence = existing.Receipt.Sequence;
-                }
-            }
-            if (receipt.Sequence != lastSequence + 1)
-            {
-                throw new ActiveReleaseBindingException(
+                throw new ReleaseBindingTruthConflictException(
                     "truth store append sequence conflict: expected the exactly-next per-device sequence");
             }
             _records.Add(record);
@@ -195,6 +206,81 @@ public sealed class InMemoryReleaseBindingTruthStore : IReleaseBindingTruthStore
         {
             return [.. _records];
         }
+    }
+
+    public ReleaseBindingRecoveryFence IssueRecoveryFence(string deviceBindingId)
+    {
+        ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
+        lock (_gate)
+        {
+            var head = HeadLocked(deviceBindingId);
+            if (head is null || head.CurrentBinding is not { Status: "active" } active)
+            {
+                throw new ActiveReleaseBindingException(
+                    "recovery fence issuance requires an active release binding");
+            }
+            return new ReleaseBindingRecoveryFence(
+                deviceBindingId,
+                head.Receipt.Sequence,
+                active.ReleaseBomSha256,
+                active.Generation);
+        }
+    }
+
+    public void CommitRecoveryFence(
+        ReleaseBindingRecoveryFence fence,
+        Guid recoveryId,
+        string recoveryContentSha256)
+    {
+        ArgumentNullException.ThrowIfNull(fence);
+        if (recoveryId == Guid.Empty || string.IsNullOrEmpty(recoveryContentSha256))
+        {
+            throw new ActiveReleaseBindingException(
+                "recovery fence commit requires a recovery id and content digest");
+        }
+        lock (_gate)
+        {
+            if (_fences.TryGetValue(recoveryId, out var existing))
+            {
+                // Idempotent redelivery of the exact same recovery content
+                // for the exact same fenced journal position; anything else
+                // on the same recovery id fails closed.
+                if (existing.Fence == fence
+                    && string.Equals(existing.ContentSha256, recoveryContentSha256, StringComparison.Ordinal))
+                {
+                    return;
+                }
+                throw new ReleaseBindingRecoveryFenceConflictException(
+                    "recovery fence commit conflict: the recovery id was already fenced differently");
+            }
+            var head = HeadLocked(fence.DeviceBindingId);
+            if (head is null
+                || head.Receipt.Sequence != fence.JournalSequence
+                || head.CurrentBinding is not { Status: "active" } active
+                || !string.Equals(active.ReleaseBomSha256, fence.ReleaseBomSha256, StringComparison.Ordinal)
+                || active.Generation != fence.Generation)
+            {
+                throw new ReleaseBindingRecoveryFenceConflictException(
+                    "recovery fence commit conflict: the release binding revision advanced past the issued fence");
+            }
+            _fences[recoveryId] = (fence, recoveryContentSha256);
+        }
+    }
+
+    private long LastSequenceLocked(string deviceBindingId)
+        => HeadLocked(deviceBindingId)?.Receipt.Sequence ?? 0;
+
+    private ReleaseBindingTruthRecord? HeadLocked(string deviceBindingId)
+    {
+        ReleaseBindingTruthRecord? head = null;
+        foreach (var existing in _records)
+        {
+            if (string.Equals(existing.DeviceBindingId, deviceBindingId, StringComparison.Ordinal))
+            {
+                head = existing;
+            }
+        }
+        return head;
     }
 }
 
