@@ -54,6 +54,15 @@ public sealed record ActiveReleaseBindingV1(
         ControlContractValidation.RequireHex(ReceiptId, "receipt_", 32, nameof(ReceiptId));
     }
 
+    /// <summary>
+    /// The execution token is an ephemeral secret: the record's printed form
+    /// redacts it so logs, exception messages, and debugger dumps never carry
+    /// the raw token (the executor-gateway wire DTO redacts identically).
+    /// Value-based record equality still covers ExecutionTokenBase64.
+    /// </summary>
+    public override string ToString()
+        => $"{nameof(ActiveReleaseBindingV1)} {{ SchemaVersion = {SchemaVersion}, ContractId = {ContractId}, ProducerModule = {ProducerModule}, DeviceBindingId = {DeviceBindingId}, ReleaseBomSha256 = {ReleaseBomSha256}, Generation = {Generation}, ReleaseBomGeneration = {ReleaseBomGeneration}, ExecutionTokenBase64 = [REDACTED], ActivationTokenSha256 = {ActivationTokenSha256}, Status = {Status}, SignerIdentity = {SignerIdentity}, SignerKeyId = {SignerKeyId}, BomSignatureSha256 = {BomSignatureSha256}, ActivatedAt = {ActivatedAt:O}, ReceiptId = {ReceiptId} }}";
+
     private void RequireSignerCommittedToken()
     {
         byte[] token;

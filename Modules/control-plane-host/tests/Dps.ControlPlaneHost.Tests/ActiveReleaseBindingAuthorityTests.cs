@@ -737,12 +737,14 @@ public sealed class ActiveReleaseBindingAuthorityTests
         // Duplicated record (replayed receipt identity).
         Assert.Throws<ActiveReleaseBindingException>(
             () => Authority(signer, new FrozenTruthStore([records[0], records[0]])));
-        // Tampered receipt payload digest.
+        // Tampered receipt payload digest: rejected by
+        // ReleaseBindingReceiptV1.Validate itself (fixed-time digest check),
+        // which recovery invokes on every journal receipt.
         var tampered = records[1] with
         {
             Receipt = records[1].Receipt with { PayloadSha256 = new string('0', 64) }
         };
-        Assert.Throws<ActiveReleaseBindingException>(
+        Assert.Throws<ArgumentException>(
             () => Authority(signer, new FrozenTruthStore([records[0], tampered])));
     }
 
@@ -991,6 +993,60 @@ public sealed class ActiveReleaseBindingAuthorityTests
         var recovered = Authority(signer, new FrozenTruthStore(records));
         Assert.True(recovered.TryReadActive(Device, out var binding));
         Assert.Equal(Sha256Hex(second), binding!.ReleaseBomSha256);
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public void BindingToStringRedactsTheExecutionToken()
+    {
+        using var signer = new TestSigner();
+        var authority = Authority(signer);
+        var (bom, token) = MakeBom(signer, "bom-1", 1, null);
+        authority.Activate(Device, bom, token);
+        Assert.True(authority.TryReadActive(Device, out var binding));
+
+        var printed = binding!.ToString();
+        Assert.DoesNotContain(token, printed, StringComparison.Ordinal);
+        Assert.Contains("[REDACTED]", printed, StringComparison.Ordinal);
+        // Redaction is print-only: value equality still covers the token.
+        Assert.Equal(binding, binding with { });
+        Assert.NotEqual(binding, binding with { ExecutionTokenBase64 = Token("other") });
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public void StoreAppendRejectsForkedOrNonContiguousSequences()
+    {
+        using var signer = new TestSigner();
+        var store = new InMemoryReleaseBindingTruthStore();
+
+        // Two authority instances sharing one store: both see an empty
+        // journal, both try to land generation 1 — the second Append is a
+        // sequence conflict and faults instead of forking the journal.
+        var left = Authority(signer, store);
+        var right = Authority(signer, store);
+        var (leftBom, leftToken) = MakeBom(signer, "bom-1", 1, null);
+        left.Activate(Device, leftBom, leftToken);
+        var (rightBom, rightToken) = MakeBom(signer, "bom-1b", 1, null);
+        Assert.Throws<ActiveReleaseBindingException>(
+            () => right.Activate(Device, rightBom, rightToken));
+
+        // The losing instance made no visible change and the journal holds
+        // exactly the winner's record.
+        var records = store.LoadAll();
+        var record = Assert.Single(records);
+        Assert.Equal(Sha256Hex(leftBom), record.CurrentBinding.ReleaseBomSha256);
+        Assert.False(right.TryReadActive(Device, out _));
+
+        // Direct store misuse: skipping ahead or replaying a sequence faults.
+        Assert.Throws<ActiveReleaseBindingException>(
+            () => store.Append(record with
+            {
+                Receipt = record.Receipt with
+                {
+                    Sequence = 3,
+                    PayloadSha256 = (record.Receipt with { Sequence = 3 }).ComputePayloadSha256()
+                }
+            }));
+        Assert.Throws<ActiveReleaseBindingException>(() => store.Append(record));
     }
 
     // ----- third adversarial review: F1-F4 regressions -----

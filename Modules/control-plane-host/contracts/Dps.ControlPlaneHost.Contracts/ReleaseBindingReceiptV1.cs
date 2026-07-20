@@ -58,6 +58,19 @@ public sealed record ReleaseBindingReceiptV1(
         ReleaseBindingValidation.RequireIdentity(ActorIdentity, nameof(ActorIdentity));
         ControlContractValidation.RequireUtc(OccurredAt, nameof(OccurredAt));
         ControlContractValidation.RequireSha256(PayloadSha256, nameof(PayloadSha256));
+        // The declared digest must BE the digest of the receipt content: a
+        // receipt whose fields were mutated without recomputing payload_sha256
+        // is rejected here, so no shape-valid-but-inconsistent receipt passes
+        // any Validate call site (codec serialize/deserialize, authority
+        // issuance, truth-store recovery). Fixed-time over the decoded bytes.
+        if (!CryptographicOperations.FixedTimeEquals(
+                Convert.FromHexString(PayloadSha256),
+                Convert.FromHexString(ComputePayloadSha256())))
+        {
+            throw new ArgumentException(
+                "Release binding receipt payload_sha256 does not match the receipt content.",
+                nameof(PayloadSha256));
+        }
         ControlContractValidation.RequireHex(ReceiptId, "receipt_", 32, nameof(ReceiptId));
         switch (ReceiptKind)
         {

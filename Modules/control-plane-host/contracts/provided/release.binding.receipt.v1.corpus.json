@@ -16,16 +16,16 @@
     "sequence": 1,
     "actor_identity": "deployed-release-controller",
     "occurred_at": "2026-07-14T00:00:00Z",
-    "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "payload_sha256": "e100ca466b74892775e1581ea7dc1a7d40983f4d0f512374d69a5fe6aad08416",
     "receipt_id": "receipt_99999999999999999999999999999999"
   },
   "cases": [
     {"id": "valid-activation-null-from", "schemaValid": true, "codecValid": true, "patch": {}, "remove": []},
-    {"id": "valid-activation-previous-from", "schemaValid": true, "codecValid": true, "patch": {"from": {"release_bom_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "generation": 1, "status": "previous"}, "to": {"release_bom_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "generation": 2, "status": "active"}, "sequence": 2}, "remove": []},
-    {"id": "valid-activation-revoked-from", "schemaValid": true, "codecValid": true, "patch": {"from": {"release_bom_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "generation": 1, "status": "revoked"}, "to": {"release_bom_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "generation": 2, "status": "active"}, "sequence": 3}, "remove": []},
+    {"id": "valid-activation-previous-from", "schemaValid": true, "codecValid": true, "patch": {"from": {"release_bom_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "generation": 1, "status": "previous"}, "to": {"release_bom_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "generation": 2, "status": "active"}, "sequence": 2, "payload_sha256": "4c5454f5140a9391dc95aee92d99f1b3c15d1ba22788c12ef51a2173d84e325b"}, "remove": []},
+    {"id": "valid-activation-revoked-from", "schemaValid": true, "codecValid": true, "patch": {"from": {"release_bom_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "generation": 1, "status": "revoked"}, "to": {"release_bom_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "generation": 2, "status": "active"}, "sequence": 3, "payload_sha256": "ccbe46824d0338eca76b3c33b49877977fc9a5306fef96c3cce5f030aefca02e"}, "remove": []},
     {"id": "activation-from-active", "schemaValid": false, "codecValid": false, "patch": {"from": {"release_bom_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "generation": 1, "status": "active"}, "to": {"release_bom_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "generation": 2, "status": "active"}, "sequence": 2}, "remove": []},
-    {"id": "valid-revocation", "schemaValid": true, "codecValid": true, "patch": {"receipt_kind": "revocation", "from": {"release_bom_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "generation": 1, "status": "active"}, "to": {"release_bom_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "generation": 1, "status": "revoked"}, "sequence": 2, "actor_identity": "control-plane-host"}, "remove": []},
-    {"id": "valid-rollback", "schemaValid": true, "codecValid": true, "patch": {"receipt_kind": "rollback", "from": {"release_bom_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "generation": 2, "status": "revoked"}, "to": {"release_bom_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "generation": 3, "status": "active"}, "sequence": 3, "actor_identity": "control-plane-host"}, "remove": []},
+    {"id": "valid-revocation", "schemaValid": true, "codecValid": true, "patch": {"receipt_kind": "revocation", "from": {"release_bom_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "generation": 1, "status": "active"}, "to": {"release_bom_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "generation": 1, "status": "revoked"}, "sequence": 2, "actor_identity": "control-plane-host", "payload_sha256": "bef4b7bbd2d1ad40963315aa156daaf3bdcaea57c6d147bd0475998c7359b67a"}, "remove": []},
+    {"id": "valid-rollback", "schemaValid": true, "codecValid": true, "patch": {"receipt_kind": "rollback", "from": {"release_bom_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "generation": 2, "status": "revoked"}, "to": {"release_bom_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", "generation": 3, "status": "active"}, "sequence": 3, "actor_identity": "control-plane-host", "payload_sha256": "b1f62e9f8d69cd938ed35590f71bb82a6169421b6fc9a8d3eeaf996431675cfd"}, "remove": []},
     {"id": "additional-field", "schemaValid": false, "codecValid": false, "patch": {"unexpected": true}, "remove": []},
     {"id": "unknown-major", "schemaValid": false, "codecValid": false, "patch": {"schema_version": "2.0.0"}, "remove": []},
     {"id": "wrong-producer", "schemaValid": false, "codecValid": false, "patch": {"producer_module": "executor-gateway"}, "remove": []},
@@ -41,6 +41,7 @@
     {"id": "offset-not-zulu", "schemaValid": false, "codecValid": false, "patch": {"occurred_at": "2026-07-14T00:00:00+00:00"}, "remove": []},
     {"id": "uppercase-payload-hash", "schemaValid": false, "codecValid": false, "patch": {"payload_sha256": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}, "remove": []},
     {"id": "trailing-newline-receipt-id", "schemaValid": false, "codecValid": false, "patch": {"receipt_id": "receipt_99999999999999999999999999999999\n"}, "remove": []},
-    {"id": "missing-device-binding", "schemaValid": false, "codecValid": false, "patch": {}, "remove": ["device_binding_id"]}
+    {"id": "missing-device-binding", "schemaValid": false, "codecValid": false, "patch": {}, "remove": ["device_binding_id"]},
+    {"id": "payload-digest-mismatch", "schemaValid": true, "codecValid": false, "patch": {"actor_identity": "rogue-release-controller"}, "remove": []}
   ]
 }

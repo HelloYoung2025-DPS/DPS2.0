@@ -340,15 +340,18 @@ public sealed class ControlPlaneSubmissionLifecycleProducer : IDisposable
     private readonly AuthorityCallState _recoveryAuthority = new();
     private readonly string _policyStateAuthorityFingerprintSha256;
     private readonly TimeSpan _authorityTimeout;
+    private readonly PolicyBoundReleaseBomFactsSource _releaseBomFactsSource;
 
     public ControlPlaneSubmissionLifecycleProducer(
         IControlPlaneReconciliationSigningAuthority reconciliationSigner,
         IControlPlaneHumanRecoveryApprovalAuthority recoverySigner,
         string policyStateAuthorityFingerprintSha256,
+        PolicyBoundReleaseBomFactsSource releaseBomFactsSource,
         TimeSpan? authorityTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(reconciliationSigner);
         ArgumentNullException.ThrowIfNull(recoverySigner);
+        ArgumentNullException.ThrowIfNull(releaseBomFactsSource);
         if (ReferenceEquals(reconciliationSigner, recoverySigner))
             throw new InvalidOperationException(
                 "Reconciliation and human recovery require separate signing capabilities.");
@@ -366,6 +369,7 @@ public sealed class ControlPlaneSubmissionLifecycleProducer : IDisposable
 
         _reconciliationSigner = reconciliationSigner;
         _recoverySigner = recoverySigner;
+        _releaseBomFactsSource = releaseBomFactsSource;
         _policyStateAuthorityFingerprintSha256 =
             policyStateAuthorityFingerprintSha256;
         _authorityTimeout = effectiveAuthorityTimeout;
@@ -531,6 +535,29 @@ public sealed class ControlPlaneSubmissionLifecycleProducer : IDisposable
         {
             throw new UnauthorizedAccessException(
                 "Recovery requires the exact verified CONFIRMED_NOT_SUBMITTED reconciliation chain.");
+        }
+
+        // Same-source production wiring: the next-BOM facts a recovery names
+        // must match the live active release binding read at issuance time
+        // from the one composition-fixed authority
+        // (PolicyBoundReleaseBomFactsSource). Callers cannot supply their own
+        // BOM truth. A mismatch is a visible fail-closed refusal — never a
+        // silent overwrite of the caller-declared values.
+        if (!_releaseBomFactsSource.TryReadActiveFacts(
+                state.DeviceBindingId,
+                out var activeReleaseBomSha256,
+                out var activeReleaseBomGeneration))
+        {
+            throw new UnauthorizedAccessException(
+                "Recovery requires an active release binding for the device; none is active.");
+        }
+        if (!ControlPlaneSubmissionStateConsumer.FixedDigestEquals(
+                activeReleaseBomSha256,
+                request.NextReleaseBomSha256)
+            || activeReleaseBomGeneration != request.NextReleaseBomGeneration)
+        {
+            throw new UnauthorizedAccessException(
+                "Recovery next release BOM facts do not match the live active release binding.");
         }
 
         var unsigned = new ApprovalSubmissionRecoveryV1(

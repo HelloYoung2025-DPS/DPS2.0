@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Dps.ControlPlaneHost.Contracts;
 using Dps.PolicyApproval.Contracts;
 using Xunit;
 
@@ -54,23 +55,27 @@ public sealed class ControlPlaneSubmissionLifecycleTests
             new ControlPlaneSubmissionLifecycleProducer(
                 collapsed,
                 collapsed,
-                stateFingerprint));
+                stateFingerprint,
+                FactsSource()));
         Assert.Throws<InvalidOperationException>(() =>
             new ControlPlaneSubmissionLifecycleProducer(
                 new TestReconciliationSigner(sharedKey),
                 new TestRecoverySigner(sharedKey),
-                stateFingerprint));
+                stateFingerprint,
+                FactsSource()));
         using var separateRecoveryKey = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         Assert.Throws<InvalidOperationException>(() =>
             new ControlPlaneSubmissionLifecycleProducer(
                 new TestReconciliationSigner(policyStateKey),
                 new TestRecoverySigner(separateRecoveryKey),
-                stateFingerprint));
+                stateFingerprint,
+                FactsSource()));
         Assert.Throws<ArgumentNullException>(() =>
             new ControlPlaneSubmissionLifecycleProducer(
                 null!,
                 new TestRecoverySigner(sharedKey),
-                stateFingerprint));
+                stateFingerprint,
+                FactsSource()));
     }
 
     [Fact, Trait("Category", "Contract")]
@@ -219,6 +224,65 @@ public sealed class ControlPlaneSubmissionLifecycleTests
             TestContext.Current.CancellationToken));
     }
 
+    [Fact, Trait("Category", "Unit")]
+    public async Task RecoveryFailsClosedWhenNextBomFactsDivergeFromTheLiveActiveBinding()
+    {
+        using var fixture = new Fixture();
+        var pending = fixture.ConsumePending();
+        var reconciliation = await fixture.Producer.CreateReconciliationAsync(
+            pending,
+            ReconciliationRequest(),
+            TestContext.Current.CancellationToken);
+        var reconciled = fixture.ConsumeReconciled(pending.Value, reconciliation);
+        var request = RecoveryRequest();
+
+        // The caller-declared NextReleaseBom* facts must equal the live
+        // active binding read at issuance; every divergence is a visible
+        // fail-closed refusal, never a silent overwrite.
+        using var divergentGeneration = new ControlPlaneSubmissionLifecycleProducer(
+            fixture.ReconciliationSigner,
+            fixture.RecoverySigner,
+            fixture.Consumer.AuthorityFingerprintSha256,
+            FactsSource(generation: 9));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            divergentGeneration.CreateRecoveryAsync(
+                reconciled,
+                reconciliation,
+                request,
+                TestContext.Current.CancellationToken));
+
+        using var divergentBom = new ControlPlaneSubmissionLifecycleProducer(
+            fixture.ReconciliationSigner,
+            fixture.RecoverySigner,
+            fixture.Consumer.AuthorityFingerprintSha256,
+            FactsSource(releaseBomSha256: new string('e', 64)));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            divergentBom.CreateRecoveryAsync(
+                reconciled,
+                reconciliation,
+                request,
+                TestContext.Current.CancellationToken));
+
+        using var noActiveBinding = new ControlPlaneSubmissionLifecycleProducer(
+            fixture.ReconciliationSigner,
+            fixture.RecoverySigner,
+            fixture.Consumer.AuthorityFingerprintSha256,
+            FactsSource(absent: true));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            noActiveBinding.CreateRecoveryAsync(
+                reconciled,
+                reconciliation,
+                request,
+                TestContext.Current.CancellationToken));
+
+        Assert.Throws<ArgumentNullException>(() =>
+            new ControlPlaneSubmissionLifecycleProducer(
+                fixture.ReconciliationSigner,
+                fixture.RecoverySigner,
+                fixture.Consumer.AuthorityFingerprintSha256,
+                null!));
+    }
+
     [Fact, Trait("Category", "Contract")]
     public async Task CoordinatorExecutesSeparatedProducerPortAndConsumerRoundTrip()
     {
@@ -326,6 +390,7 @@ public sealed class ControlPlaneSubmissionLifecycleTests
                 delayedAuthority,
                 fixture.RecoverySigner,
                 fixture.Consumer.AuthorityFingerprintSha256,
+                FactsSource(),
                 TimeSpan.FromMilliseconds(25));
         var untouchedPort = new ReconciliationPort(fixture.PolicyStateKey);
         var authorityTimeoutCoordinator =
@@ -367,7 +432,8 @@ public sealed class ControlPlaneSubmissionLifecycleTests
             new ControlPlaneSubmissionLifecycleProducer(
                 cancellationRaceSigner,
                 fixture.RecoverySigner,
-                fixture.Consumer.AuthorityFingerprintSha256);
+                fixture.Consumer.AuthorityFingerprintSha256,
+                FactsSource());
         var cancellationRacePort = new ReconciliationPort(fixture.PolicyStateKey);
         var cancellationRaceCoordinator =
             new ControlPlaneSubmissionLifecycleCoordinator(
@@ -417,6 +483,7 @@ public sealed class ControlPlaneSubmissionLifecycleTests
             signer,
             new TestRecoverySigner(recoveryKey),
             consumer.AuthorityFingerprintSha256,
+            FactsSource(),
             AttackTimeout(attack));
         if (attack == "key-replacement")
             responder.ReplaceSigningKey(rogueKey);
@@ -465,6 +532,7 @@ public sealed class ControlPlaneSubmissionLifecycleTests
             new TestReconciliationSigner(reconciliationKey),
             signer,
             consumer.AuthorityFingerprintSha256,
+            FactsSource(),
             AttackTimeout(attack));
         if (attack == "key-replacement")
             responder.ReplaceSigningKey(rogueKey);
@@ -552,6 +620,51 @@ public sealed class ControlPlaneSubmissionLifecycleTests
             "human_" + new string('3', 64),
             Now.AddMinutes(1),
             Now.AddMinutes(5));
+
+    /// <summary>
+    /// Fixture facts source matching the recovery request's next-BOM facts
+    /// (Bom / generation 8) unless a divergence is requested. The producer
+    /// reads these facts live at recovery issuance and fail-closes on any
+    /// mismatch with the caller-declared NextReleaseBom* values.
+    /// </summary>
+    private static PolicyBoundReleaseBomFactsSource FactsSource(
+        long generation = 8,
+        string? releaseBomSha256 = null,
+        bool absent = false)
+        => new(new FixedLifecycleBindingReader(absent
+            ? null
+            : new ActiveReleaseBindingV1(
+                "1.0.0",
+                "active.release.binding/v1",
+                "control-plane-host",
+                Binding,
+                releaseBomSha256 ?? Bom,
+                generation,
+                7,
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925",
+                "active",
+                "deployed-release-controller",
+                "deployed-controller-key-v1",
+                new string('d', 64),
+                new DateTimeOffset(2026, 7, 14, 0, 0, 0, TimeSpan.Zero),
+                "receipt_99999999999999999999999999999999")));
+
+    private sealed class FixedLifecycleBindingReader : IActiveReleaseBindingReader
+    {
+        private readonly ActiveReleaseBindingV1? _binding;
+
+        public FixedLifecycleBindingReader(ActiveReleaseBindingV1? binding)
+        {
+            _binding = binding;
+        }
+
+        public bool TryReadActive(string deviceBindingId, out ActiveReleaseBindingV1? binding)
+        {
+            binding = _binding;
+            return binding is not null;
+        }
+    }
 
     private static ApprovalSubmissionStateExpectation Expectation(
         ApprovalSubmissionStateV1 state)
@@ -1034,7 +1147,8 @@ public sealed class ControlPlaneSubmissionLifecycleTests
             Producer = new ControlPlaneSubmissionLifecycleProducer(
                 ReconciliationSigner,
                 RecoverySigner,
-                Consumer.AuthorityFingerprintSha256);
+                Consumer.AuthorityFingerprintSha256,
+                FactsSource());
         }
 
         internal ECDsa PolicyStateKey { get; }

@@ -155,6 +155,7 @@ EXPECTED_CASE_IDS = {
         "uppercase-payload-hash",
         "trailing-newline-receipt-id",
         "missing-device-binding",
+        "payload-digest-mismatch",
     },
 }
 

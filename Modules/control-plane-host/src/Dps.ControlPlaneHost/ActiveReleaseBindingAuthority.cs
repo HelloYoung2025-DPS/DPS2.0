@@ -163,8 +163,28 @@ public sealed class InMemoryReleaseBindingTruthStore : IReleaseBindingTruthStore
     public void Append(ReleaseBindingTruthRecord record)
     {
         ArgumentNullException.ThrowIfNull(record);
+        var receipt = record.Receipt
+            ?? throw new ActiveReleaseBindingException("truth store append requires a receipt");
         lock (_gate)
         {
+            // Minimal compare-and-swap guard: the journal accepts only the
+            // exactly-next sequence per device, so two authority instances
+            // sharing one store cannot both land the same generation — the
+            // loser faults instead of silently forking the journal. The
+            // durable PostgreSQL CAS journal remains a later batch.
+            long lastSequence = 0;
+            foreach (var existing in _records)
+            {
+                if (string.Equals(existing.DeviceBindingId, record.DeviceBindingId, StringComparison.Ordinal))
+                {
+                    lastSequence = existing.Receipt.Sequence;
+                }
+            }
+            if (receipt.Sequence != lastSequence + 1)
+            {
+                throw new ActiveReleaseBindingException(
+                    "truth store append sequence conflict: expected the exactly-next per-device sequence");
+            }
             _records.Add(record);
         }
     }
@@ -600,10 +620,9 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
             {
                 throw new ActiveReleaseBindingException("truth store journal receipt identity fork");
             }
-            if (!string.Equals(receipt.PayloadSha256, receipt.ComputePayloadSha256(), StringComparison.Ordinal))
-            {
-                throw new ActiveReleaseBindingException("truth store journal receipt payload digest mismatch");
-            }
+            // Payload digest self-consistency is enforced by
+            // ReleaseBindingReceiptV1.Validate (fixed-time), already invoked
+            // above on every journal receipt — no duplicate check here.
             var expectedRuntimeGeneration = receipt.ReceiptKind switch
             {
                 "activation" or "rollback" => state.RuntimeGeneration + 1,
