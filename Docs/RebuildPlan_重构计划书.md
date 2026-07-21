@@ -174,9 +174,11 @@ brain-to-hand 的唯一交接合同采用 `edge.bridge.exchange/v2`：由 `zenno
 删除 `factory-release-controller` 前必须保留两类不同能力：
 
 - 候选校验：迁入普通 `Tools/ci`，继续验证模块/合同/DAG/兼容矩阵/hash/审批，不签名、不部署、不持运行状态。
-- 运行真相：由 `control-plane-host` 提供 `active.release.binding/v1`，按 `device_binding_id` 保存 BOM digest、单调 generation、opaque token、active/previous/revoked 状态，并向 policy 与 executor 提供同一个 composition-fixed reader。
+- 运行真相：由 `control-plane-host` 提供 `active.release.binding/v1`，按 `device_binding_id` 保存 BOM digest、单调 generation、opaque token、active/previous/revoked 状态；R0-C 只交付该持久权威与 policy/executor 两侧的合同层消费接口。
 
 Release BOM 由仓外用户/KMS release signer 签发。模型、候选代码和 Control Plane 运行进程都不能取得签名私钥。激活、撤销、回滚分别产生版本化 receipt。
+
+**与 M4 的交付边界（消除本节与 §10 的歧义）**：M1B/R0-C 只证明 policy 与 gateway 两条消费路径的**合同层同源**——同一 contract、同一 major 版本、共享 corpus，绑定同一 generation/token 三元组的字段语义对齐。该证明**不能、也不得声称证明**两条路径在运行时消费同一个 provider 实例（合同层证据无法区分一个共享 durable reader 与两个各自背书的 reader）。"向 policy 与 executor 提供同一个运行时 composition-fixed reader"的**同实例义务**由 §10 M4 退出行承接：M4 须证明 policy 与 gateway 实际消费同一个 active-binding provider 实例，覆盖 activation/revocation/rollback、restart、并发读与设备隔离。M4 完成前，涉及模块保持 `releaseEligible=false`、不具备 production composition entrypoint，不得以 tests 工程组装或合同层证据宣称生产接线；如需负向验证，使用现有仓内确定性验证证明 production publish/dispatch 入口不可用即可。
 
 ### 4.4 R0-D 删除 11 个模块
 
@@ -409,11 +411,11 @@ flowchart LR
 |---|---|---|
 | M0 | 干净基线、固定工具链、current/proposed/verified 清单 | 保留侧 required baseline 可复现，仓库保护规则已启用 |
 | M1A | receipt schema/Manifest/validator 迁移 | 固定旧门与新门对攻击语料均 PASS，独立批准 |
-| M1B | 普通 candidate BOM validator、active release binding、外部 signer 合同 | policy 与 gateway 读同一 generation/token，回滚/撤销测试 PASS |
+| M1B | 普通 candidate BOM validator、active release binding、外部 signer 合同 | policy 与 gateway 按合同层同源证明读同一 generation/token（不证明、不声称证明运行时同一 provider 实例，见 §4.3 与 M4 的交付边界），回滚/撤销测试 PASS |
 | M1C | 11 个 factory 目录和专属引用删除 | 无悬空 owner/consumer/schema，代码净减少，完整静态门与 module-impact suite PASS；外部 merge queue（§15 条目 1）已配置并以模拟并行冲突及 merge HEAD 重跑验证 |
 | M2 | Persona 投影、memory v3、interest v2、planner 行为分布与 session nonce 参数采样、Soul 隔离 | 双 Soul 正反例（含固定输入下行为分布差异）、换绑、删除传播、golden vectors PASS |
 | M3 | app package、operation.compiled v2、edge handoff v2、独立 Legacy 入口、唯一 ActionExecutor、视觉提案链 | 旧入口不可达；未知/空/partial fail closed；信封 delay/typing/trajectory 参数在携带对应参数的 step 上消费生效、越界即拒绝，均有可执行测试；两种非 IG fixture 与 visual-security suite PASS |
-| M4 | composition root、attempt/receipt、postcondition、session+command reliability snapshot、kill switch | 端到端 PostgreSQL + native fixture，两套 300 窗口语义与 kill-notify suite PASS |
+| M4 | composition root（含 §4.3 交付边界移交的同实例义务）、attempt/receipt、postcondition、session+command reliability snapshot、kill switch | 端到端 PostgreSQL + native fixture，两套 300 窗口语义与 kill-notify suite PASS；须证明 policy 与 gateway 实际消费同一个 active-binding provider 实例，覆盖 activation/revocation/rollback、restart、并发读与设备隔离（见 §4.3 与 M4 的交付边界） |
 | M5 | macOS AVD + Parallels + ZennoDroid 模拟环境 | 原始 evidence 标记 `SIMULATION`；不提升 Windows/DEVICE 等级 |
 | M6 | 目标 Windows、授权设备、受限 canary | 仅由对应可执行门逐级签发既有 evidence level |
 
