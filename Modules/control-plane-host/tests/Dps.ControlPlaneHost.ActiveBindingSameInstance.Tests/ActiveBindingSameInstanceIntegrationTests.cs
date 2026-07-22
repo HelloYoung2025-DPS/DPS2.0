@@ -53,8 +53,9 @@ public sealed class ActiveBindingSameInstanceIntegrationTests
     {
         await using var database = await SameInstanceReleaseBindingDatabase.CreateAsync(Token);
         using var signer = new SameInstanceBomSigner();
+        var releaseBindingStore = database.CreateStore();
         var authority = new ActiveReleaseBindingAuthority(
-            [signer.TrustKey], database.CreateStore(), () => Now);
+            [signer.TrustKey], releaseBindingStore, () => Now);
         var (bom, token) = signer.SignBom("bom-1", 1, null);
         authority.Activate(Device, bom, token);
 
@@ -69,9 +70,9 @@ public sealed class ActiveBindingSameInstanceIntegrationTests
         Assert.Equal(token, executorObserved.ExecutionTokenBase64);
 
         // Policy consumer path: the real production recovery composition
-        // binds the SAME instance as its composition-fixed reader; the
-        // composition-fixed reader is mandatory (null fails construction).
-        using (var policyRecovery = CreatePolicyRecoveryClient(authority))
+        // binds the store-issued coordination capability from the SAME CPH
+        // instance; the capability is mandatory (null fails construction).
+        using (var policyRecovery = CreatePolicyRecoveryClient(releaseBindingStore))
         {
             Assert.NotNull(policyRecovery);
         }
@@ -93,14 +94,15 @@ public sealed class ActiveBindingSameInstanceIntegrationTests
     {
         await using var database = await SameInstanceReleaseBindingDatabase.CreateAsync(Token);
         using var signer = new SameInstanceBomSigner();
+        var releaseBindingStore = database.CreateStore();
         var authority = new ActiveReleaseBindingAuthority(
-            [signer.TrustKey], database.CreateStore(), () => Now);
+            [signer.TrustKey], releaseBindingStore, () => Now);
         var (bom1, token1) = signer.SignBom("bom-1", 1, null);
         authority.Activate(Device, bom1, token1);
         var (bom2, token2) = signer.SignBom("bom-2", 2, bom1);
         authority.Activate(Device, bom2, token2);
         var executorReader = new ControlPlaneHostActiveReleaseBomReader(authority);
-        using var policyRecovery = CreatePolicyRecoveryClient(authority);
+        using var policyRecovery = CreatePolicyRecoveryClient(releaseBindingStore);
         Assert.True(authority.TryReadActive(Device, out var active));
         Assert.Equal(2, active!.Generation);
 
@@ -140,8 +142,9 @@ public sealed class ActiveBindingSameInstanceIntegrationTests
     {
         await using var database = await SameInstanceReleaseBindingDatabase.CreateAsync(Token);
         using var signer = new SameInstanceBomSigner();
+        var firstReleaseBindingStore = database.CreateStore();
         var first = new ActiveReleaseBindingAuthority(
-            [signer.TrustKey], database.CreateStore(), () => Now);
+            [signer.TrustKey], firstReleaseBindingStore, () => Now);
         var (bom1, token1) = signer.SignBom("bom-1", 1, null);
         first.Activate(Device, bom1, token1);
         var (bom2, token2) = signer.SignBom("bom-2", 2, bom1);
@@ -155,10 +158,11 @@ public sealed class ActiveBindingSameInstanceIntegrationTests
         // the journal with full re-verification; both consumer paths are
         // re-pointed at it and observe the same recovered
         // generation/token/sha (revocation/rollback truth survived).
+        var restartedReleaseBindingStore = database.CreateStore();
         var restarted = new ActiveReleaseBindingAuthority(
-            [signer.TrustKey], database.CreateStore(), () => Now);
+            [signer.TrustKey], restartedReleaseBindingStore, () => Now);
         var executorReader = new ControlPlaneHostActiveReleaseBomReader(restarted);
-        using var policyRecovery = CreatePolicyRecoveryClient(restarted);
+        using var policyRecovery = CreatePolicyRecoveryClient(restartedReleaseBindingStore);
         var executorObserved = await executorReader.ReadVerifiedActiveAsync(Device, Token);
 
         Assert.NotNull(executorObserved);
@@ -176,12 +180,13 @@ public sealed class ActiveBindingSameInstanceIntegrationTests
     {
         await using var database = await SameInstanceReleaseBindingDatabase.CreateAsync(Token);
         using var signer = new SameInstanceBomSigner();
+        var releaseBindingStore = database.CreateStore();
         var authority = new ActiveReleaseBindingAuthority(
-            [signer.TrustKey], database.CreateStore(), () => Now);
+            [signer.TrustKey], releaseBindingStore, () => Now);
         var (bom, token) = signer.SignBom("bom-1", 1, null);
         authority.Activate(Device, bom, token);
         var executorReader = new ControlPlaneHostActiveReleaseBomReader(authority);
-        using var policyRecovery = CreatePolicyRecoveryClient(authority);
+        using var policyRecovery = CreatePolicyRecoveryClient(releaseBindingStore);
 
         // A second device_binding_id observes nothing on either consumer
         // path: the executor adapter reads null and the same instance
@@ -193,15 +198,15 @@ public sealed class ActiveBindingSameInstanceIntegrationTests
     }
 
     /// <summary>
-    /// Real production policy recovery composition over the same
-    /// composition-fixed reader instance, with a pairwise-distinct
+    /// Real production policy recovery composition over the same store-issued
+    /// coordination capability, with a pairwise-distinct
     /// eight-authority topology generated per call. The options carry a
     /// well-formed bounded connection string; composition itself performs
     /// no PostgreSQL I/O (per-operation role verification happens only
     /// inside the real RecoverAsync path).
     /// </summary>
     private static PolicyApprovalSubmissionRecoveryClient CreatePolicyRecoveryClient(
-        IActiveReleaseBindingReader reader)
+        IActiveReleaseBindingRecoveryCoordinator releaseBindingRecoveryCoordinator)
     {
         using var evaluation = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var promotion = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -241,7 +246,7 @@ public sealed class ActiveBindingSameInstanceIntegrationTests
                 executor.ExportSubjectPublicKeyInfo(),
                 recovery.ExportSubjectPublicKeyInfo(),
                 statePrivateKey,
-                reader);
+                releaseBindingRecoveryCoordinator);
         }
         finally
         {

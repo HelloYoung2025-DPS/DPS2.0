@@ -67,8 +67,9 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         using var stateSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var bomSigner = new SameInstanceBomSigner();
         var authorityTopology = SubmissionTopology(evaluationSigner, revocationSigner, fenceSigner, executorSigner, reconciliationSigner, recoverySigner, stateSigner);
+        var releaseBindingStore = bindings.CreateStore();
         var authority = new ActiveReleaseBindingAuthority(
-            [bomSigner.TrustKey], bindings.CreateStore(), () => SameInstanceNow);
+            [bomSigner.TrustKey], releaseBindingStore, () => SameInstanceNow);
         var (bom, token) = bomSigner.SignBom("policy-sameinst-bom-1", 1, null);
         authority.Activate(DeviceA, bom, token);
         var liveSha256 = SameInstanceBomSigner.Sha256Hex(bom);
@@ -96,7 +97,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             executorSigner,
             recoverySigner,
             stateSigner,
-            authority);
+            releaseBindingStore);
 
         var authorized = await recoveryClient.AuthorizeSubmissionRecoveryAsync(
             SignRecovery(recoverySigner, RecoveryPinnedToLiveBinding(
@@ -142,8 +143,9 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         using var stateSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var bomSigner = new SameInstanceBomSigner();
         var authorityTopology = SubmissionTopology(evaluationSigner, revocationSigner, fenceSigner, executorSigner, reconciliationSigner, recoverySigner, stateSigner);
+        var releaseBindingStore = bindings.CreateStore();
         var authority = new ActiveReleaseBindingAuthority(
-            [bomSigner.TrustKey], bindings.CreateStore(), () => SameInstanceNow);
+            [bomSigner.TrustKey], releaseBindingStore, () => SameInstanceNow);
         var (bom1, token1) = bomSigner.SignBom("policy-sameinst-bom-1", 1, null);
         authority.Activate(DeviceA, bom1, token1);
         var bom1Sha256 = SameInstanceBomSigner.Sha256Hex(bom1);
@@ -168,7 +170,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             executorSigner,
             recoverySigner,
             stateSigner,
-            authority);
+            releaseBindingStore);
         var staleRecovery = SignRecovery(recoverySigner, RecoveryPinnedToLiveBinding(
             prepared.Intent,
             prepared.Reconciliation,
@@ -220,8 +222,9 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         using var stateSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var bomSigner = new SameInstanceBomSigner();
         var authorityTopology = SubmissionTopology(evaluationSigner, revocationSigner, fenceSigner, executorSigner, reconciliationSigner, recoverySigner, stateSigner);
+        var releaseBindingStore = bindings.CreateStore();
         var authority = new ActiveReleaseBindingAuthority(
-            [bomSigner.TrustKey], bindings.CreateStore(), () => SameInstanceNow);
+            [bomSigner.TrustKey], releaseBindingStore, () => SameInstanceNow);
         var (bom1, token1) = bomSigner.SignBom("policy-sameinst-bom-1", 1, null);
         authority.Activate(DeviceA, bom1, token1);
         var bom1Sha256 = SameInstanceBomSigner.Sha256Hex(bom1);
@@ -246,7 +249,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             executorSigner,
             recoverySigner,
             stateSigner,
-            authority);
+            releaseBindingStore);
         var staleRecovery = SignRecovery(recoverySigner, RecoveryPinnedToLiveBinding(
             prepared.Intent,
             prepared.Reconciliation,
@@ -261,15 +264,16 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         authority.Revoke(DeviceA, 1);
         Assert.Null(await executorReader.ReadVerifiedActiveAsync(DeviceA, cancellationToken));
         Assert.False(authority.TryReadActive(DeviceA, out _));
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+        await Assert.ThrowsAsync<ActiveReleaseBindingException>(() =>
             recoveryClient.AuthorizeSubmissionRecoveryAsync(staleRecovery, cancellationToken));
         await AssertRecoveryCountAsync(database, prepared.Intent.SubmissionAttemptId, 0, cancellationToken);
 
         // Process restart: a SECOND authority over the same store replays
         // the journal with full re-verification; the revoked truth survives
         // and both consumer paths are re-pointed at the restarted instance.
+        var restartedReleaseBindingStore = bindings.CreateStore();
         var restarted = new ActiveReleaseBindingAuthority(
-            [bomSigner.TrustKey], bindings.CreateStore(), () => SameInstanceNow);
+            [bomSigner.TrustKey], restartedReleaseBindingStore, () => SameInstanceNow);
         Assert.False(restarted.TryReadActive(DeviceA, out _));
         var restartedExecutorReader = new ControlPlaneHostActiveReleaseBomReader(restarted);
         Assert.Null(await restartedExecutorReader.ReadVerifiedActiveAsync(DeviceA, cancellationToken));
@@ -286,7 +290,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             executorSigner,
             recoverySigner,
             stateSigner,
-            restarted);
+            restartedReleaseBindingStore);
 
         var authorized = await restartedRecoveryClient.AuthorizeSubmissionRecoveryAsync(
             SignRecovery(recoverySigner, RecoveryPinnedToLiveBinding(

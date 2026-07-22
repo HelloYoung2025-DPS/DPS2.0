@@ -4384,6 +4384,8 @@ def _release_validation_allowlist_errors(release_text: str) -> List[str]:
                 "$native_stop_trust_receipt_path",
                 "--schema-sha256",
                 "$schema_sha256",
+                "--minimum-remaining-lifetime-seconds",
+                "86400",
             ]
             if (
                 len(candidate) == 1

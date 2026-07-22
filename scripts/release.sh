@@ -147,7 +147,8 @@ fi
   --bom "$bom_path" \
   --previous-bom "$previous_bom_path" \
   --native-stop-trust-receipt "$native_stop_trust_receipt_path" \
-  --schema-sha256 "$schema_sha256"
+  --schema-sha256 "$schema_sha256" \
+  --minimum-remaining-lifetime-seconds 86400
 
 echo "Release candidate validation passed for $head_commit."
 echo "No commit, tag, signature, deployment, approval, or production change was performed."

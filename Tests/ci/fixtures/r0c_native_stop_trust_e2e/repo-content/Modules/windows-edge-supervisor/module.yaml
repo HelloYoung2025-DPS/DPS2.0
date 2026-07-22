@@ -1,1 +1,0 @@
-{"artifacts":[{"build":"fixture-build","id":"dps.windows-edge-supervisor","kind":"service","status":"buildable","versioning":"semver"}],"contracts":{"consumed":[],"provided":[]},"dependencies":[],"module":{"id":"windows-edge-supervisor","version":"1.0.0"},"runtime":{"processBoundary":"out-of-process"}}

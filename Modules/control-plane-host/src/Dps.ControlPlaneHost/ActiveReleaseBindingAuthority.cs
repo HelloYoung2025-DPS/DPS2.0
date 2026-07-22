@@ -141,6 +141,15 @@ public sealed record ReleaseBindingTruthRecord(
     byte[]? SignedBomBytes);
 
 /// <summary>
+/// One atomic per-device journal snapshot. HeadSequence and Records are read
+/// from the same store snapshot, so an authority never combines a head from
+/// one instant with a delta from another.
+/// </summary>
+public sealed record ReleaseBindingJournalSnapshot(
+    long HeadSequence,
+    IReadOnlyList<ReleaseBindingTruthRecord> Records);
+
+/// <summary>
 /// One per-device transition linearization scope: the durable serialization
 /// primitive for a single activation, revocation, or rollback, held across
 /// the authority's in-process gate so the durable lock is always acquired
@@ -222,16 +231,26 @@ public interface IReleaseBindingTruthStore
     IReadOnlyList<ReleaseBindingTruthRecord> LoadAfter(string deviceBindingId, long afterSequence);
 
     /// <summary>
+    /// Atomically reads the device head and all records after the caller's
+    /// cached sequence. Durable implementations must use one database
+    /// snapshot; composing separate head and delta reads is forbidden because
+    /// a concurrent append could otherwise create a stale-serving TOCTOU.
+    /// </summary>
+    ReleaseBindingJournalSnapshot LoadSnapshotAfter(
+        string deviceBindingId,
+        long afterSequence);
+
+    /// <summary>
     /// Opens the per-device transition linearization scope for one
     /// activation, revocation, or rollback. GLOBAL LOCK ORDER (deadlock
     /// freedom): every path that touches both the durable per-device lock
     /// and the authority's in-process gate acquires the durable lock FIRST,
     /// so the authority opens this scope before entering its gate and the
     /// scoped <see cref="IReleaseBindingTransitionScope.Append"/> is the only
-    /// append a transition performs. A policy-approval recovery holds the
-    /// same per-device database advisory lock while briefly entering the
-    /// gate through the composition-fixed reader; with this order the two
-    /// can never close a hold-and-wait cycle. The default implementation is
+    /// append a transition performs. A policy-approval recovery obtains the
+    /// store-issued coordination scope backed by this same per-device
+    /// primitive and holds it through the policy commit; with this order the
+    /// two paths can never close a hold-and-wait cycle. The default implementation is
     /// a pass-through: correct only for stores whose <see cref="Append"/>
     /// already is the full linearization point (the single-process in-memory
     /// compare-and-set store, test doubles). A durable multi-process store
@@ -256,10 +275,13 @@ public interface IReleaseBindingTruthStore
 /// call site names its test-only nature explicitly.
 /// </summary>
 public sealed class InMemoryReleaseBindingTruthStore
-    : IReleaseBindingTruthStore, IReleaseBindingRecoveryFenceAuthority
+    : IReleaseBindingTruthStore,
+      IReleaseBindingRecoveryFenceAuthority,
+      IActiveReleaseBindingRecoveryCoordinator
 {
     private readonly Lock _gate = new();
     private readonly List<ReleaseBindingTruthRecord> _records = [];
+    private readonly Dictionary<string, SemaphoreSlim> _transitionLocks = [];
     private readonly Dictionary<Guid, (ReleaseBindingRecoveryFence Fence, string ContentSha256)>
         _fences = [];
 
@@ -333,6 +355,112 @@ public sealed class InMemoryReleaseBindingTruthStore
                 }
             }
             return delta;
+        }
+    }
+
+    public ReleaseBindingJournalSnapshot LoadSnapshotAfter(
+        string deviceBindingId,
+        long afterSequence)
+    {
+        ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
+        lock (_gate)
+        {
+            var head = LastSequenceLocked(deviceBindingId);
+            var delta = _records
+                .Where(record => string.Equals(
+                        record.DeviceBindingId, deviceBindingId, StringComparison.Ordinal)
+                    && record.Receipt.Sequence > afterSequence)
+                .OrderBy(record => record.Receipt.Sequence)
+                .ToArray();
+            return new ReleaseBindingJournalSnapshot(head, delta);
+        }
+    }
+
+    public IReleaseBindingTransitionScope BeginTransition(string deviceBindingId)
+    {
+        ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
+        var transitionLock = GetTransitionLock(deviceBindingId);
+        transitionLock.Wait();
+        return new InMemoryTransitionScope(this, transitionLock);
+    }
+
+    public async ValueTask<IActiveReleaseBindingRecoveryScope> AcquireAsync(
+        string deviceBindingId,
+        CancellationToken cancellationToken = default)
+    {
+        ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
+        var transitionLock = GetTransitionLock(deviceBindingId);
+        await transitionLock.WaitAsync(cancellationToken);
+        try
+        {
+            lock (_gate)
+            {
+                var head = HeadLocked(deviceBindingId);
+                if (head?.CurrentBinding is not { Status: "active" } active)
+                {
+                    throw new ActiveReleaseBindingException(
+                        "recovery coordination requires an active release binding");
+                }
+                return new InMemoryRecoveryScope(active, transitionLock);
+            }
+        }
+        catch
+        {
+            transitionLock.Release();
+            throw;
+        }
+    }
+
+    private SemaphoreSlim GetTransitionLock(string deviceBindingId)
+    {
+        lock (_gate)
+        {
+            if (!_transitionLocks.TryGetValue(deviceBindingId, out var transitionLock))
+            {
+                transitionLock = new SemaphoreSlim(1, 1);
+                _transitionLocks.Add(deviceBindingId, transitionLock);
+            }
+            return transitionLock;
+        }
+    }
+
+    private sealed class InMemoryTransitionScope(
+        InMemoryReleaseBindingTruthStore store,
+        SemaphoreSlim transitionLock) : IReleaseBindingTransitionScope
+    {
+        private bool _disposed;
+
+        public void Append(ReleaseBindingTruthRecord record)
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(InMemoryTransitionScope));
+            }
+            store.Append(record);
+        }
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            transitionLock.Release();
+        }
+    }
+
+    private sealed class InMemoryRecoveryScope(
+        ActiveReleaseBindingV1 activeBinding,
+        SemaphoreSlim transitionLock) : IActiveReleaseBindingRecoveryScope
+    {
+        private int _disposed;
+        public ActiveReleaseBindingV1 ActiveBinding { get; } = activeBinding;
+
+        public ValueTask DisposeAsync()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+            {
+                transitionLock.Release();
+            }
+            return ValueTask.CompletedTask;
         }
     }
 
@@ -564,22 +692,20 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
     private bool TrySynchronizeDevice(string deviceBindingId, DeviceState? state)
     {
         var cachedSequence = state?.Sequence ?? 0;
-        long head;
-        IReadOnlyList<ReleaseBindingTruthRecord> delta;
+        ReleaseBindingJournalSnapshot snapshot;
         try
         {
-            head = _store.LoadDeviceHeadSequence(deviceBindingId);
-            if (head < cachedSequence)
+            snapshot = _store.LoadSnapshotAfter(deviceBindingId, cachedSequence);
+            if (snapshot.HeadSequence < cachedSequence)
             {
                 // The journal is append-only: a durable head behind the
                 // cached view means a forked or regressed store.
                 return false;
             }
-            if (head == cachedSequence)
+            if (snapshot.HeadSequence == cachedSequence)
             {
                 return true;
             }
-            delta = _store.LoadAfter(deviceBindingId, cachedSequence);
         }
         catch (Exception)
         {
@@ -591,7 +717,7 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
         var seenReceiptIds = new HashSet<string>(StringComparer.Ordinal);
         try
         {
-            foreach (var record in delta)
+            foreach (var record in snapshot.Records)
             {
                 // A per-device delta carrying a foreign or null record is a
                 // store-level fork; ApplyRecord itself re-checks the receipt
@@ -609,7 +735,7 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
             return false;
         }
         return _devices.TryGetValue(deviceBindingId, out var synced)
-            && synced.Sequence == head;
+            && synced.Sequence == snapshot.HeadSequence;
     }
 
     public ReleaseBindingReceiptV1 Activate(

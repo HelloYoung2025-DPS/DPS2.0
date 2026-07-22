@@ -63,7 +63,7 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
     private readonly ECDsa? _reconciliationEvidenceAuthority;
     private readonly ECDsa? _recoveryEvidenceAuthority;
     private readonly ECDsa _stateSigner = ECDsa.Create();
-    private readonly IActiveReleaseBindingReader? _activeReleaseBindingReader;
+    private readonly IActiveReleaseBindingRecoveryCoordinator? _releaseBindingRecoveryCoordinator;
 
     private PostgresPolicyApprovalSubmissionAuthority(
         PolicyApprovalSubmissionAuthorityRuntime runtime,
@@ -74,7 +74,7 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
         ReadOnlySpan<byte> recoveryEvidencePublicKey,
         ReadOnlySpan<byte> stateSigningPrivateKeyPkcs8,
         ECDsa? fenceAuthorizationAuthority,
-        IActiveReleaseBindingReader? activeReleaseBindingReader)
+        IActiveReleaseBindingRecoveryCoordinator? releaseBindingRecoveryCoordinator)
     {
         _runtime = runtime;
         authorityTopology.Validate();
@@ -84,8 +84,8 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
                 || reconciliationEvidencePublicKey.IsEmpty
                 || recoveryEvidencePublicKey.IsEmpty
                 || fenceAuthorizationAuthority is null
-                || activeReleaseBindingReader is not null)
-                throw new ArgumentException("Executor composition requires read-only reconciliation/recovery evidence keys and accepts no transition authority or active release binding reader.");
+                || releaseBindingRecoveryCoordinator is not null)
+                throw new ArgumentException("Executor composition requires read-only reconciliation/recovery evidence keys and accepts no release binding recovery coordinator.");
         }
         else if (transitionAuthorityPublicKey.IsEmpty
                  || !reconciliationEvidencePublicKey.IsEmpty
@@ -95,12 +95,12 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
             throw new ArgumentException("Reconciliation and recovery compositions require only their exact transition authority.");
         }
 
-        if (runtime.Role == PolicyApprovalSubmissionDatabaseRole.Recovery && activeReleaseBindingReader is null)
-            throw new ArgumentException("Recovery composition requires the composition-fixed active release binding reader.", nameof(activeReleaseBindingReader));
-        if (runtime.Role == PolicyApprovalSubmissionDatabaseRole.Reconciliation && activeReleaseBindingReader is not null)
-            throw new ArgumentException("Reconciliation composition accepts no active release binding reader.", nameof(activeReleaseBindingReader));
+        if (runtime.Role == PolicyApprovalSubmissionDatabaseRole.Recovery && releaseBindingRecoveryCoordinator is null)
+            throw new ArgumentException("Recovery composition requires the store-issued release binding recovery coordinator.", nameof(releaseBindingRecoveryCoordinator));
+        if (runtime.Role == PolicyApprovalSubmissionDatabaseRole.Reconciliation && releaseBindingRecoveryCoordinator is not null)
+            throw new ArgumentException("Reconciliation composition accepts no release binding recovery coordinator.", nameof(releaseBindingRecoveryCoordinator));
 
-        _activeReleaseBindingReader = activeReleaseBindingReader;
+        _releaseBindingRecoveryCoordinator = releaseBindingRecoveryCoordinator;
 
         _transitionAuthority = runtime.Role == PolicyApprovalSubmissionDatabaseRole.Executor
             ? null
@@ -226,10 +226,10 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
         ReadOnlySpan<byte> executorAuthorityPublicKey,
         ReadOnlySpan<byte> recoveryAuthorityPublicKey,
         ReadOnlySpan<byte> stateSigningPrivateKeyPkcs8,
-        IActiveReleaseBindingReader activeReleaseBindingReader)
+        IActiveReleaseBindingRecoveryCoordinator releaseBindingRecoveryCoordinator)
     {
         RequireRuntimeRole(runtime, PolicyApprovalSubmissionDatabaseRole.Recovery);
-        ArgumentNullException.ThrowIfNull(activeReleaseBindingReader);
+        ArgumentNullException.ThrowIfNull(releaseBindingRecoveryCoordinator);
         return new PostgresPolicyApprovalSubmissionAuthority(
             runtime,
             authorityTopology,
@@ -239,7 +239,7 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
             ReadOnlySpan<byte>.Empty,
             stateSigningPrivateKeyPkcs8,
             null,
-            activeReleaseBindingReader);
+            releaseBindingRecoveryCoordinator);
     }
 
     internal void VerifyIntent(ApprovalSubmissionIntentV1 intent)
@@ -801,18 +801,18 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
         }
         if (snapshot.State.State != ApprovalSubmissionStateV1.ReconciledNotSubmitted)
             throw new UnauthorizedAccessException("Recovery requires an independent CONFIRMED_NOT_SUBMITTED state.");
-        await using var connection = await OpenRoleAsync(cancellationToken);
-        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
-        await AcquireReleaseBindingTransitionLockAsync(
-            connection,
-            transaction,
+        await using var releaseBindingScope = await _releaseBindingRecoveryCoordinator!.AcquireAsync(
             recovery.DeviceBindingId,
             cancellationToken);
+        RequireActiveReleaseBindingMatchesRecovery(
+            recovery,
+            releaseBindingScope.ActiveBinding);
+        await using var connection = await OpenRoleAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         var databaseNow = await ReadDatabaseNowAsync(connection, transaction, cancellationToken);
         var state = CreateSignedState(snapshot.Intent, ApprovalSubmissionStateV1.RecoveryAuthorized, snapshot.State.StateSha256, recoverySha256, databaseNow);
         await using var command = LifecycleCommand(connection, transaction, "recover_approval_submission", recovery, recoverySha256, state);
         _ = await command.ExecuteScalarAsync(cancellationToken);
-        RequireActiveReleaseBindingMatchesRecovery(recovery);
         await transaction.CommitAsync(cancellationToken);
         var persisted = (await ReadSubmissionAsync(
             recovery.SubmissionAttemptId,
@@ -822,80 +822,27 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
         return persisted;
     }
 
-    // Commit-time Release BOM fence (F2) behind a database-enforced
-    // per-device linearization point: the recovery transaction first takes
-    // the same per-device pg_advisory_xact_lock that control-plane-host's
-    // journal transitions take (AcquireReleaseBindingTransitionLockAsync),
-    // so the signed recovery envelope's next-BOM facts are compared against
-    // the live active binding INSIDE the same serialization domain and the
-    // same transaction as the approval_submission_recoveries commit. A
+    // Commit-time Release BOM fence (F2) behind a store-proven per-device
+    // linearization point. The only accepted production capability is issued
+    // by the release-binding truth store itself; it acquires that store's
+    // transition lock and reads the active binding in the same held scope.
+    // Policy holds the scope through its authorization commit. A
     // transition that committed first is observed here and fails the
     // comparison (the transaction rolls back with zero recovery rows); a
     // recovery holding the lock makes any concurrent transition commit only
     // after this one. An unreadable, non-active, foreign-device, or
     // mismatched binding fails closed: the exception rolls the transaction
     // back, so no recovery fact and no partial write is ever persisted.
-    private void RequireActiveReleaseBindingMatchesRecovery(ApprovalSubmissionRecoveryV1 recovery)
+    private static void RequireActiveReleaseBindingMatchesRecovery(
+        ApprovalSubmissionRecoveryV1 recovery,
+        ActiveReleaseBindingV1 binding)
     {
-        if (!_activeReleaseBindingReader!.TryReadActive(recovery.DeviceBindingId, out var binding)
-            || binding is null
-            || !string.Equals(binding.Status, "active", StringComparison.Ordinal)
+        ArgumentNullException.ThrowIfNull(binding);
+        if (!string.Equals(binding.Status, "active", StringComparison.Ordinal)
             || !string.Equals(binding.DeviceBindingId, recovery.DeviceBindingId, StringComparison.Ordinal)
             || !FixedDigestEquals(binding.ReleaseBomSha256, recovery.NextReleaseBomSha256)
             || binding.Generation != recovery.NextReleaseBomGeneration)
             throw new UnauthorizedAccessException("Recovery next release BOM facts do not match the live active release binding; the recovery commit fails closed.");
-    }
-
-    // The release-binding schema baseline marker control-plane-host's
-    // migration 002_create_release_binding_truth.sql installs as its journal
-    // schema comment. Policy never reads control-plane-host tables; the
-    // marker check below reads only the PostgreSQL catalog for this exact
-    // comment and is the proof that this connection shares one database —
-    // and therefore one advisory-lock serialization domain, since advisory
-    // locks are database-local — with the control-plane-host journal.
-    private const string ReleaseBindingBaselineMarker =
-        "dps.control-plane-host.release-binding-baseline/v1";
-
-    /// <summary>
-    /// Takes the shared per-device release-binding transition lock inside the
-    /// recovery commit transaction, after BEGIN and before the final
-    /// active-binding comparison. The lock expression is byte-identical to
-    /// the one control-plane-host's append/fence functions evaluate
-    /// (pg_advisory_xact_lock(hashtextextended('release-binding:' ||
-    /// device_binding_id, 0)), from migration
-    /// 002_create_release_binding_truth.sql); being transaction-scoped, it is
-    /// released automatically at commit or rollback. Fail closed when the
-    /// coordination proof is absent — without the baseline marker in the
-    /// current database there is no shared advisory-lock domain with the
-    /// journal, so atomic coordination is unavailable and no recovery may
-    /// commit. Lock order is always database-advisory-lock first, in-process
-    /// authority gate second (the reader below enters the gate only briefly,
-    /// already holding this lock), matching the control-plane-host transition
-    /// paths so no hold-and-wait cycle exists.
-    /// </summary>
-    private static async Task AcquireReleaseBindingTransitionLockAsync(
-        NpgsqlConnection connection,
-        NpgsqlTransaction transaction,
-        string deviceBindingId,
-        CancellationToken cancellationToken)
-    {
-        await using (var coordination = new NpgsqlCommand(
-            """
-            SELECT EXISTS (
-                SELECT 1 FROM pg_catalog.pg_namespace n
-                WHERE pg_catalog.obj_description(n.oid, 'pg_namespace') = @release_binding_baseline_marker)
-            """,
-            connection, transaction) { CommandTimeout = 5 })
-        {
-            coordination.Parameters.AddWithValue("release_binding_baseline_marker", ReleaseBindingBaselineMarker);
-            if (await coordination.ExecuteScalarAsync(cancellationToken) is not true)
-                throw new UnauthorizedAccessException("Recovery cannot prove the control-plane-host release binding journal shares this PostgreSQL database; atomic coordination is unavailable, so the recovery fails closed.");
-        }
-        await using var transitionLock = new NpgsqlCommand(
-            "SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('release-binding:' || @device_binding_id, 0))",
-            connection, transaction) { CommandTimeout = 5 };
-        transitionLock.Parameters.AddWithValue("device_binding_id", deviceBindingId);
-        await transitionLock.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private ApprovalSubmissionStateV1 CreateSignedState(

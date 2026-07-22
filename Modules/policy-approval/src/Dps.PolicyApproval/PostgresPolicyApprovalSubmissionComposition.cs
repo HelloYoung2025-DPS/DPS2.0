@@ -236,7 +236,7 @@ public sealed class PolicyApprovalSubmissionRecoveryClient : IDisposable
         ReadOnlySpan<byte> executorSubmissionPublicKey,
         ReadOnlySpan<byte> recoveryPublicKey,
         ReadOnlySpan<byte> policyStateSigningPrivateKeyPkcs8,
-        IActiveReleaseBindingReader activeReleaseBindingReader)
+        IActiveReleaseBindingRecoveryCoordinator releaseBindingRecoveryCoordinator)
     {
         _authority = PostgresPolicyApprovalSubmissionAuthority.CreateRecovery(
             options.ToAuthorityRuntime(),
@@ -244,7 +244,7 @@ public sealed class PolicyApprovalSubmissionRecoveryClient : IDisposable
             executorSubmissionPublicKey,
             recoveryPublicKey,
             policyStateSigningPrivateKeyPkcs8,
-            activeReleaseBindingReader);
+            releaseBindingRecoveryCoordinator);
     }
 
     public static PolicyApprovalSubmissionRecoveryClient CreateProduction(
@@ -253,11 +253,11 @@ public sealed class PolicyApprovalSubmissionRecoveryClient : IDisposable
         ReadOnlySpan<byte> executorSubmissionPublicKey,
         ReadOnlySpan<byte> recoveryPublicKey,
         ReadOnlySpan<byte> policyStateSigningPrivateKeyPkcs8,
-        IActiveReleaseBindingReader activeReleaseBindingReader)
+        IActiveReleaseBindingRecoveryCoordinator releaseBindingRecoveryCoordinator)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(authorityTopology);
-        ArgumentNullException.ThrowIfNull(activeReleaseBindingReader);
+        ArgumentNullException.ThrowIfNull(releaseBindingRecoveryCoordinator);
         options.Validate();
         authorityTopology.Validate();
         return new PolicyApprovalSubmissionRecoveryClient(
@@ -266,7 +266,7 @@ public sealed class PolicyApprovalSubmissionRecoveryClient : IDisposable
             executorSubmissionPublicKey,
             recoveryPublicKey,
             policyStateSigningPrivateKeyPkcs8,
-            activeReleaseBindingReader);
+            releaseBindingRecoveryCoordinator);
     }
 
     public Task<PolicyApprovalSubmissionSnapshot> ReadSubmissionAsync(

@@ -134,6 +134,16 @@ public sealed class ActiveReleaseBindingAuthorityTests
                         record.DeviceBindingId, deviceBindingId, StringComparison.Ordinal)
                     && record.Receipt.Sequence > afterSequence)
                 .OrderBy(record => record.Receipt.Sequence)];
+
+        public ReleaseBindingJournalSnapshot LoadSnapshotAfter(
+            string deviceBindingId,
+            long afterSequence)
+        {
+            var delta = LoadAfter(deviceBindingId, afterSequence);
+            return new ReleaseBindingJournalSnapshot(
+                LoadDeviceHeadSequence(deviceBindingId),
+                delta);
+        }
     }
 
     private static ActiveReleaseBindingAuthority Authority(
@@ -178,6 +188,81 @@ public sealed class ActiveReleaseBindingAuthorityTests
         Assert.Equal(1, receipt.Sequence);
         Assert.Equal(binding.ReceiptId, receipt.ReceiptId);
         Assert.Equal(receipt.ComputePayloadSha256(), receipt.PayloadSha256);
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public async Task StoreIssuedRecoveryScopeReadsExactActiveAndSerializesOnlyItsDevice()
+    {
+        using var signer = new TestSigner();
+        var store = InMemoryReleaseBindingTruthStore.CreateTestOnly();
+        var authority = Authority(signer, store);
+        var (bom, token) = MakeBom(signer, "bom-coordinated", 1, null);
+        authority.Activate(Device, bom, token);
+
+        var scope = await store.AcquireAsync(Device, TestContext.Current.CancellationToken);
+        Assert.Equal(Device, scope.ActiveBinding.DeviceBindingId);
+        Assert.Equal(Sha256Hex(bom), scope.ActiveBinding.ReleaseBomSha256);
+        Assert.Equal(1, scope.ActiveBinding.Generation);
+        Assert.Equal(token, scope.ActiveBinding.ExecutionTokenBase64);
+
+        var sameDeviceTransition = Task.Run(() => authority.Revoke(Device, 1));
+        var (otherBom, otherToken) = MakeBom(signer, "bom-other", 1, null);
+        var otherDeviceTransition = Task.Run(
+            () => authority.Activate(OtherDevice, otherBom, otherToken));
+        var otherReceipt = await otherDeviceTransition.WaitAsync(
+            TimeSpan.FromSeconds(2),
+            TestContext.Current.CancellationToken);
+        Assert.Equal("activation", otherReceipt.ReceiptKind);
+        await Task.Delay(
+            TimeSpan.FromMilliseconds(100),
+            TestContext.Current.CancellationToken);
+        Assert.False(sameDeviceTransition.IsCompleted);
+
+        await scope.DisposeAsync();
+        var revoked = await sameDeviceTransition.WaitAsync(
+            TimeSpan.FromSeconds(2),
+            TestContext.Current.CancellationToken);
+        Assert.Equal("revocation", revoked.ReceiptKind);
+        Assert.False(authority.TryReadActive(Device, out _));
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public async Task FailedRecoveryScopeAcquisitionReleasesTheTransitionPrimitive()
+    {
+        using var signer = new TestSigner();
+        var store = InMemoryReleaseBindingTruthStore.CreateTestOnly();
+        var authority = Authority(signer, store);
+
+        await Assert.ThrowsAsync<ActiveReleaseBindingException>(
+            () => store.AcquireAsync(Device, TestContext.Current.CancellationToken).AsTask());
+
+        var (bom, token) = MakeBom(signer, "bom-after-failed-scope", 1, null);
+        var receipt = await Task.Run(() => authority.Activate(Device, bom, token))
+            .WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+        Assert.Equal("activation", receipt.ReceiptKind);
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public async Task CancelledRecoveryWaitDoesNotLeakTheTransitionPrimitive()
+    {
+        using var signer = new TestSigner();
+        var store = InMemoryReleaseBindingTruthStore.CreateTestOnly();
+        var authority = Authority(signer, store);
+        var (bom, token) = MakeBom(signer, "bom-cancelled-wait", 1, null);
+        authority.Activate(Device, bom, token);
+        var firstScope = await store.AcquireAsync(
+            Device,
+            TestContext.Current.CancellationToken);
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => store.AcquireAsync(Device, cancelled.Token).AsTask());
+
+        await firstScope.DisposeAsync();
+        var receipt = await Task.Run(() => authority.Revoke(Device, 1))
+            .WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+        Assert.Equal("revocation", receipt.ReceiptKind);
     }
 
     [Fact, Trait("Category", "Unit")]
@@ -1096,6 +1181,11 @@ public sealed class ActiveReleaseBindingAuthorityTests
             string deviceBindingId,
             long afterSequence)
             => _inner.LoadAfter(deviceBindingId, afterSequence);
+
+        public ReleaseBindingJournalSnapshot LoadSnapshotAfter(
+            string deviceBindingId,
+            long afterSequence)
+            => _inner.LoadSnapshotAfter(deviceBindingId, afterSequence);
     }
 
     private sealed class FixedBindingReader(ActiveReleaseBindingV1? binding) : IActiveReleaseBindingReader
@@ -1301,8 +1391,9 @@ public sealed class ActiveReleaseBindingAuthorityTests
             InMemoryReleaseBindingTruthStore.CreateTestOnly();
 
         public bool FreshnessReadsFail { get; set; }
-        public Func<IReadOnlyList<ReleaseBindingTruthRecord>, IReadOnlyList<ReleaseBindingTruthRecord>>?
-            DeltaOverride { get; set; }
+        public Func<ReleaseBindingJournalSnapshot, ReleaseBindingJournalSnapshot>?
+            SnapshotOverride { get; set; }
+        public Action? BeforeSnapshot { get; set; }
 
         public void Append(ReleaseBindingTruthRecord record) => _inner.Append(record);
 
@@ -1325,8 +1416,21 @@ public sealed class ActiveReleaseBindingAuthorityTests
             {
                 throw new InvalidOperationException("truth store freshness read refused");
             }
-            var delta = _inner.LoadAfter(deviceBindingId, afterSequence);
-            return DeltaOverride?.Invoke(delta) ?? delta;
+            return _inner.LoadAfter(deviceBindingId, afterSequence);
+        }
+
+        public ReleaseBindingJournalSnapshot LoadSnapshotAfter(
+            string deviceBindingId,
+            long afterSequence)
+        {
+            if (FreshnessReadsFail)
+            {
+                throw new InvalidOperationException("truth store freshness read refused");
+            }
+            BeforeSnapshot?.Invoke();
+            BeforeSnapshot = null;
+            var snapshot = _inner.LoadSnapshotAfter(deviceBindingId, afterSequence);
+            return SnapshotOverride?.Invoke(snapshot) ?? snapshot;
         }
     }
 
@@ -1408,15 +1512,20 @@ public sealed class ActiveReleaseBindingAuthorityTests
         // A delta record that fails the recovery pipeline (its recorded
         // signed BOM bytes are truncated): the read fails closed and must
         // NOT fall back to the cached bom-1 view.
-        store.DeltaOverride = static delta =>
-            [delta[0] with { SignedBomBytes = delta[0].SignedBomBytes![1..] }];
+        store.SnapshotOverride = static snapshot => snapshot with
+        {
+            Records = [snapshot.Records[0] with
+            {
+                SignedBomBytes = snapshot.Records[0].SignedBomBytes![1..]
+            }]
+        };
         Assert.False(reader.TryReadActive(Device, out var poisoned));
         Assert.Null(poisoned);
         Assert.Throws<ActiveReleaseBindingException>(() => reader.ReadReceipts(Device));
 
         // The store cannot be consulted at all: the same fail-closed
         // posture, still never the stale cache.
-        store.DeltaOverride = null;
+        store.SnapshotOverride = null;
         store.FreshnessReadsFail = true;
         Assert.False(reader.TryReadActive(Device, out _));
         Assert.Throws<ActiveReleaseBindingException>(() => reader.ReadReceipts(Device));
@@ -1429,5 +1538,29 @@ public sealed class ActiveReleaseBindingAuthorityTests
         Assert.Equal(Sha256Hex(second), binding!.ReleaseBomSha256);
         Assert.Equal(2, binding.Generation);
         Assert.Equal(writer.ReadReceipts(Device), reader.ReadReceipts(Device));
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public void AtomicSnapshotClosesHeadThenDeltaInterleavingWindow()
+    {
+        using var signer = new TestSigner();
+        var store = new ResyncTestStore();
+        var writer = new ActiveReleaseBindingAuthority([signer.TrustKey], store, () => Now);
+        var (first, firstToken) = MakeBom(signer, "bom-1", 1, null);
+        writer.Activate(Device, first, firstToken);
+        var reader = new ActiveReleaseBindingAuthority([signer.TrustKey], store, () => Now);
+        Assert.True(reader.TryReadActive(Device, out var cached));
+        Assert.Equal(Sha256Hex(first), cached!.ReleaseBomSha256);
+
+        var (second, secondToken) = MakeBom(signer, "bom-2", 2, first);
+        store.BeforeSnapshot = () => writer.Activate(Device, second, secondToken);
+
+        // The append happens at the exact old head-check/delta-read seam.
+        // One atomic store snapshot must include the new head and its record,
+        // so this read cannot return the cached bom-1 binding.
+        Assert.True(reader.TryReadActive(Device, out var advanced));
+        Assert.Equal(Sha256Hex(second), advanced!.ReleaseBomSha256);
+        Assert.Equal(2, advanced.Generation);
+        Assert.Equal(2, reader.ReadReceipts(Device).Count);
     }
 }

@@ -220,13 +220,16 @@ public sealed class PostgresReleaseBindingTruthStoreOptions
 /// activation, revocation, and rollback; the scoped append runs the CAS
 /// function on the same session — where the function's internal advisory
 /// lock is re-entrant — and commits, so the journal row is durable before the
-/// authority publishes. Because no path ever holds the in-process gate while
-/// waiting on this advisory lock, a policy-approval recovery that holds the
-/// same per-device lock and briefly waits on the gate through the
-/// composition-fixed reader cannot close a hold-and-wait deadlock cycle.
+/// authority publishes. Policy recovery obtains a store-issued scope that
+/// takes this same advisory lock and reads the binding in that transaction,
+/// then holds the scope through its policy commit. No path waits for the
+/// advisory lock while holding the authority gate, so no hold-and-wait cycle
+/// can form.
 /// </summary>
 public sealed class PostgresReleaseBindingTruthStore
-    : IReleaseBindingTruthStore, IReleaseBindingRecoveryFenceAuthority
+    : IReleaseBindingTruthStore,
+      IReleaseBindingRecoveryFenceAuthority,
+      IActiveReleaseBindingRecoveryCoordinator
 {
     private static readonly string[] TableNames =
     [
@@ -297,6 +300,13 @@ public sealed class PostgresReleaseBindingTruthStore
             .GetAwaiter()
             .GetResult();
 
+    public ReleaseBindingJournalSnapshot LoadSnapshotAfter(
+        string deviceBindingId,
+        long afterSequence)
+        => LoadSnapshotAfterAsync(deviceBindingId, afterSequence, CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+
     public ReleaseBindingRecoveryFence IssueRecoveryFence(string deviceBindingId)
         => IssueRecoveryFenceAsync(deviceBindingId, CancellationToken.None)
             .GetAwaiter()
@@ -322,6 +332,68 @@ public sealed class PostgresReleaseBindingTruthStore
     public IReleaseBindingTransitionScope BeginTransition(string deviceBindingId)
         => BeginTransitionAsync(deviceBindingId, CancellationToken.None).GetAwaiter().GetResult();
 
+    public async ValueTask<IActiveReleaseBindingRecoveryScope> AcquireAsync(
+        string deviceBindingId,
+        CancellationToken cancellationToken = default)
+    {
+        ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
+        var connection = await OpenVerifiedAsync(cancellationToken);
+        NpgsqlTransaction? transaction = null;
+        var ownershipTransferred = false;
+        try
+        {
+            transaction = await connection.BeginTransactionAsync(
+                IsolationLevel.ReadCommitted, cancellationToken);
+            await using (var transitionLock = Command(
+                "SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('release-binding:' || @device_binding_id, 0))",
+                connection,
+                transaction))
+            {
+                transitionLock.Parameters.AddWithValue("device_binding_id", deviceBindingId);
+                await transitionLock.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            await using var bindingCommand = Command(
+                $"SELECT current_binding_wire FROM {_qualifiedJournal} "
+                + "WHERE device_binding_id = @device_binding_id "
+                + "ORDER BY sequence DESC LIMIT 1",
+                connection,
+                transaction);
+            bindingCommand.Parameters.AddWithValue("device_binding_id", deviceBindingId);
+            var wire = await bindingCommand.ExecuteScalarAsync(cancellationToken) as byte[]
+                ?? throw new ActiveReleaseBindingException(
+                    "recovery coordination requires an active release binding");
+            var binding = ActiveReleaseBindingV1Codec.Deserialize(wire);
+            if (!string.Equals(binding.DeviceBindingId, deviceBindingId, StringComparison.Ordinal)
+                || !string.Equals(binding.Status, "active", StringComparison.Ordinal))
+            {
+                throw new ActiveReleaseBindingException(
+                    "recovery coordination requires the exact active binding for the requested device");
+            }
+
+            var scope = new PostgresRecoveryScope(binding, connection, transaction);
+            ownershipTransferred = true;
+            return scope;
+        }
+        finally
+        {
+            if (!ownershipTransferred)
+            {
+                try
+                {
+                    if (transaction is not null)
+                    {
+                        await transaction.DisposeAsync();
+                    }
+                }
+                finally
+                {
+                    await connection.DisposeAsync();
+                }
+            }
+        }
+    }
+
     private async Task<IReleaseBindingTransitionScope> BeginTransitionAsync(
         string deviceBindingId,
         CancellationToken cancellationToken)
@@ -329,6 +401,7 @@ public sealed class PostgresReleaseBindingTruthStore
         ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
         var connection = await OpenVerifiedAsync(cancellationToken);
         NpgsqlTransaction? transaction = null;
+        var ownershipTransferred = false;
         try
         {
             transaction = await connection.BeginTransactionAsync(
@@ -345,15 +418,24 @@ public sealed class PostgresReleaseBindingTruthStore
             command.Parameters.AddWithValue("device_binding_id", deviceBindingId);
             await command.ExecuteNonQueryAsync(cancellationToken);
             var scope = new PostgresTransitionScope(this, connection, transaction);
-            transaction = null;
+            ownershipTransferred = true;
             return scope;
         }
         finally
         {
-            if (transaction is not null)
+            if (!ownershipTransferred)
             {
-                await transaction.DisposeAsync();
-                await connection.DisposeAsync();
+                try
+                {
+                    if (transaction is not null)
+                    {
+                        await transaction.DisposeAsync();
+                    }
+                }
+                finally
+                {
+                    await connection.DisposeAsync();
+                }
             }
         }
     }
@@ -483,6 +565,51 @@ public sealed class PostgresReleaseBindingTruthStore
         }
     }
 
+    private sealed class PostgresRecoveryScope : IActiveReleaseBindingRecoveryScope
+    {
+        private PostgresRecoveryResources? _resources;
+
+        internal PostgresRecoveryScope(
+            ActiveReleaseBindingV1 activeBinding,
+            NpgsqlConnection connection,
+            NpgsqlTransaction transaction)
+        {
+            ActiveBinding = activeBinding;
+            _resources = new PostgresRecoveryResources(connection, transaction);
+        }
+
+        public ActiveReleaseBindingV1 ActiveBinding { get; }
+
+        public async ValueTask DisposeAsync()
+        {
+            var resources = Interlocked.Exchange(ref _resources, null);
+            if (resources is null)
+            {
+                return;
+            }
+
+            try
+            {
+                try
+                {
+                    await resources.Transaction.RollbackAsync(CancellationToken.None);
+                }
+                finally
+                {
+                    await resources.Transaction.DisposeAsync();
+                }
+            }
+            finally
+            {
+                await resources.Connection.DisposeAsync();
+            }
+        }
+    }
+
+    private sealed record PostgresRecoveryResources(
+        NpgsqlConnection Connection,
+        NpgsqlTransaction Transaction);
+
     private async Task<IReadOnlyList<ReleaseBindingTruthRecord>> LoadAllAsync(
         CancellationToken cancellationToken)
     {
@@ -536,6 +663,51 @@ public sealed class PostgresReleaseBindingTruthStore
         command.Parameters.AddWithValue("device_binding_id", deviceBindingId);
         command.Parameters.AddWithValue("after_sequence", afterSequence);
         return await ReadRecordsAsync(command, cancellationToken);
+    }
+
+    private async Task<ReleaseBindingJournalSnapshot> LoadSnapshotAfterAsync(
+        string deviceBindingId,
+        long afterSequence,
+        CancellationToken cancellationToken)
+    {
+        ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
+        if (afterSequence < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(afterSequence));
+        }
+        await using var connection = await OpenVerifiedAsync(cancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(
+            IsolationLevel.RepeatableRead, cancellationToken);
+        await using var headCommand = Command(
+            $"SELECT COALESCE(max(sequence), 0) FROM {_qualifiedJournal} "
+            + "WHERE device_binding_id = @device_binding_id",
+            connection,
+            transaction);
+        headCommand.Parameters.AddWithValue("device_binding_id", deviceBindingId);
+        var head = Convert.ToInt64(
+            await headCommand.ExecuteScalarAsync(cancellationToken),
+            System.Globalization.CultureInfo.InvariantCulture);
+
+        await using var deltaCommand = Command(
+            $"""
+            SELECT device_binding_id, sequence, receipt_kind, receipt_wire,
+                   current_binding_wire, previous_binding_wire,
+                   last_activation_signer_generation, request_sha256,
+                   signed_bom_wire
+            FROM {_qualifiedJournal}
+            WHERE device_binding_id = @device_binding_id
+              AND sequence > @after_sequence
+              AND sequence <= @snapshot_head
+            ORDER BY sequence
+            """,
+            connection,
+            transaction);
+        deltaCommand.Parameters.AddWithValue("device_binding_id", deviceBindingId);
+        deltaCommand.Parameters.AddWithValue("after_sequence", afterSequence);
+        deltaCommand.Parameters.AddWithValue("snapshot_head", head);
+        var records = await ReadRecordsAsync(deltaCommand, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return new ReleaseBindingJournalSnapshot(head, records);
     }
 
     private static async Task<IReadOnlyList<ReleaseBindingTruthRecord>> ReadRecordsAsync(

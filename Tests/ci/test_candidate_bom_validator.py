@@ -504,6 +504,24 @@ class BomFixture:
         for authority in self.bom["native_stop_challenge_authorities"]:
             authority["challenge_authority_sha256"] = SUBJECT._canonical_challenge_authority_hash(authority)
 
+    def rewrite_previous(self):
+        for authority in self.previous["native_stop_authorities"]:
+            authority["worker_authority_sha256"] = SUBJECT._canonical_authority_hash(
+                authority
+            )
+        for authority in self.previous["device_route_assignment_authorities"]:
+            authority["route_authority_sha256"] = (
+                SUBJECT._canonical_route_authority_hash(authority)
+            )
+        for authority in self.previous["native_stop_challenge_authorities"]:
+            authority["challenge_authority_sha256"] = (
+                SUBJECT._canonical_challenge_authority_hash(authority)
+            )
+        self.previous["signature"] = self._sign_bom(self.previous)
+        self.previous_bytes = _write_json(self.previous_path, self.previous)
+        self.bom["previous_stable_bom_sha256"] = sha256_bytes(self.previous_bytes)
+        self.rewrite_candidate(update_scope=False)
+
     def rewrite_module_builder_id(self, module_id, builder_id):
         module = next(item for item in self.bom["modules"] if item["module_id"] == module_id)
         provenance_path = self.bundle / module["provenance_uri"]
@@ -531,7 +549,7 @@ class BomFixture:
         policy=None,
         policy_sha=None,
         validation_time="2026-07-14T00:00:00Z",
-        minimum_remaining_lifetime_seconds=0,
+        minimum_remaining_lifetime_seconds=SUBJECT._DEFAULT_MINIMUM_REMAINING_LIFETIME_SECONDS,
     ):
         # validation_time is pinned to the fixture created_at so the suite is
         # deterministic; pass None to exercise the system-UTC-now default.
@@ -634,6 +652,21 @@ class ReleaseCliEntryTests(unittest.TestCase):
                     ])
         self.assertEqual(2, raised.exception.code)
         self.assertIn("--minimum-remaining-lifetime-seconds", stderr.getvalue())
+
+    def test_the_cli_rejects_a_zero_minimum_remaining_lifetime(self) -> None:
+        with tempfile.TemporaryDirectory() as bundle:
+            with contextlib.redirect_stderr(io.StringIO()) as stderr:
+                with self.assertRaises(SystemExit) as raised:
+                    SUBJECT.main([
+                        "--bundle-root", bundle,
+                        "--bom", "bom.json",
+                        "--previous-bom", "previous.json",
+                        "--native-stop-trust-receipt", "receipt.json",
+                        "--schema-sha256", "0" * 64,
+                        "--minimum-remaining-lifetime-seconds", "0",
+                    ])
+        self.assertEqual(2, raised.exception.code)
+        self.assertIn("positive integer", stderr.getvalue())
 
 
 class MigrationFidelityTests(unittest.TestCase):
@@ -891,6 +924,63 @@ class RuntimeAuthorityCurrencyTests(unittest.TestCase):
     must fall inside every current runtime authority window, with the
     configured minimum remaining lifetime (expired-authority finding)."""
 
+    def test_previous_stable_authority_expired_at_validation_time_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            fixture.previous["created_at"] = "2026-07-13T00:00:00Z"
+            fixture.previous["native_stop_authorities"][0]["valid_until"] = (
+                "2026-07-13T23:59:59.0000001Z"
+            )
+            fixture.rewrite_previous()
+            with self.assertRaisesRegex(
+                CandidateBomError,
+                "previous stable BOM native stop authority native-stop-authority-a"
+                " is expired at the validation time",
+            ):
+                fixture.validate()
+
+    def test_previous_stable_authority_inside_nonzero_interval_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            fixture.previous["native_stop_authorities"][0]["valid_until"] = (
+                "2026-07-14T12:00:00.0000001Z"
+            )
+            fixture.rewrite_previous()
+            with self.assertRaisesRegex(
+                CandidateBomError,
+                "previous stable BOM native stop authority native-stop-authority-a"
+                " expires inside the minimum remaining lifetime",
+            ):
+                fixture.validate()
+
+    def test_all_previous_stable_authority_sets_enforce_the_nonzero_interval(self):
+        cases = (
+            (
+                "native_stop_authorities",
+                "previous stable BOM native stop authority native-stop-authority-a",
+            ),
+            (
+                "device_route_assignment_authorities",
+                "previous stable BOM device route authority device-route-authority-a",
+            ),
+            (
+                "native_stop_challenge_authorities",
+                "previous stable BOM challenge authority native-stop-challenge-authority-a",
+            ),
+        )
+        for authority_set, expected_label in cases:
+            with self.subTest(authority_set=authority_set), tempfile.TemporaryDirectory() as directory:
+                fixture = BomFixture(directory)
+                fixture.previous[authority_set][0]["valid_until"] = (
+                    "2026-07-14T12:00:00.0000001Z"
+                )
+                fixture.rewrite_previous()
+                with self.assertRaisesRegex(
+                    CandidateBomError,
+                    expected_label + " expires inside the minimum remaining lifetime",
+                ):
+                    fixture.validate()
+
     def test_authority_set_expired_at_validation_time_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = BomFixture(directory)
@@ -971,6 +1061,25 @@ class RuntimeAuthorityCurrencyTests(unittest.TestCase):
                 validator.validate(
                     fixture.bom_path, fixture.previous_path, fixture.receipt_path
                 )
+
+    def test_default_nonzero_interval_rejects_near_expiry_candidate(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            validator = fixture.validator(validation_time="2026-07-30T12:00:00Z")
+            with self.assertRaisesRegex(
+                CandidateBomError,
+                "candidate Release BOM native stop authority native-stop-authority-a"
+                " expires inside the minimum remaining lifetime",
+            ):
+                validator.validate(
+                    fixture.bom_path, fixture.previous_path, fixture.receipt_path
+                )
+
+    def test_constructor_rejects_explicit_zero_interval(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            with self.assertRaisesRegex(CandidateBomError, "positive integer"):
+                fixture.validator(minimum_remaining_lifetime_seconds=0)
 
     def test_authorities_valid_with_sufficient_remaining_lifetime_pass(self):
         # Same instant; a 1-day minimum is satisfied by every window.

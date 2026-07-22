@@ -2448,7 +2448,7 @@ if [[ -n "$phase0_evidence" ]]; then
   phase0_arguments+=(--evidence "$phase0_evidence")
 fi
 "$python_executable" Tools/ci/run_phase0_gate.py "${phase0_arguments[@]}"
-"$python_executable" Tools/ci/candidate_bom_validator.py --repo-root "$repo_root" --bundle-root "$bundle_root" --bom "$bom_path" --previous-bom "$previous_bom_path" --native-stop-trust-receipt "$native_stop_trust_receipt_path" --schema-sha256 "$schema_sha256"
+"$python_executable" Tools/ci/candidate_bom_validator.py --repo-root "$repo_root" --bundle-root "$bundle_root" --bom "$bom_path" --previous-bom "$previous_bom_path" --native-stop-trust-receipt "$native_stop_trust_receipt_path" --schema-sha256 "$schema_sha256" --minimum-remaining-lifetime-seconds 86400
 """,
             encoding="utf-8",
         )
@@ -2787,7 +2787,8 @@ if __name__ == "__main__":
                 '--repo-root "$repo_root" --bundle-root "$bundle_root" '
                 '--bom "$bom_path" --previous-bom "$previous_bom_path" '
                 '--native-stop-trust-receipt "$native_stop_trust_receipt_path" '
-                '--schema-sha256 "$schema_sha256"\n',
+                '--schema-sha256 "$schema_sha256" '
+                '--minimum-remaining-lifetime-seconds 86400\n',
                 "",
             ),
             encoding="utf-8",
@@ -2810,13 +2811,15 @@ if __name__ == "__main__":
                 '--repo-root "$repo_root" --bundle-root "$bundle_root" '
                 '--bom "$bom_path" --previous-bom "$previous_bom_path" '
                 '--native-stop-trust-receipt "$native_stop_trust_receipt_path" '
-                '--schema-sha256 "$schema_sha256"\n',
+                '--schema-sha256 "$schema_sha256" '
+                '--minimum-remaining-lifetime-seconds 86400\n',
                 '# "$python_executable" '
                 "Tools/ci/candidate_bom_validator.py "
                 '--repo-root "$repo_root" --bundle-root "$bundle_root" '
                 '--bom "$bom_path" --previous-bom "$previous_bom_path" '
                 '--native-stop-trust-receipt "$native_stop_trust_receipt_path" '
-                '--schema-sha256 "$schema_sha256"\n',
+                '--schema-sha256 "$schema_sha256" '
+                '--minimum-remaining-lifetime-seconds 86400\n',
             ),
             encoding="utf-8",
         )

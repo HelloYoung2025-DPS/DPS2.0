@@ -89,6 +89,7 @@ class CandidateBomValidatorMainEndToEndTests(unittest.TestCase):
             repo = work / "repo"
             bundle = work / "bundle"
             shutil.copytree(FIXTURES / "repo-content", repo)
+            self._materialize_synthetic_repository_metadata(repo)
             shutil.copytree(FIXTURES / "bundle", bundle)
             bom_path = work / "bom.json"
             previous_path = work / "previous-bom.json"
@@ -144,6 +145,24 @@ class CandidateBomValidatorMainEndToEndTests(unittest.TestCase):
         self.assertEqual(
             sha256_bytes(receipt_bytes), report["native_stop_trust_receipt_sha256"]
         )
+
+    @staticmethod
+    def _materialize_synthetic_repository_metadata(repo: Path) -> None:
+        """Create fixture governance names only inside the disposable repo.
+
+        Keeping AGENTS.md and module.yaml paths as tracked nested fixtures
+        makes the real repository governance scanner correctly reject them as
+        unexpected policy/module homes.  The data-only map preserves the
+        deterministic synthetic Git tree while those reserved path names are
+        created only under the test's temporary repository.
+        """
+        metadata = json.loads(
+            (FIXTURES / "synthetic-repo-metadata.json").read_text(encoding="utf-8")
+        )
+        for relative, content in metadata.items():
+            destination = repo / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(content, encoding="utf-8")
 
     def _owner_key_entry(self):
         # Read the live patched deployed anchor; the owner native-stop-trust

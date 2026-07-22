@@ -44,7 +44,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             executorSigner,
             recoverySigner,
             stateSigner,
-            MatchingActiveReleaseBindingReader(prepared.Snapshot));
+            MatchingActiveReleaseBindingCoordinator(prepared.Snapshot));
 
         var authorized = await recoveryClient.AuthorizeSubmissionRecoveryAsync(
             SignRecovery(recoverySigner, prepared.Recovery),
@@ -84,7 +84,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             stateSigner,
             "commit-binding-drift-" + drift,
             cancellationToken);
-        var drifted = new StubActiveReleaseBindingReader();
+        var drifted = new StubActiveReleaseBindingRecoveryCoordinator();
         drifted.SetActive(ActiveBinding(
             prepared.Snapshot.Approval.DeviceBindingId,
             drift == "sha256" ? new string('f', 64) : prepared.Snapshot.ReleaseBomSha256,
@@ -140,7 +140,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             executorSigner,
             recoverySigner,
             stateSigner,
-            new StubActiveReleaseBindingReader());
+            new StubActiveReleaseBindingRecoveryCoordinator());
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             recoveryClient.AuthorizeSubmissionRecoveryAsync(
@@ -184,7 +184,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             executorSigner,
             recoverySigner,
             stateSigner,
-            new ThrowingActiveReleaseBindingReader());
+            new ThrowingActiveReleaseBindingRecoveryCoordinator());
 
         // An exception out of the final comparison propagates and the
         // transaction rolls back: no recovery row, no state transition.
@@ -199,14 +199,12 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
     }
 
     [Fact, Trait("Category", "Integration")]
-    public async Task MissingReleaseBindingCoordinationFailsRecoveryClosedAndPersistsNothing()
+    public async Task StoreIssuedCoordinationDoesNotDependOnPolicyDatabaseMarker()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        // NO control-plane-host release-binding baseline exists in this
-        // database: the recovery cannot prove a shared advisory-lock
-        // serialization domain with the journal, so atomic coordination is
-        // unavailable and the commit must fail closed even though the
-        // composition-fixed reader would return matching facts.
+        // NO control-plane-host release-binding baseline exists in the
+        // policy database. Coordination belongs to the injected CPH store,
+        // not to a same-database marker or a policy-side advisory lock.
         await using var database = await PolicyApprovalTestDatabase.CreateAsync(cancellationToken);
         using var evaluationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var revocationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -234,16 +232,16 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             executorSigner,
             recoverySigner,
             stateSigner,
-            MatchingActiveReleaseBindingReader(prepared.Snapshot));
+            MatchingActiveReleaseBindingCoordinator(prepared.Snapshot));
 
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            recoveryClient.AuthorizeSubmissionRecoveryAsync(
-                SignRecovery(recoverySigner, prepared.Recovery),
-                cancellationToken));
+        var authorized = await recoveryClient.AuthorizeSubmissionRecoveryAsync(
+            SignRecovery(recoverySigner, prepared.Recovery),
+            cancellationToken);
 
         var persisted = await recoveryClient.ReadSubmissionAsync(prepared.Intent.SubmissionAttemptId, cancellationToken);
-        Assert.Equal(ApprovalSubmissionStateV1.ReconciledNotSubmitted, persisted.State.State);
-        await AssertRecoveryCountAsync(database, prepared.Intent.SubmissionAttemptId, 0, cancellationToken);
+        Assert.Equal(ApprovalSubmissionStateV1.RecoveryAuthorized, authorized.State);
+        Assert.Equal(ApprovalSubmissionStateV1.RecoveryAuthorized, persisted.State.State);
+        await AssertRecoveryCountAsync(database, prepared.Intent.SubmissionAttemptId, 1, cancellationToken);
     }
 
     private sealed record RecoverableSubmission(
@@ -296,12 +294,15 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         return new RecoverableSubmission(snapshot, firstIntent, recovery);
     }
 
-    private static StubActiveReleaseBindingReader MatchingActiveReleaseBindingReader(
+    private static StubActiveReleaseBindingRecoveryCoordinator MatchingActiveReleaseBindingCoordinator(
         PolicyApprovalAuthoritativeSnapshot snapshot)
     {
-        var reader = new StubActiveReleaseBindingReader();
-        reader.SetActive(ActiveBinding(snapshot.Approval.DeviceBindingId, snapshot.ReleaseBomSha256, 1));
-        return reader;
+        var coordinator = new StubActiveReleaseBindingRecoveryCoordinator();
+        coordinator.SetActive(ActiveBinding(
+            snapshot.Approval.DeviceBindingId,
+            snapshot.ReleaseBomSha256,
+            1));
+        return coordinator;
     }
 
     private static ActiveReleaseBindingV1 ActiveBinding(
@@ -356,19 +357,42 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         Assert.Equal(expected, await count.ExecuteScalarAsync(cancellationToken));
     }
 
-    private sealed class StubActiveReleaseBindingReader : IActiveReleaseBindingReader
+    private sealed class StubActiveReleaseBindingRecoveryCoordinator
+        : IActiveReleaseBindingRecoveryCoordinator
     {
         private readonly Dictionary<string, ActiveReleaseBindingV1> _activeBindings = new(StringComparer.Ordinal);
 
         public void SetActive(ActiveReleaseBindingV1 binding) => _activeBindings[binding.DeviceBindingId] = binding;
 
-        public bool TryReadActive(string deviceBindingId, out ActiveReleaseBindingV1? binding)
-            => _activeBindings.TryGetValue(deviceBindingId, out binding);
+        public ValueTask<IActiveReleaseBindingRecoveryScope> AcquireAsync(
+            string deviceBindingId,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!_activeBindings.TryGetValue(deviceBindingId, out var binding))
+            {
+                throw new UnauthorizedAccessException(
+                    "test recovery coordinator has no active binding for the requested device");
+            }
+            return ValueTask.FromResult<IActiveReleaseBindingRecoveryScope>(
+                new StubActiveReleaseBindingRecoveryScope(binding));
+        }
     }
 
-    private sealed class ThrowingActiveReleaseBindingReader : IActiveReleaseBindingReader
+    private sealed class StubActiveReleaseBindingRecoveryScope(
+        ActiveReleaseBindingV1 activeBinding) : IActiveReleaseBindingRecoveryScope
     {
-        public bool TryReadActive(string deviceBindingId, out ActiveReleaseBindingV1? binding)
+        public ActiveReleaseBindingV1 ActiveBinding { get; } = activeBinding;
+
+        public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    }
+
+    private sealed class ThrowingActiveReleaseBindingRecoveryCoordinator
+        : IActiveReleaseBindingRecoveryCoordinator
+    {
+        public ValueTask<IActiveReleaseBindingRecoveryScope> AcquireAsync(
+            string deviceBindingId,
+            CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("active release binding read faulted at commit time");
     }
 }

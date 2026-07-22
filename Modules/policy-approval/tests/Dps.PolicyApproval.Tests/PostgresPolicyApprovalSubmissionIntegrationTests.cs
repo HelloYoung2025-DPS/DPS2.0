@@ -334,7 +334,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         var firstIntent = SignSubmissionIntent(executorSigner, SubmissionIntent(snapshot, proposal, request, commandId: commandId));
         using var client = CreateSubmissionClient(database, authorityTopology, fenceSigner, executorSigner, reconciliationSigner, recoverySigner, stateSigner);
         using var reconciliationClient = CreateReconciliationClient(database, authorityTopology, executorSigner, reconciliationSigner, stateSigner);
-        using var recoveryClient = CreateRecoveryClient(database, authorityTopology, executorSigner, recoverySigner, stateSigner, MatchingActiveReleaseBindingReader(snapshot));
+        using var recoveryClient = CreateRecoveryClient(database, authorityTopology, executorSigner, recoverySigner, stateSigner, MatchingActiveReleaseBindingCoordinator(snapshot));
         var firstLease = await client.AcquireAsync(request, SignFenceAuthorization(fenceSigner, request), firstIntent, cancellationToken);
         var pending = (await firstLease.BeginSubmissionAsync(firstIntent, cancellationToken)).PendingReceipt;
         _ = await firstLease.QuarantineUnknownSubmissionAsync("PROCESS_CRASH", cancellationToken);
@@ -408,7 +408,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             snapshot, proposal, request, commandId: commandId));
         using var client = CreateSubmissionClient(database, authorityTopology, fenceSigner, executorSigner, reconciliationSigner, recoverySigner, stateSigner);
         using var reconciliationClient = CreateReconciliationClient(database, authorityTopology, executorSigner, reconciliationSigner, stateSigner);
-        using var recoveryClient = CreateRecoveryClient(database, authorityTopology, executorSigner, recoverySigner, stateSigner, MatchingActiveReleaseBindingReader(snapshot));
+        using var recoveryClient = CreateRecoveryClient(database, authorityTopology, executorSigner, recoverySigner, stateSigner, MatchingActiveReleaseBindingCoordinator(snapshot));
         var firstLease = await client.AcquireAsync(request, SignFenceAuthorization(fenceSigner, request), firstIntent, cancellationToken);
         var pending = (await firstLease.BeginSubmissionAsync(firstIntent, cancellationToken)).PendingReceipt;
         _ = await firstLease.QuarantineUnknownSubmissionAsync("PROCESS_CRASH", cancellationToken);
@@ -494,7 +494,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         var intent = SignSubmissionIntent(executorSigner, SubmissionIntent(snapshot, proposal, request));
         using var client = CreateSubmissionClient(database, authorityTopology, fenceSigner, executorSigner, reconciliationSigner, recoverySigner, stateSigner);
         using var reconciliationClient = CreateReconciliationClient(database, authorityTopology, executorSigner, reconciliationSigner, stateSigner);
-        using var recoveryClient = CreateRecoveryClient(database, authorityTopology, executorSigner, recoverySigner, stateSigner, MatchingActiveReleaseBindingReader(snapshot));
+        using var recoveryClient = CreateRecoveryClient(database, authorityTopology, executorSigner, recoverySigner, stateSigner, MatchingActiveReleaseBindingCoordinator(snapshot));
         var lease = await client.AcquireAsync(request, SignFenceAuthorization(fenceSigner, request), intent, cancellationToken);
         var pending = (await lease.BeginSubmissionAsync(intent, cancellationToken)).PendingReceipt;
         var future = DateTimeOffset.UtcNow.AddYears(1);
@@ -703,7 +703,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             executorSigner,
             recoverySigner,
             stateSigner,
-            new StubActiveReleaseBindingReader());
+            new StubActiveReleaseBindingRecoveryCoordinator());
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             aclDriftRecoveryClient.ReadSubmissionAsync(Guid.NewGuid(), cancellationToken));
 
@@ -833,7 +833,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         ECDsa executorSigner,
         ECDsa recoverySigner,
         ECDsa stateSigner,
-        IActiveReleaseBindingReader activeReleaseBindingReader)
+        IActiveReleaseBindingRecoveryCoordinator releaseBindingRecoveryCoordinator)
     {
         var privateKey = stateSigner.ExportPkcs8PrivateKey();
         try
@@ -844,7 +844,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
                 executorSigner.ExportSubjectPublicKeyInfo(),
                 recoverySigner.ExportSubjectPublicKeyInfo(),
                 privateKey,
-                activeReleaseBindingReader);
+                releaseBindingRecoveryCoordinator);
         }
         finally { CryptographicOperations.ZeroMemory(privateKey); }
     }

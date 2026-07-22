@@ -163,7 +163,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         await blockerTransaction.RollbackAsync(cancellationToken);
         await blockerTransaction.DisposeAsync();
 
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => recoveryTask);
+        await Assert.ThrowsAsync<ActiveReleaseBindingException>(() => recoveryTask);
         var transitionReceipt = await transitionTask;
         Assert.Equal("revocation", transitionReceipt.ReceiptKind);
         Assert.Equal(2, transitionReceipt.Sequence);
@@ -526,8 +526,9 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
                     evaluationSigner, revocationSigner, fenceSigner, executorSigner,
                     reconciliationSigner, recoverySigner, stateSigner);
                 bomSigner = new SameInstanceBomSigner();
+                var releaseBindingStore = bindings.CreateStore();
                 var authority = new ActiveReleaseBindingAuthority(
-                    [bomSigner.TrustKey], bindings.CreateStore(), () => SameInstanceNow);
+                    [bomSigner.TrustKey], releaseBindingStore, () => SameInstanceNow);
                 var boms = new List<byte[]>();
                 var tokens = new List<string>();
                 for (var index = 1; index <= activatedBomCount; index++)
@@ -561,7 +562,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
                     executorSigner,
                     recoverySigner,
                     stateSigner,
-                    authority);
+                    releaseBindingStore);
                 return new RecoveryRaceContext(
                     database,
                     bindings,

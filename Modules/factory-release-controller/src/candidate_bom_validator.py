@@ -190,6 +190,7 @@ _DEPLOYED_TRUST_POLICY_RELATIVE = (
 )
 _DEPLOYED_TRUST_POLICY_SHA256 = "e30c17a21db42d88861bfb4eeb33372e383067f07f804b7327dfa461b055121b"
 _DEPLOYED_TRUST_POLICY_ID = "dps-deployed-release-anchor-v1"
+_DEFAULT_MINIMUM_REMAINING_LIFETIME_SECONDS = 24 * 60 * 60
 
 
 class CandidateBomError(RuntimeError):
@@ -1112,7 +1113,7 @@ class CandidateBomValidator:
         expected_schema_sha256: str,
         *,
         validation_time: str | None = None,
-        minimum_remaining_lifetime_seconds: int = 0,
+        minimum_remaining_lifetime_seconds: int = _DEFAULT_MINIMUM_REMAINING_LIFETIME_SECONDS,
     ) -> None:
         if validation_time is None:
             self._validation_time_ns = _system_utc_now_nanoseconds()
@@ -1123,10 +1124,10 @@ class CandidateBomValidator:
         if (
             isinstance(minimum_remaining_lifetime_seconds, bool)
             or not isinstance(minimum_remaining_lifetime_seconds, int)
-            or minimum_remaining_lifetime_seconds < 0
+            or minimum_remaining_lifetime_seconds <= 0
         ):
             raise CandidateBomError(
-                "minimum remaining lifetime must be a non-negative integer number of seconds"
+                "minimum remaining lifetime must be a positive integer number of seconds"
             )
         self._minimum_remaining_lifetime_seconds = minimum_remaining_lifetime_seconds
         repository = Path(repository_root)
@@ -1169,7 +1170,7 @@ class CandidateBomValidator:
         expected_schema_sha256: str,
         *,
         validation_time: str | None = None,
-        minimum_remaining_lifetime_seconds: int = 0,
+        minimum_remaining_lifetime_seconds: int = _DEFAULT_MINIMUM_REMAINING_LIFETIME_SECONDS,
     ) -> "CandidateBomValidator":
         """Load the only policy accepted by the operational validation CLI.
 
@@ -2682,15 +2683,18 @@ class CandidateBomValidator:
             if not valid_from_ns <= created_at_ns < valid_until_ns:
                 raise CandidateBomError("challenge authority is not valid when the Release BOM is created")
 
-    def _validate_runtime_authority_currency(self, bom: Mapping[str, Any]) -> None:
-        """Bind the candidate's runtime authority windows to the validation instant.
+    def _validate_runtime_authority_currency(
+        self,
+        bom: Mapping[str, Any],
+        bom_label: str,
+    ) -> None:
+        """Bind one signed BOM's runtime authority windows to validation time.
 
-        The created_at checks above pin each authority window to the BOM's own
-        self-declared history, so an old, correctly signed BOM could pass the
-        live release gate after its authority sets expired.  The trusted
-        validation time must fall inside every current runtime authority
-        window, with at least the configured minimum lifetime remaining for
-        rollout and rollback.
+        The candidate and its previous stable rollback target both need usable
+        runtime authorities.  Their created_at checks pin windows only to each
+        BOM's self-declared history, so the trusted validation time must also
+        fall inside every authority window with the non-zero rollout/rollback
+        interval still remaining.
         """
         minimum_remaining_ns = self._minimum_remaining_lifetime_seconds * 1_000_000_000
         authority_sets = (
@@ -2713,15 +2717,15 @@ class CandidateBomValidator:
                 identity = entry[identity_field]
                 if self._validation_time_ns < valid_from_ns:
                     raise CandidateBomError(
-                        f"{label} {identity} is not yet valid at the validation time"
+                        f"{bom_label} {label} {identity} is not yet valid at the validation time"
                     )
                 if self._validation_time_ns >= valid_until_ns:
                     raise CandidateBomError(
-                        f"{label} {identity} is expired at the validation time"
+                        f"{bom_label} {label} {identity} is expired at the validation time"
                     )
                 if valid_until_ns - self._validation_time_ns < minimum_remaining_ns:
                     raise CandidateBomError(
-                        f"{label} {identity} expires inside the minimum remaining"
+                        f"{bom_label} {label} {identity} expires inside the minimum remaining"
                         " lifetime at the validation time"
                     )
 
@@ -3331,10 +3335,14 @@ class CandidateBomValidator:
         self._validate_native_stop_authority_bindings(bom)
         self._validate_device_route_authority_bindings(bom)
         self._validate_native_stop_challenge_authority_bindings(bom)
-        self._validate_runtime_authority_currency(bom)
+        self._validate_runtime_authority_currency(bom, "candidate Release BOM")
         evidence_signers, verification_ceiling = self._validate_evidence(bom)
         approver = self._validate_risk_and_approval(bom)
         previous = self._validate_previous_bom(bom, previous_bom_path)
+        if previous is not None:
+            self._validate_runtime_authority_currency(
+                previous, "previous stable BOM"
+            )
         self._validate_native_stop_rotation(bom, previous)
         self._validate_device_route_rotation(bom, previous)
         self._validate_native_stop_challenge_rotation(bom, previous)
@@ -3394,9 +3402,9 @@ def _load_json(path: str | os.PathLike[str], label: str) -> Mapping[str, Any]:
 
 
 def _minimum_remaining_lifetime_arg(value: str) -> int:
-    if not re.fullmatch(r"[0-9]+", value):
+    if not re.fullmatch(r"[1-9][0-9]*", value):
         raise argparse.ArgumentTypeError(
-            "must be a non-negative integer number of seconds"
+            "must be a positive integer number of seconds"
         )
     return int(value, 10)
 
@@ -3421,8 +3429,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--minimum-remaining-lifetime-seconds",
         type=_minimum_remaining_lifetime_arg,
-        default=0,
-        help="minimum authority window lifetime that must remain after the validation time",
+        default=_DEFAULT_MINIMUM_REMAINING_LIFETIME_SECONDS,
+        help="positive authority-window lifetime that must remain after validation (default: 86400)",
     )
     arguments = parser.parse_args(argv)
     try:
