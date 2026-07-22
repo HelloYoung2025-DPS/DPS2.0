@@ -310,6 +310,18 @@ def _dotnet_utc_ticks(value: Any, name: str) -> int:
     return nanoseconds // 100
 
 
+def _system_utc_now_nanoseconds() -> int:
+    # Same proleptic UTC nanosecond scale as _utc_instant_nanoseconds.
+    now = datetime.now(timezone.utc)
+    seconds = (
+        (now.toordinal() - 1) * 86_400
+        + now.hour * 3_600
+        + now.minute * 60
+        + now.second
+    )
+    return seconds * 1_000_000_000 + now.microsecond * 1_000
+
+
 def _require_bundle_uri(value: Any, name: str) -> str:
     if (
         not isinstance(value, str)
@@ -1098,7 +1110,25 @@ class CandidateBomValidator:
         trust_policy: Mapping[str, Any],
         expected_trust_policy_sha256: str,
         expected_schema_sha256: str,
+        *,
+        validation_time: str | None = None,
+        minimum_remaining_lifetime_seconds: int = 0,
     ) -> None:
+        if validation_time is None:
+            self._validation_time_ns = _system_utc_now_nanoseconds()
+        else:
+            self._validation_time_ns = _utc_instant_nanoseconds(
+                validation_time, "validation time"
+            )
+        if (
+            isinstance(minimum_remaining_lifetime_seconds, bool)
+            or not isinstance(minimum_remaining_lifetime_seconds, int)
+            or minimum_remaining_lifetime_seconds < 0
+        ):
+            raise CandidateBomError(
+                "minimum remaining lifetime must be a non-negative integer number of seconds"
+            )
+        self._minimum_remaining_lifetime_seconds = minimum_remaining_lifetime_seconds
         repository = Path(repository_root)
         bundle = Path(bundle_root)
         if repository.is_symlink() or not repository.is_dir():
@@ -1137,6 +1167,9 @@ class CandidateBomValidator:
         repository_root: str | os.PathLike[str],
         bundle_root: str | os.PathLike[str],
         expected_schema_sha256: str,
+        *,
+        validation_time: str | None = None,
+        minimum_remaining_lifetime_seconds: int = 0,
     ) -> "CandidateBomValidator":
         """Load the only policy accepted by the operational validation CLI.
 
@@ -1164,6 +1197,8 @@ class CandidateBomValidator:
             policy,
             _DEPLOYED_TRUST_POLICY_SHA256,
             expected_schema_sha256,
+            validation_time=validation_time,
+            minimum_remaining_lifetime_seconds=minimum_remaining_lifetime_seconds,
         )
 
     def _validate_signature_shape(self, signature: Any, label: str) -> Mapping[str, Any]:
@@ -2647,6 +2682,49 @@ class CandidateBomValidator:
             if not valid_from_ns <= created_at_ns < valid_until_ns:
                 raise CandidateBomError("challenge authority is not valid when the Release BOM is created")
 
+    def _validate_runtime_authority_currency(self, bom: Mapping[str, Any]) -> None:
+        """Bind the candidate's runtime authority windows to the validation instant.
+
+        The created_at checks above pin each authority window to the BOM's own
+        self-declared history, so an old, correctly signed BOM could pass the
+        live release gate after its authority sets expired.  The trusted
+        validation time must fall inside every current runtime authority
+        window, with at least the configured minimum lifetime remaining for
+        rollout and rollback.
+        """
+        minimum_remaining_ns = self._minimum_remaining_lifetime_seconds * 1_000_000_000
+        authority_sets = (
+            ("native stop authority", bom["native_stop_authorities"], "authority_id"),
+            (
+                "device route authority",
+                bom["device_route_assignment_authorities"],
+                "route_authority_id",
+            ),
+            ("challenge authority", bom["native_stop_challenge_authorities"], "authority_id"),
+        )
+        for label, entries, identity_field in authority_sets:
+            for entry in entries:
+                valid_from_ns = 100 * _dotnet_utc_ticks(
+                    entry["valid_from"], f"{label} valid_from"
+                )
+                valid_until_ns = 100 * _dotnet_utc_ticks(
+                    entry["valid_until"], f"{label} valid_until"
+                )
+                identity = entry[identity_field]
+                if self._validation_time_ns < valid_from_ns:
+                    raise CandidateBomError(
+                        f"{label} {identity} is not yet valid at the validation time"
+                    )
+                if self._validation_time_ns >= valid_until_ns:
+                    raise CandidateBomError(
+                        f"{label} {identity} is expired at the validation time"
+                    )
+                if valid_until_ns - self._validation_time_ns < minimum_remaining_ns:
+                    raise CandidateBomError(
+                        f"{label} {identity} expires inside the minimum remaining"
+                        " lifetime at the validation time"
+                    )
+
     def _validate_evidence(self, bom: Mapping[str, Any]) -> tuple[list[str], str]:
         evidence_signers: list[str] = []
         evidence_by_id: dict[str, Mapping[str, Any]] = {}
@@ -3253,6 +3331,7 @@ class CandidateBomValidator:
         self._validate_native_stop_authority_bindings(bom)
         self._validate_device_route_authority_bindings(bom)
         self._validate_native_stop_challenge_authority_bindings(bom)
+        self._validate_runtime_authority_currency(bom)
         evidence_signers, verification_ceiling = self._validate_evidence(bom)
         approver = self._validate_risk_and_approval(bom)
         previous = self._validate_previous_bom(bom, previous_bom_path)
@@ -3314,6 +3393,14 @@ def _load_json(path: str | os.PathLike[str], label: str) -> Mapping[str, Any]:
     return _require_mapping(value, label)
 
 
+def _minimum_remaining_lifetime_arg(value: str) -> int:
+    if not re.fullmatch(r"[0-9]+", value):
+        raise argparse.ArgumentTypeError(
+            "must be a non-negative integer number of seconds"
+        )
+    return int(value, 10)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate a signed DPS candidate BOM without deploying it")
     parser.add_argument("--repo-root", default=str(Path(__file__).resolve().parents[3]))
@@ -3326,12 +3413,25 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="externally signed release.bom.native.stop.authority.trust/v1 receipt",
     )
     parser.add_argument("--schema-sha256", required=True, help="SHA-256 of exact governance Release BOM schema bytes")
+    parser.add_argument(
+        "--validation-time",
+        default=None,
+        help="trusted validation instant as a canonical UTC timestamp (default: system UTC now)",
+    )
+    parser.add_argument(
+        "--minimum-remaining-lifetime-seconds",
+        type=_minimum_remaining_lifetime_arg,
+        default=0,
+        help="minimum authority window lifetime that must remain after the validation time",
+    )
     arguments = parser.parse_args(argv)
     try:
         validator = CandidateBomValidator.from_deployed_anchor(
             arguments.repo_root,
             arguments.bundle_root,
             arguments.schema_sha256,
+            validation_time=arguments.validation_time,
+            minimum_remaining_lifetime_seconds=arguments.minimum_remaining_lifetime_seconds,
         )
         result = validator.validate(
             arguments.bom,

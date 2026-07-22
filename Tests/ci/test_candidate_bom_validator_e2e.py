@@ -123,6 +123,11 @@ class CandidateBomValidatorMainEndToEndTests(unittest.TestCase):
                     "--previous-bom", str(previous_path),
                     "--native-stop-trust-receipt", str(receipt_path),
                     "--schema-sha256", schema_sha,
+                    # The fixture authority windows close on 2026-07-31, so the
+                    # happy path pins the validation instant deterministically
+                    # inside them (the fixture created_at) instead of depending
+                    # on the wall clock.
+                    "--validation-time", "2026-07-14T00:00:00Z",
                 ],
                 capture_output=True, text=True, timeout=120,
             )

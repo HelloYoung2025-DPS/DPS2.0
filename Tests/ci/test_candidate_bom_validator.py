@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -525,10 +526,22 @@ class BomFixture:
         )
         self.rewrite_candidate(update_scope=False)
 
-    def validator(self, policy=None, policy_sha=None):
+    def validator(
+        self,
+        policy=None,
+        policy_sha=None,
+        validation_time="2026-07-14T00:00:00Z",
+        minimum_remaining_lifetime_seconds=0,
+    ):
+        # validation_time is pinned to the fixture created_at so the suite is
+        # deterministic; pass None to exercise the system-UTC-now default.
         value = self.policy if policy is None else policy
         digest = sha256_bytes(canonical_bytes(value)) if policy_sha is None else policy_sha
-        return CandidateBomValidator(self.repo, self.bundle, value, digest, self.schema_sha)
+        return CandidateBomValidator(
+            self.repo, self.bundle, value, digest, self.schema_sha,
+            validation_time=validation_time,
+            minimum_remaining_lifetime_seconds=minimum_remaining_lifetime_seconds,
+        )
 
     def validate(self):
         return self.validator().validate(
@@ -582,6 +595,45 @@ class ReleaseCliEntryTests(unittest.TestCase):
         payload = json.loads(stdout.getvalue())
         self.assertEqual("FAIL", payload["result"])
         self.assertIn("not trusted for bom", payload["reason"])
+
+    def test_the_cli_rejects_a_malformed_validation_time_as_a_structured_fail(self) -> None:
+        # --validation-time is strict UTC: a malformed value fails closed in the
+        # constructor and is reported as a JSON FAIL, never a traceback.
+        schema_sha = hashlib.sha256(
+            (ROOT / "governance" / "schemas" / "release-bom.schema.json").read_bytes()
+        ).hexdigest()
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            with contextlib.redirect_stdout(io.StringIO()) as stdout:
+                exit_code = SUBJECT.main([
+                    "--repo-root", str(ROOT),
+                    "--bundle-root", str(fixture.bundle),
+                    "--bom", str(fixture.bom_path),
+                    "--previous-bom", str(fixture.previous_path),
+                    "--native-stop-trust-receipt", str(fixture.receipt_path),
+                    "--schema-sha256", schema_sha,
+                    "--validation-time", "2026-07-14 12:00:00",
+                ])
+        self.assertEqual(1, exit_code)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual("FAIL", payload["result"])
+        self.assertIn("validation time", payload["reason"])
+
+    def test_the_cli_rejects_a_negative_minimum_remaining_lifetime(self) -> None:
+        # argparse hard-exits before any validation work starts.
+        with tempfile.TemporaryDirectory() as bundle:
+            with contextlib.redirect_stderr(io.StringIO()) as stderr:
+                with self.assertRaises(SystemExit) as raised:
+                    SUBJECT.main([
+                        "--bundle-root", bundle,
+                        "--bom", "bom.json",
+                        "--previous-bom", "previous.json",
+                        "--native-stop-trust-receipt", "receipt.json",
+                        "--schema-sha256", "0" * 64,
+                        "--minimum-remaining-lifetime-seconds", "-1",
+                    ])
+        self.assertEqual(2, raised.exception.code)
+        self.assertIn("--minimum-remaining-lifetime-seconds", stderr.getvalue())
 
 
 class MigrationFidelityTests(unittest.TestCase):
@@ -832,6 +884,116 @@ class CandidateBomValidatorTests(unittest.TestCase):
                     key["purposes"].append("bom")
             with self.assertRaisesRegex(CandidateBomError, "assigned to bom|cannot be reused"):
                 fixture.validator(policy=policy)
+
+
+class RuntimeAuthorityCurrencyTests(unittest.TestCase):
+    """The live validation instant, not the BOM's self-declared created_at,
+    must fall inside every current runtime authority window, with the
+    configured minimum remaining lifetime (expired-authority finding)."""
+
+    def test_authority_set_expired_at_validation_time_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            validator = fixture.validator(validation_time="2026-08-01T00:00:00Z")
+            with self.assertRaisesRegex(
+                CandidateBomError,
+                "native stop authority native-stop-authority-a is expired"
+                " at the validation time",
+            ):
+                validator.validate(
+                    fixture.bom_path, fixture.previous_path, fixture.receipt_path
+                )
+
+    def test_expired_device_route_authority_names_the_route_set(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            fixture.bom["device_route_assignment_authorities"][0]["valid_until"] = (
+                "2026-07-20T00:00:00.0000002Z"
+            )
+            fixture.rehash_authorities()
+            fixture.rewrite_candidate()
+            validator = fixture.validator(validation_time="2026-07-25T00:00:00Z")
+            with self.assertRaisesRegex(
+                CandidateBomError,
+                "device route authority device-route-authority-a is expired"
+                " at the validation time",
+            ):
+                validator.validate(
+                    fixture.bom_path, fixture.previous_path, fixture.receipt_path
+                )
+
+    def test_expired_challenge_authority_names_the_challenge_set(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            fixture.bom["native_stop_challenge_authorities"][0]["valid_until"] = (
+                "2026-07-20T00:00:00.0000003Z"
+            )
+            fixture.rehash_authorities()
+            fixture.rewrite_candidate()
+            validator = fixture.validator(validation_time="2026-07-25T00:00:00Z")
+            with self.assertRaisesRegex(
+                CandidateBomError,
+                "challenge authority native-stop-challenge-authority-a is expired"
+                " at the validation time",
+            ):
+                validator.validate(
+                    fixture.bom_path, fixture.previous_path, fixture.receipt_path
+                )
+
+    def test_not_yet_valid_authority_is_rejected_at_validation_time(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            validator = fixture.validator(validation_time="2026-06-01T00:00:00Z")
+            with self.assertRaisesRegex(
+                CandidateBomError,
+                "native stop authority native-stop-authority-a is not yet valid"
+                " at the validation time",
+            ):
+                validator.validate(
+                    fixture.bom_path, fixture.previous_path, fixture.receipt_path
+                )
+
+    def test_authority_below_minimum_remaining_lifetime_is_rejected(self):
+        # Inside every window, but the earliest window end (native stop,
+        # 2026-07-31T00:00:00.0000001Z) is only ~1 day out, below the 2-day
+        # minimum remaining lifetime required for rollout and rollback.
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            validator = fixture.validator(
+                validation_time="2026-07-30T00:00:00Z",
+                minimum_remaining_lifetime_seconds=2 * 24 * 60 * 60,
+            )
+            with self.assertRaisesRegex(
+                CandidateBomError,
+                "native stop authority native-stop-authority-a expires inside"
+                " the minimum remaining lifetime at the validation time",
+            ):
+                validator.validate(
+                    fixture.bom_path, fixture.previous_path, fixture.receipt_path
+                )
+
+    def test_authorities_valid_with_sufficient_remaining_lifetime_pass(self):
+        # Same instant; a 1-day minimum is satisfied by every window.
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            result = fixture.validator(
+                validation_time="2026-07-30T00:00:00Z",
+                minimum_remaining_lifetime_seconds=24 * 60 * 60,
+            ).validate(fixture.bom_path, fixture.previous_path, fixture.receipt_path)
+            self.assertEqual("PASS", result["result"])
+
+    def test_validation_time_defaults_to_system_utc_now(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            before_ns = int((datetime.now(timezone.utc).timestamp() - 1) * 1_000_000_000)
+            validator = fixture.validator(validation_time=None)
+            after_ns = int((datetime.now(timezone.utc).timestamp() + 1) * 1_000_000_000)
+        unix_epoch_offset_ns = 62_135_596_800 * 1_000_000_000
+        self.assertTrue(
+            before_ns + unix_epoch_offset_ns
+            <= validator._validation_time_ns
+            <= after_ns + unix_epoch_offset_ns
+        )
 
 
 if __name__ == "__main__":
