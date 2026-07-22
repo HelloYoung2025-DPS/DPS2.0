@@ -28,6 +28,9 @@
   "release_approver_identities": [
     "deployed-human-approver"
   ],
+  "native_stop_trust_signer_identities": [
+    "owner-native-stop-trust-signer-1"
+  ],
   "allow_bootstrap": false,
   "keys": [
     {
@@ -61,6 +64,14 @@
       "modulus_hex": "ed3ff13c94dfbe7e1aa270bb4eada854895858fcb9ced2ab89ff7e589df79cb356d8b83c5e3cf3e4acb12c2d60ecd43d4e09c1c566106623809a3c67fcd6bf92c98864bb6a58d7bc224b09d5ff4e02751db23f8d4344a800ddc3299fc41adb86396f451ce581634ac4b030faa43b7c47b245b469a343df97f08409f227a01a3fde0da584df46dacff9ee515557a08b115a8883be54abb0bdd91116df02d527f2796976c8c177a70edac6eca46d02ad0800c616ca11e149cc955306d0937dbf163a96e4cfbefdd6a73ee8ee5f2ea26161df11161d805165ed06822a98b3f34c73b765b8edb9dda72b0104080b1a0a0f45eb53c475840be75e51527468b815efff",
       "exponent": 65537,
       "purposes": ["approval"]
+    },
+    {
+      "key_id": "native-stop-trust-owner-key-1",
+      "identity": "owner-native-stop-trust-signer-1",
+      "algorithm": "rsa-pss-sha256",
+      "modulus_hex": "acae7e97690f13048e22e7684bbc2e9d1ce30556f8e1067690ea8a036ef90f0e2e7d390e2a380b273f096d73e1d323ef78b9700206499a5c4189f69787d26b0989572c5fc9e9ccb91bc768e11336631c53809137a1fae62754e4eff8de054e1a7b375df9156e848ef95be6b336815a2eb0632411003281854bc232932d80b994acdc49863efc8ba84e0a84f1947c300677b32058c6208dd6ff05a25c89fb1c321ec5515f2a15d463b673a24074af524d8b21e2b7c7d33ccd1c8c945da73c5337064495aaaabf81eba2e4e6cf83d46bb6f6126e42cf5f20e45fac075f48dcb843eaa08c5cba222b210a41a0a193e3691d84dc9bee7c407a5bcbd59001bd9b3c83f8c8d3dab8495e9517f9f1e968170e165f75a6041e7811d46dcb7d38d67578a7b039f26c9f8f3ac03758a9c2848efb9d687791e840223e357b6c37006daca6788d8dbdf15fe6e540c11a1350ea0c182cd1372e118a8ce391234dd91cc6e5c7657c0aa77eaeec086611a0ea3eb29f8d82ac50d22bd1f56b08cbab55343c78a383",
+      "exponent": 65537,
+      "purposes": ["native-stop-trust"]
     }
   ]
 }

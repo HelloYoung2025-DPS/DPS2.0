@@ -556,27 +556,32 @@ class ReleaseCliEntryTests(unittest.TestCase):
         self.assertEqual(2, raised.exception.code)
         self.assertIn("--native-stop-trust-receipt", stderr.getvalue())
 
-    def test_the_cli_reports_the_dead_policy_as_a_structured_fail(self) -> None:
-        # With a complete argv the entry gets past argparse and dies on the
-        # unprovisioned deployed policy -- as a JSON FAIL on stdout with exit 1,
-        # not a traceback.  This is the exact behaviour release.sh sees today.
+    def test_the_cli_reports_an_untrusted_bom_signer_as_a_structured_fail(self) -> None:
+        # The deployed anchor is live (the owner provisioned the
+        # native-stop-trust signer on 2026-07-21), so a complete argv now gets
+        # past argparse AND the anchor constructor, then dies in validate():
+        # the fixture BOM is signed by the test-suite controller-key, which
+        # the deployed policy does not trust for "bom".  The CLI must report
+        # that as a JSON FAIL on stdout with exit 1, not a traceback -- the
+        # structured-error contract release.sh relies on.
         schema_sha = hashlib.sha256(
             (ROOT / "governance" / "schemas" / "release-bom.schema.json").read_bytes()
         ).hexdigest()
-        with tempfile.TemporaryDirectory() as bundle:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
             with contextlib.redirect_stdout(io.StringIO()) as stdout:
                 exit_code = SUBJECT.main([
                     "--repo-root", str(ROOT),
-                    "--bundle-root", bundle,
-                    "--bom", "bom.json",
-                    "--previous-bom", "previous.json",
-                    "--native-stop-trust-receipt", "receipt.json",
+                    "--bundle-root", str(fixture.bundle),
+                    "--bom", str(fixture.bom_path),
+                    "--previous-bom", str(fixture.previous_path),
+                    "--native-stop-trust-receipt", str(fixture.receipt_path),
                     "--schema-sha256", schema_sha,
                 ])
         self.assertEqual(1, exit_code)
         payload = json.loads(stdout.getvalue())
         self.assertEqual("FAIL", payload["result"])
-        self.assertIn("native_stop_trust_signer_identities", payload["reason"])
+        self.assertIn("not trusted for bom", payload["reason"])
 
 
 class MigrationFidelityTests(unittest.TestCase):
@@ -626,38 +631,30 @@ class MigrationFidelityTests(unittest.TestCase):
         self.assertEqual(outcomes[0], outcomes[1])
 
     def test_the_operational_anchor_entry_constructs_the_release_validator(self) -> None:
-        # DELIBERATE VISIBLE RED, blocked on the owner.  The deployed trust
-        # policy artifact predates the native-stop authority code: no
-        # native_stop_trust_signer_identities role group, no key with the
-        # native-stop-trust purpose.  Provisioning that signer identity and its
-        # single-purpose key, and re-anchoring the code-bound policy digest, is
-        # the owner's out-of-repo trust decision -- no in-repo value can be
-        # derived for it.  Until then scripts/release.sh cannot construct a
-        # validator, exactly as at base (which invoked the module-side copy and
-        # died on the same field, unexercised by any suite).
+        # RESOLVED 2026-07-21: the owner provisioned the native-stop-trust
+        # signer out-of-repo (identity owner-native-stop-trust-signer-1,
+        # single-purpose key native-stop-trust-owner-key-1), the deployed
+        # policy gained its native_stop_trust_signer_identities group, and
+        # the code-bound digest was re-anchored to the patched policy.  The
+        # operational anchor entry now constructs.
         #
-        # Both governing authorities require this to be RED, not certified:
-        # the project rule that a visible red beats an executor-less silent gap,
-        # and the external review's finding that a gate must not convert total
-        # release-path unavailability into positive evidence.  The gate design
-        # forbids skip/expectedFailure outputs, so an honest plain failure is
-        # the only mechanism left.
-        #
-        # Scope of this test when it eventually goes green: constructor
-        # instantiation ONLY.  That is the tripwire, not the coverage -- the
-        # release entry is main() end to end (argparse -> construct -> validate
-        # a signed BOM against a bundle and receipt), and its happy path cannot
-        # be exercised until the owner-provisioned policy exists, because the
-        # CLI accepts no policy override by design and fixtures cannot be
-        # signed against keys that do not exist yet.  When this turns green,
-        # the completion criterion is an end-to-end main() happy-path test with
-        # a signed fixture BOM; the CLI's TODAY-reachable behaviour is covered
-        # by ReleaseCliEntryTests below.
+        # Scope of this test: constructor instantiation ONLY.  That is the
+        # tripwire, not the coverage -- the release entry is main() end to
+        # end (argparse -> construct -> validate a signed BOM against a
+        # bundle and receipt).  The remaining completion criterion is the
+        # end-to-end main() happy-path test with an owner-signed fixture
+        # receipt (Tests/ci/test_candidate_bom_validator_e2e.py); the CLI's
+        # TODAY-reachable behaviour is covered by ReleaseCliEntryTests.
         schema_sha = hashlib.sha256(
             (ROOT / "governance" / "schemas" / "release-bom.schema.json").read_bytes()
         ).hexdigest()
         with tempfile.TemporaryDirectory() as bundle:
-            SUBJECT.CandidateBomValidator.from_deployed_anchor(ROOT, bundle, schema_sha)
+            validator = SUBJECT.CandidateBomValidator.from_deployed_anchor(ROOT, bundle, schema_sha)
+        self.assertIsInstance(validator, SUBJECT.CandidateBomValidator)
+        self.assertEqual("dps-deployed-release-anchor-v1", validator._trust.policy_id)
+        self.assertEqual(
+            "native-stop-trust-owner-key-1", validator._trust.native_stop_trust_key_id
+        )
 
 
 class CandidateBomValidatorTests(unittest.TestCase):

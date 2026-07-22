@@ -1,0 +1,1 @@
+{"artifacts":[{"build":"fixture-build","id":"dps.policy-approval","kind":"assembly","status":"buildable","versioning":"semver"}],"contracts":{"consumed":[],"provided":[]},"dependencies":[],"module":{"id":"policy-approval","version":"1.0.0"},"runtime":{"processBoundary":"modular-monolith"}}

@@ -188,7 +188,7 @@ _DEPLOYED_TRUST_POLICY_RELATIVE = (
     "Modules/factory-release-controller/operations/"
     "deployed-release-trust-policy.v1.json"
 )
-_DEPLOYED_TRUST_POLICY_SHA256 = "4c741528f79a120e6ae88f5fe7bf126613771aadd57fe93f6a2bf5290c5c5f20"
+_DEPLOYED_TRUST_POLICY_SHA256 = "e30c17a21db42d88861bfb4eeb33372e383067f07f804b7327dfa461b055121b"
 _DEPLOYED_TRUST_POLICY_ID = "dps-deployed-release-anchor-v1"
 
 

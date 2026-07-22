@@ -1,0 +1,1 @@
+{"edges":[],"failOnCycle":true,"generatedFrom":"Modules/*/module.yaml","nodes":["policy-approval","windows-edge-supervisor","windows-edge-worker"],"parallelWaves":[["policy-approval","windows-edge-supervisor","windows-edge-worker"]],"schemaVersion":"dps.dependency-graph/v1"}

@@ -1,0 +1,1 @@
+{"contracts":[],"generatedFrom":"Modules/*/module.yaml","policyRef":"governance/policies/compatibility-policy.yaml","requiredCombinations":["N/N","N/N-1","N-1/N","N-1/N-1"],"schemaVersion":"dps.compatibility-matrix/v1","unknownMajorBehavior":"reject","unknownNPlus1":"REJECT"}

@@ -1,0 +1,1 @@
+{"artifacts":[{"build":"fixture-build","id":"dps.windows-edge-worker","kind":"service","status":"buildable","versioning":"semver"}],"contracts":{"consumed":[],"provided":[]},"dependencies":[],"module":{"id":"windows-edge-worker","version":"1.0.0"},"runtime":{"processBoundary":"out-of-process"}}

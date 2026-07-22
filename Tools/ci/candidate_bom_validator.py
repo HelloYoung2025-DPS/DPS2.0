@@ -12,13 +12,13 @@ scripts/release.sh invokes and the one the Phase 0 CI-integrity allowlist
 pins; its code-bound trust policy lives under governance/policies/.  The
 module-side original stays byte-identical until R0-D removes it.
 
-Known-dead operational entry, blocked on the owner: the deployed trust
-policy predates the native-stop authority code (no
-native_stop_trust_signer_identities group, no native-stop-trust key), so
-from_deployed_anchor -- and therefore the release-script CLI -- cannot
-construct a validator until the owner provisions that signer and re-anchors
-the code-bound digest.  Identical at base, where release.sh invoked the
-module-side copy and died on the same field.
+The owner provisioned the native-stop-trust signer out-of-repo on
+2026-07-21: the deployed trust policy now carries the
+native_stop_trust_signer_identities group (owner-native-stop-trust-signer-1)
+and the single-purpose native-stop-trust key native-stop-trust-owner-key-1,
+and the code-bound digest was re-anchored to the patched policy, so
+from_deployed_anchor constructs the release validator against the live
+anchor.
 """
 
 from __future__ import annotations
@@ -203,7 +203,7 @@ _KIND_CEILING = {
 _DEPLOYED_TRUST_POLICY_RELATIVE = (
     "governance/policies/deployed-release-trust-policy.v1.json"
 )
-_DEPLOYED_TRUST_POLICY_SHA256 = "4c741528f79a120e6ae88f5fe7bf126613771aadd57fe93f6a2bf5290c5c5f20"
+_DEPLOYED_TRUST_POLICY_SHA256 = "e30c17a21db42d88861bfb4eeb33372e383067f07f804b7327dfa461b055121b"
 _DEPLOYED_TRUST_POLICY_ID = "dps-deployed-release-anchor-v1"
 
 

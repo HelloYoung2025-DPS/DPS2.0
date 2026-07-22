@@ -442,21 +442,24 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         "test_duplicate_receipt_member_and_old_mixed_shape_fail_closed",
         "test_policy_roles_and_key_purposes_are_separated",
         # Migration-fidelity pins: the module-side original may not drift from
-        # the Tools/ci copy before R0-D deletes it, and the pre-existing dead
-        # from_deployed_anchor entry stays visibly registered, not silently
-        # green.
+        # the Tools/ci copy before R0-D deletes it, and the operational anchor
+        # entry stays visibly registered, not silently green.
         "test_the_trust_policy_bytes_are_identical_in_both_homes",
         "test_the_code_bound_policy_digest_did_not_change_in_migration",
         "test_the_operational_anchor_entry_behaves_identically_in_both_copies",
-        # DELIBERATE VISIBLE RED until the owner provisions the native-stop
-        # signer in the deployed policy: the release entry is dead, and a gate
-        # must not certify that state as success.  When it goes green it proves
-        # constructor instantiation only -- the completion criterion is then an
-        # end-to-end main() happy-path test with a signed fixture BOM.
+        # The owner provisioned the native-stop signer in the deployed policy
+        # and re-anchored the code-bound digest on 2026-07-21, so this
+        # constructor tripwire is green.  It proves constructor instantiation
+        # only -- the completion criterion is the end-to-end main() happy-path
+        # test with an owner-signed fixture receipt.
         "test_the_operational_anchor_entry_constructs_the_release_validator",
         # TODAY-reachable behaviour of the actual CLI entry release.sh invokes.
         "test_the_cli_refuses_to_start_without_the_receipt_argument",
-        "test_the_cli_reports_the_dead_policy_as_a_structured_fail",
+        "test_the_cli_reports_an_untrusted_bom_signer_as_a_structured_fail",
+        # R0-C F1 completion: the end-to-end main() happy path with the
+        # owner-signed native-stop-trust receipt fixture (signer provisioned
+        # 2026-07-21) -- pinned so an emptied body cannot read as green.
+        "test_main_happy_path_with_owner_signed_receipt_passes",
     }
     command = [
         sys.executable,
