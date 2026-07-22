@@ -176,6 +176,11 @@ public sealed class InMemoryReleaseBindingTruthStore
     /// <summary>
     /// The only way to obtain the non-durable in-memory store. Production
     /// composition must use <see cref="PostgresReleaseBindingTruthStore"/>.
+    /// M4 boundary (RebuildPlan §4.3, PR#6 v2): this store is test-only and
+    /// the production composition root is deferred to milestone M4; until
+    /// then non-test environments have no composition entrypoint at all —
+    /// HostStartup accepts only --self-check and fails closed with exit 64
+    /// for every other invocation (pinned by HostStartupEntrypointTests).
     /// </summary>
     public static InMemoryReleaseBindingTruthStore CreateTestOnly() => new();
 
