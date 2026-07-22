@@ -117,6 +117,23 @@ public sealed class ActiveReleaseBindingAuthorityTests
     {
         public void Append(ReleaseBindingTruthRecord record) { }
         public IReadOnlyList<ReleaseBindingTruthRecord> LoadAll() => records;
+
+        public long LoadDeviceHeadSequence(string deviceBindingId)
+            => records
+                .Where(record => string.Equals(
+                    record.DeviceBindingId, deviceBindingId, StringComparison.Ordinal))
+                .Select(record => record.Receipt.Sequence)
+                .DefaultIfEmpty(0)
+                .Max();
+
+        public IReadOnlyList<ReleaseBindingTruthRecord> LoadAfter(
+            string deviceBindingId,
+            long afterSequence)
+            => [.. records
+                .Where(record => string.Equals(
+                        record.DeviceBindingId, deviceBindingId, StringComparison.Ordinal)
+                    && record.Receipt.Sequence > afterSequence)
+                .OrderBy(record => record.Receipt.Sequence)];
     }
 
     private static ActiveReleaseBindingAuthority Authority(
@@ -1034,7 +1051,12 @@ public sealed class ActiveReleaseBindingAuthorityTests
         var records = store.LoadAll();
         var record = Assert.Single(records);
         Assert.Equal(Sha256Hex(leftBom), record.CurrentBinding.ReleaseBomSha256);
-        Assert.False(right.TryReadActive(Device, out _));
+        // Revision-aware reads: the loser's cached empty view is stale, so
+        // its next read resyncs from the shared journal and serves the
+        // winner's binding — it never reports the superseded empty state.
+        Assert.True(right.TryReadActive(Device, out var resynced));
+        Assert.Equal(Sha256Hex(leftBom), resynced!.ReleaseBomSha256);
+        Assert.Equal(record.Receipt, Assert.Single(right.ReadReceipts(Device)));
 
         // Direct store misuse: skipping ahead or replaying a sequence faults.
         Assert.Throws<ReleaseBindingTruthConflictException>(
@@ -1066,6 +1088,14 @@ public sealed class ActiveReleaseBindingAuthorityTests
         }
 
         public IReadOnlyList<ReleaseBindingTruthRecord> LoadAll() => _inner.LoadAll();
+
+        public long LoadDeviceHeadSequence(string deviceBindingId)
+            => _inner.LoadDeviceHeadSequence(deviceBindingId);
+
+        public IReadOnlyList<ReleaseBindingTruthRecord> LoadAfter(
+            string deviceBindingId,
+            long afterSequence)
+            => _inner.LoadAfter(deviceBindingId, afterSequence);
     }
 
     private sealed class FixedBindingReader(ActiveReleaseBindingV1? binding) : IActiveReleaseBindingReader
@@ -1256,5 +1286,148 @@ public sealed class ActiveReleaseBindingAuthorityTests
         Assert.True(source.TryReadActiveFacts(Device, out var sha, out var generation));
         Assert.Equal(binding!.ReleaseBomSha256, sha);
         Assert.Equal(binding.Generation, generation);
+    }
+
+    // ----- multi-instance revision-aware reads: resync-on-read -----
+
+    /// <summary>
+    /// In-memory store twin whose per-device freshness reads can be severed
+    /// or poisoned on demand, driving the resync fail-closed edges without
+    /// corrupting the durable journal content itself.
+    /// </summary>
+    private sealed class ResyncTestStore : IReleaseBindingTruthStore
+    {
+        private readonly InMemoryReleaseBindingTruthStore _inner =
+            InMemoryReleaseBindingTruthStore.CreateTestOnly();
+
+        public bool FreshnessReadsFail { get; set; }
+        public Func<IReadOnlyList<ReleaseBindingTruthRecord>, IReadOnlyList<ReleaseBindingTruthRecord>>?
+            DeltaOverride { get; set; }
+
+        public void Append(ReleaseBindingTruthRecord record) => _inner.Append(record);
+
+        public IReadOnlyList<ReleaseBindingTruthRecord> LoadAll() => _inner.LoadAll();
+
+        public long LoadDeviceHeadSequence(string deviceBindingId)
+        {
+            if (FreshnessReadsFail)
+            {
+                throw new InvalidOperationException("truth store freshness read refused");
+            }
+            return _inner.LoadDeviceHeadSequence(deviceBindingId);
+        }
+
+        public IReadOnlyList<ReleaseBindingTruthRecord> LoadAfter(
+            string deviceBindingId,
+            long afterSequence)
+        {
+            if (FreshnessReadsFail)
+            {
+                throw new InvalidOperationException("truth store freshness read refused");
+            }
+            var delta = _inner.LoadAfter(deviceBindingId, afterSequence);
+            return DeltaOverride?.Invoke(delta) ?? delta;
+        }
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public void FreshReaderServesTheCacheAndForeignDeviceProgressDoesNotDisturbIt()
+    {
+        using var signer = new TestSigner();
+        var store = InMemoryReleaseBindingTruthStore.CreateTestOnly();
+        var writer = Authority(signer, store);
+        var (bom, token) = MakeBom(signer, "bom-1", 1, null);
+        writer.Activate(Device, bom, token);
+        var reader = Authority(signer, store);
+
+        // The cached view at the journal head is served repeatedly with no
+        // state change (the empty-delta path).
+        Assert.True(reader.TryReadActive(Device, out var first));
+        Assert.True(reader.TryReadActive(Device, out var second));
+        Assert.Equal(first, second);
+        Assert.Equal(Sha256Hex(bom), first!.ReleaseBomSha256);
+        Assert.Single(reader.ReadReceipts(Device));
+
+        // Journal growth on OTHER devices does not touch this device's
+        // freshness: the head check is scoped per device_binding_id.
+        var (foreignBom, foreignToken) = MakeBom(signer, "bom-foreign", 1, null);
+        writer.Activate(OtherDevice, foreignBom, foreignToken);
+        Assert.True(reader.TryReadActive(Device, out var undisturbed));
+        Assert.Equal(first, undisturbed);
+        Assert.Single(reader.ReadReceipts(Device));
+        // The foreign device's own read resyncs from the journal on demand.
+        Assert.True(reader.TryReadActive(OtherDevice, out var foreign));
+        Assert.Equal(Sha256Hex(foreignBom), foreign!.ReleaseBomSha256);
+        Assert.True(reader.TryReadActive(Device, out var stillUndisturbed));
+        Assert.Equal(first, stillUndisturbed);
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public void LaggingReaderReplaysTheWholeDeltaThroughTheRecoveryPipeline()
+    {
+        using var signer = new TestSigner();
+        var store = InMemoryReleaseBindingTruthStore.CreateTestOnly();
+        var writer = Authority(signer, store);
+        var (first, firstToken) = MakeBom(signer, "bom-1", 1, null);
+        writer.Activate(Device, first, firstToken);
+        var reader = Authority(signer, store);
+
+        // Another instance lands three transitions of every kind while the
+        // reader's cache sleeps: activation, revocation, rollback.
+        var (second, secondToken) = MakeBom(signer, "bom-2", 2, first);
+        writer.Activate(Device, second, secondToken);
+        writer.Revoke(Device, 2);
+        writer.Rollback(Device, firstToken);
+
+        // The reader never serves the stale bom-1 cache: one read replays
+        // the whole multi-record, multi-kind delta and serves the exact
+        // rolled-back truth (bom-1 digest and token, runtime generation 3).
+        Assert.True(reader.TryReadActive(Device, out var binding));
+        Assert.Equal(Sha256Hex(first), binding!.ReleaseBomSha256);
+        Assert.Equal(3, binding.Generation);
+        Assert.Equal(1, binding.ReleaseBomGeneration);
+        Assert.Equal(firstToken, binding.ExecutionTokenBase64);
+        Assert.Equal(writer.ReadReceipts(Device), reader.ReadReceipts(Device));
+        Assert.Equal(4, reader.ReadReceipts(Device).Count);
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public void InvalidOrUnreachableDeltaFailsClosedAndNeverServesTheStaleCache()
+    {
+        using var signer = new TestSigner();
+        var store = new ResyncTestStore();
+        var writer = new ActiveReleaseBindingAuthority([signer.TrustKey], store, () => Now);
+        var (first, firstToken) = MakeBom(signer, "bom-1", 1, null);
+        writer.Activate(Device, first, firstToken);
+        var reader = new ActiveReleaseBindingAuthority([signer.TrustKey], store, () => Now);
+        Assert.True(reader.TryReadActive(Device, out var cached));
+        Assert.Equal(Sha256Hex(first), cached!.ReleaseBomSha256);
+        var (second, secondToken) = MakeBom(signer, "bom-2", 2, first);
+        writer.Activate(Device, second, secondToken);
+
+        // A delta record that fails the recovery pipeline (its recorded
+        // signed BOM bytes are truncated): the read fails closed and must
+        // NOT fall back to the cached bom-1 view.
+        store.DeltaOverride = static delta =>
+            [delta[0] with { SignedBomBytes = delta[0].SignedBomBytes![1..] }];
+        Assert.False(reader.TryReadActive(Device, out var poisoned));
+        Assert.Null(poisoned);
+        Assert.Throws<ActiveReleaseBindingException>(() => reader.ReadReceipts(Device));
+
+        // The store cannot be consulted at all: the same fail-closed
+        // posture, still never the stale cache.
+        store.DeltaOverride = null;
+        store.FreshnessReadsFail = true;
+        Assert.False(reader.TryReadActive(Device, out _));
+        Assert.Throws<ActiveReleaseBindingException>(() => reader.ReadReceipts(Device));
+
+        // Freshness restored: the same instance resyncs from the journal
+        // and serves the advanced truth — the failed reads left no
+        // poisoned residue behind.
+        store.FreshnessReadsFail = false;
+        Assert.True(reader.TryReadActive(Device, out var binding));
+        Assert.Equal(Sha256Hex(second), binding!.ReleaseBomSha256);
+        Assert.Equal(2, binding.Generation);
+        Assert.Equal(writer.ReadReceipts(Device), reader.ReadReceipts(Device));
     }
 }

@@ -82,14 +82,84 @@ public sealed class PostgresReleaseBindingTruthStoreIntegrationTests
             () => right.Activate(Device, rightBom, rightToken));
 
         // The loser published nothing and the journal holds exactly the
-        // winner's record; a fresh instance recovers the winner's truth.
-        Assert.False(right.TryReadActive(Device, out _));
+        // winner's record. Revision-aware reads: the loser's cached empty
+        // view is stale, so its next read resyncs from the shared journal
+        // and serves the winner's binding — it can never report the
+        // superseded empty state as the truth.
         Assert.Equal(1, await leftStore.CountJournalAsync(Token));
+        Assert.True(right.TryReadActive(Device, out var resynced));
+        Assert.Equal(Sha256Hex(leftBom), resynced!.ReleaseBomSha256);
+        Assert.Equal(winnerReceipt, Assert.Single(right.ReadReceipts(Device)));
+        // A fresh instance recovers the same winner's truth.
         var recovered = new ActiveReleaseBindingAuthority(
             [signer.TrustKey], database.CreateStore(), () => Now);
         Assert.True(recovered.TryReadActive(Device, out var binding));
         Assert.Equal(Sha256Hex(leftBom), binding!.ReleaseBomSha256);
         Assert.Equal(winnerReceipt, Assert.Single(recovered.ReadReceipts(Device)));
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task TwoInstanceSupersessionResyncsAndNeverServesTheStaleBinding()
+    {
+        await using var database = await ReleaseBindingTestDatabase.CreateAsync(Token);
+        using var signer = new BomSigner();
+
+        // Both instances recover the SAME activated BOM A over the shared
+        // durable journal.
+        var bootstrap = new ActiveReleaseBindingAuthority(
+            [signer.TrustKey], database.CreateStore(), () => Now);
+        var (bomA, tokenA) = signer.SignBom("bom-a", 1, null);
+        bootstrap.Activate(Device, bomA, tokenA);
+        var one = new ActiveReleaseBindingAuthority(
+            [signer.TrustKey], database.CreateStore(), () => Now);
+        var two = new ActiveReleaseBindingAuthority(
+            [signer.TrustKey], database.CreateStore(), () => Now);
+        Assert.True(one.TryReadActive(Device, out var aOne));
+        Assert.True(two.TryReadActive(Device, out var aTwo));
+        Assert.Equal(Sha256Hex(bomA), aOne!.ReleaseBomSha256);
+        Assert.Equal(aOne, aTwo);
+
+        // Supersession by activation: instance-1 activates BOM B; instance-2
+        // must NEVER serve A again — the resync serves B's exact
+        // generation/digest/token and the receipt trails converge.
+        var (bomB, tokenB) = signer.SignBom("bom-b", 2, bomA);
+        var supersedingReceipt = one.Activate(Device, bomB, tokenB);
+        Assert.True(two.TryReadActive(Device, out var bTwo));
+        Assert.Equal(Sha256Hex(bomB), bTwo!.ReleaseBomSha256);
+        Assert.Equal(2, bTwo.Generation);
+        Assert.Equal(tokenB, bTwo.ExecutionTokenBase64);
+        Assert.NotEqual(aTwo, bTwo);
+        Assert.Equal(one.ReadReceipts(Device), two.ReadReceipts(Device));
+        Assert.Equal(supersedingReceipt, two.ReadReceipts(Device)[^1]);
+
+        // Supersession by revocation: instance-2 fails closed instead of
+        // dispatching the revoked BOM B.
+        one.Revoke(Device, bTwo.Generation);
+        Assert.False(two.TryReadActive(Device, out var revoked));
+        Assert.Null(revoked);
+        Assert.Equal(one.ReadReceipts(Device), two.ReadReceipts(Device));
+
+        // Supersession by rollback: instance-1 rolls back to A; instance-2
+        // serves the rolled-back truth — A's digest and token at the NEW
+        // runtime generation 3, never the stale generation-1 A and never
+        // the revoked B.
+        one.Rollback(Device, tokenA);
+        Assert.True(two.TryReadActive(Device, out var rolledBack));
+        Assert.Equal(Sha256Hex(bomA), rolledBack!.ReleaseBomSha256);
+        Assert.Equal(3, rolledBack.Generation);
+        Assert.Equal(1, rolledBack.ReleaseBomGeneration);
+        Assert.Equal(tokenA, rolledBack.ExecutionTokenBase64);
+        Assert.Equal(one.ReadReceipts(Device), two.ReadReceipts(Device));
+        Assert.Equal(4, two.ReadReceipts(Device).Count);
+
+        // Store outage: instance-2 holds a valid cached view (A active) but
+        // the durable journal cannot be consulted — every authoritative
+        // read fails closed (false / throw) instead of serving the cache
+        // without a freshness proof.
+        await database.DisableRuntimeLoginAsync(Token);
+        Assert.False(two.TryReadActive(Device, out var outage));
+        Assert.Null(outage);
+        Assert.Throws<ActiveReleaseBindingException>(() => two.ReadReceipts(Device));
     }
 
     [Fact, Trait("Category", "Integration")]
@@ -523,6 +593,23 @@ public sealed class PostgresReleaseBindingTruthStoreIntegrationTests
                 _schemaName,
                 _runtimeRoleName,
                 _migrationRoleName));
+
+        /// <summary>
+        /// Severs the runtime role's LOGIN right — a real PostgreSQL-level
+        /// outage for every store instance of this database: subsequent
+        /// connections fail authentication, so freshness reads cannot be
+        /// consulted and must fail closed.
+        /// </summary>
+        internal async Task DisableRuntimeLoginAsync(CancellationToken cancellationToken)
+        {
+            var quotedRole = new NpgsqlCommandBuilder().QuoteIdentifier(_runtimeRoleName);
+            await using var admin = new NpgsqlConnection(_migrationConnectionString);
+            await admin.OpenAsync(cancellationToken);
+            await using var command = new NpgsqlCommand(
+                $"ALTER ROLE {quotedRole} NOLOGIN",
+                admin);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+        }
 
         public async ValueTask DisposeAsync()
             => await CleanupAsync(

@@ -269,6 +269,18 @@ public sealed class PostgresReleaseBindingTruthStore
     public IReadOnlyList<ReleaseBindingTruthRecord> LoadAll()
         => LoadAllAsync(CancellationToken.None).GetAwaiter().GetResult();
 
+    public long LoadDeviceHeadSequence(string deviceBindingId)
+        => LoadDeviceHeadSequenceAsync(deviceBindingId, CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+
+    public IReadOnlyList<ReleaseBindingTruthRecord> LoadAfter(
+        string deviceBindingId,
+        long afterSequence)
+        => LoadAfterAsync(deviceBindingId, afterSequence, CancellationToken.None)
+            .GetAwaiter()
+            .GetResult();
+
     public ReleaseBindingRecoveryFence IssueRecoveryFence(string deviceBindingId)
         => IssueRecoveryFenceAsync(deviceBindingId, CancellationToken.None)
             .GetAwaiter()
@@ -357,6 +369,51 @@ public sealed class PostgresReleaseBindingTruthStore
             ORDER BY device_binding_id, sequence
             """,
             connection);
+        return await ReadRecordsAsync(command, cancellationToken);
+    }
+
+    private async Task<long> LoadDeviceHeadSequenceAsync(
+        string deviceBindingId,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = await OpenVerifiedAsync(cancellationToken);
+        await using var command = Command(
+            $"SELECT COALESCE(max(sequence), 0) FROM {_qualifiedJournal} "
+            + "WHERE device_binding_id = @device_binding_id",
+            connection);
+        command.Parameters.AddWithValue("device_binding_id", deviceBindingId);
+        return Convert.ToInt64(
+            await command.ExecuteScalarAsync(cancellationToken),
+            System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private async Task<IReadOnlyList<ReleaseBindingTruthRecord>> LoadAfterAsync(
+        string deviceBindingId,
+        long afterSequence,
+        CancellationToken cancellationToken)
+    {
+        await using var connection = await OpenVerifiedAsync(cancellationToken);
+        await using var command = Command(
+            $"""
+            SELECT device_binding_id, sequence, receipt_kind, receipt_wire,
+                   current_binding_wire, previous_binding_wire,
+                   last_activation_signer_generation, request_sha256,
+                   signed_bom_wire
+            FROM {_qualifiedJournal}
+            WHERE device_binding_id = @device_binding_id
+              AND sequence > @after_sequence
+            ORDER BY sequence
+            """,
+            connection);
+        command.Parameters.AddWithValue("device_binding_id", deviceBindingId);
+        command.Parameters.AddWithValue("after_sequence", afterSequence);
+        return await ReadRecordsAsync(command, cancellationToken);
+    }
+
+    private static async Task<IReadOnlyList<ReleaseBindingTruthRecord>> ReadRecordsAsync(
+        NpgsqlCommand command,
+        CancellationToken cancellationToken)
+    {
         var records = new List<ReleaseBindingTruthRecord>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
