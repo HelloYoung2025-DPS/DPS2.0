@@ -14,11 +14,14 @@ namespace Dps.ExecutorGateway.Tests;
 /// the gateway's own ActiveReleaseBomBindingV1 accepts exactly that triple
 /// byte-for-byte against the pinned constants that control-plane-host's
 /// PolicyBoundReleaseBomFactsSource contract test pins against the identical
-/// corpus case. The production wiring (a control-plane-host-backed
-/// IVerifiedActiveReleaseBomReader implementation) belongs to the future M4
-/// composition root (RebuildPlan section 10); a module-level ProjectReference
-/// from executor-gateway to control-plane-host is forbidden because it closes
-/// a dependency cycle back into control-plane-host. What this test pins is the
+/// corpus case. The provider-backed adapter now exists as
+/// ControlPlaneHostActiveReleaseBomReader (finding F4) over a ProjectReference
+/// to the control-plane-host contract pack only — the single cross-module
+/// reference shape the repository gate permits; a ProjectReference to the
+/// control-plane-host module assembly itself remains forbidden because it
+/// closes a dependency cycle back into control-plane-host. The production
+/// composition wiring of that adapter still belongs to the future M4
+/// composition root (RebuildPlan section 10). What this test pins is the
 /// contract-layer same-source invariant only.
 /// </summary>
 public sealed class ActiveReleaseBomBindingSharedCorpusTests
