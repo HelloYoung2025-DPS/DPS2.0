@@ -14,8 +14,28 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
     {
         PropertyNameCaseInsensitive = false,
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
-        WriteIndented = false
+        WriteIndented = false,
+        Converters = { new ZuluDateTimeOffsetConverter() }
     };
+
+    // Raw forged rows must carry the canonical Zulu UTC wire so the lifecycle
+    // readback parses them and the forged chain is rejected by signature,
+    // digest, and binding verification rather than by timestamp decoding.
+    private sealed class ZuluDateTimeOffsetConverter : JsonConverter<DateTimeOffset>
+    {
+        public override DateTimeOffset Read(
+            ref Utf8JsonReader reader,
+            Type typeToConvert,
+            JsonSerializerOptions options)
+            => reader.GetDateTimeOffset();
+
+        public override void Write(
+            Utf8JsonWriter writer,
+            DateTimeOffset value,
+            JsonSerializerOptions options)
+            => writer.WriteStringValue(
+                value.ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss.FFFFFFF'Z'", System.Globalization.CultureInfo.InvariantCulture));
+    }
 
     [Fact, Trait("Category", "Integration")]
     public async Task RawTransitionCredentialsCannotForgeEvidenceOrReuseOldAttemptAndLease()

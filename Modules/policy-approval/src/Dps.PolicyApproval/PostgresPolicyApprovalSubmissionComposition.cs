@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
+using Dps.ControlPlaneHost.Contracts;
 using Dps.PolicyApproval.Contracts;
 using Npgsql;
 
@@ -234,14 +235,16 @@ public sealed class PolicyApprovalSubmissionRecoveryClient : IDisposable
         PolicyApprovalSubmissionAuthorityTopology authorityTopology,
         ReadOnlySpan<byte> executorSubmissionPublicKey,
         ReadOnlySpan<byte> recoveryPublicKey,
-        ReadOnlySpan<byte> policyStateSigningPrivateKeyPkcs8)
+        ReadOnlySpan<byte> policyStateSigningPrivateKeyPkcs8,
+        IActiveReleaseBindingReader activeReleaseBindingReader)
     {
         _authority = PostgresPolicyApprovalSubmissionAuthority.CreateRecovery(
             options.ToAuthorityRuntime(),
             authorityTopology,
             executorSubmissionPublicKey,
             recoveryPublicKey,
-            policyStateSigningPrivateKeyPkcs8);
+            policyStateSigningPrivateKeyPkcs8,
+            activeReleaseBindingReader);
     }
 
     public static PolicyApprovalSubmissionRecoveryClient CreateProduction(
@@ -249,10 +252,12 @@ public sealed class PolicyApprovalSubmissionRecoveryClient : IDisposable
         PolicyApprovalSubmissionAuthorityTopology authorityTopology,
         ReadOnlySpan<byte> executorSubmissionPublicKey,
         ReadOnlySpan<byte> recoveryPublicKey,
-        ReadOnlySpan<byte> policyStateSigningPrivateKeyPkcs8)
+        ReadOnlySpan<byte> policyStateSigningPrivateKeyPkcs8,
+        IActiveReleaseBindingReader activeReleaseBindingReader)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(authorityTopology);
+        ArgumentNullException.ThrowIfNull(activeReleaseBindingReader);
         options.Validate();
         authorityTopology.Validate();
         return new PolicyApprovalSubmissionRecoveryClient(
@@ -260,7 +265,8 @@ public sealed class PolicyApprovalSubmissionRecoveryClient : IDisposable
             authorityTopology,
             executorSubmissionPublicKey,
             recoveryPublicKey,
-            policyStateSigningPrivateKeyPkcs8);
+            policyStateSigningPrivateKeyPkcs8,
+            activeReleaseBindingReader);
     }
 
     public Task<PolicyApprovalSubmissionSnapshot> ReadSubmissionAsync(

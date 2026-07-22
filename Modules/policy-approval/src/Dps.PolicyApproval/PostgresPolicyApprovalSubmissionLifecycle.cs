@@ -2,6 +2,7 @@ using System.Data;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Dps.ControlPlaneHost.Contracts;
 using Dps.PolicyApproval.Contracts;
 using Npgsql;
 using NpgsqlTypes;
@@ -62,6 +63,7 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
     private readonly ECDsa? _reconciliationEvidenceAuthority;
     private readonly ECDsa? _recoveryEvidenceAuthority;
     private readonly ECDsa _stateSigner = ECDsa.Create();
+    private readonly IActiveReleaseBindingReader? _activeReleaseBindingReader;
 
     private PostgresPolicyApprovalSubmissionAuthority(
         PolicyApprovalSubmissionAuthorityRuntime runtime,
@@ -71,7 +73,8 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
         ReadOnlySpan<byte> reconciliationEvidencePublicKey,
         ReadOnlySpan<byte> recoveryEvidencePublicKey,
         ReadOnlySpan<byte> stateSigningPrivateKeyPkcs8,
-        ECDsa? fenceAuthorizationAuthority)
+        ECDsa? fenceAuthorizationAuthority,
+        IActiveReleaseBindingReader? activeReleaseBindingReader)
     {
         _runtime = runtime;
         authorityTopology.Validate();
@@ -80,8 +83,9 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
             if (!transitionAuthorityPublicKey.IsEmpty
                 || reconciliationEvidencePublicKey.IsEmpty
                 || recoveryEvidencePublicKey.IsEmpty
-                || fenceAuthorizationAuthority is null)
-                throw new ArgumentException("Executor composition requires read-only reconciliation/recovery evidence keys and accepts no transition authority.");
+                || fenceAuthorizationAuthority is null
+                || activeReleaseBindingReader is not null)
+                throw new ArgumentException("Executor composition requires read-only reconciliation/recovery evidence keys and accepts no transition authority or active release binding reader.");
         }
         else if (transitionAuthorityPublicKey.IsEmpty
                  || !reconciliationEvidencePublicKey.IsEmpty
@@ -90,6 +94,13 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
         {
             throw new ArgumentException("Reconciliation and recovery compositions require only their exact transition authority.");
         }
+
+        if (runtime.Role == PolicyApprovalSubmissionDatabaseRole.Recovery && activeReleaseBindingReader is null)
+            throw new ArgumentException("Recovery composition requires the composition-fixed active release binding reader.", nameof(activeReleaseBindingReader));
+        if (runtime.Role == PolicyApprovalSubmissionDatabaseRole.Reconciliation && activeReleaseBindingReader is not null)
+            throw new ArgumentException("Reconciliation composition accepts no active release binding reader.", nameof(activeReleaseBindingReader));
+
+        _activeReleaseBindingReader = activeReleaseBindingReader;
 
         _transitionAuthority = runtime.Role == PolicyApprovalSubmissionDatabaseRole.Executor
             ? null
@@ -185,7 +196,8 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
             reconciliationEvidencePublicKey,
             recoveryEvidencePublicKey,
             stateSigningPrivateKeyPkcs8,
-            fenceAuthorizationAuthority);
+            fenceAuthorizationAuthority,
+            null);
     }
 
     internal static PostgresPolicyApprovalSubmissionAuthority CreateReconciliation(
@@ -204,6 +216,7 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
             ReadOnlySpan<byte>.Empty,
             ReadOnlySpan<byte>.Empty,
             stateSigningPrivateKeyPkcs8,
+            null,
             null);
     }
 
@@ -212,9 +225,11 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
         PolicyApprovalSubmissionAuthorityTopology authorityTopology,
         ReadOnlySpan<byte> executorAuthorityPublicKey,
         ReadOnlySpan<byte> recoveryAuthorityPublicKey,
-        ReadOnlySpan<byte> stateSigningPrivateKeyPkcs8)
+        ReadOnlySpan<byte> stateSigningPrivateKeyPkcs8,
+        IActiveReleaseBindingReader activeReleaseBindingReader)
     {
         RequireRuntimeRole(runtime, PolicyApprovalSubmissionDatabaseRole.Recovery);
+        ArgumentNullException.ThrowIfNull(activeReleaseBindingReader);
         return new PostgresPolicyApprovalSubmissionAuthority(
             runtime,
             authorityTopology,
@@ -223,7 +238,8 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
             ReadOnlySpan<byte>.Empty,
             ReadOnlySpan<byte>.Empty,
             stateSigningPrivateKeyPkcs8,
-            null);
+            null,
+            activeReleaseBindingReader);
     }
 
     internal void VerifyIntent(ApprovalSubmissionIntentV1 intent)
@@ -791,6 +807,7 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
         var state = CreateSignedState(snapshot.Intent, ApprovalSubmissionStateV1.RecoveryAuthorized, snapshot.State.StateSha256, recoverySha256, databaseNow);
         await using var command = LifecycleCommand(connection, transaction, "recover_approval_submission", recovery, recoverySha256, state);
         _ = await command.ExecuteScalarAsync(cancellationToken);
+        RequireActiveReleaseBindingMatchesRecovery(recovery);
         await transaction.CommitAsync(cancellationToken);
         var persisted = (await ReadSubmissionAsync(
             recovery.SubmissionAttemptId,
@@ -798,6 +815,26 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
         if (persisted.State != ApprovalSubmissionStateV1.RecoveryAuthorized)
             throw new InvalidDataException("Recovery authorization did not survive exact readback.");
         return persisted;
+    }
+
+    // Commit-time Release BOM fence (F2): the signed recovery envelope names
+    // the next release BOM facts it was issued against, but the active binding
+    // can change between control-plane-host's issuance fence commit and this
+    // commit. Re-read the live active binding from the composition-fixed
+    // control-plane-host reader at commit time and require the exact
+    // (sha256, runtime generation) pair the envelope carries. An unreadable,
+    // non-active, foreign-device, or mismatched binding fails closed: the
+    // exception rolls the transaction back, so no recovery fact and no
+    // partial write is ever persisted.
+    private void RequireActiveReleaseBindingMatchesRecovery(ApprovalSubmissionRecoveryV1 recovery)
+    {
+        if (!_activeReleaseBindingReader!.TryReadActive(recovery.DeviceBindingId, out var binding)
+            || binding is null
+            || !string.Equals(binding.Status, "active", StringComparison.Ordinal)
+            || !string.Equals(binding.DeviceBindingId, recovery.DeviceBindingId, StringComparison.Ordinal)
+            || !FixedDigestEquals(binding.ReleaseBomSha256, recovery.NextReleaseBomSha256)
+            || binding.Generation != recovery.NextReleaseBomGeneration)
+            throw new UnauthorizedAccessException("Recovery next release BOM facts do not match the live active release binding; the recovery commit fails closed.");
     }
 
     private ApprovalSubmissionStateV1 CreateSignedState(
@@ -1002,9 +1039,9 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
         CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand("SELECT clock_timestamp()", connection, transaction) { CommandTimeout = 5 };
-        var value = await command.ExecuteScalarAsync(cancellationToken)
-            ?? throw new InvalidOperationException("PostgreSQL did not return its trusted clock.");
-        return ((DateTimeOffset)value).ToUniversalTime();
+        var value = (DateTime)(await command.ExecuteScalarAsync(cancellationToken)
+            ?? throw new InvalidOperationException("PostgreSQL did not return its trusted clock."));
+        return new DateTimeOffset(value, TimeSpan.Zero);
     }
 
     private static async Task ConfigureTerminalTransactionAsync(
