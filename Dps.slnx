@@ -40,6 +40,7 @@
     <Project Path="Modules/control-plane-host/src/Dps.ControlPlaneHost/Dps.ControlPlaneHost.csproj" />
   </Folder>
   <Folder Name="/Modules/control-plane-host/tests/">
+    <Project Path="Modules/control-plane-host/tests/Dps.ControlPlaneHost.ActiveBindingSameInstance.Tests/Dps.ControlPlaneHost.ActiveBindingSameInstance.Tests.csproj" />
     <Project Path="Modules/control-plane-host/tests/Dps.ControlPlaneHost.Tests/Dps.ControlPlaneHost.Tests.csproj" />
   </Folder>
   <Folder Name="/Modules/device-registry/" />

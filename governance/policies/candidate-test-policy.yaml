@@ -343,6 +343,17 @@
       ]
     },
     {
+      "moduleId": "control-plane-host",
+      "suiteId": "control-plane-host.same-instance-integration",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/control-plane-host/tests/Dps.ControlPlaneHost.ActiveBindingSameInstance.Tests/Dps.ControlPlaneHost.ActiveBindingSameInstance.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 4,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES"
+      ]
+    },
+    {
       "moduleId": "device-registry",
       "suiteId": "device-registry.integration",
       "evidenceKind": "REAL_POSTGRESQL",

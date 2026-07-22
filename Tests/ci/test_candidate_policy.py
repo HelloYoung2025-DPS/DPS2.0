@@ -66,6 +66,7 @@ EXPECTED_INTEGRATION_FLOORS = {
     "binding.integration": 42,
     "command-orchestrator.postgresql18": 21,
     "control-plane-host.integration": 56,
+    "control-plane-host.same-instance-integration": 4,
     "device-registry.integration": 15,
     "edge-local-journal.recovery-simulation": 7,
     "evidence-service.integration": 1,
@@ -109,6 +110,10 @@ EXPECTED_INTEGRATION_TRUST = {
         frozenset({"DPS_TEST_POSTGRES"}),
     ),
     "control-plane-host.integration": (
+        "REAL_POSTGRESQL",
+        frozenset({"DPS_TEST_POSTGRES"}),
+    ),
+    "control-plane-host.same-instance-integration": (
         "REAL_POSTGRESQL",
         frozenset({"DPS_TEST_POSTGRES"}),
     ),
@@ -197,6 +202,7 @@ EXPECTED_INTEGRATION_CATEGORIES = {
     "binding.integration": "Integration",
     "command-orchestrator.postgresql18": "Integration",
     "control-plane-host.integration": "Integration",
+    "control-plane-host.same-instance-integration": "Integration",
     "device-registry.integration": "Integration",
     "edge-local-journal.recovery-simulation": "Integration",
     "evidence-service.integration": "Integration",
