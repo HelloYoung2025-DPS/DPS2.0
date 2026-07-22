@@ -40,8 +40,7 @@
     "target": "cpython-3.12",
     "processBoundary": "out-of-process",
     "entrypoints": [
-      "Modules/factory-release-controller/src/release_controller.py",
-      "Modules/factory-release-controller/src/candidate_bom_validator.py"
+      "Modules/factory-release-controller/src/release_controller.py"
     ],
     "toolchainStatus": "proposed"
   },

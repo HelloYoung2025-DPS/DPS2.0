@@ -330,6 +330,10 @@ class ProvidedContractSchemaTests(unittest.TestCase):
         self.assertEqual("release.binding.receipt/v1", receipt["contract_id"]["const"])
         self.assertEqual("control-plane-host", receipt["producer_module"]["const"])
         self.assertEqual(["activation", "revocation", "rollback"], receipt["receipt_kind"]["enum"])
+        for properties in (binding, receipt):
+            for identity in ("soul_id", "platform_account_id", "trace_id", "idempotency_key"):
+                with self.subTest(contract=properties["contract_id"]["const"], identity=identity):
+                    self.assertIsNone(properties[identity]["const"])
 
     def test_20_release_binding_generation_and_sequence_are_int64_bounded(self) -> None:
         binding_validator = _validator(CONTRACTS[5][1])

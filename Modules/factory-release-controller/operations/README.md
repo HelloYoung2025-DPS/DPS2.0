@@ -2,18 +2,32 @@
 
 ## Candidate gate
 
-The root release workflow may invoke only this fixed validation CLI:
+R0-C moved the authoritative root release validation entrypoint to the
+ordinary, stateless CI tool below. The module-local copy remains only as a
+byte-compared rollback/migration-fidelity fixture until the module is removed
+in R0-D; release orchestration must not invoke it.
 
 ```text
-python3.12 Modules/factory-release-controller/src/candidate_bom_validator.py \
+python3.12 Tools/ci/candidate_bom_validator.py \
   --repo-root <clean-checkout> \
   --bundle-root <immutable-bundle> \
   --bom <candidate-bom.json> \
   --previous-bom <previous-stable-bom.json> \
+  --native-stop-trust-receipt <external-owner-receipt.json> \
+  --minimum-remaining-lifetime-seconds 86400 \
   --schema-sha256 <exact-release-bom-schema-sha256>
 ```
 
-The CLI validates only. It always loads `operations/deployed-release-trust-policy.v1.json`; its identity and canonical SHA-256 are fixed in the validator code. A caller cannot provide or override a trust policy, its identities, or its required gates. Each required gate binds an evidence ID to an exact evidence kind and a minimum verification level. A signed optional `FAIL`, a wrong kind, or a lower level cannot satisfy a required gate. The reported candidate ceiling is derived from the required gates that actually passed and is capped at `INTEGRATION_VERIFIED`. Changing that anchor is a separately reviewed deployment-governance change and cannot approve a product candidate in the same run.
+The CLI validates only. It always loads the migrated
+`governance/policies/deployed-release-trust-policy.v1.json`; its identity and
+canonical SHA-256 are fixed in the validator code. A caller cannot provide or
+override a trust policy, its identities, or its required gates. Each required
+gate binds an evidence ID to an exact evidence kind and a minimum verification
+level. A signed optional `FAIL`, a wrong kind, or a lower level cannot satisfy
+a required gate. The reported candidate ceiling is derived from the required
+gates that actually passed and is capped at `INTEGRATION_VERIFIED`. Changing
+that anchor is a separately reviewed deployment-governance change and cannot
+approve a product candidate in the same run.
 
 The repository stores public verification material only. The corresponding production private keys are intentionally not present, and the initial anchor keys were generated without retaining their private halves; therefore the baseline fails closed until a separately authorized key-provisioning change replaces the anchor. The CLI never commits, tags, deploys, starts a shell, or executes text from a model, BOM, manifest, or artifact. Exit `0` means the candidate bundle passed static signed-BOM validation; it does not mean canary or scale verification.
 

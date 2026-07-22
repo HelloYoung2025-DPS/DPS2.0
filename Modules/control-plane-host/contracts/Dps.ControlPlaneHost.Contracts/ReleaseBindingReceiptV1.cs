@@ -87,9 +87,22 @@ public sealed record ReleaseBindingReceiptV1(
         ControlContractValidation.RequireHex(ReceiptId, "receipt_", 32, nameof(ReceiptId));
         switch (ReceiptKind)
         {
-            case "activation" when From is null or { Status: "previous" } or { Status: "revoked" } && To.Status == "active":
-            case "revocation" when From is { Status: "active" } && To.Status == "revoked":
-            case "rollback" when From is { Status: "revoked" } && To.Status == "active":
+            case "activation" when
+                From is null or { Status: "previous" } or { Status: "revoked" }
+                && To.Status == "active"
+                && To.Generation == checked((From?.Generation ?? 0) + 1):
+            case "revocation" when
+                From is { Status: "active" }
+                && To.Status == "revoked"
+                && To.Generation == From.Generation
+                && string.Equals(
+                    To.ReleaseBomSha256,
+                    From.ReleaseBomSha256,
+                    StringComparison.Ordinal):
+            case "rollback" when
+                From is { Status: "revoked" }
+                && To.Status == "active"
+                && To.Generation == checked(From.Generation + 1):
                 break;
             default:
                 throw new ArgumentException(

@@ -73,6 +73,33 @@ public sealed class ActiveReleaseBindingContractTests
                 ReleaseBindingReceiptV1Codec.Serialize(receipt));
             Assert.Equal(receipt, roundTripped);
         }
+
+        // A self-consistent payload digest cannot make an impossible
+        // transition into a valid public receipt. Activation/rollback advance
+        // the runtime generation exactly once; revocation preserves the exact
+        // digest and generation while changing only active -> revoked.
+        AssertSemanticallyInvalid(receipts[0] with
+        {
+            To = receipts[0].To with { Generation = receipts[0].To.Generation + 1 }
+        });
+        AssertSemanticallyInvalid(receipts[2] with
+        {
+            To = receipts[2].To with { Generation = receipts[2].To.Generation + 1 }
+        });
+        AssertSemanticallyInvalid(receipts[3] with
+        {
+            To = receipts[3].To with { Generation = receipts[3].To.Generation + 1 }
+        });
+        AssertSemanticallyInvalid(receipts[3] with
+        {
+            To = receipts[3].To with { ReleaseBomSha256 = new string('f', 64) }
+        });
+    }
+
+    private static void AssertSemanticallyInvalid(ReleaseBindingReceiptV1 receipt)
+    {
+        var rebound = receipt with { PayloadSha256 = receipt.ComputePayloadSha256() };
+        Assert.ThrowsAny<Exception>(() => ReleaseBindingReceiptV1Codec.Serialize(rebound));
     }
 
     private sealed class PinnedBindingReader(ActiveReleaseBindingV1 binding) : IActiveReleaseBindingReader
