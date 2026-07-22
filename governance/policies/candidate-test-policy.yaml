@@ -34,14 +34,14 @@
       "suiteId": "control-plane-host.contract",
       "testTarget": "Modules/control-plane-host/tests/Dps.ControlPlaneHost.Tests/Dps.ControlPlaneHost.Tests.csproj",
       "testCategory": "Contract",
-      "minimumExecutedTests": 23
+      "minimumExecutedTests": 27
     },
     {
       "moduleId": "control-plane-host",
       "suiteId": "control-plane-host.contract-schema",
       "testTarget": "Modules/control-plane-host/tests/test_control_plane_contract_schemas.py",
       "testCategory": "Contract",
-      "minimumExecutedTests": 16
+      "minimumExecutedTests": 20
     },
     {
       "moduleId": "device-registry",
@@ -337,7 +337,7 @@
       "evidenceKind": "REAL_POSTGRESQL",
       "testTarget": "Modules/control-plane-host/tests/Dps.ControlPlaneHost.Tests/Dps.ControlPlaneHost.Tests.csproj",
       "testCategory": "Integration",
-      "minimumExecutedTests": 56,
+      "minimumExecutedTests": 66,
       "requiredEnvironment": [
         "DPS_TEST_POSTGRES"
       ]
@@ -543,7 +543,7 @@
       "evidenceKind": "REAL_POSTGRESQL",
       "testTarget": "Modules/policy-approval/tests/Dps.PolicyApproval.Tests/Dps.PolicyApproval.Tests.csproj",
       "testCategory": "Integration",
-      "minimumExecutedTests": 40,
+      "minimumExecutedTests": 53,
       "requiredEnvironment": [
         "DPS_TEST_POSTGRES"
       ]

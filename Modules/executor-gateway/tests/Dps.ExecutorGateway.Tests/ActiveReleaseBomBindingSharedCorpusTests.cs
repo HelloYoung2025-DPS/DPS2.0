@@ -50,13 +50,15 @@ public sealed class ActiveReleaseBomBindingSharedCorpusTests
             deviceBindingId,
             releaseBomSha256,
             generation,
-            executionToken);
+            executionToken,
+            RequireString(corpusCase, "status"));
         binding.Validate();
 
         Assert.Equal(PinnedReleaseBomSha256, binding.ReleaseBomSha256);
         Assert.Equal(PinnedGeneration, binding.Generation);
         Assert.Equal(PinnedExecutionTokenBase64, binding.ExecutionTokenBase64);
         Assert.Equal(PinnedDevice, binding.DeviceBindingId);
+        Assert.Equal("active", binding.Status);
         Assert.Equal(
             Convert.FromBase64String(PinnedExecutionTokenBase64),
             Convert.FromBase64String(binding.ExecutionTokenBase64));

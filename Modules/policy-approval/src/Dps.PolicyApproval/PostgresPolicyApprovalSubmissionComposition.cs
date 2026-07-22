@@ -236,7 +236,7 @@ public sealed class PolicyApprovalSubmissionRecoveryClient : IDisposable
         ReadOnlySpan<byte> executorSubmissionPublicKey,
         ReadOnlySpan<byte> recoveryPublicKey,
         ReadOnlySpan<byte> policyStateSigningPrivateKeyPkcs8,
-        IActiveReleaseBindingRecoveryCoordinator releaseBindingRecoveryCoordinator)
+        IPolicyActiveReleaseBindingRecoverySource releaseBindingRecoverySource)
     {
         _authority = PostgresPolicyApprovalSubmissionAuthority.CreateRecovery(
             options.ToAuthorityRuntime(),
@@ -244,7 +244,7 @@ public sealed class PolicyApprovalSubmissionRecoveryClient : IDisposable
             executorSubmissionPublicKey,
             recoveryPublicKey,
             policyStateSigningPrivateKeyPkcs8,
-            releaseBindingRecoveryCoordinator);
+            releaseBindingRecoverySource);
     }
 
     public static PolicyApprovalSubmissionRecoveryClient CreateProduction(
@@ -253,11 +253,12 @@ public sealed class PolicyApprovalSubmissionRecoveryClient : IDisposable
         ReadOnlySpan<byte> executorSubmissionPublicKey,
         ReadOnlySpan<byte> recoveryPublicKey,
         ReadOnlySpan<byte> policyStateSigningPrivateKeyPkcs8,
-        IActiveReleaseBindingRecoveryCoordinator releaseBindingRecoveryCoordinator)
+        ActiveReleaseBindingRecoveryCapability releaseBindingRecoveryCapability)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(authorityTopology);
-        ArgumentNullException.ThrowIfNull(releaseBindingRecoveryCoordinator);
+        ArgumentNullException.ThrowIfNull(releaseBindingRecoveryCapability);
+        releaseBindingRecoveryCapability.RequireDurable();
         options.Validate();
         authorityTopology.Validate();
         return new PolicyApprovalSubmissionRecoveryClient(
@@ -266,7 +267,29 @@ public sealed class PolicyApprovalSubmissionRecoveryClient : IDisposable
             executorSubmissionPublicKey,
             recoveryPublicKey,
             policyStateSigningPrivateKeyPkcs8,
-            releaseBindingRecoveryCoordinator);
+            new CapabilityRecoverySource(releaseBindingRecoveryCapability));
+    }
+
+    internal static PolicyApprovalSubmissionRecoveryClient CreateTestOnly(
+        PostgresPolicyApprovalSubmissionRecoveryOptions options,
+        PolicyApprovalSubmissionAuthorityTopology authorityTopology,
+        ReadOnlySpan<byte> executorSubmissionPublicKey,
+        ReadOnlySpan<byte> recoveryPublicKey,
+        ReadOnlySpan<byte> policyStateSigningPrivateKeyPkcs8,
+        IPolicyActiveReleaseBindingRecoverySource releaseBindingRecoverySource)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(authorityTopology);
+        ArgumentNullException.ThrowIfNull(releaseBindingRecoverySource);
+        options.Validate();
+        authorityTopology.Validate();
+        return new PolicyApprovalSubmissionRecoveryClient(
+            options,
+            authorityTopology,
+            executorSubmissionPublicKey,
+            recoveryPublicKey,
+            policyStateSigningPrivateKeyPkcs8,
+            releaseBindingRecoverySource);
     }
 
     public Task<PolicyApprovalSubmissionSnapshot> ReadSubmissionAsync(
@@ -278,6 +301,32 @@ public sealed class PolicyApprovalSubmissionRecoveryClient : IDisposable
         ApprovalSubmissionRecoveryV1 recovery,
         CancellationToken cancellationToken = default)
         => _authority.RecoverAsync(recovery, cancellationToken);
+
+    internal Task<PolicyApprovalSubmissionRecoveryCommitResult>
+        AuthorizeSubmissionRecoveryWithObservationAsync(
+            ApprovalSubmissionRecoveryV1 recovery,
+            CancellationToken cancellationToken = default)
+        => _authority.RecoverWithObservationAsync(recovery, cancellationToken);
+
+    private sealed class CapabilityRecoverySource(
+        ActiveReleaseBindingRecoveryCapability capability)
+        : IPolicyActiveReleaseBindingRecoverySource
+    {
+        public async ValueTask<IPolicyActiveReleaseBindingRecoveryScope> AcquireAsync(
+            string deviceBindingId,
+            CancellationToken cancellationToken)
+            => new CapabilityRecoveryScope(
+                await capability.AcquireAsync(deviceBindingId, cancellationToken));
+    }
+
+    private sealed class CapabilityRecoveryScope(
+        ActiveReleaseBindingRecoveryLease lease)
+        : IPolicyActiveReleaseBindingRecoveryScope
+    {
+        public ActiveReleaseBindingV1 ActiveBinding => lease.ActiveBinding;
+
+        public ValueTask DisposeAsync() => lease.DisposeAsync();
+    }
 
     public void Dispose() => _authority.Dispose();
 }

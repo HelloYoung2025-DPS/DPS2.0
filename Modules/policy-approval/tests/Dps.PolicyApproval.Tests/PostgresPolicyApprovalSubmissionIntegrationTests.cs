@@ -833,7 +833,29 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         ECDsa executorSigner,
         ECDsa recoverySigner,
         ECDsa stateSigner,
-        IActiveReleaseBindingRecoveryCoordinator releaseBindingRecoveryCoordinator)
+        IPolicyActiveReleaseBindingRecoverySource releaseBindingRecoverySource)
+    {
+        var privateKey = stateSigner.ExportPkcs8PrivateKey();
+        try
+        {
+            return PolicyApprovalSubmissionRecoveryClient.CreateTestOnly(
+                database.SubmissionRecoveryOptions,
+                authorityTopology,
+                executorSigner.ExportSubjectPublicKeyInfo(),
+                recoverySigner.ExportSubjectPublicKeyInfo(),
+                privateKey,
+                releaseBindingRecoverySource);
+        }
+        finally { CryptographicOperations.ZeroMemory(privateKey); }
+    }
+
+    private static PolicyApprovalSubmissionRecoveryClient CreateRecoveryClient(
+        PolicyApprovalTestDatabase database,
+        PolicyApprovalSubmissionAuthorityTopology authorityTopology,
+        ECDsa executorSigner,
+        ECDsa recoverySigner,
+        ECDsa stateSigner,
+        ActiveReleaseBindingRecoveryCapability releaseBindingRecoveryCapability)
     {
         var privateKey = stateSigner.ExportPkcs8PrivateKey();
         try
@@ -844,7 +866,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
                 executorSigner.ExportSubjectPublicKeyInfo(),
                 recoverySigner.ExportSubjectPublicKeyInfo(),
                 privateKey,
-                releaseBindingRecoveryCoordinator);
+                releaseBindingRecoveryCapability);
         }
         finally { CryptographicOperations.ZeroMemory(privateKey); }
     }

@@ -153,6 +153,76 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
     }
 
     [Fact, Trait("Category", "Integration")]
+    public async Task CommitTimeTokenMutationWithUnchangedDeclaredDigestRejectsRecoveryAndPersistsNothing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var database = await PolicyApprovalTestDatabase.CreateAsync(cancellationToken);
+        using var evaluationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var revocationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var fenceSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var executorSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var reconciliationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var recoverySigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var stateSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var authorityTopology = SubmissionTopology(
+            evaluationSigner, revocationSigner, fenceSigner, executorSigner,
+            reconciliationSigner, recoverySigner, stateSigner);
+        var prepared = await PrepareRecoverableSubmissionAsync(
+            database,
+            authorityTopology,
+            evaluationSigner,
+            revocationSigner,
+            fenceSigner,
+            executorSigner,
+            reconciliationSigner,
+            recoverySigner,
+            stateSigner,
+            "commit-binding-token-mutation",
+            cancellationToken);
+        var coordinator = MatchingActiveReleaseBindingCoordinator(prepared.Snapshot);
+        var valid = ActiveBinding(
+            prepared.Snapshot.Approval.DeviceBindingId,
+            prepared.Snapshot.ReleaseBomSha256,
+            1);
+        coordinator.SetActive(valid with
+        {
+            ExecutionTokenBase64 = Convert.ToBase64String(
+                SHA256.HashData(Encoding.UTF8.GetBytes("mutated-policy-token")))
+        });
+        using var recoveryClient = CreateRecoveryClient(
+            database,
+            authorityTopology,
+            executorSigner,
+            recoverySigner,
+            stateSigner,
+            coordinator);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            recoveryClient.AuthorizeSubmissionRecoveryAsync(
+                SignRecovery(recoverySigner, prepared.Recovery),
+                cancellationToken));
+
+        await AssertRecoveryCountAsync(
+            database, prepared.Intent.SubmissionAttemptId, 0, cancellationToken);
+    }
+
+    [Fact, Trait("Category", "Unit")]
+    public void ProductionRecoveryFactoryAcceptsOnlyTheSealedCphCapability()
+    {
+        var factory = Assert.Single(
+            typeof(PolicyApprovalSubmissionRecoveryClient)
+                .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static),
+            static method => method.Name == "CreateProduction");
+        Assert.Equal(
+            typeof(ActiveReleaseBindingRecoveryCapability),
+            factory.GetParameters()[^1].ParameterType);
+        Assert.True(typeof(ActiveReleaseBindingRecoveryCapability).IsSealed);
+        Assert.DoesNotContain(
+            typeof(ActiveReleaseBindingRecoveryCapability).GetConstructors(),
+            static constructor => constructor.IsPublic || constructor.IsFamily);
+    }
+
+    [Fact, Trait("Category", "Integration")]
     public async Task CommitTimeReaderExceptionRollsRecoveryBackAndPersistsNothing()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -358,15 +428,15 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
     }
 
     private sealed class StubActiveReleaseBindingRecoveryCoordinator
-        : IActiveReleaseBindingRecoveryCoordinator
+        : IPolicyActiveReleaseBindingRecoverySource
     {
         private readonly Dictionary<string, ActiveReleaseBindingV1> _activeBindings = new(StringComparer.Ordinal);
 
         public void SetActive(ActiveReleaseBindingV1 binding) => _activeBindings[binding.DeviceBindingId] = binding;
 
-        public ValueTask<IActiveReleaseBindingRecoveryScope> AcquireAsync(
+        public ValueTask<IPolicyActiveReleaseBindingRecoveryScope> AcquireAsync(
             string deviceBindingId,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!_activeBindings.TryGetValue(deviceBindingId, out var binding))
@@ -374,13 +444,13 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
                 throw new UnauthorizedAccessException(
                     "test recovery coordinator has no active binding for the requested device");
             }
-            return ValueTask.FromResult<IActiveReleaseBindingRecoveryScope>(
+            return ValueTask.FromResult<IPolicyActiveReleaseBindingRecoveryScope>(
                 new StubActiveReleaseBindingRecoveryScope(binding));
         }
     }
 
     private sealed class StubActiveReleaseBindingRecoveryScope(
-        ActiveReleaseBindingV1 activeBinding) : IActiveReleaseBindingRecoveryScope
+        ActiveReleaseBindingV1 activeBinding) : IPolicyActiveReleaseBindingRecoveryScope
     {
         public ActiveReleaseBindingV1 ActiveBinding { get; } = activeBinding;
 
@@ -388,11 +458,11 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
     }
 
     private sealed class ThrowingActiveReleaseBindingRecoveryCoordinator
-        : IActiveReleaseBindingRecoveryCoordinator
+        : IPolicyActiveReleaseBindingRecoverySource
     {
-        public ValueTask<IActiveReleaseBindingRecoveryScope> AcquireAsync(
+        public ValueTask<IPolicyActiveReleaseBindingRecoveryScope> AcquireAsync(
             string deviceBindingId,
-            CancellationToken cancellationToken = default)
+            CancellationToken cancellationToken)
             => throw new InvalidOperationException("active release binding read faulted at commit time");
     }
 }

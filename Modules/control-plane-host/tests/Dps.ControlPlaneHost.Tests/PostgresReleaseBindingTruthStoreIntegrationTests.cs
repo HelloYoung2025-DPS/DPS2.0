@@ -24,6 +24,8 @@ public sealed class PostgresReleaseBindingTruthStoreIntegrationTests
         var firstStore = database.CreateStore();
         var first = new ActiveReleaseBindingAuthority(
             [signer.TrustKey], firstStore, () => Now);
+        Assert.True(first.RecoveryCapability.IsDurable);
+        first.RecoveryCapability.RequireDurable();
 
         var (bom1, token1) = signer.SignBom("bom-1", 1, null);
         first.Activate(Device, bom1, token1);
@@ -436,7 +438,7 @@ public sealed class PostgresReleaseBindingTruthStoreIntegrationTests
     }
 
     private sealed class FrozenReader(Contracts.ActiveReleaseBindingV1 binding)
-        : Contracts.IActiveReleaseBindingReader
+        : IActiveReleaseBindingReader
     {
         public bool TryReadActive(
             string deviceBindingId,

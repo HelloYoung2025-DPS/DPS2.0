@@ -1524,8 +1524,20 @@ public sealed class VerifiedExecutorGatewayTests
             Convert.ToBase64String(new byte[ExecutionAuthorizationProtocolV1.P1363SignatureSizeBytes]));
     }
 
-    private static ActiveReleaseBomBindingV1 Binding(string? digest = null, string? device = null, string? schema = null, long generation = 7, string? token = null) =>
-        new(schema ?? ActiveReleaseBomBindingV1.CurrentSchemaVersion, device ?? Device, digest ?? StableBom, generation, token ?? StableToken);
+    private static ActiveReleaseBomBindingV1 Binding(
+        string? digest = null,
+        string? device = null,
+        string? schema = null,
+        long generation = 7,
+        string? token = null,
+        string status = "active") =>
+        new(
+            schema ?? ActiveReleaseBomBindingV1.CurrentSchemaVersion,
+            device ?? Device,
+            digest ?? StableBom,
+            generation,
+            token ?? StableToken,
+            status);
 
     private static ExecutionAuthorizationV1 Sign(ExecutionAuthorizationV1 authorization, ECDsa signer)
     {

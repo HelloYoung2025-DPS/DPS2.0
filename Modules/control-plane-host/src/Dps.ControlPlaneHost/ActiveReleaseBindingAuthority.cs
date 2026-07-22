@@ -195,6 +195,40 @@ internal sealed class PassThroughReleaseBindingTransitionScope : IReleaseBinding
 }
 
 /// <summary>
+/// Module-private read seam used by control-plane-host's own lifecycle
+/// tests. Cross-module production composition cannot name or implement it;
+/// public consumers receive only the sealed authority-issued capability.
+/// </summary>
+internal interface IActiveReleaseBindingReader
+{
+    bool TryReadActive(
+        string deviceBindingId,
+        out ActiveReleaseBindingV1? binding);
+}
+
+/// <summary>
+/// Module-private store coordination port. Implementations hold the exact
+/// per-device transition primitive used by activation, revocation, and
+/// rollback; it is intentionally absent from the public contract surface.
+/// </summary>
+internal interface IActiveReleaseBindingRecoveryCoordinator
+{
+    ValueTask<IActiveReleaseBindingRecoveryScope> AcquireAsync(
+        string deviceBindingId,
+        CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// Module-private held store scope. Only
+/// <see cref="ActiveReleaseBindingAuthority"/> may wrap one in the public
+/// nominal recovery lease issued by its capability.
+/// </summary>
+internal interface IActiveReleaseBindingRecoveryScope : IAsyncDisposable
+{
+    ActiveReleaseBindingV1 ActiveBinding { get; }
+}
+
+/// <summary>
 /// Append-only truth store for release binding transitions. The authority
 /// appends one record per successful transition and loads the full journal
 /// at construction to recover state. The durable implementation is
@@ -384,9 +418,10 @@ public sealed class InMemoryReleaseBindingTruthStore
         return new InMemoryTransitionScope(this, transitionLock);
     }
 
-    public async ValueTask<IActiveReleaseBindingRecoveryScope> AcquireAsync(
+    async ValueTask<IActiveReleaseBindingRecoveryScope>
+        IActiveReleaseBindingRecoveryCoordinator.AcquireAsync(
         string deviceBindingId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
         var transitionLock = GetTransitionLock(deviceBindingId);
@@ -584,7 +619,9 @@ public sealed class InMemoryReleaseBindingTruthStore
 /// one lock; byte-identical re-submissions return the original receipt
 /// without state change and conflicting re-submissions fail closed.
 /// </summary>
-public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
+public sealed class ActiveReleaseBindingAuthority
+    : IActiveReleaseBindingRecoveryCapabilityIssuer,
+      IActiveReleaseBindingReader
 {
     private const string SchemaVersion = "1.0.0";
     private static readonly byte[] SignatureDomain =
@@ -607,6 +644,7 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
     private readonly Lock _gate = new();
     private readonly IReadOnlyDictionary<string, ReleaseBomTrustKey> _keys;
     private readonly IReleaseBindingTruthStore _store;
+    private readonly IActiveReleaseBindingRecoveryCoordinator _recoveryCoordinator;
     private readonly Func<DateTimeOffset> _utcNow;
     private readonly Dictionary<string, DeviceState> _devices = new(StringComparer.Ordinal);
 
@@ -632,8 +670,53 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
         }
         _keys = keys;
         _store = store;
+        _recoveryCoordinator = store as IActiveReleaseBindingRecoveryCoordinator
+            ?? throw new ArgumentException(
+                "The release binding truth store must provide the module-private recovery coordination primitive.",
+                nameof(store));
         _utcNow = utcNow;
+        RecoveryCapability = new ActiveReleaseBindingRecoveryCapability(
+            this,
+            store is PostgresReleaseBindingTruthStore);
         RecoverFromStore();
+    }
+
+    /// <summary>
+    /// The sole nominal recovery capability for this authority and its exact
+    /// injected truth store. Consumers cannot construct or substitute it.
+    /// </summary>
+    public ActiveReleaseBindingRecoveryCapability RecoveryCapability { get; }
+
+    bool IActiveReleaseBindingRecoveryCapabilityIssuer.TryReadActive(
+        string deviceBindingId,
+        out ActiveReleaseBindingV1? binding)
+        => TryReadActive(deviceBindingId, out binding);
+
+    async ValueTask<ActiveReleaseBindingRecoveryLease>
+        IActiveReleaseBindingRecoveryCapabilityIssuer.AcquireAsync(
+        string deviceBindingId,
+        CancellationToken cancellationToken)
+    {
+        var scope = await _recoveryCoordinator.AcquireAsync(
+            deviceBindingId, cancellationToken);
+        try
+        {
+            return new ActiveReleaseBindingRecoveryLease(
+                scope.ActiveBinding,
+                new RecoveryLeaseRelease(scope));
+        }
+        catch
+        {
+            await scope.DisposeAsync();
+            throw;
+        }
+    }
+
+    private sealed class RecoveryLeaseRelease(
+        IActiveReleaseBindingRecoveryScope scope)
+        : IActiveReleaseBindingRecoveryLeaseRelease
+    {
+        public ValueTask ReleaseAsync() => scope.DisposeAsync();
     }
 
     public bool TryReadActive(string deviceBindingId, out ActiveReleaseBindingV1? binding)

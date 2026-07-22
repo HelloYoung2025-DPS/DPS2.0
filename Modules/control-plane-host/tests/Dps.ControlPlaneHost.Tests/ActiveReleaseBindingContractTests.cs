@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Reflection;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -17,6 +18,86 @@ public sealed class ActiveReleaseBindingContractTests
     private const string Device = "db_11111111111111111111111111111111";
     private static readonly DateTimeOffset Now =
         new(2026, 7, 14, 0, 0, 0, TimeSpan.Zero);
+
+    [Fact, Trait("Category", "Contract")]
+    public void RecoveryCapabilityIsSealedNominalAndHasOneModuleIssuer()
+    {
+        var contractAssembly = typeof(ActiveReleaseBindingRecoveryCapability).Assembly;
+        Assert.Null(contractAssembly.GetType(
+            "Dps.ControlPlaneHost.Contracts.IActiveReleaseBindingReader"));
+        Assert.Null(contractAssembly.GetType(
+            "Dps.ControlPlaneHost.Contracts.IActiveReleaseBindingRecoveryCoordinator"));
+        Assert.Null(contractAssembly.GetType(
+            "Dps.ControlPlaneHost.Contracts.IActiveReleaseBindingRecoveryScope"));
+
+        AssertNominalPublicSurface(typeof(ActiveReleaseBindingRecoveryCapability));
+        AssertNominalPublicSurface(typeof(ActiveReleaseBindingRecoveryLease));
+        var factsSourceConstructor = Assert.Single(
+            typeof(PolicyBoundReleaseBomFactsSource).GetConstructors());
+        Assert.Equal(
+            [typeof(ActiveReleaseBindingRecoveryCapability)],
+            factsSourceConstructor.GetParameters()
+                .Select(static parameter => parameter.ParameterType));
+
+        var friends = contractAssembly
+            .GetCustomAttributes<System.Runtime.CompilerServices.InternalsVisibleToAttribute>()
+            .Select(static attribute => attribute.AssemblyName)
+            .ToArray();
+        Assert.Equal(["Dps.ControlPlaneHost"], friends);
+
+        var issuer = Assert.IsAssignableFrom<Type>(contractAssembly.GetType(
+            "Dps.ControlPlaneHost.Contracts.IActiveReleaseBindingRecoveryCapabilityIssuer"));
+        Assert.False(issuer.IsPublic);
+        var issuerTypes = typeof(ActiveReleaseBindingAuthority).Assembly
+            .GetTypes()
+            .Where(issuer.IsAssignableFrom)
+            .ToArray();
+        Assert.Equal([typeof(ActiveReleaseBindingAuthority)], issuerTypes);
+
+        using var rsa = RSA.Create(2048);
+        var parameters = rsa.ExportParameters(false);
+        var authority = new ActiveReleaseBindingAuthority(
+            [new ReleaseBomTrustKey(
+                "test-bom-key-v1",
+                "test-release-controller",
+                Convert.ToHexStringLower(parameters.Modulus!),
+                65537)],
+            InMemoryReleaseBindingTruthStore.CreateTestOnly(),
+            () => Now);
+        Assert.Same(authority.RecoveryCapability, authority.RecoveryCapability);
+        Assert.False(authority.RecoveryCapability.IsDurable);
+        Assert.Throws<InvalidOperationException>(
+            () => authority.RecoveryCapability.RequireDurable());
+        Assert.Throws<InvalidOperationException>(
+            () => new PolicyBoundReleaseBomFactsSource(authority.RecoveryCapability));
+        Assert.False(authority.RecoveryCapability.TryReadActive(Device, out _));
+    }
+
+    private static void AssertNominalPublicSurface(Type type)
+    {
+        Assert.True(type.IsPublic);
+        Assert.True(type.IsSealed);
+        var constructors = type.GetConstructors(
+            System.Reflection.BindingFlags.Instance
+            | System.Reflection.BindingFlags.Public
+            | System.Reflection.BindingFlags.NonPublic);
+        Assert.DoesNotContain(
+            constructors,
+            static constructor => constructor.IsPublic
+                || constructor.IsFamily
+                || constructor.IsFamilyOrAssembly);
+        var declaredPublicMethods = type.GetMethods(
+            System.Reflection.BindingFlags.Instance
+            | System.Reflection.BindingFlags.Public
+            | System.Reflection.BindingFlags.DeclaredOnly);
+        Assert.DoesNotContain(
+            declaredPublicMethods,
+            static method => method.IsVirtual && !method.IsFinal);
+        Assert.DoesNotContain(
+            declaredPublicMethods.SelectMany(static method => method.GetParameters()),
+            static parameter => parameter.ParameterType == typeof(object)
+                || typeof(Delegate).IsAssignableFrom(parameter.ParameterType));
+    }
 
     [Fact, Trait("Category", "Contract")]
     public void ActiveReleaseBindingCorpusBindsTheCodec()

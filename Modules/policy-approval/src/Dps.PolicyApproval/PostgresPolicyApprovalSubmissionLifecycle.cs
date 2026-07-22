@@ -32,6 +32,36 @@ public sealed record PolicyApprovalSubmissionSnapshot(
         ApprovalSubmissionStateV1.UnknownSubmission;
 }
 
+/// <summary>
+/// Safe commit-time evidence returned only to same-module integration tests.
+/// The raw execution token never leaves the active-binding scope and is not
+/// persisted; this digest is recomputed from the raw token that Policy
+/// actually validated rather than copied from the binding's declared hash.
+/// </summary>
+internal sealed record PolicyRecoveryActiveBindingObservation(
+    string DeviceBindingId,
+    string ReleaseBomSha256,
+    long Generation,
+    string ComputedExecutionTokenSha256,
+    string Status);
+
+internal sealed record PolicyApprovalSubmissionRecoveryCommitResult(
+    ApprovalSubmissionStateV1 State,
+    bool Inserted,
+    PolicyRecoveryActiveBindingObservation? CommitTimeActiveBinding);
+
+internal interface IPolicyActiveReleaseBindingRecoverySource
+{
+    ValueTask<IPolicyActiveReleaseBindingRecoveryScope> AcquireAsync(
+        string deviceBindingId,
+        CancellationToken cancellationToken);
+}
+
+internal interface IPolicyActiveReleaseBindingRecoveryScope : IAsyncDisposable
+{
+    ActiveReleaseBindingV1 ActiveBinding { get; }
+}
+
 public sealed class PolicyApprovalSubmissionCommitUncertainException : Exception
 {
     public PolicyApprovalSubmissionCommitUncertainException(string message, Exception innerException)
@@ -63,7 +93,7 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
     private readonly ECDsa? _reconciliationEvidenceAuthority;
     private readonly ECDsa? _recoveryEvidenceAuthority;
     private readonly ECDsa _stateSigner = ECDsa.Create();
-    private readonly IActiveReleaseBindingRecoveryCoordinator? _releaseBindingRecoveryCoordinator;
+    private readonly IPolicyActiveReleaseBindingRecoverySource? _releaseBindingRecoverySource;
 
     private PostgresPolicyApprovalSubmissionAuthority(
         PolicyApprovalSubmissionAuthorityRuntime runtime,
@@ -74,7 +104,7 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
         ReadOnlySpan<byte> recoveryEvidencePublicKey,
         ReadOnlySpan<byte> stateSigningPrivateKeyPkcs8,
         ECDsa? fenceAuthorizationAuthority,
-        IActiveReleaseBindingRecoveryCoordinator? releaseBindingRecoveryCoordinator)
+        IPolicyActiveReleaseBindingRecoverySource? releaseBindingRecoverySource)
     {
         _runtime = runtime;
         authorityTopology.Validate();
@@ -84,7 +114,7 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
                 || reconciliationEvidencePublicKey.IsEmpty
                 || recoveryEvidencePublicKey.IsEmpty
                 || fenceAuthorizationAuthority is null
-                || releaseBindingRecoveryCoordinator is not null)
+                || releaseBindingRecoverySource is not null)
                 throw new ArgumentException("Executor composition requires read-only reconciliation/recovery evidence keys and accepts no release binding recovery coordinator.");
         }
         else if (transitionAuthorityPublicKey.IsEmpty
@@ -95,12 +125,12 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
             throw new ArgumentException("Reconciliation and recovery compositions require only their exact transition authority.");
         }
 
-        if (runtime.Role == PolicyApprovalSubmissionDatabaseRole.Recovery && releaseBindingRecoveryCoordinator is null)
-            throw new ArgumentException("Recovery composition requires the store-issued release binding recovery coordinator.", nameof(releaseBindingRecoveryCoordinator));
-        if (runtime.Role == PolicyApprovalSubmissionDatabaseRole.Reconciliation && releaseBindingRecoveryCoordinator is not null)
-            throw new ArgumentException("Reconciliation composition accepts no release binding recovery coordinator.", nameof(releaseBindingRecoveryCoordinator));
+        if (runtime.Role == PolicyApprovalSubmissionDatabaseRole.Recovery && releaseBindingRecoverySource is null)
+            throw new ArgumentException("Recovery composition requires the CPH-issued release binding recovery capability.", nameof(releaseBindingRecoverySource));
+        if (runtime.Role == PolicyApprovalSubmissionDatabaseRole.Reconciliation && releaseBindingRecoverySource is not null)
+            throw new ArgumentException("Reconciliation composition accepts no release binding recovery source.", nameof(releaseBindingRecoverySource));
 
-        _releaseBindingRecoveryCoordinator = releaseBindingRecoveryCoordinator;
+        _releaseBindingRecoverySource = releaseBindingRecoverySource;
 
         _transitionAuthority = runtime.Role == PolicyApprovalSubmissionDatabaseRole.Executor
             ? null
@@ -226,10 +256,10 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
         ReadOnlySpan<byte> executorAuthorityPublicKey,
         ReadOnlySpan<byte> recoveryAuthorityPublicKey,
         ReadOnlySpan<byte> stateSigningPrivateKeyPkcs8,
-        IActiveReleaseBindingRecoveryCoordinator releaseBindingRecoveryCoordinator)
+        IPolicyActiveReleaseBindingRecoverySource releaseBindingRecoverySource)
     {
         RequireRuntimeRole(runtime, PolicyApprovalSubmissionDatabaseRole.Recovery);
-        ArgumentNullException.ThrowIfNull(releaseBindingRecoveryCoordinator);
+        ArgumentNullException.ThrowIfNull(releaseBindingRecoverySource);
         return new PostgresPolicyApprovalSubmissionAuthority(
             runtime,
             authorityTopology,
@@ -239,7 +269,7 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
             ReadOnlySpan<byte>.Empty,
             stateSigningPrivateKeyPkcs8,
             null,
-            releaseBindingRecoveryCoordinator);
+            releaseBindingRecoverySource);
     }
 
     internal void VerifyIntent(ApprovalSubmissionIntentV1 intent)
@@ -786,6 +816,11 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
     internal async Task<ApprovalSubmissionStateV1> RecoverAsync(
         ApprovalSubmissionRecoveryV1 recovery,
         CancellationToken cancellationToken)
+        => (await RecoverWithObservationAsync(recovery, cancellationToken)).State;
+
+    internal async Task<PolicyApprovalSubmissionRecoveryCommitResult> RecoverWithObservationAsync(
+        ApprovalSubmissionRecoveryV1 recovery,
+        CancellationToken cancellationToken)
     {
         RequireRole(PolicyApprovalSubmissionDatabaseRole.Recovery);
         VerifyRecovery(recovery);
@@ -796,15 +831,21 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
         RequireRecoveryBinding(snapshot, recovery);
         if (snapshot.State.State == ApprovalSubmissionStateV1.RecoveryAuthorized)
         {
-            if (FixedDigestEquals(snapshot.State.EvidenceSha256, recoverySha256)) return snapshot.State;
+            if (FixedDigestEquals(snapshot.State.EvidenceSha256, recoverySha256))
+            {
+                return new PolicyApprovalSubmissionRecoveryCommitResult(
+                    snapshot.State,
+                    Inserted: false,
+                    CommitTimeActiveBinding: null);
+            }
             throw new PolicyApprovalSubmissionConflictException("Submission attempt is recovered by another exact human authorization commitment.");
         }
         if (snapshot.State.State != ApprovalSubmissionStateV1.ReconciledNotSubmitted)
             throw new UnauthorizedAccessException("Recovery requires an independent CONFIRMED_NOT_SUBMITTED state.");
-        await using var releaseBindingScope = await _releaseBindingRecoveryCoordinator!.AcquireAsync(
+        await using var releaseBindingScope = await _releaseBindingRecoverySource!.AcquireAsync(
             recovery.DeviceBindingId,
             cancellationToken);
-        RequireActiveReleaseBindingMatchesRecovery(
+        var activeBindingObservation = RequireActiveReleaseBindingMatchesRecovery(
             recovery,
             releaseBindingScope.ActiveBinding);
         await using var connection = await OpenRoleAsync(cancellationToken);
@@ -819,7 +860,10 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
             cancellationToken)).State;
         if (persisted.State != ApprovalSubmissionStateV1.RecoveryAuthorized)
             throw new InvalidDataException("Recovery authorization did not survive exact readback.");
-        return persisted;
+        return new PolicyApprovalSubmissionRecoveryCommitResult(
+            persisted,
+            Inserted: true,
+            activeBindingObservation);
     }
 
     // Commit-time Release BOM fence (F2) behind a store-proven per-device
@@ -833,16 +877,46 @@ internal sealed class PostgresPolicyApprovalSubmissionAuthority : IDisposable
     // after this one. An unreadable, non-active, foreign-device, or
     // mismatched binding fails closed: the exception rolls the transaction
     // back, so no recovery fact and no partial write is ever persisted.
-    private static void RequireActiveReleaseBindingMatchesRecovery(
+    private static PolicyRecoveryActiveBindingObservation RequireActiveReleaseBindingMatchesRecovery(
         ApprovalSubmissionRecoveryV1 recovery,
         ActiveReleaseBindingV1 binding)
     {
         ArgumentNullException.ThrowIfNull(binding);
+        binding.Validate();
         if (!string.Equals(binding.Status, "active", StringComparison.Ordinal)
             || !string.Equals(binding.DeviceBindingId, recovery.DeviceBindingId, StringComparison.Ordinal)
             || !FixedDigestEquals(binding.ReleaseBomSha256, recovery.NextReleaseBomSha256)
             || binding.Generation != recovery.NextReleaseBomGeneration)
             throw new UnauthorizedAccessException("Recovery next release BOM facts do not match the live active release binding; the recovery commit fails closed.");
+
+        byte[]? token = null;
+        byte[]? computed = null;
+        byte[]? declared = null;
+        try
+        {
+            token = Convert.FromBase64String(binding.ExecutionTokenBase64);
+            computed = SHA256.HashData(token);
+            declared = Convert.FromHexString(binding.ActivationTokenSha256);
+            if (computed.Length != 32
+                || declared.Length != 32
+                || !CryptographicOperations.FixedTimeEquals(computed, declared))
+            {
+                throw new UnauthorizedAccessException(
+                    "Recovery active release binding token does not match the signer commitment; the recovery commit fails closed.");
+            }
+            return new PolicyRecoveryActiveBindingObservation(
+                binding.DeviceBindingId,
+                binding.ReleaseBomSha256,
+                binding.Generation,
+                Convert.ToHexStringLower(computed),
+                binding.Status);
+        }
+        finally
+        {
+            if (token is not null) CryptographicOperations.ZeroMemory(token);
+            if (computed is not null) CryptographicOperations.ZeroMemory(computed);
+            if (declared is not null) CryptographicOperations.ZeroMemory(declared);
+        }
     }
 
     private ApprovalSubmissionStateV1 CreateSignedState(

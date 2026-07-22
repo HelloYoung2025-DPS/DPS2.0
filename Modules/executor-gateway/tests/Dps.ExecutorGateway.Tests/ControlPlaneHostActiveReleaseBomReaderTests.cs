@@ -64,6 +64,7 @@ public sealed class ControlPlaneHostActiveReleaseBomReaderTests
         Assert.NotEqual(binding.ReleaseBomGeneration, mapped.Generation);
         Assert.Equal(token, mapped.ExecutionTokenBase64);
         Assert.Equal(tokenSha256, mapped.ComputeExecutionTokenSha256());
+        Assert.Equal("active", mapped.Status);
         mapped.Validate();
         // The token stays redacted from string rendering on the mapped DTO.
         Assert.DoesNotContain(token, mapped.ToString(), StringComparison.Ordinal);
@@ -156,6 +157,7 @@ public sealed class ControlPlaneHostActiveReleaseBomReaderTests
         Assert.Equal(PinnedGeneration, mapped.Generation);
         Assert.Equal(PinnedExecutionTokenBase64, mapped.ExecutionTokenBase64);
         Assert.Equal(PinnedDevice, mapped.DeviceBindingId);
+        Assert.Equal("active", mapped.Status);
         Assert.Equal(
             Convert.FromBase64String(PinnedExecutionTokenBase64),
             Convert.FromBase64String(mapped.ExecutionTokenBase64));
@@ -196,7 +198,7 @@ public sealed class ControlPlaneHostActiveReleaseBomReaderTests
 
     private sealed class FakeActiveReleaseBindingReader(
         ActiveReleaseBindingV1? binding,
-        bool found = true) : IActiveReleaseBindingReader
+        bool found = true) : IActiveReleaseBindingTestReader
     {
         public int CallCount { get; private set; }
 

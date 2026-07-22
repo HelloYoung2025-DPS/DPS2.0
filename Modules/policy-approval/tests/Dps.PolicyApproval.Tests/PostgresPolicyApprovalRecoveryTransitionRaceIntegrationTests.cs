@@ -562,7 +562,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
                     executorSigner,
                     recoverySigner,
                     stateSigner,
-                    releaseBindingStore);
+                    authority.RecoveryCapability);
                 return new RecoveryRaceContext(
                     database,
                     bindings,

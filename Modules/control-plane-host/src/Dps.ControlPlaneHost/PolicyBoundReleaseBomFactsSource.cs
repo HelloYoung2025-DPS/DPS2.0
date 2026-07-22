@@ -11,8 +11,8 @@ namespace Dps.ControlPlaneHost;
 ///
 /// Direction note (RebuildPlan §4.3 "向 policy 与 executor 提供同一个
 /// composition-fixed reader"): the "same reader" means both consumption
-/// paths are sourced from the one authoritative
-/// <see cref="IActiveReleaseBindingReader"/>. policy-approval must NOT take
+/// paths are sourced from the one authority-issued sealed
+/// <see cref="ActiveReleaseBindingRecoveryCapability"/>. policy-approval must NOT take
 /// a direct module dependency on control-plane-host — control-plane-host
 /// already depends on policy-approval, so that edge is a dependency cycle
 /// (proved by Tools/ci/phase0.py build_dependency_graph_snapshot, which
@@ -35,10 +35,16 @@ public sealed class PolicyBoundReleaseBomFactsSource
 {
     private readonly IActiveReleaseBindingReader _reader;
 
-    public PolicyBoundReleaseBomFactsSource(IActiveReleaseBindingReader reader)
+    public PolicyBoundReleaseBomFactsSource(
+        ActiveReleaseBindingRecoveryCapability capability)
     {
-        _reader = reader ?? throw new ArgumentNullException(nameof(reader));
+        ArgumentNullException.ThrowIfNull(capability);
+        capability.RequireDurable();
+        _reader = new CapabilityReader(capability);
     }
+
+    internal PolicyBoundReleaseBomFactsSource(IActiveReleaseBindingReader reader)
+        => _reader = reader ?? throw new ArgumentNullException(nameof(reader));
 
     public bool TryReadActiveFacts(
         string deviceBindingId,
@@ -65,5 +71,15 @@ public sealed class PolicyBoundReleaseBomFactsSource
         releaseBomSha256 = binding.ReleaseBomSha256;
         releaseBomGeneration = binding.Generation;
         return true;
+    }
+
+    private sealed class CapabilityReader(
+        ActiveReleaseBindingRecoveryCapability capability)
+        : IActiveReleaseBindingReader
+    {
+        public bool TryReadActive(
+            string deviceBindingId,
+            out ActiveReleaseBindingV1? binding)
+            => capability.TryReadActive(deviceBindingId, out binding);
     }
 }

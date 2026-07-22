@@ -5,7 +5,7 @@ namespace Dps.ExecutorGateway;
 /// <summary>
 /// Composition-fixed, unique provider-backed adapter from the
 /// control-plane-host authoritative active Release BOM port
-/// (<see cref="IActiveReleaseBindingReader"/>, contract
+/// (<see cref="ActiveReleaseBindingRecoveryCapability"/>, contract
 /// active.release.binding/v1) onto this module's own
 /// <see cref="IVerifiedActiveReleaseBomReader"/> port. This is the
 /// RebuildPlan §4.3 "same composition-fixed reader for policy and executor"
@@ -26,19 +26,29 @@ namespace Dps.ExecutorGateway;
 /// </summary>
 public sealed class ControlPlaneHostActiveReleaseBomReader : IVerifiedActiveReleaseBomReader
 {
-    private readonly IActiveReleaseBindingReader _reader;
+    private readonly ActiveReleaseBindingRecoveryCapability? _capability;
+    private readonly IActiveReleaseBindingTestReader? _testReader;
 
-    public ControlPlaneHostActiveReleaseBomReader(IActiveReleaseBindingReader reader)
+    public ControlPlaneHostActiveReleaseBomReader(
+        ActiveReleaseBindingRecoveryCapability capability)
     {
-        _reader = reader ?? throw new ArgumentNullException(nameof(reader));
+        ArgumentNullException.ThrowIfNull(capability);
+        capability.RequireDurable();
+        _capability = capability;
     }
+
+    internal ControlPlaneHostActiveReleaseBomReader(IActiveReleaseBindingTestReader testReader)
+        => _testReader = testReader ?? throw new ArgumentNullException(nameof(testReader));
 
     public ValueTask<ActiveReleaseBomBindingV1?> ReadVerifiedActiveAsync(
         string deviceBindingId,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!_reader.TryReadActive(deviceBindingId, out var binding) || binding is null)
+        var found = _capability is not null
+            ? _capability.TryReadActive(deviceBindingId, out var binding)
+            : _testReader!.TryReadActive(deviceBindingId, out binding);
+        if (!found || binding is null)
         {
             return ValueTask.FromResult<ActiveReleaseBomBindingV1?>(null);
         }
@@ -52,6 +62,17 @@ public sealed class ControlPlaneHostActiveReleaseBomReader : IVerifiedActiveRele
             binding.DeviceBindingId,
             binding.ReleaseBomSha256,
             binding.Generation,
-            binding.ExecutionTokenBase64));
+            binding.ExecutionTokenBase64,
+            binding.Status));
     }
+}
+
+/// <summary>
+/// Same-module unit-test seam only. The public production constructor accepts
+/// only the sealed CPH-issued capability, so no consumer can substitute an
+/// arbitrary reader in a supported composition.
+/// </summary>
+internal interface IActiveReleaseBindingTestReader
+{
+    bool TryReadActive(string deviceBindingId, out ActiveReleaseBindingV1? binding);
 }

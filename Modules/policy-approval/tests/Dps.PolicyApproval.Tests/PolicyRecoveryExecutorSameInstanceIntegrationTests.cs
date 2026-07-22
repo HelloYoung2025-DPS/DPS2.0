@@ -17,7 +17,7 @@ namespace Dps.PolicyApproval.Tests;
 /// policy leg: ONE <see cref="ActiveReleaseBindingAuthority"/> instance backed
 /// by ONE <see cref="PostgresReleaseBindingTruthStore"/> (unique schema per
 /// run) is injected as the composition-fixed
-/// <see cref="IActiveReleaseBindingReader"/> into BOTH real consumer code
+/// <see cref="ActiveReleaseBindingRecoveryCapability"/> into BOTH real consumer code
 /// paths on the same running instance:
 /// (i) the full production policy recovery pipeline — the real
 /// <see cref="PolicyApprovalSubmissionRecoveryClient"/> composition driven
@@ -76,7 +76,9 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         // The SAME running instance backs both consumer paths: the real
         // executor adapter and the real recovery composition's commit-time
         // RequireActiveReleaseBindingMatchesRecovery re-read.
-        var executorReader = new ControlPlaneHostActiveReleaseBomReader(authority);
+        var compositionCapability = authority.RecoveryCapability;
+        Assert.Same(compositionCapability, authority.RecoveryCapability);
+        var executorReader = new ControlPlaneHostActiveReleaseBomReader(compositionCapability);
         var prepared = await PrepareSameInstanceRecoverableSubmissionAsync(
             database,
             authorityTopology,
@@ -97,9 +99,9 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             executorSigner,
             recoverySigner,
             stateSigner,
-            releaseBindingStore);
+            compositionCapability);
 
-        var authorized = await recoveryClient.AuthorizeSubmissionRecoveryAsync(
+        var policyResult = await recoveryClient.AuthorizeSubmissionRecoveryWithObservationAsync(
             SignRecovery(recoverySigner, RecoveryPinnedToLiveBinding(
                 prepared.Intent,
                 prepared.Reconciliation,
@@ -109,7 +111,10 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
                 Sha256Hex("same-instance-native:accept"))),
             cancellationToken);
 
-        Assert.Equal(ApprovalSubmissionStateV1.RecoveryAuthorized, authorized.State);
+        Assert.Equal(ApprovalSubmissionStateV1.RecoveryAuthorized, policyResult.State.State);
+        Assert.True(policyResult.Inserted);
+        var policyObserved = Assert.IsType<PolicyRecoveryActiveBindingObservation>(
+            policyResult.CommitTimeActiveBinding);
         await AssertRecoveryCountAsync(database, prepared.Intent.SubmissionAttemptId, 1, cancellationToken);
 
         // Field-level equality of the two consumer observations of the same
@@ -117,15 +122,20 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         // the policy commit-time check accepted against.
         var executorObserved = await executorReader.ReadVerifiedActiveAsync(DeviceA, cancellationToken);
         Assert.NotNull(executorObserved);
-        Assert.True(authority.TryReadActive(DeviceA, out var policyObserved));
-        Assert.NotNull(policyObserved);
-        Assert.Equal("active", policyObserved!.Status);
-        Assert.Equal(policyObserved.ReleaseBomSha256, executorObserved!.ReleaseBomSha256);
+        Assert.Equal("active", policyObserved.Status);
+        Assert.Equal(policyObserved.Status, executorObserved!.Status);
+        Assert.Equal(policyObserved.ReleaseBomSha256, executorObserved.ReleaseBomSha256);
         Assert.Equal(policyObserved.Generation, executorObserved.Generation);
-        Assert.Equal(policyObserved.ExecutionTokenBase64, executorObserved.ExecutionTokenBase64);
+        Assert.Equal(
+            policyObserved.ComputedExecutionTokenSha256,
+            executorObserved.ComputeExecutionTokenSha256());
         Assert.Equal(liveSha256, executorObserved.ReleaseBomSha256);
         Assert.Equal(1, executorObserved.Generation);
-        Assert.Equal(token, executorObserved.ExecutionTokenBase64);
+        Assert.Equal(
+            SameInstanceBomSigner.Sha256Hex(Convert.FromBase64String(token)),
+            executorObserved.ComputeExecutionTokenSha256());
+        await AssertRecoveryPayloadExcludesRawTokenAsync(
+            database, prepared.Intent.SubmissionAttemptId, token, cancellationToken);
     }
 
     [Fact, Trait("Category", "Integration")]
@@ -149,7 +159,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         var (bom1, token1) = bomSigner.SignBom("policy-sameinst-bom-1", 1, null);
         authority.Activate(DeviceA, bom1, token1);
         var bom1Sha256 = SameInstanceBomSigner.Sha256Hex(bom1);
-        var executorReader = new ControlPlaneHostActiveReleaseBomReader(authority);
+        var executorReader = new ControlPlaneHostActiveReleaseBomReader(authority.RecoveryCapability);
         var prepared = await PrepareSameInstanceRecoverableSubmissionAsync(
             database,
             authorityTopology,
@@ -170,7 +180,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             executorSigner,
             recoverySigner,
             stateSigner,
-            releaseBindingStore);
+            authority.RecoveryCapability);
         var staleRecovery = SignRecovery(recoverySigner, RecoveryPinnedToLiveBinding(
             prepared.Intent,
             prepared.Reconciliation,
@@ -195,12 +205,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         // values from the same instance that rejected the stale envelope.
         var executorObserved = await executorReader.ReadVerifiedActiveAsync(DeviceA, cancellationToken);
         Assert.NotNull(executorObserved);
-        Assert.True(authority.TryReadActive(DeviceA, out var policyObserved));
-        Assert.NotNull(policyObserved);
-        Assert.Equal("active", policyObserved!.Status);
-        Assert.Equal(policyObserved.ReleaseBomSha256, executorObserved!.ReleaseBomSha256);
-        Assert.Equal(policyObserved.Generation, executorObserved.Generation);
-        Assert.Equal(policyObserved.ExecutionTokenBase64, executorObserved.ExecutionTokenBase64);
+        Assert.Equal("active", executorObserved!.Status);
         Assert.Equal(SameInstanceBomSigner.Sha256Hex(bom2), executorObserved.ReleaseBomSha256);
         Assert.Equal(2, executorObserved.Generation);
         Assert.Equal(token2, executorObserved.ExecutionTokenBase64);
@@ -228,7 +233,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         var (bom1, token1) = bomSigner.SignBom("policy-sameinst-bom-1", 1, null);
         authority.Activate(DeviceA, bom1, token1);
         var bom1Sha256 = SameInstanceBomSigner.Sha256Hex(bom1);
-        var executorReader = new ControlPlaneHostActiveReleaseBomReader(authority);
+        var executorReader = new ControlPlaneHostActiveReleaseBomReader(authority.RecoveryCapability);
         var prepared = await PrepareSameInstanceRecoverableSubmissionAsync(
             database,
             authorityTopology,
@@ -249,7 +254,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             executorSigner,
             recoverySigner,
             stateSigner,
-            releaseBindingStore);
+            authority.RecoveryCapability);
         var staleRecovery = SignRecovery(recoverySigner, RecoveryPinnedToLiveBinding(
             prepared.Intent,
             prepared.Reconciliation,
@@ -275,7 +280,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         var restarted = new ActiveReleaseBindingAuthority(
             [bomSigner.TrustKey], restartedReleaseBindingStore, () => SameInstanceNow);
         Assert.False(restarted.TryReadActive(DeviceA, out _));
-        var restartedExecutorReader = new ControlPlaneHostActiveReleaseBomReader(restarted);
+        var restartedExecutorReader = new ControlPlaneHostActiveReleaseBomReader(restarted.RecoveryCapability);
         Assert.Null(await restartedExecutorReader.ReadVerifiedActiveAsync(DeviceA, cancellationToken));
 
         // Re-activation on the restarted instance advances the runtime
@@ -290,9 +295,9 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             executorSigner,
             recoverySigner,
             stateSigner,
-            restartedReleaseBindingStore);
+            restarted.RecoveryCapability);
 
-        var authorized = await restartedRecoveryClient.AuthorizeSubmissionRecoveryAsync(
+        var policyResult = await restartedRecoveryClient.AuthorizeSubmissionRecoveryWithObservationAsync(
             SignRecovery(recoverySigner, RecoveryPinnedToLiveBinding(
                 prepared.Intent,
                 prepared.Reconciliation,
@@ -302,20 +307,127 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
                 Sha256Hex("same-instance-native:restart"))),
             cancellationToken);
 
-        Assert.Equal(ApprovalSubmissionStateV1.RecoveryAuthorized, authorized.State);
+        Assert.Equal(ApprovalSubmissionStateV1.RecoveryAuthorized, policyResult.State.State);
+        Assert.True(policyResult.Inserted);
+        var policyObserved = Assert.IsType<PolicyRecoveryActiveBindingObservation>(
+            policyResult.CommitTimeActiveBinding);
         await AssertRecoveryCountAsync(database, prepared.Intent.SubmissionAttemptId, 1, cancellationToken);
 
         var executorObserved = await restartedExecutorReader.ReadVerifiedActiveAsync(DeviceA, cancellationToken);
         Assert.NotNull(executorObserved);
-        Assert.True(restarted.TryReadActive(DeviceA, out var policyObserved));
-        Assert.NotNull(policyObserved);
-        Assert.Equal("active", policyObserved!.Status);
-        Assert.Equal(policyObserved.ReleaseBomSha256, executorObserved!.ReleaseBomSha256);
+        Assert.Equal("active", policyObserved.Status);
+        Assert.Equal(policyObserved.Status, executorObserved!.Status);
+        Assert.Equal(policyObserved.ReleaseBomSha256, executorObserved.ReleaseBomSha256);
         Assert.Equal(policyObserved.Generation, executorObserved.Generation);
-        Assert.Equal(policyObserved.ExecutionTokenBase64, executorObserved.ExecutionTokenBase64);
+        Assert.Equal(
+            policyObserved.ComputedExecutionTokenSha256,
+            executorObserved.ComputeExecutionTokenSha256());
         Assert.Equal(bom2Sha256, executorObserved.ReleaseBomSha256);
         Assert.Equal(2, executorObserved.Generation);
         Assert.Equal(token2, executorObserved.ExecutionTokenBase64);
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task SameInstanceRollbackRestoresPreviousTokenAtMonotonicGenerationForBothConsumers()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var database = await PolicyApprovalTestDatabase.CreateAsync(cancellationToken);
+        await using var bindings = await SameInstanceReleaseBindingDatabase.CreateAsync(cancellationToken);
+        using var evaluationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var revocationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var fenceSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var executorSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var reconciliationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var recoverySigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var stateSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var bomSigner = new SameInstanceBomSigner();
+        var authorityTopology = SubmissionTopology(
+            evaluationSigner, revocationSigner, fenceSigner, executorSigner,
+            reconciliationSigner, recoverySigner, stateSigner);
+        var releaseBindingStore = bindings.CreateStore();
+        var authority = new ActiveReleaseBindingAuthority(
+            [bomSigner.TrustKey], releaseBindingStore, () => SameInstanceNow);
+        var (bom1, token1) = bomSigner.SignBom("policy-sameinst-rollback-bom-1", 1, null);
+        authority.Activate(DeviceA, bom1, token1);
+        var (bom2, token2) = bomSigner.SignBom("policy-sameinst-rollback-bom-2", 2, bom1);
+        authority.Activate(DeviceA, bom2, token2);
+        authority.Revoke(DeviceA, 2);
+        authority.Rollback(DeviceA, token1);
+        var bom1Sha256 = SameInstanceBomSigner.Sha256Hex(bom1);
+        var prepared = await PrepareSameInstanceRecoverableSubmissionAsync(
+            database,
+            authorityTopology,
+            evaluationSigner,
+            revocationSigner,
+            fenceSigner,
+            executorSigner,
+            reconciliationSigner,
+            recoverySigner,
+            stateSigner,
+            bom1Sha256,
+            3,
+            "same-instance-rollback",
+            cancellationToken);
+        using var recoveryClient = CreateRecoveryClient(
+            database,
+            authorityTopology,
+            executorSigner,
+            recoverySigner,
+            stateSigner,
+            authority.RecoveryCapability);
+        var policyResult = await recoveryClient.AuthorizeSubmissionRecoveryWithObservationAsync(
+            SignRecovery(recoverySigner, RecoveryPinnedToLiveBinding(
+                prepared.Intent,
+                prepared.Reconciliation,
+                bom1Sha256,
+                3,
+                Sha256Hex("same-instance-authorization:rollback"),
+                Sha256Hex("same-instance-native:rollback"))),
+            cancellationToken);
+        var policyObserved = Assert.IsType<PolicyRecoveryActiveBindingObservation>(
+            policyResult.CommitTimeActiveBinding);
+        var executorObserved = await new ControlPlaneHostActiveReleaseBomReader(authority.RecoveryCapability)
+            .ReadVerifiedActiveAsync(DeviceA, cancellationToken);
+
+        Assert.Equal(ApprovalSubmissionStateV1.RecoveryAuthorized, policyResult.State.State);
+        Assert.True(policyResult.Inserted);
+        Assert.NotNull(executorObserved);
+        Assert.Equal("active", policyObserved.Status);
+        Assert.Equal(policyObserved.Status, executorObserved!.Status);
+        Assert.Equal(bom1Sha256, policyObserved.ReleaseBomSha256);
+        Assert.Equal(policyObserved.ReleaseBomSha256, executorObserved.ReleaseBomSha256);
+        Assert.Equal(3, policyObserved.Generation);
+        Assert.Equal(policyObserved.Generation, executorObserved.Generation);
+        Assert.Equal(
+            policyObserved.ComputedExecutionTokenSha256,
+            executorObserved.ComputeExecutionTokenSha256());
+        Assert.Equal(
+            SameInstanceBomSigner.Sha256Hex(Convert.FromBase64String(token1)),
+            policyObserved.ComputedExecutionTokenSha256);
+        Assert.NotEqual(
+            SameInstanceBomSigner.Sha256Hex(Convert.FromBase64String(token2)),
+            policyObserved.ComputedExecutionTokenSha256);
+        await AssertRecoveryCountAsync(
+            database, prepared.Intent.SubmissionAttemptId, 1, cancellationToken);
+        await AssertRecoveryPayloadExcludesRawTokenAsync(
+            database, prepared.Intent.SubmissionAttemptId, token1, cancellationToken);
+    }
+
+    private static async Task AssertRecoveryPayloadExcludesRawTokenAsync(
+        PolicyApprovalTestDatabase database,
+        Guid submissionAttemptId,
+        string rawTokenBase64,
+        CancellationToken cancellationToken)
+    {
+        await using var owner = new NpgsqlConnection(database.AdminConnectionString);
+        await owner.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            $"SELECT recovery_json::text || state_json::text FROM {database.SchemaName}.approval_submission_recoveries WHERE submission_attempt_id = @submission_attempt_id",
+            owner) { CommandTimeout = 5 };
+        command.Parameters.AddWithValue("submission_attempt_id", submissionAttemptId);
+        var persisted = Assert.IsType<string>(await command.ExecuteScalarAsync(cancellationToken));
+        Assert.DoesNotContain(rawTokenBase64, persisted, StringComparison.Ordinal);
+        Assert.DoesNotContain("execution_token", persisted, StringComparison.Ordinal);
     }
 
     /// <summary>

@@ -113,7 +113,8 @@ public sealed class ActiveReleaseBindingAuthorityTests
     }
 
     private sealed class FrozenTruthStore(IReadOnlyList<ReleaseBindingTruthRecord> records)
-        : IReleaseBindingTruthStore
+        : IReleaseBindingTruthStore,
+          IActiveReleaseBindingRecoveryCoordinator
     {
         public void Append(ReleaseBindingTruthRecord record) { }
         public IReadOnlyList<ReleaseBindingTruthRecord> LoadAll() => records;
@@ -144,6 +145,13 @@ public sealed class ActiveReleaseBindingAuthorityTests
                 LoadDeviceHeadSequence(deviceBindingId),
                 delta);
         }
+
+        public ValueTask<IActiveReleaseBindingRecoveryScope> AcquireAsync(
+            string deviceBindingId,
+            CancellationToken cancellationToken)
+            => ValueTask.FromException<IActiveReleaseBindingRecoveryScope>(
+                new NotSupportedException(
+                    "Frozen journal recovery fixtures do not issue recovery scopes."));
     }
 
     private static ActiveReleaseBindingAuthority Authority(
@@ -199,7 +207,8 @@ public sealed class ActiveReleaseBindingAuthorityTests
         var (bom, token) = MakeBom(signer, "bom-coordinated", 1, null);
         authority.Activate(Device, bom, token);
 
-        var scope = await store.AcquireAsync(Device, TestContext.Current.CancellationToken);
+        var scope = await authority.RecoveryCapability.AcquireAsync(
+            Device, TestContext.Current.CancellationToken);
         Assert.Equal(Device, scope.ActiveBinding.DeviceBindingId);
         Assert.Equal(Sha256Hex(bom), scope.ActiveBinding.ReleaseBomSha256);
         Assert.Equal(1, scope.ActiveBinding.Generation);
@@ -219,6 +228,9 @@ public sealed class ActiveReleaseBindingAuthorityTests
         Assert.False(sameDeviceTransition.IsCompleted);
 
         await scope.DisposeAsync();
+        // Public lease disposal is idempotent and cannot over-release the
+        // exact store primitive it owns.
+        await scope.DisposeAsync();
         var revoked = await sameDeviceTransition.WaitAsync(
             TimeSpan.FromSeconds(2),
             TestContext.Current.CancellationToken);
@@ -234,7 +246,8 @@ public sealed class ActiveReleaseBindingAuthorityTests
         var authority = Authority(signer, store);
 
         await Assert.ThrowsAsync<ActiveReleaseBindingException>(
-            () => store.AcquireAsync(Device, TestContext.Current.CancellationToken).AsTask());
+            () => authority.RecoveryCapability.AcquireAsync(
+                Device, TestContext.Current.CancellationToken).AsTask());
 
         var (bom, token) = MakeBom(signer, "bom-after-failed-scope", 1, null);
         var receipt = await Task.Run(() => authority.Activate(Device, bom, token))
@@ -250,14 +263,15 @@ public sealed class ActiveReleaseBindingAuthorityTests
         var authority = Authority(signer, store);
         var (bom, token) = MakeBom(signer, "bom-cancelled-wait", 1, null);
         authority.Activate(Device, bom, token);
-        var firstScope = await store.AcquireAsync(
+        var firstScope = await authority.RecoveryCapability.AcquireAsync(
             Device,
             TestContext.Current.CancellationToken);
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => store.AcquireAsync(Device, cancelled.Token).AsTask());
+            () => authority.RecoveryCapability.AcquireAsync(
+                Device, cancelled.Token).AsTask());
 
         await firstScope.DisposeAsync();
         var receipt = await Task.Run(() => authority.Revoke(Device, 1))
@@ -1158,7 +1172,9 @@ public sealed class ActiveReleaseBindingAuthorityTests
 
     // ----- third adversarial review: F1-F4 regressions -----
 
-    private sealed class FailingAppendStore : IReleaseBindingTruthStore
+    private sealed class FailingAppendStore
+        : IReleaseBindingTruthStore,
+          IActiveReleaseBindingRecoveryCoordinator
     {
         private readonly InMemoryReleaseBindingTruthStore _inner = InMemoryReleaseBindingTruthStore.CreateTestOnly();
         public bool FailNextAppend { get; set; }
@@ -1186,6 +1202,12 @@ public sealed class ActiveReleaseBindingAuthorityTests
             string deviceBindingId,
             long afterSequence)
             => _inner.LoadSnapshotAfter(deviceBindingId, afterSequence);
+
+        public ValueTask<IActiveReleaseBindingRecoveryScope> AcquireAsync(
+            string deviceBindingId,
+            CancellationToken cancellationToken)
+            => ((IActiveReleaseBindingRecoveryCoordinator)_inner).AcquireAsync(
+                deviceBindingId, cancellationToken);
     }
 
     private sealed class FixedBindingReader(ActiveReleaseBindingV1? binding) : IActiveReleaseBindingReader
@@ -1385,7 +1407,9 @@ public sealed class ActiveReleaseBindingAuthorityTests
     /// or poisoned on demand, driving the resync fail-closed edges without
     /// corrupting the durable journal content itself.
     /// </summary>
-    private sealed class ResyncTestStore : IReleaseBindingTruthStore
+    private sealed class ResyncTestStore
+        : IReleaseBindingTruthStore,
+          IActiveReleaseBindingRecoveryCoordinator
     {
         private readonly InMemoryReleaseBindingTruthStore _inner =
             InMemoryReleaseBindingTruthStore.CreateTestOnly();
@@ -1432,6 +1456,12 @@ public sealed class ActiveReleaseBindingAuthorityTests
             var snapshot = _inner.LoadSnapshotAfter(deviceBindingId, afterSequence);
             return SnapshotOverride?.Invoke(snapshot) ?? snapshot;
         }
+
+        public ValueTask<IActiveReleaseBindingRecoveryScope> AcquireAsync(
+            string deviceBindingId,
+            CancellationToken cancellationToken)
+            => ((IActiveReleaseBindingRecoveryCoordinator)_inner).AcquireAsync(
+                deviceBindingId, cancellationToken);
     }
 
     [Fact, Trait("Category", "Unit")]

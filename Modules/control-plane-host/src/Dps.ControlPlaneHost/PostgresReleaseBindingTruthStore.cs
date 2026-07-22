@@ -332,9 +332,10 @@ public sealed class PostgresReleaseBindingTruthStore
     public IReleaseBindingTransitionScope BeginTransition(string deviceBindingId)
         => BeginTransitionAsync(deviceBindingId, CancellationToken.None).GetAwaiter().GetResult();
 
-    public async ValueTask<IActiveReleaseBindingRecoveryScope> AcquireAsync(
+    async ValueTask<IActiveReleaseBindingRecoveryScope>
+        IActiveReleaseBindingRecoveryCoordinator.AcquireAsync(
         string deviceBindingId,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
         var connection = await OpenVerifiedAsync(cancellationToken);
