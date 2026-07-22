@@ -318,6 +318,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var database = await PolicyApprovalTestDatabase.CreateAsync(cancellationToken);
+        await using var releaseBindingBaseline = await SameInstanceReleaseBindingDatabase.CreateAsync(cancellationToken);
         using var evaluationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var revocationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var fenceSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -389,6 +390,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var database = await PolicyApprovalTestDatabase.CreateAsync(cancellationToken);
+        await using var releaseBindingBaseline = await SameInstanceReleaseBindingDatabase.CreateAsync(cancellationToken);
         using var evaluationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var revocationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var fenceSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -477,6 +479,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var database = await PolicyApprovalTestDatabase.CreateAsync(cancellationToken);
+        await using var releaseBindingBaseline = await SameInstanceReleaseBindingDatabase.CreateAsync(cancellationToken);
         using var evaluationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var revocationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var fenceSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);

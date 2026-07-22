@@ -14,6 +14,10 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var database = await PolicyApprovalTestDatabase.CreateAsync(cancellationToken);
+        // The commit-time coordination proof: the recovery commit lock
+        // requires the control-plane-host release-binding baseline marker in
+        // this database (advisory locks are database-local).
+        await using var releaseBindingBaseline = await SameInstanceReleaseBindingDatabase.CreateAsync(cancellationToken);
         using var evaluationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var revocationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var fenceSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -59,6 +63,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var database = await PolicyApprovalTestDatabase.CreateAsync(cancellationToken);
+        await using var releaseBindingBaseline = await SameInstanceReleaseBindingDatabase.CreateAsync(cancellationToken);
         using var evaluationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var revocationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var fenceSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -108,6 +113,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var database = await PolicyApprovalTestDatabase.CreateAsync(cancellationToken);
+        await using var releaseBindingBaseline = await SameInstanceReleaseBindingDatabase.CreateAsync(cancellationToken);
         using var evaluationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var revocationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
         using var fenceSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
@@ -135,6 +141,100 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             recoverySigner,
             stateSigner,
             new StubActiveReleaseBindingReader());
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            recoveryClient.AuthorizeSubmissionRecoveryAsync(
+                SignRecovery(recoverySigner, prepared.Recovery),
+                cancellationToken));
+
+        var persisted = await recoveryClient.ReadSubmissionAsync(prepared.Intent.SubmissionAttemptId, cancellationToken);
+        Assert.Equal(ApprovalSubmissionStateV1.ReconciledNotSubmitted, persisted.State.State);
+        await AssertRecoveryCountAsync(database, prepared.Intent.SubmissionAttemptId, 0, cancellationToken);
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task CommitTimeReaderExceptionRollsRecoveryBackAndPersistsNothing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var database = await PolicyApprovalTestDatabase.CreateAsync(cancellationToken);
+        await using var releaseBindingBaseline = await SameInstanceReleaseBindingDatabase.CreateAsync(cancellationToken);
+        using var evaluationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var revocationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var fenceSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var executorSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var reconciliationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var recoverySigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var stateSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var authorityTopology = SubmissionTopology(evaluationSigner, revocationSigner, fenceSigner, executorSigner, reconciliationSigner, recoverySigner, stateSigner);
+        var prepared = await PrepareRecoverableSubmissionAsync(
+            database,
+            authorityTopology,
+            evaluationSigner,
+            revocationSigner,
+            fenceSigner,
+            executorSigner,
+            reconciliationSigner,
+            recoverySigner,
+            stateSigner,
+            "commit-binding-reader-fault",
+            cancellationToken);
+        using var recoveryClient = CreateRecoveryClient(
+            database,
+            authorityTopology,
+            executorSigner,
+            recoverySigner,
+            stateSigner,
+            new ThrowingActiveReleaseBindingReader());
+
+        // An exception out of the final comparison propagates and the
+        // transaction rolls back: no recovery row, no state transition.
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            recoveryClient.AuthorizeSubmissionRecoveryAsync(
+                SignRecovery(recoverySigner, prepared.Recovery),
+                cancellationToken));
+
+        var persisted = await recoveryClient.ReadSubmissionAsync(prepared.Intent.SubmissionAttemptId, cancellationToken);
+        Assert.Equal(ApprovalSubmissionStateV1.ReconciledNotSubmitted, persisted.State.State);
+        await AssertRecoveryCountAsync(database, prepared.Intent.SubmissionAttemptId, 0, cancellationToken);
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task MissingReleaseBindingCoordinationFailsRecoveryClosedAndPersistsNothing()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        // NO control-plane-host release-binding baseline exists in this
+        // database: the recovery cannot prove a shared advisory-lock
+        // serialization domain with the journal, so atomic coordination is
+        // unavailable and the commit must fail closed even though the
+        // composition-fixed reader would return matching facts.
+        await using var database = await PolicyApprovalTestDatabase.CreateAsync(cancellationToken);
+        using var evaluationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var revocationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var fenceSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var executorSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var reconciliationSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var recoverySigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var stateSigner = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        var authorityTopology = SubmissionTopology(evaluationSigner, revocationSigner, fenceSigner, executorSigner, reconciliationSigner, recoverySigner, stateSigner);
+        var prepared = await PrepareRecoverableSubmissionAsync(
+            database,
+            authorityTopology,
+            evaluationSigner,
+            revocationSigner,
+            fenceSigner,
+            executorSigner,
+            reconciliationSigner,
+            recoverySigner,
+            stateSigner,
+            "commit-binding-uncoordinated",
+            cancellationToken);
+        using var recoveryClient = CreateRecoveryClient(
+            database,
+            authorityTopology,
+            executorSigner,
+            recoverySigner,
+            stateSigner,
+            MatchingActiveReleaseBindingReader(prepared.Snapshot));
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             recoveryClient.AuthorizeSubmissionRecoveryAsync(
@@ -264,5 +364,11 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
 
         public bool TryReadActive(string deviceBindingId, out ActiveReleaseBindingV1? binding)
             => _activeBindings.TryGetValue(deviceBindingId, out binding);
+    }
+
+    private sealed class ThrowingActiveReleaseBindingReader : IActiveReleaseBindingReader
+    {
+        public bool TryReadActive(string deviceBindingId, out ActiveReleaseBindingV1? binding)
+            => throw new InvalidOperationException("active release binding read faulted at commit time");
     }
 }

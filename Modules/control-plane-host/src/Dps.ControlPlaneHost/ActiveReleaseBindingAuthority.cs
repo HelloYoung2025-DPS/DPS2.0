@@ -141,6 +141,51 @@ public sealed record ReleaseBindingTruthRecord(
     byte[]? SignedBomBytes);
 
 /// <summary>
+/// One per-device transition linearization scope: the durable serialization
+/// primitive for a single activation, revocation, or rollback, held across
+/// the authority's in-process gate so the durable lock is always acquired
+/// BEFORE the gate (the global lock order documented on
+/// <see cref="IReleaseBindingTruthStore.BeginTransition"/>). The authority
+/// disposes the scope after the transition publishes; an unused or faulted
+/// scope persists nothing and releases the durable lock.
+/// </summary>
+public interface IReleaseBindingTransitionScope : IDisposable
+{
+    /// <summary>
+    /// Appends the transition's journal record inside the scope's
+    /// linearization window. On a successful return the record is durable
+    /// (for the durable store, committed) and the per-device serialization
+    /// may be released; any exception persists nothing the caller could
+    /// observe as a landed transition.
+    /// </summary>
+    void Append(ReleaseBindingTruthRecord record);
+}
+
+/// <summary>
+/// Default <see cref="IReleaseBindingTransitionScope"/> for stores whose
+/// <see cref="IReleaseBindingTruthStore.Append"/> already IS the full
+/// linearization point (the single-process in-memory compare-and-set store
+/// and test doubles): no durable lock exists to hoist ahead of the
+/// authority's gate, so the scope simply forwards the append.
+/// </summary>
+internal sealed class PassThroughReleaseBindingTransitionScope : IReleaseBindingTransitionScope
+{
+    private readonly IReleaseBindingTruthStore _store;
+
+    internal PassThroughReleaseBindingTransitionScope(IReleaseBindingTruthStore store)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+        _store = store;
+    }
+
+    public void Append(ReleaseBindingTruthRecord record) => _store.Append(record);
+
+    public void Dispose()
+    {
+    }
+}
+
+/// <summary>
 /// Append-only truth store for release binding transitions. The authority
 /// appends one record per successful transition and loads the full journal
 /// at construction to recover state. The durable implementation is
@@ -175,6 +220,32 @@ public interface IReleaseBindingTruthStore
     /// pipeline as a full recovery replay.
     /// </summary>
     IReadOnlyList<ReleaseBindingTruthRecord> LoadAfter(string deviceBindingId, long afterSequence);
+
+    /// <summary>
+    /// Opens the per-device transition linearization scope for one
+    /// activation, revocation, or rollback. GLOBAL LOCK ORDER (deadlock
+    /// freedom): every path that touches both the durable per-device lock
+    /// and the authority's in-process gate acquires the durable lock FIRST,
+    /// so the authority opens this scope before entering its gate and the
+    /// scoped <see cref="IReleaseBindingTransitionScope.Append"/> is the only
+    /// append a transition performs. A policy-approval recovery holds the
+    /// same per-device database advisory lock while briefly entering the
+    /// gate through the composition-fixed reader; with this order the two
+    /// can never close a hold-and-wait cycle. The default implementation is
+    /// a pass-through: correct only for stores whose <see cref="Append"/>
+    /// already is the full linearization point (the single-process in-memory
+    /// compare-and-set store, test doubles). A durable multi-process store
+    /// MUST override with a scope that holds the real per-device
+    /// serialization primitive from before the gate until the append commits
+    /// (<see cref="PostgresReleaseBindingTruthStore"/> holds the per-device
+    /// pg_advisory_xact_lock on the scope's own transaction, which the SQL
+    /// append function then takes re-entrantly on the same session).
+    /// </summary>
+    IReleaseBindingTransitionScope BeginTransition(string deviceBindingId)
+    {
+        ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
+        return new PassThroughReleaseBindingTransitionScope(this);
+    }
 }
 
 /// <summary>
@@ -560,6 +631,14 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
 
         var bomBytesCopy = signedBomBytes.ToArray();
 
+        // Global lock order (see IReleaseBindingTruthStore.BeginTransition):
+        // the per-device durable serialization is acquired BEFORE _gate,
+        // never the reverse, so a policy-approval recovery holding the same
+        // per-device database advisory lock while briefly entering _gate
+        // through the reader can never close a hold-and-wait cycle against
+        // this transition. The scope's Append commits before the publish
+        // below, keeping the durability-first ordering.
+        using var transition = _store.BeginTransition(deviceBindingId);
         lock (_gate)
         {
             var state = _devices.TryGetValue(deviceBindingId, out var existing)
@@ -651,7 +730,7 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
             // a successful append is ever published. An Append failure
             // leaves zero visible change on the read and idempotency
             // surfaces.
-            _store.Append(new ReleaseBindingTruthRecord(
+            transition.Append(new ReleaseBindingTruthRecord(
                 deviceBindingId, receipt, binding, demoted,
                 facts.SignerGeneration, requestSha256, bomBytesCopy));
             state.RuntimeGeneration = generation;
@@ -668,6 +747,9 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
 
     public ReleaseBindingReceiptV1 Revoke(string deviceBindingId, long generation)
     {
+        // Lock order: see Activate — the per-device transition scope is
+        // acquired before _gate on every transition path.
+        using var transition = _store.BeginTransition(deviceBindingId);
         lock (_gate)
         {
             ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
@@ -701,7 +783,7 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
 
             var revoked = active with { Status = "revoked" };
             // Durability first (see Activate): append, then publish.
-            _store.Append(new ReleaseBindingTruthRecord(
+            transition.Append(new ReleaseBindingTruthRecord(
                 deviceBindingId, receipt, revoked, state.Previous,
                 state.LastActivationSignerGeneration, requestSha256, SignedBomBytes: null));
             state.Current = revoked;
@@ -714,6 +796,9 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
     public ReleaseBindingReceiptV1 Rollback(string deviceBindingId, string executionTokenBase64)
     {
         var tokenSha256 = RequireCanonicalTokenSha256(executionTokenBase64);
+        // Lock order: see Activate — the per-device transition scope is
+        // acquired before _gate on every transition path.
+        using var transition = _store.BeginTransition(deviceBindingId);
         lock (_gate)
         {
             ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
@@ -788,7 +873,7 @@ public sealed class ActiveReleaseBindingAuthority : IActiveReleaseBindingReader
                 occurredAt: now);
 
             // Durability first (see Activate): append, then publish.
-            _store.Append(new ReleaseBindingTruthRecord(
+            transition.Append(new ReleaseBindingTruthRecord(
                 deviceBindingId, receipt, binding, PreviousBinding: null,
                 state.LastActivationSignerGeneration, requestSha256, restoredBomBytes));
             state.RuntimeGeneration = generation;

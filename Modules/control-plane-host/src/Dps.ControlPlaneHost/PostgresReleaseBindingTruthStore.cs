@@ -1,3 +1,4 @@
+using System.Data;
 using System.Text;
 using Dps.ControlPlaneHost.Contracts;
 using Npgsql;
@@ -208,6 +209,21 @@ public sealed class PostgresReleaseBindingTruthStoreOptions
 /// one database transaction holding the same device journal lock as appends —
 /// re-verifies the head has not advanced and appends the fence record, or
 /// raises so the caller never releases the signed recovery envelope.
+///
+/// Transitions: <see cref="BeginTransition"/> implements the durable half of
+/// the global lock-order convention. It opens one verified connection and one
+/// ReadCommitted transaction and takes the per-device
+/// pg_advisory_xact_lock with the byte-identical key the
+/// append_release_binding_record function derives
+/// (hashtextextended('release-binding:' || device_binding_id, 0)). The
+/// authority acquires this scope BEFORE entering its in-process gate on every
+/// activation, revocation, and rollback; the scoped append runs the CAS
+/// function on the same session — where the function's internal advisory
+/// lock is re-entrant — and commits, so the journal row is durable before the
+/// authority publishes. Because no path ever holds the in-process gate while
+/// waiting on this advisory lock, a policy-approval recovery that holds the
+/// same per-device lock and briefly waits on the gate through the
+/// composition-fixed reader cannot close a hold-and-wait deadlock cycle.
 /// </summary>
 public sealed class PostgresReleaseBindingTruthStore
     : IReleaseBindingTruthStore, IReleaseBindingRecoveryFenceAuthority
@@ -298,6 +314,55 @@ public sealed class PostgresReleaseBindingTruthStore
         ReleaseBindingTruthRecord record,
         CancellationToken cancellationToken)
     {
+        await using var connection = await OpenVerifiedAsync(cancellationToken);
+        await using var command = CreateAppendCommand(connection, null, record);
+        await ExecuteAppendCommandAsync(command, cancellationToken);
+    }
+
+    public IReleaseBindingTransitionScope BeginTransition(string deviceBindingId)
+        => BeginTransitionAsync(deviceBindingId, CancellationToken.None).GetAwaiter().GetResult();
+
+    private async Task<IReleaseBindingTransitionScope> BeginTransitionAsync(
+        string deviceBindingId,
+        CancellationToken cancellationToken)
+    {
+        ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
+        var connection = await OpenVerifiedAsync(cancellationToken);
+        NpgsqlTransaction? transaction = null;
+        try
+        {
+            transaction = await connection.BeginTransactionAsync(
+                IsolationLevel.ReadCommitted, cancellationToken);
+            // The byte-identical per-device key the append/fence SECURITY
+            // DEFINER functions derive; taken here — on the scope's own
+            // transaction — BEFORE the authority enters its in-process gate,
+            // and re-taken re-entrantly by the append function on this same
+            // session. Released automatically at commit/rollback.
+            await using var command = Command(
+                "SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('release-binding:' || @device_binding_id, 0))",
+                connection,
+                transaction);
+            command.Parameters.AddWithValue("device_binding_id", deviceBindingId);
+            await command.ExecuteNonQueryAsync(cancellationToken);
+            var scope = new PostgresTransitionScope(this, connection, transaction);
+            transaction = null;
+            return scope;
+        }
+        finally
+        {
+            if (transaction is not null)
+            {
+                await transaction.DisposeAsync();
+                await connection.DisposeAsync();
+            }
+        }
+    }
+
+    private NpgsqlCommand CreateAppendCommand(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        ReleaseBindingTruthRecord record)
+    {
         ArgumentNullException.ThrowIfNull(record);
         var receipt = record.Receipt
             ?? throw new ActiveReleaseBindingException("truth store append requires a receipt");
@@ -320,12 +385,12 @@ public sealed class PostgresReleaseBindingTruthStore
             ? null
             : ActiveReleaseBindingV1Codec.Serialize(record.PreviousBinding);
 
-        await using var connection = await OpenVerifiedAsync(cancellationToken);
-        await using var command = Command(
+        var command = Command(
             $"SELECT {_qualifiedAppend}(@device_binding_id, @sequence, @receipt_kind, "
             + "@receipt_wire, @current_binding_wire, @previous_binding_wire, "
             + "@last_activation_signer_generation, @request_sha256, @signed_bom_wire)",
-            connection);
+            connection,
+            transaction);
         command.Parameters.AddWithValue("device_binding_id", record.DeviceBindingId);
         command.Parameters.AddWithValue("sequence", receipt.Sequence);
         command.Parameters.AddWithValue("receipt_kind", receipt.ReceiptKind);
@@ -341,6 +406,13 @@ public sealed class PostgresReleaseBindingTruthStore
         command.Parameters.AddWithValue(
             "signed_bom_wire",
             (object?)record.SignedBomBytes ?? DBNull.Value);
+        return command;
+    }
+
+    private static async Task ExecuteAppendCommandAsync(
+        NpgsqlCommand command,
+        CancellationToken cancellationToken)
+    {
         try
         {
             await command.ExecuteNonQueryAsync(cancellationToken);
@@ -352,6 +424,62 @@ public sealed class PostgresReleaseBindingTruthStore
             throw new ReleaseBindingTruthConflictException(
                 "truth store append sequence conflict: expected the exactly-next per-device sequence",
                 exception);
+        }
+    }
+
+    /// <summary>
+    /// One durable per-device transition scope: the open connection and
+    /// transaction that hold the device's advisory lock from before the
+    /// authority's in-process gate until the append commits. Append commits
+    /// the transaction, so a successful return means the journal row is
+    /// durable and the lock released; disposing an unused scope rolls back
+    /// and persists nothing.
+    /// </summary>
+    private sealed class PostgresTransitionScope : IReleaseBindingTransitionScope
+    {
+        private readonly PostgresReleaseBindingTruthStore _store;
+        private NpgsqlConnection? _connection;
+        private NpgsqlTransaction? _transaction;
+
+        internal PostgresTransitionScope(
+            PostgresReleaseBindingTruthStore store,
+            NpgsqlConnection connection,
+            NpgsqlTransaction transaction)
+        {
+            _store = store;
+            _connection = connection;
+            _transaction = transaction;
+        }
+
+        public void Append(ReleaseBindingTruthRecord record)
+            => AppendAsync(record, CancellationToken.None).GetAwaiter().GetResult();
+
+        private async Task AppendAsync(
+            ReleaseBindingTruthRecord record,
+            CancellationToken cancellationToken)
+        {
+            if (_connection is null || _transaction is null)
+            {
+                throw new ObjectDisposedException(
+                    nameof(PostgresTransitionScope),
+                    "A completed or disposed transition scope cannot append.");
+            }
+
+            await using var command = _store.CreateAppendCommand(_connection, _transaction, record);
+            await ExecuteAppendCommandAsync(command, cancellationToken);
+            await _transaction.CommitAsync(cancellationToken);
+            await _transaction.DisposeAsync();
+            _transaction = null;
+            await _connection.DisposeAsync();
+            _connection = null;
+        }
+
+        public void Dispose()
+        {
+            _transaction?.Dispose();
+            _transaction = null;
+            _connection?.Dispose();
+            _connection = null;
         }
     }
 
@@ -705,7 +833,13 @@ public sealed class PostgresReleaseBindingTruthStore
     }
 
     private static NpgsqlCommand Command(string sql, NpgsqlConnection connection)
-        => new(sql, connection)
+        => Command(sql, connection, null);
+
+    private static NpgsqlCommand Command(
+        string sql,
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction)
+        => new(sql, connection, transaction)
         {
             CommandTimeout = PostgresControlPlaneConnectionPolicy.MaximumSeconds
         };
