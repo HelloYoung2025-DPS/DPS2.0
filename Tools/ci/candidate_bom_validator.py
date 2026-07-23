@@ -10,7 +10,8 @@ gate code and must survive that module's R0-D deletion.  It validates only:
 no signing, no deployment, no runtime state.  This copy is the one
 scripts/release.sh invokes and the one the Phase 0 CI-integrity allowlist
 pins; its code-bound trust policy lives under governance/policies/.  The
-module-side original stays byte-identical until R0-D removes it.
+module-side original matches this copy after exactly the three declared
+migration edits until R0-D removes it.
 
 The owner provisioned the native-stop-trust signer out-of-repo on
 2026-07-21: the deployed trust policy now carries the

@@ -286,7 +286,7 @@ R0B_FROZEN_BASELINE_COMMIT = "8f63593d4f262ec1496b05300da75a71b86eaab4"
 
 
 def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
-    minimum_adversarial_tests = 137
+    minimum_adversarial_tests = 138
     required_inventory = {
         "test_missing_standard_module_layout_is_rejected",
         "test_placeholder_only_src_is_rejected",
@@ -444,6 +444,7 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         # Migration-fidelity pins: the module-side original may not drift from
         # the Tools/ci copy before R0-D deletes it, and the operational anchor
         # entry stays visibly registered, not silently green.
+        "test_the_validator_sources_differ_only_by_the_three_declared_migration_edits",
         "test_the_trust_policy_bytes_are_identical_in_both_homes",
         "test_the_code_bound_policy_digest_did_not_change_in_migration",
         "test_the_operational_anchor_entry_behaves_identically_in_both_copies",

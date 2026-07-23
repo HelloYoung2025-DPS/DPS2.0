@@ -680,6 +680,73 @@ class MigrationFidelityTests(unittest.TestCase):
     )
     MIGRATED_POLICY = ROOT / "governance" / "policies" / "deployed-release-trust-policy.v1.json"
 
+    def test_the_validator_sources_differ_only_by_the_three_declared_migration_edits(self) -> None:
+        module_docstring = (
+            b'"""Fail-closed signed Release BOM validator used by the root release gate.\n'
+            b"\n"
+            b"The module intentionally exposes no command execution surface.  It verifies\n"
+            b"fixed JSON shapes, repository Git objects, immutable bundle bytes, RSA-PSS\n"
+            b"signatures, independent evidence, risk approval, and the previous stable BOM.\n"
+            b'"""\n'
+        )
+        tools_docstring = (
+            b'"""Fail-closed signed Release BOM validator used by the root release gate.\n'
+            b"\n"
+            b"The module intentionally exposes no command execution surface.  It verifies\n"
+            b"fixed JSON shapes, repository Git objects, immutable bundle bytes, RSA-PSS\n"
+            b"signatures, independent evidence, risk approval, and the previous stable BOM.\n"
+            b"\n"
+            b"R0-C (RebuildPlan 4.3) migrated this validator here from\n"
+            b"Modules/factory-release-controller/src/ -- candidate validation is ordinary\n"
+            b"gate code and must survive that module's R0-D deletion.  It validates only:\n"
+            b"no signing, no deployment, no runtime state.  This copy is the one\n"
+            b"scripts/release.sh invokes and the one the Phase 0 CI-integrity allowlist\n"
+            b"pins; its code-bound trust policy lives under governance/policies/.  The\n"
+            b"module-side original matches this copy after exactly the three declared\n"
+            b"migration edits until R0-D removes it.\n"
+            b"\n"
+            b"The owner provisioned the native-stop-trust signer out-of-repo on\n"
+            b"2026-07-21: the deployed trust policy now carries the\n"
+            b"native_stop_trust_signer_identities group (owner-native-stop-trust-signer-1)\n"
+            b"and the single-purpose native-stop-trust key native-stop-trust-owner-key-1,\n"
+            b"and the code-bound digest was re-anchored to the patched policy, so\n"
+            b"from_deployed_anchor constructs the release validator against the live\n"
+            b"anchor.\n"
+            b'"""\n'
+        )
+        module_policy_path = (
+            b'_DEPLOYED_TRUST_POLICY_RELATIVE = (\n'
+            b'    "Modules/factory-release-controller/operations/"\n'
+            b'    "deployed-release-trust-policy.v1.json"\n'
+            b')\n'
+        )
+        tools_policy_path = (
+            b'_DEPLOYED_TRUST_POLICY_RELATIVE = (\n'
+            b'    "governance/policies/deployed-release-trust-policy.v1.json"\n'
+            b')\n'
+        )
+        module_repo_root = (
+            b'    parser.add_argument("--repo-root", '
+            b'default=str(Path(__file__).resolve().parents[3]))\n'
+        )
+        tools_repo_root = (
+            b'    # Tools/ci/<this file> -> parents[2] is the repository root.\n'
+            b'    parser.add_argument("--repo-root", '
+            b'default=str(Path(__file__).resolve().parents[2]))\n'
+        )
+        declared_edits = (
+            (tools_docstring, module_docstring),
+            (tools_policy_path, module_policy_path),
+            (tools_repo_root, module_repo_root),
+        )
+        normalized_tools = SOURCE_PATH.read_bytes()
+        module_source = self.MODULE_SOURCE.read_bytes()
+        for tools_block, module_block in declared_edits:
+            self.assertEqual(1, normalized_tools.count(tools_block))
+            self.assertEqual(1, module_source.count(module_block))
+            normalized_tools = normalized_tools.replace(tools_block, module_block, 1)
+        self.assertEqual(module_source, normalized_tools)
+
     def test_the_trust_policy_bytes_are_identical_in_both_homes(self) -> None:
         self.assertEqual(self.MODULE_POLICY.read_bytes(), self.MIGRATED_POLICY.read_bytes())
 

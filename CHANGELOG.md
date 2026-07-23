@@ -2,6 +2,13 @@
 
 ## [Unreleased] - 2026-07-17
 
+### R0-C Release BOM authority migration
+
+#### Changed
+
+- 将 `factory-release-controller` 保留的候选 BOM validator 与权威 `Tools/ci` 副本之间的迁移忠实度收紧为 required byte-level 测试：只允许已声明的顶层说明、部署信任策略路径和 `--repo-root` 深度三处精确差异，任何额外源码漂移均失败关闭；相应 Phase 0 adversarial test floor 从 137 提升到 138。
+- `governance/modules/module-catalog.yaml` 中 `gbrain-projector` 的 `riskTier` 由 R2 校正为 R3，仅修复官方生成快照相对权威 `Modules/gbrain-projector/module.yaml` 的既有漂移：该 manifest 在本批基线 `7a0ed9c3b31fbd21922114ce49e3dcf84d41ef05` 已为 R3 且本批未修改；这不是 R0-C 新增风险策略或批次边界变更。
+
 ### M0/R0-A 基线复现（第一个实现批次）
 
 #### Added
