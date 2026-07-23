@@ -1,0 +1,1 @@
+{"evidence_id":"factory-phase0-static","issuer_identity":"evidence-issuer","kind":"REPOSITORY","required":true,"result":"PASS","schema_version":"dps.release-evidence/v1","tested_commit":"569074f8770e0d125019b6aa65bf6f0f48980786","verification_level":"REPOSITORY_STATIC_VERIFIED"}

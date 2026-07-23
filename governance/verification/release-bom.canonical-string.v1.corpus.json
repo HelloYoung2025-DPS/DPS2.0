@@ -1,0 +1,26 @@
+{
+  "schema_version": "dps.release-bom-canonical-string-corpus/v1",
+  "encoding": "base64-encoded UTF-8 JSON wire",
+  "cases": [
+    {
+      "id": "escaped-legal-scalars",
+      "wire_base64": "WyJcdWUwMDAiLCJcdTIwMjgiLCJcdTMwMDAiLCJcdWQ4MDBcdWRjMDAiXQ==",
+      "canonical_base64": "WyLugIAiLCLigKgiLCLjgIAiLCLwkICAIl0="
+    },
+    {
+      "id": "unicode-scalar-key-order",
+      "wire_base64": "eyLwkICAIjo0LCLugIAiOjMsIuOAgCI6Miwi4oCoIjoxLCJhIjowfQ==",
+      "canonical_base64": "eyJhIjowLCLigKgiOjEsIuOAgCI6Miwi7oCAIjozLCLwkICAIjo0fQ=="
+    },
+    {
+      "id": "minimal-string-escapes",
+      "wire_base64": "WyJcIiIsIlxcIiwiXGIiLCJcZiIsIlxuIiwiXHIiLCJcdCIsIlx1MDAwMCIsIlx1MDAxZiJd",
+      "canonical_base64": "WyJcIiIsIlxcIiwiXGIiLCJcZiIsIlxuIiwiXHIiLCJcdCIsIlx1MDAwMCIsIlx1MDAxZiJd"
+    },
+    {
+      "id": "prefix-and-astral-order",
+      "wire_base64": "eyJh8JCAgCI6NCwiYe6AgCI6MywiYSI6MSwiYeOAgCI6Mn0=",
+      "canonical_base64": "eyJhIjoxLCJh44CAIjoyLCJh7oCAIjozLCJh8JCAgCI6NH0="
+    }
+  ]
+}

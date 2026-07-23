@@ -1,4 +1,4 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><AssemblyName>Dps.PolicyApproval.Tests</AssemblyName><RootNamespace>Dps.PolicyApproval.Tests</RootNamespace><IsPackable>false</IsPackable></PropertyGroup>
-  <ItemGroup><PackageReference Include="Microsoft.NET.Test.Sdk" /><PackageReference Include="Npgsql" /><PackageReference Include="xunit.v3" /><ProjectReference Include="../../src/Dps.PolicyApproval/Dps.PolicyApproval.csproj" /></ItemGroup>
+  <ItemGroup><PackageReference Include="Microsoft.NET.Test.Sdk" /><PackageReference Include="Npgsql" /><PackageReference Include="xunit.v3" /><ProjectReference Include="../../src/Dps.PolicyApproval/Dps.PolicyApproval.csproj" /><ProjectReference Include="../../../control-plane-host/src/Dps.ControlPlaneHost/Dps.ControlPlaneHost.csproj" /><ProjectReference Include="../../../executor-gateway/src/Dps.ExecutorGateway/Dps.ExecutorGateway.csproj" /></ItemGroup>
 </Project>

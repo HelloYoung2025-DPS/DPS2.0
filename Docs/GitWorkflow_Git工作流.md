@@ -99,6 +99,7 @@ The helper is a validation-only preflight. It requires a completely clean checko
   --bundle-root /absolute/path/to/candidate-bundle \
   --bom release-bom.json \
   --previous-bom previous-stable-bom.json \
+  --native-stop-trust-receipt /absolute/path/to/native-stop-trust-receipt.json \
   --schema-sha256 <lowercase-sha256>
 ```
 

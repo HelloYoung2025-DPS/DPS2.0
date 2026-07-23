@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <UseMicrosoftTestingPlatformRunner>true</UseMicrosoftTestingPlatformRunner>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="xunit.v3" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Dps.ControlPlaneHost/Dps.ControlPlaneHost.csproj" />
+    <ProjectReference Include="../../contracts/Dps.ControlPlaneHost.Contracts/Dps.ControlPlaneHost.Contracts.csproj" />
+    <ProjectReference Include="../../../executor-gateway/src/Dps.ExecutorGateway/Dps.ExecutorGateway.csproj" />
+    <ProjectReference Include="../../../policy-approval/src/Dps.PolicyApproval/Dps.PolicyApproval.csproj" />
+  </ItemGroup>
+</Project>

@@ -825,7 +825,7 @@ public sealed class PostgresControlPlaneTruthStore
                    COALESCE(pg_catalog.pg_get_expr(default_value.adbin, default_value.adrelid), ''),
                    a.attidentity = '',
                    a.attgenerated = '',
-                   COALESCE(collation.collname, ''),
+                   COALESCE(collation_value.collname, ''),
                    CASE WHEN a.atttypid = 'pg_catalog.text'::regtype
                         THEN a.attcollation = 'pg_catalog."C"'::regcollation
                         ELSE a.attcollation = 0
@@ -835,7 +835,7 @@ public sealed class PostgresControlPlaneTruthStore
             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
             LEFT JOIN pg_catalog.pg_attrdef default_value
               ON default_value.adrelid = a.attrelid AND default_value.adnum = a.attnum
-            LEFT JOIN pg_catalog.pg_collation collation ON collation.oid = a.attcollation
+            LEFT JOIN pg_catalog.pg_collation collation_value ON collation_value.oid = a.attcollation
             WHERE n.nspname = @schema_name
               AND c.relname = ANY(@table_names)
               AND a.attnum > 0
@@ -886,11 +886,13 @@ public sealed class PostgresControlPlaneTruthStore
                              AND constraint_value.confupdtype = 'a'
                              AND constraint_value.confmatchtype = 's'
                         ELSE true END,
-                   NOT constraint_value.connoinherit,
+                   CASE WHEN constraint_value.contype = 'c'
+                        THEN NOT constraint_value.connoinherit
+                        ELSE constraint_value.connoinherit END,
                    constraint_value.conenforced,
                    pg_catalog.obj_description(
                        constraint_value.oid,
-                       'pg_constraint') =
+                       'pg_constraint') IS NOT DISTINCT FROM
                        'dps.control-plane-host.constraint-definition-baseline/v1'
                        || E'\n'
                        || pg_catalog.pg_get_constraintdef(constraint_value.oid, false)

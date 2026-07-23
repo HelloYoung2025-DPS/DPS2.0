@@ -38,6 +38,16 @@ CONTRACTS = (
         POLICY_PROVIDED / "approval.submission.state.v1.schema.json",
         POLICY_PROVIDED / "approval.submission.state.v1.corpus.json",
     ),
+    (
+        "active.release.binding/v1",
+        PROVIDED / "active.release.binding.v1.schema.json",
+        PROVIDED / "active.release.binding.v1.corpus.json",
+    ),
+    (
+        "release.binding.receipt/v1",
+        PROVIDED / "release.binding.receipt.v1.schema.json",
+        PROVIDED / "release.binding.receipt.v1.corpus.json",
+    ),
 )
 EXPECTED_CASE_IDS = {
     "action.execution.promotion/v1": {
@@ -100,6 +110,53 @@ EXPECTED_CASE_IDS = {
         "ack-without-predecessor",
         "unknown-field",
     },
+    "active.release.binding/v1": {
+        "valid",
+        "additional-field",
+        "unknown-major",
+        "wrong-contract-id",
+        "wrong-producer",
+        "uppercase-device-binding",
+        "short-bom-digest",
+        "zero-generation",
+        "fractional-generation",
+        "zero-signer-generation",
+        "fractional-signer-generation",
+        "token-hex-not-base64",
+        "token-missing-padding",
+        "uppercase-activation-token-sha",
+        "unknown-status",
+        "empty-signer-identity",
+        "trailing-newline-signer-key",
+        "uppercase-signature-hash",
+        "offset-not-zulu",
+        "missing-receipt-id",
+    },
+    "release.binding.receipt/v1": {
+        "valid-activation-null-from",
+        "valid-activation-previous-from",
+        "valid-activation-revoked-from",
+        "activation-from-active",
+        "valid-revocation",
+        "valid-rollback",
+        "additional-field",
+        "unknown-major",
+        "wrong-producer",
+        "unknown-kind",
+        "activation-to-not-active",
+        "revocation-null-from",
+        "rollback-from-not-revoked",
+        "endpoint-additional-field",
+        "missing-to",
+        "zero-sequence",
+        "fractional-sequence",
+        "uppercase-actor",
+        "offset-not-zulu",
+        "uppercase-payload-hash",
+        "trailing-newline-receipt-id",
+        "missing-device-binding",
+        "payload-digest-mismatch",
+    },
 }
 
 
@@ -141,7 +198,7 @@ def _apply_case(corpus: dict[str, object], case: dict[str, object]) -> dict[str,
 
 
 class ProvidedContractSchemaTests(unittest.TestCase):
-    """Exactly sixteen fail-closed tests; candidate policy binds this floor."""
+    """Exactly twenty fail-closed tests; candidate policy binds this floor."""
 
     def test_01_both_schemas_are_draft_2020_12(self) -> None:
         for _, schema_path, _ in CONTRACTS:
@@ -258,6 +315,64 @@ class ProvidedContractSchemaTests(unittest.TestCase):
         self.assertEqual("human-release-approver", recovery["authority_role"]["const"])
         self.assertEqual("policy-approval", state["producer_module"]["const"])
 
+    def test_17_release_binding_shared_corpus(self) -> None:
+        self._assert_corpus(CONTRACTS[5])
+
+    def test_18_release_binding_receipt_shared_corpus(self) -> None:
+        self._assert_corpus(CONTRACTS[6])
+
+    def test_19_release_binding_ownership_is_fixed(self) -> None:
+        binding = _load(CONTRACTS[5][1])["properties"]
+        receipt = _load(CONTRACTS[6][1])["properties"]
+        manifest = _load(MODULE_ROOT / "module.yaml")
+        self.assertEqual("active.release.binding/v1", binding["contract_id"]["const"])
+        self.assertEqual("control-plane-host", binding["producer_module"]["const"])
+        self.assertEqual(["active", "previous", "revoked"], binding["status"]["enum"])
+        # R0-C stores the raw token in the append-only binding journal so an
+        # exact prior binding can be restored. Its wire privacy class remains
+        # the v1 value "internal"; storage durability is declared separately
+        # as a secret scope and must never be mislabeled ephemeral.
+        self.assertEqual("internal", binding["privacy_class"]["const"])
+        secret_scopes = manifest["security"]["secretScopes"]
+        self.assertEqual(
+            [
+                "durable append-only active-release-binding execution token at rest; "
+                "redacted from text output and readable only through the "
+                "composition-fixed authority"
+            ],
+            secret_scopes,
+        )
+        self.assertNotIn("ephemeral", " ".join(secret_scopes).lower())
+        retention = manifest["data"]["retention"].lower()
+        for term in (
+            "raw active-release-binding execution tokens",
+            "append-only postgresql truth",
+            "durable at-rest secrets",
+        ):
+            with self.subTest(retention_term=term):
+                self.assertIn(term, retention)
+        self.assertEqual("release.binding.receipt/v1", receipt["contract_id"]["const"])
+        self.assertEqual("control-plane-host", receipt["producer_module"]["const"])
+        self.assertEqual(["activation", "revocation", "rollback"], receipt["receipt_kind"]["enum"])
+        for properties in (binding, receipt):
+            for identity in ("soul_id", "platform_account_id", "trace_id", "idempotency_key"):
+                with self.subTest(contract=properties["contract_id"]["const"], identity=identity):
+                    self.assertIsNone(properties[identity]["const"])
+
+    def test_20_release_binding_generation_and_sequence_are_int64_bounded(self) -> None:
+        binding_validator = _validator(CONTRACTS[5][1])
+        binding = copy.deepcopy(_load(CONTRACTS[5][2])["base"])
+        binding["generation"] = 9223372036854775807
+        self.assertTrue(binding_validator.is_valid(binding))
+        binding["generation"] = 9223372036854775808
+        self.assertFalse(binding_validator.is_valid(binding))
+        receipt_validator = _validator(CONTRACTS[6][1])
+        receipt = copy.deepcopy(_load(CONTRACTS[6][2])["base"])
+        receipt["sequence"] = 9223372036854775807
+        self.assertTrue(receipt_validator.is_valid(receipt))
+        receipt["sequence"] = 9223372036854775808
+        self.assertFalse(receipt_validator.is_valid(receipt))
+
     def _assert_corpus(
         self,
         contract: tuple[str, Path, Path],
@@ -286,10 +401,10 @@ def load_tests(
 ) -> unittest.TestSuite:
     del loader, pattern
     observed_floor = tests.countTestCases()
-    if observed_floor != 16:
+    if observed_floor != 20:
         raise RuntimeError(
             "control-plane-host.contract-schema floor mismatch: "
-            f"expected=16 observed={observed_floor}"
+            f"expected=20 observed={observed_floor}"
         )
     return tests
 
@@ -297,9 +412,9 @@ def load_tests(
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(ProvidedContractSchemaTests)
     observed_floor = suite.countTestCases()
-    if observed_floor != 16:
+    if observed_floor != 20:
         raise SystemExit(
-            f"control-plane-host.contract-schema floor mismatch: expected=16 observed={observed_floor}"
+            f"control-plane-host.contract-schema floor mismatch: expected=20 observed={observed_floor}"
         )
     result = unittest.TextTestRunner(verbosity=1).run(suite)
     raise SystemExit(0 if result.wasSuccessful() else 1)

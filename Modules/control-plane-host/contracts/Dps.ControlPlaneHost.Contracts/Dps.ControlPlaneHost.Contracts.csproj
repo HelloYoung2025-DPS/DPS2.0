@@ -4,8 +4,11 @@
     <AssemblyName>Dps.ControlPlaneHost.Contracts</AssemblyName>
     <RootNamespace>Dps.ControlPlaneHost.Contracts</RootNamespace>
     <PackageId>Dps.ControlPlaneHost.Contracts</PackageId>
-    <Version>0.4.0</Version>
+    <Version>0.5.0</Version>
   </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Dps.ControlPlaneHost" />
+  </ItemGroup>
   <ItemGroup>
     <None Include="../provided/control.plane.receipt.v1.schema.json"
           Pack="true"
@@ -17,5 +20,25 @@
                       LogicalName="Dps.ControlPlaneHost.Contracts.control.plane.receipt.v1.schema.json" />
     <EmbeddedResource Include="../provided/control.plane.receipt.v1.corpus.json"
                       LogicalName="Dps.ControlPlaneHost.Contracts.control.plane.receipt.v1.corpus.json" />
+    <None Include="../provided/active.release.binding.v1.schema.json"
+          Pack="true"
+          PackagePath="contracts" />
+    <None Include="../provided/active.release.binding.v1.corpus.json"
+          Pack="true"
+          PackagePath="contracts" />
+    <None Include="../provided/release.binding.receipt.v1.schema.json"
+          Pack="true"
+          PackagePath="contracts" />
+    <None Include="../provided/release.binding.receipt.v1.corpus.json"
+          Pack="true"
+          PackagePath="contracts" />
+    <EmbeddedResource Include="../provided/active.release.binding.v1.schema.json"
+                      LogicalName="Dps.ControlPlaneHost.Contracts.active.release.binding.v1.schema.json" />
+    <EmbeddedResource Include="../provided/active.release.binding.v1.corpus.json"
+                      LogicalName="Dps.ControlPlaneHost.Contracts.active.release.binding.v1.corpus.json" />
+    <EmbeddedResource Include="../provided/release.binding.receipt.v1.schema.json"
+                      LogicalName="Dps.ControlPlaneHost.Contracts.release.binding.receipt.v1.schema.json" />
+    <EmbeddedResource Include="../provided/release.binding.receipt.v1.corpus.json"
+                      LogicalName="Dps.ControlPlaneHost.Contracts.release.binding.receipt.v1.corpus.json" />
   </ItemGroup>
 </Project>

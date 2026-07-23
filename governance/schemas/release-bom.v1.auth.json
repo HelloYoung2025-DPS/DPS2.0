@@ -1,0 +1,134 @@
+{
+  "schema_version": "dps.release-bom-auth-spec/v1",
+  "profile_id": "r0c-deployed-rsa-pss-sha256/v1",
+  "release_bom_contract": {
+    "schema_version": "dps.release-bom/v1",
+    "schema_path": "governance/schemas/release-bom.schema.json",
+    "issued_statuses": [
+      "SIGNED",
+      "STABLE"
+    ]
+  },
+  "scope": {
+    "applies_to": "R0-C deployed Release BOM issuance and verification for the candidate validator and active release binding authority",
+    "does_not_redefine_release_bom_schema": true,
+    "does_not_change_signature_algorithm_enum": true,
+    "explicit_non_scope": [
+      {
+        "surface": "Tools/verification external F6-F9 verification",
+        "contract_id": "dps.external-verification-bom/v1",
+        "signature_algorithm": "ecdsa-p256-sha256",
+        "domain_separator_utf8": "dps-external-verification-bom/v1\n",
+        "statement": "This RSA-PSS profile is cryptographically disjoint from the dormant F6-F9 ECDSA Release BOM protocol; neither contract accepts the other's identifier or signing domain."
+      }
+    ]
+  },
+  "private_key_boundary": {
+    "exclusive_owner": "repository-external Owner/KMS release signer",
+    "allowed_private_key_locations": [
+      "Owner-controlled external release signer",
+      "Owner-controlled KMS"
+    ],
+    "forbidden_private_key_recipients": [
+      "repository",
+      "model",
+      "candidate code",
+      "Tools/ci process",
+      "Control Plane runtime process"
+    ],
+    "repository_material": "public verification facts and conformance vectors only"
+  },
+  "key_profile": {
+    "algorithm": "rsa-pss-sha256",
+    "selected_key_cardinality_per_issuance": 1,
+    "identity_and_material_binding": "one exact key_id, identity, modulus_hex, exponent tuple",
+    "purposes_exact": [
+      "bom"
+    ],
+    "modulus_encoding": "canonical lowercase unsigned hexadecimal without a leading zero nibble",
+    "minimum_unsigned_modulus_octets": 256,
+    "public_exponent": 65537
+  },
+  "pss_profile": {
+    "message_hash": "SHA-256",
+    "mask_generation_function": "MGF1",
+    "mgf1_hash": "SHA-256",
+    "salt_length_octets": 32,
+    "trailer_field_hex": "bc"
+  },
+  "signing_input": {
+    "domain_separator_utf8": "dps-release-bom/v1\n",
+    "payload_definition": "for each issued lifecycle wire, all top-level Release BOM members except the single signature member",
+    "payload_encoding": "UTF-8",
+    "payload_json_profile": "sorted compact canonical JSON bound by the referenced number and string corpora",
+    "message_formula": "UTF8(domain_separator_utf8) || canonical_payload_utf8"
+  },
+  "lifecycle_pair": {
+    "candidate_wire": {
+      "status": "SIGNED",
+      "role": "candidate validation and active binding activation"
+    },
+    "stable_twin_wire": {
+      "status": "STABLE",
+      "role": "durable previous-stable lifecycle wire for a later non-bootstrap activation"
+    },
+    "top_level_differences_exact": [
+      "status",
+      "signature"
+    ],
+    "all_other_top_level_members": "deep-equal JSON values; because both complete wires are canonical, each corresponding member has one byte-identical canonical encoding",
+    "signature_rule": "SIGNED and STABLE payloads are independently RSA-PSS signed; a signature from one status cannot be copied to the other",
+    "issuance_rule": "each accepted issuance creates and persists the exact SIGNED candidate wire and its exact STABLE lifecycle twin",
+    "next_candidate_reference": {
+      "previous_stable_bom": "bom_id of the exact persisted STABLE lifecycle twin",
+      "previous_stable_bom_sha256": "lowercase SHA-256 digest of the exact persisted STABLE lifecycle-twin wire"
+    }
+  },
+  "canonical_wire": {
+    "top_level_value": "one JSON object",
+    "encoding": "UTF-8",
+    "maximum_final_wire_utf8_bytes": 4194304,
+    "object_member_order": "ascending Unicode scalar value",
+    "member_separator": ",",
+    "name_value_separator": ":",
+    "ascii_escaping": "disabled except JSON-required escapes and U+0000 through U+001F",
+    "duplicate_members": "reject",
+    "trailing_bytes": "reject",
+    "signature_object_exact_members": [
+      "algorithm",
+      "key_id",
+      "value"
+    ],
+    "signature_value_encoding": "RFC 4648 standard alphabet canonical padded Base64 with no whitespace"
+  },
+  "rsa_representative": {
+    "modulus_octet_length_formula": "k = ceil(bit_length(n) / 8)",
+    "signature_octets": "exact I2OSP(s, k)",
+    "required_signature_octet_length": "k",
+    "representative_range": "0 <= s < n",
+    "short_or_overlong_encoding": "reject"
+  },
+  "issuance_output": {
+    "construction": "independently insert each exact signature object and canonicalize the complete SIGNED and STABLE Release BOM wires",
+    "persist_before_return": [
+      "exact canonical SIGNED final wire bytes",
+      "exact canonical STABLE lifecycle-twin final wire bytes",
+      "lowercase SHA-256 digest of each exact final wire",
+      "selected key identity and material binding",
+      "both independent signature byte strings"
+    ],
+    "identical_request_behavior": "return both byte-identical persisted final wires; do not perform either randomized RSA-PSS issuance again",
+    "release_bom_sha256_definition": "lowercase SHA-256 digest of the applicable exact persisted SIGNED or STABLE final wire bytes",
+    "consumer_rule": "candidate, activation, previous-stable binding, recovery, receipt, and retry paths reuse the applicable exact persisted final wire bytes"
+  },
+  "canonicalization_corpora": [
+    {
+      "path": "governance/verification/release-bom.canonical-number.v1.corpus.json",
+      "sha256": "14f115b4acb3b11e4cc97b4fd657eea6b112841b3ee7bdc6b293e9fae4add4d3"
+    },
+    {
+      "path": "governance/verification/release-bom.canonical-string.v1.corpus.json",
+      "sha256": "a7a132a48170ce6495af87706faa722670d4ceb856620436b5906e78d1ee42f9"
+    }
+  ]
+}

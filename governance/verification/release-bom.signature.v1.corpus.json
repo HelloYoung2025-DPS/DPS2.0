@@ -1,0 +1,165 @@
+{
+  "schema_version": "dps.release-bom-signature-corpus/v1",
+  "profile_id": "r0c-deployed-rsa-pss-sha256/v1",
+  "auth_spec": {
+    "path": "governance/schemas/release-bom.v1.auth.json",
+    "sha256": "e8f381cea601f277dc6eda3ade054a919f238a29e39c6acd9d727b5928d3890c"
+  },
+  "key": {
+    "key_id": "corpus-external-owner-kms-key-1",
+    "identity": "corpus-external-owner-kms-signer-1",
+    "algorithm": "rsa-pss-sha256",
+    "modulus_hex": "ca789b0b97fc236bc16f67234797bee64452b8316b80c95d37c761149200148f6a1c2ce928b7608637d70d9e71464b6d71eaa7f58cef2ded947002c7300e10d0b6cfb52fd1da63d1c0fba0b00db7cd6b73b327d74c5f6ae3ea336f5bcde926996386ad3ea3cfb18e55eeb833811652e264fdb2dcd7b2522c49136e1a14918042690fcd5aad17620385677510377f54eb8a5513283f1bd1f637ba5552f1e0b1128fcaf49bd142349467e81d35b068711d1b25a3133c9efef78b76587c1e5d3d55c845d6c906fc075851cd5658a9c4a482a115d54656db9b209fda2244944269ef70518194a1b34420ab1649bb97fa0814edd2afb1a0e931d135ff7969b55f57f5",
+    "unsigned_modulus_octets": 256,
+    "exponent": 65537,
+    "purposes": [
+      "bom"
+    ],
+    "private_key_material": "absent; this synthetic public key is not trusted by the deployed release policy"
+  },
+  "positive": {
+    "id": "rsa-pss-sha256-salt32-canonical-final-wire",
+    "domain_separator_utf8": "dps-release-bom/v1\n",
+    "canonical_payload_utf8": "{\"bom_id\":\"contract-vector-1\",\"schema_version\":\"dps.release-bom/v1\",\"status\":\"SIGNED\"}",
+    "payload_sha256": "17e9231f510d1b016fd1269b49513a0cd5ea0ba2cde0ebd81774acf39fa3b766",
+    "message_sha256": "9f9d79c13921372973c4304c7d6acb16d16df4363d168775cd23c6360eb1600e",
+    "signature_base64": "lKkSrnieC6JLrQs0dxWpc+1JIh/qF+D27TjKVgBvoB/e/LPL9oNkv02j0MJyPFA383Ihr5f6wv+6a3tFHHsYiINcaMWhYNG0MkqxucerRkPTXAedCMonBDs2kp/sVqGMlP/+v8A2ODyURSn96OIi2i60Vl1cvmq/xtBZgETHNKYwMxlEUQbuINAXKylzXr7nRwvr/K/JJ/jtSxqSlWvhBPyEumZAkrChVzYwT2SF8PVD3GPphWJ1pU1TfR3w10oHlnvWWn9JtKFUaNMo+gexte1snk0mOTUVJHe5CIITIuYDcMn/TTnCfvjvPa4Q9M0P5rix9/9Px3aLYq/K3lVnUQ==",
+    "signature_octets": 256,
+    "signature_sha256": "fae9b221faeace72dece7f8134203e0d959b87632f24708469c68b28a4138b02",
+    "final_wire_utf8": "{\"bom_id\":\"contract-vector-1\",\"schema_version\":\"dps.release-bom/v1\",\"signature\":{\"algorithm\":\"rsa-pss-sha256\",\"key_id\":\"corpus-external-owner-kms-key-1\",\"value\":\"lKkSrnieC6JLrQs0dxWpc+1JIh/qF+D27TjKVgBvoB/e/LPL9oNkv02j0MJyPFA383Ihr5f6wv+6a3tFHHsYiINcaMWhYNG0MkqxucerRkPTXAedCMonBDs2kp/sVqGMlP/+v8A2ODyURSn96OIi2i60Vl1cvmq/xtBZgETHNKYwMxlEUQbuINAXKylzXr7nRwvr/K/JJ/jtSxqSlWvhBPyEumZAkrChVzYwT2SF8PVD3GPphWJ1pU1TfR3w10oHlnvWWn9JtKFUaNMo+gexte1snk0mOTUVJHe5CIITIuYDcMn/TTnCfvjvPa4Q9M0P5rix9/9Px3aLYq/K3lVnUQ==\"},\"status\":\"SIGNED\"}",
+    "final_wire_sha256": "48552c4efddd507b78fd76a56b3f28dcd4c9f2876937e7c807f31358dc708ad0",
+    "identical_retry_final_wire_sha256": "48552c4efddd507b78fd76a56b3f28dcd4c9f2876937e7c807f31358dc708ad0",
+    "expected": "PASS"
+  },
+  "stable_twin": {
+    "id": "rsa-pss-sha256-salt32-canonical-stable-lifecycle-twin",
+    "domain_separator_utf8": "dps-release-bom/v1\n",
+    "canonical_payload_utf8": "{\"bom_id\":\"contract-vector-1\",\"schema_version\":\"dps.release-bom/v1\",\"status\":\"STABLE\"}",
+    "payload_sha256": "b524b9b9fbd434a966d6831dc20df395ce8522db88a794079b07b62796436673",
+    "message_sha256": "ece0c6ed75db2d03763fe0930c6fd9120d04ee4eb5f0577e9c94cbf2649bc65a",
+    "signature_base64": "ubjw8E9ejPd/anTOPDdEkqxkC2XZPjc6kcyTYxDN6HcP+HOclFCUZmKD75cbcQzccDqtX2FNu7zFi5+dfoSHSeYLz0dGPakjqCkCLQmTNiAXAsukCCDEpHHGVLai01bOcRHTJGIEBnCAae9CJjiiWIrw9BE662vgX+bRlzcgHnS/VgbpiczOg3RrdicSAvqtfHVTQubc79P6+y95tuBHclvW9aoLq+Anjv7pPweRnFHWwcG4riE8yihcEDHQkB5WnrHHFgfUXhMHGGA1nv+04JdLNNwHRZhSObrm0+3WX/ZVWF1Pxm8NhxKMeDc+em9cQ6UOiRdLEML4kpCtHkQcvA==",
+    "signature_octets": 256,
+    "signature_sha256": "9340104aeee07ba8d4272a6d5fe4ec54d49947587a3d5769d4baa7dc86456f86",
+    "final_wire_utf8": "{\"bom_id\":\"contract-vector-1\",\"schema_version\":\"dps.release-bom/v1\",\"signature\":{\"algorithm\":\"rsa-pss-sha256\",\"key_id\":\"corpus-external-owner-kms-key-1\",\"value\":\"ubjw8E9ejPd/anTOPDdEkqxkC2XZPjc6kcyTYxDN6HcP+HOclFCUZmKD75cbcQzccDqtX2FNu7zFi5+dfoSHSeYLz0dGPakjqCkCLQmTNiAXAsukCCDEpHHGVLai01bOcRHTJGIEBnCAae9CJjiiWIrw9BE662vgX+bRlzcgHnS/VgbpiczOg3RrdicSAvqtfHVTQubc79P6+y95tuBHclvW9aoLq+Anjv7pPweRnFHWwcG4riE8yihcEDHQkB5WnrHHFgfUXhMHGGA1nv+04JdLNNwHRZhSObrm0+3WX/ZVWF1Pxm8NhxKMeDc+em9cQ6UOiRdLEML4kpCtHkQcvA==\"},\"status\":\"STABLE\"}",
+    "final_wire_sha256": "3a95c76a2c522a7fbbef5bb1b5d424f820d4b44b0c13b337f0bb1425c3540f09",
+    "identical_retry_final_wire_sha256": "3a95c76a2c522a7fbbef5bb1b5d424f820d4b44b0c13b337f0bb1425c3540f09",
+    "expected": "PASS"
+  },
+  "pair_invariant": {
+    "top_level_differences_exact": [
+      "status",
+      "signature"
+    ],
+    "candidate_status": "SIGNED",
+    "stable_twin_status": "STABLE",
+    "candidate_final_wire_sha256": "48552c4efddd507b78fd76a56b3f28dcd4c9f2876937e7c807f31358dc708ad0",
+    "stable_twin_final_wire_sha256": "3a95c76a2c522a7fbbef5bb1b5d424f820d4b44b0c13b337f0bb1425c3540f09",
+    "next_candidate_previous_stable_bom": "contract-vector-1",
+    "next_candidate_previous_stable_bom_sha256": "3a95c76a2c522a7fbbef5bb1b5d424f820d4b44b0c13b337f0bb1425c3540f09",
+    "expected": "PASS"
+  },
+  "negative_cases": [
+    {
+      "id": "base64-padding-bit-alias",
+      "mutation": "replace-canonical-final-quartet-UQ==-with-UR==",
+      "expected": "FAIL",
+      "reason": "signature Base64 is not the canonical re-encoding"
+    },
+    {
+      "id": "base64-trailing-whitespace",
+      "mutation": "append-LF-to-signature-base64",
+      "expected": "FAIL",
+      "reason": "signature Base64 contains whitespace"
+    },
+    {
+      "id": "short-i2osp",
+      "mutation": "remove-first-signature-octet",
+      "expected": "FAIL",
+      "reason": "signature is not exact I2OSP(s, k)"
+    },
+    {
+      "id": "representative-equals-modulus",
+      "mutation": "use-modulus-octets-as-signature",
+      "expected": "FAIL",
+      "reason": "RSA representative is not less than n"
+    },
+    {
+      "id": "modulus-below-256-octets",
+      "mutation": "remove-first-modulus-octet",
+      "expected": "FAIL",
+      "reason": "RSA modulus is below the deployed 256-octet minimum"
+    },
+    {
+      "id": "wrong-public-exponent",
+      "mutation": "replace-exponent-with-3",
+      "expected": "FAIL",
+      "reason": "deployed BOM key exponent is not 65537"
+    },
+    {
+      "id": "purpose-reuse",
+      "mutation": "replace-purposes-with-bom-and-artifact",
+      "expected": "FAIL",
+      "reason": "deployed BOM signing key purpose is not exactly bom"
+    },
+    {
+      "id": "wrong-mgf1-hash",
+      "mutation": "replace-mgf1-hash-with-SHA-384",
+      "expected": "FAIL",
+      "reason": "MGF1 hash is not SHA-256"
+    },
+    {
+      "id": "wrong-salt-length",
+      "mutation": "replace-salt-length-with-20",
+      "expected": "FAIL",
+      "reason": "RSA-PSS salt length is not 32 octets"
+    },
+    {
+      "id": "wrong-trailer-field",
+      "mutation": "replace-trailer-bc-with-cc",
+      "expected": "FAIL",
+      "reason": "RSA-PSS trailer field is not 0xbc"
+    },
+    {
+      "id": "altered-payload",
+      "mutation": "replace-status-SIGNED-with-REVOKED",
+      "expected": "FAIL",
+      "reason": "signature does not bind the altered canonical payload"
+    },
+    {
+      "id": "altered-domain",
+      "mutation": "remove-domain-separator-LF",
+      "expected": "FAIL",
+      "reason": "signature does not bind a different domain separator"
+    },
+    {
+      "id": "final-wire-trailing-lf",
+      "mutation": "append-LF-to-final-wire",
+      "expected": "FAIL",
+      "reason": "the complete signed BOM is not the exact canonical final wire"
+    },
+    {
+      "id": "final-wire-member-reorder",
+      "mutation": "move-status-before-signature",
+      "expected": "FAIL",
+      "reason": "the complete signed BOM is not in canonical member order"
+    },
+    {
+      "id": "identical-request-new-final-wire",
+      "mutation": "change-one-signature-base64-character-on-retry",
+      "expected": "FAIL",
+      "reason": "an identical issuance request must reuse the byte-identical persisted final wire"
+    },
+    {
+      "id": "stable-twin-copied-candidate-signature",
+      "mutation": "copy-SIGNED-signature-object-to-STABLE-payload",
+      "expected": "FAIL",
+      "reason": "SIGNED and STABLE lifecycle payloads require independent signatures"
+    },
+    {
+      "id": "stable-twin-top-level-drift",
+      "mutation": "change-STABLE-bom-id",
+      "expected": "FAIL",
+      "reason": "the lifecycle twin may differ from the candidate only in status and signature"
+    }
+  ]
+}

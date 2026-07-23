@@ -22,6 +22,8 @@ if str(TOOLS_DIR) not in sys.path:
 import external_gate as external_gate_module  # noqa: E402
 from external_gate import (  # noqa: E402
     ELIGIBLE,
+    F6_F9_RELEASE_BOM_CONTRACT_ID,
+    F6_F9_RELEASE_BOM_SIGNATURE_DOMAIN,
     ExternalGateError,
     _openssl_verify_p1363,
     canonical_bytes,
@@ -456,7 +458,7 @@ class Fixture:
         self.runner_sbom_digest = hashlib.sha256(b"synthetic-f7-runner-sbom").hexdigest()
         self.bom_path = root / "release-bom.json"
         self.bom = {
-            "schema_version": "dps.release-bom/v1",
+            "schema_version": F6_F9_RELEASE_BOM_CONTRACT_ID,
             "bom_id": "bom-test-0001",
             "status": "SIGNED",
             "modules": [
@@ -938,7 +940,7 @@ class Fixture:
         previous_provider_digest = hashlib.sha256(b"previous edge worker").hexdigest()
         previous_consumer_digest = hashlib.sha256(b"previous scale consumer").hexdigest()
         previous_bom = {
-            "schema_version": "dps.release-bom/v1",
+            "schema_version": F6_F9_RELEASE_BOM_CONTRACT_ID,
             "bom_id": "bom-stable-0001",
             "status": "STABLE",
             "release_bom_generation": 1,
@@ -1728,6 +1730,21 @@ class ExternalGateAttackTests(unittest.TestCase):
         self.assertEqual("bom_artifact_mismatch", decision.reason_code)
         self.assertNotEqual(0, decision.exit_code)
 
+    def test_r0c_release_bom_contract_id_is_not_an_f6_f9_contract(self) -> None:
+        self.assertEqual(
+            "dps.external-verification-bom/v1",
+            F6_F9_RELEASE_BOM_CONTRACT_ID,
+        )
+        self.fixture.bom["schema_version"] = "dps.release-bom/v1"
+        self.fixture.bom_path.write_bytes(canonical_bytes(self.fixture.bom))
+        self.fixture.evidence["release_bom"]["sha256"] = hashlib.sha256(
+            self.fixture.bom_path.read_bytes()
+        ).hexdigest()
+        self.fixture.reseal()
+        decision = self.decision()
+        self.assertEqual("unknown_bom_version", decision.reason_code)
+        self.assertNotEqual(0, decision.exit_code)
+
     def test_release_bom_duplicate_keys_are_rejected(self) -> None:
         bom_text = self.fixture.bom_path.read_text(encoding="utf-8")
         duplicate = bom_text.replace('"status":"SIGNED"', '"status":"STABLE","status":"SIGNED"', 1)
@@ -1945,7 +1962,7 @@ class F7ExternalGateTests(unittest.TestCase):
         unsigned_bom.pop("signature")
         self.fixture.bom["signature"]["value"] = _openssl_sign_p1363(
             bom_private,
-            b"dps-release-bom/v1\n" + canonical_bytes(unsigned_bom),
+            F6_F9_RELEASE_BOM_SIGNATURE_DOMAIN + canonical_bytes(unsigned_bom),
         )
         self.fixture.bom_path.write_bytes(canonical_bytes(self.fixture.bom))
         self.fixture.evidence["release_bom"]["sha256"] = hashlib.sha256(
@@ -1978,6 +1995,37 @@ class F7ExternalGateTests(unittest.TestCase):
         windows_private, device_private, _bom_private = self.sign_with_ephemeral_test_keys()
         signature = self.fixture.bom["signature"]["value"]
         self.fixture.bom["signature"]["value"] = ("A" if signature[0] != "A" else "B") + signature[1:]
+        self.fixture.bom_path.write_bytes(canonical_bytes(self.fixture.bom))
+        self.fixture.evidence["release_bom"]["sha256"] = hashlib.sha256(
+            self.fixture.bom_path.read_bytes()
+        ).hexdigest()
+        self.fixture.evidence["payload"]["release_bom_sha256"] = self.fixture.evidence[
+            "release_bom"
+        ]["sha256"]
+        self.fixture.refresh_f7_prerequisite_receipt(windows_private)
+        self._sign_attestation(device_private)
+        decision = run_gate(
+            "f7",
+            self.fixture.evidence_path,
+            self.fixture.trust_path.resolve(),
+            clock=lambda: self.fixture.finished + timedelta(minutes=2),
+        )
+        self.assertEqual("invalid_signature", decision.reason_code)
+        self.assertNotEqual(0, decision.exit_code)
+
+    @unittest.skipUnless(shutil.which("openssl"), "OpenSSL is required")
+    def test_r0c_release_bom_domain_is_not_accepted_by_f6_f9(self) -> None:
+        windows_private, device_private, bom_private = self.sign_with_ephemeral_test_keys()
+        self.assertEqual(
+            b"dps-external-verification-bom/v1\n",
+            F6_F9_RELEASE_BOM_SIGNATURE_DOMAIN,
+        )
+        unsigned_bom = copy.deepcopy(self.fixture.bom)
+        unsigned_bom.pop("signature")
+        self.fixture.bom["signature"]["value"] = _openssl_sign_p1363(
+            bom_private,
+            b"dps-release-bom/v1\n" + canonical_bytes(unsigned_bom),
+        )
         self.fixture.bom_path.write_bytes(canonical_bytes(self.fixture.bom))
         self.fixture.evidence["release_bom"]["sha256"] = hashlib.sha256(
             self.fixture.bom_path.read_bytes()

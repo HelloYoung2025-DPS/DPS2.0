@@ -79,6 +79,48 @@
       "candidateGreenEligible": true
     },
     {
+      "moduleId": "executor-gateway",
+      "declarationKind": "consumed",
+      "contractId": "active.release.binding",
+      "major": 1,
+      "source": "Modules/control-plane-host/contracts/provided/active.release.binding.v1.schema.json",
+      "status": "proposed",
+      "mode": "active",
+      "ownerModule": "control-plane-host",
+      "schemaProducers": [
+        "control-plane-host"
+      ],
+      "candidateGreenEligible": true
+    },
+    {
+      "moduleId": "policy-approval",
+      "declarationKind": "consumed",
+      "contractId": "active.release.binding",
+      "major": 1,
+      "source": "Modules/control-plane-host/contracts/provided/active.release.binding.v1.schema.json",
+      "status": "proposed",
+      "mode": "active",
+      "ownerModule": "control-plane-host",
+      "schemaProducers": [
+        "control-plane-host"
+      ],
+      "candidateGreenEligible": true
+    },
+    {
+      "moduleId": "control-plane-host",
+      "declarationKind": "provided",
+      "contractId": "active.release.binding",
+      "major": 1,
+      "source": "Modules/control-plane-host/contracts/provided/active.release.binding.v1.schema.json",
+      "status": "proposed",
+      "mode": "active",
+      "ownerModule": "control-plane-host",
+      "schemaProducers": [
+        "control-plane-host"
+      ],
+      "candidateGreenEligible": true
+    },
+    {
       "moduleId": "operation-compiler",
       "declarationKind": "consumed",
       "contractId": "approval.decision",
@@ -1623,6 +1665,20 @@
       "candidateGreenEligible": true
     },
     {
+      "moduleId": "control-plane-host",
+      "declarationKind": "provided",
+      "contractId": "release.binding.receipt",
+      "major": 1,
+      "source": "Modules/control-plane-host/contracts/provided/release.binding.receipt.v1.schema.json",
+      "status": "proposed",
+      "mode": "active",
+      "ownerModule": "control-plane-host",
+      "schemaProducers": [
+        "control-plane-host"
+      ],
+      "candidateGreenEligible": true
+    },
+    {
       "moduleId": "factory-control-plane-host",
       "declarationKind": "consumed",
       "contractId": "rollback.plan",
@@ -2245,6 +2301,64 @@
       "compatibilityGroupRequired": false,
       "activeProducerConsumer": false,
       "candidateGreenEligible": false
+    },
+    {
+      "contractId": "active.release.binding",
+      "major": 1,
+      "ownerModule": "control-plane-host",
+      "ownerMode": "active",
+      "producerModule": "control-plane-host",
+      "producerDeclarationKind": "provided",
+      "producerMode": "active",
+      "transportSenderModule": "control-plane-host",
+      "transportSenderMode": "active",
+      "transportSenderDeclarationKind": "provided",
+      "transportReceiverModule": "executor-gateway",
+      "transportPreservesProducer": false,
+      "consumerModule": "executor-gateway",
+      "consumerDeclarationKind": "consumed",
+      "consumerMode": "active",
+      "producerResolution": "schema-producer-is-transport-sender",
+      "communicationPairSha256": "4c339ca2edb1f22aef17074a3559bf0ef98c5c8061c7b1145630a19f9889c225",
+      "reciprocalResolved": true,
+      "direction": "current-producer-to-current-consumer",
+      "executionClass": "active-runtime",
+      "readCompatible": false,
+      "runnable": true,
+      "deployable": true,
+      "independentDeployable": true,
+      "compatibilityGroupRequired": false,
+      "activeProducerConsumer": true,
+      "candidateGreenEligible": true
+    },
+    {
+      "contractId": "active.release.binding",
+      "major": 1,
+      "ownerModule": "control-plane-host",
+      "ownerMode": "active",
+      "producerModule": "control-plane-host",
+      "producerDeclarationKind": "provided",
+      "producerMode": "active",
+      "transportSenderModule": "control-plane-host",
+      "transportSenderMode": "active",
+      "transportSenderDeclarationKind": "provided",
+      "transportReceiverModule": "policy-approval",
+      "transportPreservesProducer": false,
+      "consumerModule": "policy-approval",
+      "consumerDeclarationKind": "consumed",
+      "consumerMode": "active",
+      "producerResolution": "schema-producer-is-transport-sender",
+      "communicationPairSha256": "76225acefcd32246a03ed08270f2c4c6c697f36a4cde3e52aed103a14e040afd",
+      "reciprocalResolved": true,
+      "direction": "current-producer-to-current-consumer",
+      "executionClass": "active-runtime",
+      "readCompatible": false,
+      "runnable": true,
+      "deployable": true,
+      "independentDeployable": true,
+      "compatibilityGroupRequired": false,
+      "activeProducerConsumer": true,
+      "candidateGreenEligible": true
     },
     {
       "contractId": "approval.decision",

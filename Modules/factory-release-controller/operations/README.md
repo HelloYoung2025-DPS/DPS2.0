@@ -2,22 +2,44 @@
 
 ## Candidate gate
 
-The root release workflow may invoke only this fixed validation CLI:
+R0-C moved the authoritative root release validation entrypoint to the
+ordinary, stateless CI tool below. The module-local copy remains only as a
+byte-compared rollback/migration-fidelity fixture until the module is removed
+in R0-D; release orchestration must not invoke it.
 
 ```text
-python3.12 Modules/factory-release-controller/src/candidate_bom_validator.py \
+python3.12 Tools/ci/candidate_bom_validator.py \
   --repo-root <clean-checkout> \
   --bundle-root <immutable-bundle> \
   --bom <candidate-bom.json> \
   --previous-bom <previous-stable-bom.json> \
+  --native-stop-trust-receipt <external-owner-receipt.json> \
+  --minimum-remaining-lifetime-seconds 86400 \
   --schema-sha256 <exact-release-bom-schema-sha256>
 ```
 
-The CLI validates only. It always loads `operations/deployed-release-trust-policy.v1.json`; its identity and canonical SHA-256 are fixed in the validator code. A caller cannot provide or override a trust policy, its identities, or its required gates. Each required gate binds an evidence ID to an exact evidence kind and a minimum verification level. A signed optional `FAIL`, a wrong kind, or a lower level cannot satisfy a required gate. The reported candidate ceiling is derived from the required gates that actually passed and is capped at `INTEGRATION_VERIFIED`. Changing that anchor is a separately reviewed deployment-governance change and cannot approve a product candidate in the same run.
+The CLI validates only. It always loads the migrated
+`governance/policies/deployed-release-trust-policy.v1.json`; its identity and
+canonical SHA-256 are fixed in the validator code. A caller cannot provide or
+override a trust policy, its identities, or its required gates. Each required
+gate binds an evidence ID to an exact evidence kind and a minimum verification
+level. A signed optional `FAIL`, a wrong kind, or a lower level cannot satisfy
+a required gate. The reported candidate ceiling is derived from the required
+gates that actually passed and is capped at `INTEGRATION_VERIFIED`. Changing
+that anchor is a separately reviewed deployment-governance change and cannot
+approve a product candidate in the same run.
 
 The repository stores public verification material only. The corresponding production private keys are intentionally not present, and the initial anchor keys were generated without retaining their private halves; therefore the baseline fails closed until a separately authorized key-provisioning change replaces the anchor. The CLI never commits, tags, deploys, starts a shell, or executes text from a model, BOM, manifest, or artifact. Exit `0` means the candidate bundle passed static signed-BOM validation; it does not mean canary or scale verification.
 
 All JSON crossing the gate uses duplicate-key-rejecting strict parsing and exact accepted shapes. Candidate, previous-BOM, policy, Manifest, descriptor, SBOM, provenance, evidence, and approval inputs are byte-, depth-, node-, and collection-bounded; artifacts are streamed through a fixed maximum-size digest check. The dependency DAG and compatibility matrix are rebuilt from the exact integration-commit Manifests, including dependency version ranges and exact consumed/provider contract sources. A matching hash alone is never sufficient. The previous stable BOM must be in the candidate's Git ancestry and its governed module combination, artifacts, metadata, DAG, and compatibility matrix must still be independently verifiable from the immutable bundle.
+
+## External Release BOM signer contract
+
+The authoritative R0-C issuance and verification profile is [release-bom.v1.auth.json](../../../governance/schemas/release-bom.v1.auth.json). The Release BOM is issued only by a repository-external Owner/KMS release signer. Its RSA private key must never enter this repository, any model, candidate code, the `Tools/ci` process, or a Control Plane runtime process. Repository code contains only schemas, public verification facts, and conformance vectors; neither this controller nor the candidate validator signs, deploys, or persists runtime activation state.
+
+Each accepted external issuance produces and persists two exact canonical wires: a `SIGNED` candidate and its independently RSA-PSS-signed `STABLE` lifecycle twin. Every top-level value other than `status` and `signature` is deep-equal. The new candidate references the exact previously persisted STABLE wire by BOM ID and SHA-256 digest; for non-bootstrap activation, Control Plane Host receives that same exact previous STABLE wire beside the new SIGNED candidate and refuses reconstruction or normalization. The newly issued candidate's STABLE twin remains with the external issuance record for the next candidate's chain.
+
+Each final canonical SIGNED or STABLE wire is bounded to 4 MiB. Both signatures cover the status-specific canonical payload with the fixed `dps-release-bom/v1\n` domain, and the activation token digest is committed by the signer before either wire is issued. Identical issuance retries return the already persisted byte-identical pair rather than generating fresh randomized RSA-PSS signatures.
 
 ## Rollout
 

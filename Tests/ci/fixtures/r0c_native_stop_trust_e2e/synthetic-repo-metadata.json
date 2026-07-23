@@ -1,0 +1,9 @@
+{
+  "AGENTS.md": "# Root rules\n",
+  "Modules/policy-approval/AGENTS.md": "# policy-approval rules\n",
+  "Modules/policy-approval/module.yaml": "{\"artifacts\":[{\"build\":\"fixture-build\",\"id\":\"dps.policy-approval\",\"kind\":\"assembly\",\"status\":\"buildable\",\"versioning\":\"semver\"}],\"contracts\":{\"consumed\":[],\"provided\":[]},\"dependencies\":[],\"module\":{\"id\":\"policy-approval\",\"version\":\"1.0.0\"},\"runtime\":{\"processBoundary\":\"modular-monolith\"}}\n",
+  "Modules/windows-edge-supervisor/AGENTS.md": "# windows-edge-supervisor rules\n",
+  "Modules/windows-edge-supervisor/module.yaml": "{\"artifacts\":[{\"build\":\"fixture-build\",\"id\":\"dps.windows-edge-supervisor\",\"kind\":\"service\",\"status\":\"buildable\",\"versioning\":\"semver\"}],\"contracts\":{\"consumed\":[],\"provided\":[]},\"dependencies\":[],\"module\":{\"id\":\"windows-edge-supervisor\",\"version\":\"1.0.0\"},\"runtime\":{\"processBoundary\":\"out-of-process\"}}\n",
+  "Modules/windows-edge-worker/AGENTS.md": "# windows-edge-worker rules\n",
+  "Modules/windows-edge-worker/module.yaml": "{\"artifacts\":[{\"build\":\"fixture-build\",\"id\":\"dps.windows-edge-worker\",\"kind\":\"service\",\"status\":\"buildable\",\"versioning\":\"semver\"}],\"contracts\":{\"consumed\":[],\"provided\":[]},\"dependencies\":[],\"module\":{\"id\":\"windows-edge-worker\",\"version\":\"1.0.0\"},\"runtime\":{\"processBoundary\":\"out-of-process\"}}\n"
+}

@@ -40,6 +40,7 @@
     <Project Path="Modules/control-plane-host/src/Dps.ControlPlaneHost/Dps.ControlPlaneHost.csproj" />
   </Folder>
   <Folder Name="/Modules/control-plane-host/tests/">
+    <Project Path="Modules/control-plane-host/tests/Dps.ControlPlaneHost.ActiveBindingSameInstance.Tests/Dps.ControlPlaneHost.ActiveBindingSameInstance.Tests.csproj" />
     <Project Path="Modules/control-plane-host/tests/Dps.ControlPlaneHost.Tests/Dps.ControlPlaneHost.Tests.csproj" />
   </Folder>
   <Folder Name="/Modules/device-registry/" />
@@ -89,6 +90,14 @@
   </Folder>
   <Folder Name="/Modules/executor-gateway/tests/Dps.ExecutorGateway.NativeFixture/">
     <Project Path="Modules/executor-gateway/tests/Dps.ExecutorGateway.NativeFixture/Dps.ExecutorGateway.NativeFixture.csproj" />
+  </Folder>
+  <Folder Name="/Modules/factory-release-controller/" />
+  <Folder Name="/Modules/factory-release-controller/contracts/" />
+  <Folder Name="/Modules/factory-release-controller/contracts/provided/">
+    <Project Path="Modules/factory-release-controller/contracts/provided/Dps.FactoryReleaseController.Contracts/Dps.FactoryReleaseController.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/factory-release-controller/tests/">
+    <Project Path="Modules/factory-release-controller/tests/Dps.FactoryReleaseController.Contracts.Tests/Dps.FactoryReleaseController.Contracts.Tests.csproj" />
   </Folder>
   <Folder Name="/Modules/gbrain-projector/" />
   <Folder Name="/Modules/gbrain-projector/contracts/">

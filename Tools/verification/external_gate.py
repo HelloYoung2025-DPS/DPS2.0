@@ -33,6 +33,8 @@ FAIL = "FAIL"
 ELIGIBLE = "ELIGIBLE_FOR_EXTERNAL_ISSUANCE"
 P1363_ALGORITHM = "ECDSA_P256_SHA256_P1363"
 BOM_ALGORITHM = "ecdsa-p256-sha256"
+F6_F9_RELEASE_BOM_CONTRACT_ID = "dps.external-verification-bom/v1"
+F6_F9_RELEASE_BOM_SIGNATURE_DOMAIN = b"dps-external-verification-bom/v1\n"
 SHA256_RE = re.compile(r"^[0-9a-f]{64}\Z")
 GIT_OBJECT_RE = re.compile(r"^[0-9a-f]{40}\Z")
 EXTERNAL_ID_RE = re.compile(r"^[A-Za-z][A-Za-z0-9._:/-]{7,127}$")
@@ -1387,7 +1389,7 @@ def _verify_release_bom(
     }
     if not required.issubset(bom):
         _fail("invalid_bom", f"Release BOM is missing fields {sorted(required - set(bom))}")
-    if bom["schema_version"] != "dps.release-bom/v1":
+    if bom["schema_version"] != F6_F9_RELEASE_BOM_CONTRACT_ID:
         _fail("unknown_bom_version", "Release BOM schema version is unsupported")
     if bom["bom_id"] != binding["bom_id"] or bom["status"] != binding["status"]:
         _fail("bom_binding_mismatch", "Release BOM id or status does not match the evidence envelope")
@@ -1418,7 +1420,7 @@ def _verify_release_bom(
     unsigned_bom.pop("signature")
     signature_verifier(
         signer_key_bytes,
-        b"dps-release-bom/v1\n" + canonical_bytes(unsigned_bom),
+        F6_F9_RELEASE_BOM_SIGNATURE_DOMAIN + canonical_bytes(unsigned_bom),
         signature["value"],
     )
     return bom
@@ -4537,7 +4539,7 @@ def _verify_raw_release_bom(
     signature_verifier: Callable[[bytes, bytes, Any], None],
     label: str,
 ) -> None:
-    if bom.get("schema_version") != "dps.release-bom/v1":
+    if bom.get("schema_version") != F6_F9_RELEASE_BOM_CONTRACT_ID:
         _fail("unknown_bom_version", label + " schema version is unsupported")
     if bom.get("status") != expected_status:
         _fail("previous_stable_bom_status", label + " must have status " + expected_status)
@@ -4565,7 +4567,7 @@ def _verify_raw_release_bom(
     unsigned.pop("signature")
     signature_verifier(
         signer_key,
-        b"dps-release-bom/v1\n" + canonical_bytes(unsigned),
+        F6_F9_RELEASE_BOM_SIGNATURE_DOMAIN + canonical_bytes(unsigned),
         signature["value"],
     )
 

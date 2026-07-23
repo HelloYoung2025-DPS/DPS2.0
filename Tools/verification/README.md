@@ -54,12 +54,17 @@ signatures. The external runner attestation signs:
 dps-external-runner-attestation/v1\n + canonical-json(attestation.facts)
 ```
 
-The Release BOM signature uses the existing `ecdsa-p256-sha256` spelling and
-signs:
+The dormant F6-F9 Release BOM is a separate ECDSA contract whose identifier is
+`dps.external-verification-bom/v1`. It uses the existing
+`ecdsa-p256-sha256` spelling and signs:
 
 ```text
-dps-release-bom/v1\n + canonical-json(release-bom-without-signature)
+dps-external-verification-bom/v1\n + canonical-json(release-bom-without-signature)
 ```
+
+This identifier and domain are deliberately disjoint from the R0-C RSA Release
+BOM contract `dps.release-bom/v1` and its `dps-release-bom/v1\n` domain. Neither
+protocol accepts the other contract identifier or signing domain.
 
 Canonical JSON is UTF-8, keys sorted, no insignificant whitespace, and Unicode
 preserved. The attestation `payload_sha256` binds canonical JSON for the whole

@@ -29,5 +29,21 @@
                       LogicalName="Dps.ControlPlaneHost.Tests.ProviderCorpora.soul.memory.readback.v1.corpus.json" />
     <EmbeddedResource Include="../../../gbrain-projector/contracts/provided/gbrain.source-id.v1.corpus.json"
                       LogicalName="Dps.ControlPlaneHost.Tests.ProviderCorpora.gbrain.source-id.v1.corpus.json" />
+    <EmbeddedResource Include="../../../../governance/verification/release-bom.canonical-number.v1.corpus.json"
+                      LogicalName="Dps.ControlPlaneHost.Tests.release-bom.canonical-number.v1.corpus.json" />
+    <EmbeddedResource Include="../../../../governance/verification/release-bom.canonical-string.v1.corpus.json"
+                      LogicalName="Dps.ControlPlaneHost.Tests.release-bom.canonical-string.v1.corpus.json" />
+    <EmbeddedResource Include="../../../../Tests/ci/fixtures/r0c_release_binding_compat/corpus.json"
+                      LogicalName="Dps.ControlPlaneHost.Tests.release-binding-compat.corpus.json" />
+    <EmbeddedResource Include="../../../../Tests/ci/fixtures/r0c_release_binding_compat/trust-policy.json"
+                      LogicalName="Dps.ControlPlaneHost.Tests.release-binding-compat.trust-policy.json" />
+    <EmbeddedResource Include="../../../../Tests/ci/fixtures/r0c_release_binding_compat/token-preimages.json"
+                      LogicalName="Dps.ControlPlaneHost.Tests.release-binding-compat.token-preimages.json" />
+    <EmbeddedResource Include="../../../../Tests/ci/fixtures/r0c_release_binding_compat/bundle/candidate-bom.json"
+                      LogicalName="Dps.ControlPlaneHost.Tests.release-binding-compat.candidate-bom.json" />
+    <EmbeddedResource Include="../../../../Tests/ci/fixtures/r0c_release_binding_compat/bundle/previous-signed-bom.json"
+                      LogicalName="Dps.ControlPlaneHost.Tests.release-binding-compat.previous-signed-bom.json" />
+    <EmbeddedResource Include="../../../../Tests/ci/fixtures/r0c_release_binding_compat/bundle/previous-stable-bom.json"
+                      LogicalName="Dps.ControlPlaneHost.Tests.release-binding-compat.previous-stable-bom.json" />
   </ItemGroup>
 </Project>

@@ -34,14 +34,14 @@
       "suiteId": "control-plane-host.contract",
       "testTarget": "Modules/control-plane-host/tests/Dps.ControlPlaneHost.Tests/Dps.ControlPlaneHost.Tests.csproj",
       "testCategory": "Contract",
-      "minimumExecutedTests": 23
+      "minimumExecutedTests": 31
     },
     {
       "moduleId": "control-plane-host",
       "suiteId": "control-plane-host.contract-schema",
       "testTarget": "Modules/control-plane-host/tests/test_control_plane_contract_schemas.py",
       "testCategory": "Contract",
-      "minimumExecutedTests": 16
+      "minimumExecutedTests": 20
     },
     {
       "moduleId": "device-registry",
@@ -126,6 +126,13 @@
       "testTarget": "Modules/factory-release-controller/tests/test_contracts.py",
       "testCategory": "Contract",
       "minimumExecutedTests": 4
+    },
+    {
+      "moduleId": "factory-release-controller",
+      "suiteId": "factory-release-controller.release-bom-contract-dotnet",
+      "testTarget": "Modules/factory-release-controller/tests/Dps.FactoryReleaseController.Contracts.Tests/Dps.FactoryReleaseController.Contracts.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 6
     },
     {
       "moduleId": "factory-rollback-controller",
@@ -337,7 +344,18 @@
       "evidenceKind": "REAL_POSTGRESQL",
       "testTarget": "Modules/control-plane-host/tests/Dps.ControlPlaneHost.Tests/Dps.ControlPlaneHost.Tests.csproj",
       "testCategory": "Integration",
-      "minimumExecutedTests": 56,
+      "minimumExecutedTests": 74,
+      "requiredEnvironment": [
+        "DPS_TEST_POSTGRES"
+      ]
+    },
+    {
+      "moduleId": "control-plane-host",
+      "suiteId": "control-plane-host.same-instance-integration",
+      "evidenceKind": "REAL_POSTGRESQL",
+      "testTarget": "Modules/control-plane-host/tests/Dps.ControlPlaneHost.ActiveBindingSameInstance.Tests/Dps.ControlPlaneHost.ActiveBindingSameInstance.Tests.csproj",
+      "testCategory": "Integration",
+      "minimumExecutedTests": 4,
       "requiredEnvironment": [
         "DPS_TEST_POSTGRES"
       ]
@@ -532,7 +550,7 @@
       "evidenceKind": "REAL_POSTGRESQL",
       "testTarget": "Modules/policy-approval/tests/Dps.PolicyApproval.Tests/Dps.PolicyApproval.Tests.csproj",
       "testCategory": "Integration",
-      "minimumExecutedTests": 40,
+      "minimumExecutedTests": 53,
       "requiredEnvironment": [
         "DPS_TEST_POSTGRES"
       ]

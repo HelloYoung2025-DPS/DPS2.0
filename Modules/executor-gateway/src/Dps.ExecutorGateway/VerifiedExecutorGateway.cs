@@ -15,7 +15,8 @@ public sealed record ActiveReleaseBomBindingV1(
     string DeviceBindingId,
     string ReleaseBomSha256,
     long Generation,
-    string ExecutionTokenBase64)
+    string ExecutionTokenBase64,
+    string Status)
 {
     public const string CurrentSchemaVersion = "dps.active-release-bom-binding/v1";
     public const int ExecutionTokenSizeBytes = 32;
@@ -26,6 +27,7 @@ public sealed record ActiveReleaseBomBindingV1(
         CommandContractGuard.RequireDeviceBindingId(DeviceBindingId);
         CommandContractGuard.RequireSha256(ReleaseBomSha256, nameof(ReleaseBomSha256));
         if (Generation < 1) throw new ArgumentOutOfRangeException(nameof(Generation));
+        CommandContractGuard.RequireExact(Status, "active", nameof(Status));
         var token = DecodeExecutionToken();
         CryptographicOperations.ZeroMemory(token);
     }
@@ -37,7 +39,7 @@ public sealed record ActiveReleaseBomBindingV1(
         finally { CryptographicOperations.ZeroMemory(token); }
     }
 
-    public override string ToString() => $"{nameof(ActiveReleaseBomBindingV1)} {{ SchemaVersion = {SchemaVersion}, DeviceBindingId = {DeviceBindingId}, ReleaseBomSha256 = {ReleaseBomSha256}, Generation = {Generation}, ExecutionTokenBase64 = [REDACTED] }}";
+    public override string ToString() => $"{nameof(ActiveReleaseBomBindingV1)} {{ SchemaVersion = {SchemaVersion}, DeviceBindingId = {DeviceBindingId}, ReleaseBomSha256 = {ReleaseBomSha256}, Generation = {Generation}, ExecutionTokenBase64 = [REDACTED], Status = {Status} }}";
 
     private byte[] DecodeExecutionToken()
     {

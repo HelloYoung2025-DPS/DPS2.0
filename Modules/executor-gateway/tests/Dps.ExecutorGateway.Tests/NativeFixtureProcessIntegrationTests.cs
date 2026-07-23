@@ -846,7 +846,8 @@ public sealed class NativeFixtureProcessIntegrationTests
                 active.DeviceBindingId,
                 active.ReleaseBomSha256,
                 active.Generation,
-                active.ExecutionTokenBase64);
+                active.ExecutionTokenBase64,
+                "active");
         }
 
         public INativeSubmissionAttempt CreateInertSubmissionAttempt() => new FixtureSubmissionAttempt(this);

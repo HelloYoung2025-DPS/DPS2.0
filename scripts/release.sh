@@ -8,6 +8,7 @@ Usage:
     --bundle-root PATH \
     --bom PATH \
     --previous-bom PATH \
+    --native-stop-trust-receipt PATH \
     --schema-sha256 HEX \
     [--phase0-evidence PATH]
 
@@ -21,6 +22,7 @@ EOF
 bundle_root=""
 bom_path=""
 previous_bom_path=""
+native_stop_trust_receipt_path=""
 schema_sha256=""
 phase0_evidence=""
 
@@ -36,6 +38,10 @@ while (($#)); do
       ;;
     --previous-bom)
       previous_bom_path="${2:-}"
+      shift 2
+      ;;
+    --native-stop-trust-receipt)
+      native_stop_trust_receipt_path="${2:-}"
       shift 2
       ;;
     --schema-sha256)
@@ -62,6 +68,7 @@ for value in \
   "$bundle_root" \
   "$bom_path" \
   "$previous_bom_path" \
+  "$native_stop_trust_receipt_path" \
   "$schema_sha256"; do
   if [[ -z "$value" ]]; then
     echo "All required release validation arguments must be supplied." >&2
@@ -131,14 +138,17 @@ if [[ -n "$phase0_evidence" ]]; then
 fi
 "$python_executable" Tools/ci/run_phase0_gate.py "${phase0_arguments[@]}"
 
-PYTHONPATH="$repo_root/Modules/factory-release-controller/src" \
-  "$python_executable" \
-  Modules/factory-release-controller/src/candidate_bom_validator.py \
+# R0-C: candidate BOM validation migrated to Tools/ci (RebuildPlan 4.3); the
+# validator is a single stdlib file, so no PYTHONPATH is needed.
+"$python_executable" \
+  Tools/ci/candidate_bom_validator.py \
   --repo-root "$repo_root" \
   --bundle-root "$bundle_root" \
   --bom "$bom_path" \
   --previous-bom "$previous_bom_path" \
-  --schema-sha256 "$schema_sha256"
+  --native-stop-trust-receipt "$native_stop_trust_receipt_path" \
+  --schema-sha256 "$schema_sha256" \
+  --minimum-remaining-lifetime-seconds 86400
 
 echo "Release candidate validation passed for $head_commit."
 echo "No commit, tag, signature, deployment, approval, or production change was performed."

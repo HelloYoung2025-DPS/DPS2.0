@@ -24,6 +24,9 @@
           "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.0"
         }
       },
+      "dps.controlplanehost.contracts": {
+        "type": "Project"
+      },
       "dps.planner.contracts": {
         "type": "Project"
       },

@@ -2,6 +2,16 @@
 
 ## [Unreleased] - 2026-07-17
 
+### R0-C Release BOM authority migration
+
+#### Changed
+
+- 将 `factory-release-controller` 保留的候选 BOM validator 与权威 `Tools/ci` 副本之间的迁移忠实度收紧为 required byte-level 测试：只允许已声明的顶层说明、部署信任策略路径和 `--repo-root` 深度三处精确差异，任何额外源码漂移均失败关闭；相应 Phase 0 adversarial test floor 从 137 提升到 138。
+- 旧 F6–F9 外部验证的 ECDSA BOM 改用独立合同 `dps.external-verification-bom/v1` 与签名域 `dps-external-verification-bom/v1\n`；R0-C RSA Release BOM 继续使用 `dps.release-bom/v1` 与 `dps-release-bom/v1\n`。两条协议分别拒绝对方的合同 ID 与签名域，不再以同一身份解释两种算法。
+- 候选 validator、仓外 signer payload builder、Release BOM trust verifier 与 Control Plane 激活现在共同要求完整签名 BOM 使用唯一的 sorted/compact canonical wire；候选与 previous BOM 的尾换行、重排、mapping/bytes 漂移、非法 Unicode scalar、非有限数及超限数字均失败关闭。`.NET` canonicalizer 采用 Python `sort_keys=True` 的 Unicode scalar 顺序与浮点格式，两个 C# 消费方共用受候选信任根绑定的跨语言语料；Control Plane 同步执行 4 MiB BOM 上限。Owner fixture 以新 receipt identity 由生产 builder 可复现生成，旧 receipt ID/签名不再复用；Phase 0 adversarial floor 从 138 提升到 145，Control Plane Unit/Contract floors 分别从 62/27 提升到 64/28。
+- 候选 `ReleaseTrustPolicy` 对任何带 `bom` purpose 的公钥强制仓外 signer profile：purpose 原始数组必须唯一且恰为 `["bom"]`、算法固定 RSA-PSS/SHA-256、modulus 为无前导零 nibble 的 canonical lowercase unsigned hex 且至少 256 octets、public exponent 恰为 65537。候选与保留模块副本共用生产解析语义和多用途/1024-bit/exponent-3 等负例；完整测试 BOM 改用独立的固定 synthetic 2048-bit 测试专用 key，生产策略、signer 合同与 compatibility corpus 仍只含公开验证材料。
+- R0-C 最终测试清单将 Phase 0 minimum 固定为 156，并将 Control Plane Host 的 Unit/Contract/Schema/Integration/Same-instance floors 固定为 `79/31/20/74/4`。Release-binding mutation 在 per-device durable scope 内先同步 journal head：提交应答丢失或 stale authority 的精确重试仅在原 postcondition 仍为当前真相时回放原 receipt；已被后续状态取代的 consumed activation/revocation/rollback 请求一律拒绝，不能再次产生 generation 或 receipt。真实 PostgreSQL 覆盖 activation、revocation、rollback 三类 commit-then-timeout 跨实例恢复。
+
 ### M0/R0-A 基线复现（第一个实现批次）
 
 #### Added
