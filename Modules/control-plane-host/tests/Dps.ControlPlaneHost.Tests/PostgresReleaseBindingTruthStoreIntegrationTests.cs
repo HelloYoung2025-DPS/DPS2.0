@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Dps.ControlPlaneHost.Contracts;
 using Npgsql;
 using Xunit;
 using static Dps.ControlPlaneHost.Tests.ReleaseBindingRecoveryTestKit;
@@ -30,7 +31,7 @@ public sealed class PostgresReleaseBindingTruthStoreIntegrationTests
         var (bom1, token1) = signer.SignBom("bom-1", 1, null);
         first.Activate(Device, bom1, token1);
         var (bom2, token2) = signer.SignBom("bom-2", 2, bom1);
-        first.Activate(Device, bom2, token2);
+        first.Activate(Device, bom2, signer.StableTwin(bom1), token2);
         var rollbackReceipt = first.Rollback(Device, token1);
         Assert.True(first.TryReadActive(Device, out var beforeRestart));
 
@@ -67,6 +68,215 @@ public sealed class PostgresReleaseBindingTruthStoreIntegrationTests
     }
 
     [Fact, Trait("Category", "Integration")]
+    public async Task PreviousStableBomWireRoundTripsExactlyAndRecovers()
+    {
+        await using var database = await ReleaseBindingTestDatabase.CreateAsync(Token);
+        using var signer = new BomSigner();
+        var store = database.CreateStore();
+        var authority = new ActiveReleaseBindingAuthority(
+            [signer.TrustKey], store, () => Now);
+
+        var (bom1, token1) = signer.SignBom("bom-1", 1, null);
+        authority.Activate(Device, bom1, token1);
+        var stableBom1 = signer.StableTwin(bom1);
+        var (bom2, token2) = signer.SignBom("bom-2", 2, bom1);
+        authority.Activate(Device, bom2, stableBom1, token2);
+
+        var records = database.CreateStore().LoadAll();
+        Assert.Equal(2, records.Count);
+        Assert.Null(records[0].PreviousStableBomBytes);
+        Assert.Equal(
+            stableBom1,
+            Assert.IsType<byte[]>(records[1].PreviousStableBomBytes));
+
+        var restarted = new ActiveReleaseBindingAuthority(
+            [signer.TrustKey], database.CreateStore(), () => Now);
+        Assert.True(restarted.TryReadActive(Device, out var recovered));
+        Assert.Equal(Sha256Hex(bom2), recovered!.ReleaseBomSha256);
+        Assert.Equal(token2, recovered.ExecutionTokenBase64);
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task PreviousStableBomDatabaseShapeRejectsBootstrapAndNonActivationBytes()
+    {
+        await using var database = await ReleaseBindingTestDatabase.CreateAsync(Token);
+        using var signer = new BomSigner();
+        var store = database.CreateStore();
+
+        var memoryStore = InMemoryReleaseBindingTruthStore.CreateTestOnly();
+        var memoryAuthority = new ActiveReleaseBindingAuthority(
+            [signer.TrustKey], memoryStore, () => Now);
+        var (bom1, token1) = signer.SignBom("bom-1", 1, null);
+        memoryAuthority.Activate(Device, bom1, token1);
+        Assert.True(memoryAuthority.TryReadActive(Device, out var active));
+        memoryAuthority.Revoke(Device, active!.Generation);
+        var validRecords = memoryStore.LoadAll();
+        Assert.Equal(2, validRecords.Count);
+
+        var invalidBootstrap = validRecords[0] with
+        {
+            PreviousStableBomBytes = signer.StableTwin(bom1)
+        };
+        var bootstrapException = Assert.Throws<PostgresException>(
+            () => store.Append(invalidBootstrap));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, bootstrapException.SqlState);
+        Assert.Equal(
+            "release_binding_journal_previous_stable_bom_shape",
+            bootstrapException.ConstraintName);
+        Assert.Equal(0, await store.CountJournalAsync(Token));
+
+        store.Append(validRecords[0]);
+        var invalidRevocation = validRecords[1] with
+        {
+            PreviousStableBomBytes = signer.StableTwin(bom1)
+        };
+        var revocationException = Assert.Throws<PostgresException>(
+            () => store.Append(invalidRevocation));
+        Assert.Equal(PostgresErrorCodes.CheckViolation, revocationException.SqlState);
+        Assert.Equal(
+            "release_binding_journal_previous_stable_bom_shape",
+            revocationException.ConstraintName);
+        Assert.Equal(1, await store.CountJournalAsync(Token));
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task TamperedPersistedPreviousStableBomFailsClosedDuringRecovery()
+    {
+        await using var database = await ReleaseBindingTestDatabase.CreateAsync(Token);
+        using var signer = new BomSigner();
+        var authority = new ActiveReleaseBindingAuthority(
+            [signer.TrustKey], database.CreateStore(), () => Now);
+        var (bom1, token1) = signer.SignBom("bom-1", 1, null);
+        authority.Activate(Device, bom1, token1);
+        var stableBom1 = signer.StableTwin(bom1);
+        var (bom2, token2) = signer.SignBom("bom-2", 2, bom1);
+        authority.Activate(Device, bom2, stableBom1, token2);
+
+        // Model privileged storage corruption only after both valid
+        // transitions have been established through the production API.
+        // Change one canonical Base64 signature character so the persisted
+        // wire stays structurally valid but can no longer authenticate.
+        var tamperedStableBom1 = stableBom1.ToArray();
+        var signatureMarker =
+            System.Text.Encoding.ASCII.GetBytes("\"value\":\"");
+        var markerOffset = tamperedStableBom1.AsSpan().IndexOf(signatureMarker);
+        Assert.True(markerOffset >= 0);
+        var signatureValueOffset = markerOffset + signatureMarker.Length;
+        tamperedStableBom1[signatureValueOffset] =
+            tamperedStableBom1[signatureValueOffset] == (byte)'A'
+                ? (byte)'B'
+                : (byte)'A';
+
+        var quotedSchema =
+            new NpgsqlCommandBuilder().QuoteIdentifier(database.SchemaName);
+        await using (var admin =
+            new NpgsqlConnection(database.MigrationConnectionString))
+        {
+            await admin.OpenAsync(Token);
+            await using var transaction = await admin.BeginTransactionAsync(Token);
+            await using (var disableTrigger = new NpgsqlCommand(
+                $"""
+                ALTER TABLE {quotedSchema}.release_binding_journal
+                    DISABLE TRIGGER release_binding_journal_append_only_rows
+                """,
+                admin,
+                transaction))
+            {
+                await disableTrigger.ExecuteNonQueryAsync(Token);
+            }
+
+            await using (var tamper = new NpgsqlCommand(
+                $"""
+                UPDATE {quotedSchema}.release_binding_journal
+                SET previous_stable_bom_wire = @previous_stable_bom_wire
+                WHERE device_binding_id = @device_binding_id
+                  AND sequence = 2
+                """,
+                admin,
+                transaction))
+            {
+                tamper.Parameters.AddWithValue(
+                    "previous_stable_bom_wire",
+                    tamperedStableBom1);
+                tamper.Parameters.AddWithValue("device_binding_id", Device);
+                Assert.Equal(1, await tamper.ExecuteNonQueryAsync(Token));
+            }
+
+            await using (var enableTrigger = new NpgsqlCommand(
+                $"""
+                ALTER TABLE {quotedSchema}.release_binding_journal
+                    ENABLE TRIGGER release_binding_journal_append_only_rows
+                """,
+                admin,
+                transaction))
+            {
+                await enableTrigger.ExecuteNonQueryAsync(Token);
+            }
+            await transaction.CommitAsync(Token);
+        }
+
+        var corruptedRecords = database.CreateStore().LoadAll();
+        Assert.Equal(
+            tamperedStableBom1,
+            Assert.IsType<byte[]>(corruptedRecords[1].PreviousStableBomBytes));
+        Assert.Throws<ActiveReleaseBindingException>(() =>
+            new ActiveReleaseBindingAuthority(
+                [signer.TrustKey], database.CreateStore(), () => Now));
+    }
+
+    [Fact, Trait("Category", "Integration")]
+    public async Task FourMiBPreviousStableBomPersistsAndOneByteOverFailsBeforeAnyWrite()
+    {
+        const int maximumBomBytes = 4 * 1024 * 1024;
+        await using var database = await ReleaseBindingTestDatabase.CreateAsync(Token);
+        // Model a marked early-R0-C schema whose signed BOM constraint still
+        // carried the former 1 MiB ceiling, then re-run the production
+        // migration. PostgreSQL CREATE TABLE IF NOT EXISTS cannot replace
+        // that constraint by itself, so this guards the explicit upgrade
+        // path as well as a fresh-schema install.
+        await database.ReapplyOverLegacyOneMiBSignedBomConstraintAsync(Token);
+        using var signer = new BomSigner();
+        var store = database.CreateStore();
+        var authority = new ActiveReleaseBindingAuthority(
+            [signer.TrustKey], store, () => Now);
+
+        var (maximumBom, maximumToken) = signer.SignBom(
+            "bom-maximum", 1, null, exactWireBytes: maximumBomBytes);
+        Assert.Equal(maximumBomBytes, maximumBom.Length);
+        authority.Activate(Device, maximumBom, maximumToken);
+        Assert.Equal(1, await store.CountJournalAsync(Token));
+
+        var maximumStableBom = signer.StableTwin(maximumBom);
+        Assert.Equal(maximumBomBytes, maximumStableBom.Length);
+        var (nextBom, nextToken) = signer.SignBom(
+            "bom-after-maximum",
+            2,
+            maximumBom);
+        var oversizedStableBom = new byte[maximumBomBytes + 1];
+        maximumStableBom.CopyTo(oversizedStableBom, 0);
+        oversizedStableBom[^1] = (byte)' ';
+        Assert.Throws<ActiveReleaseBindingException>(
+            () => authority.Activate(
+                Device,
+                nextBom,
+                oversizedStableBom,
+                nextToken));
+        Assert.Equal(1, await store.CountJournalAsync(Token));
+
+        authority.Activate(Device, nextBom, maximumStableBom, nextToken);
+        Assert.Equal(2, await store.CountJournalAsync(Token));
+        var records = database.CreateStore().LoadAll();
+        Assert.Equal(
+            maximumStableBom,
+            Assert.IsType<byte[]>(records[1].PreviousStableBomBytes));
+
+        var restarted = new ActiveReleaseBindingAuthority(
+            [signer.TrustKey], database.CreateStore(), () => Now);
+        Assert.True(restarted.TryReadActive(Device, out var recovered));
+        Assert.Equal(Sha256Hex(nextBom), recovered!.ReleaseBomSha256);
+    }
+
+    [Fact, Trait("Category", "Integration")]
     public async Task TwoInstancesOnOneDatabaseCasLoserFailsClosed()
     {
         await using var database = await ReleaseBindingTestDatabase.CreateAsync(Token);
@@ -80,7 +290,7 @@ public sealed class PostgresReleaseBindingTruthStoreIntegrationTests
         var (leftBom, leftToken) = signer.SignBom("bom-1", 1, null);
         var winnerReceipt = left.Activate(Device, leftBom, leftToken);
         var (rightBom, rightToken) = signer.SignBom("bom-1b", 1, null);
-        Assert.Throws<ReleaseBindingTruthConflictException>(
+        Assert.Throws<ActiveReleaseBindingException>(
             () => right.Activate(Device, rightBom, rightToken));
 
         // The loser published nothing and the journal holds exactly the
@@ -98,6 +308,96 @@ public sealed class PostgresReleaseBindingTruthStoreIntegrationTests
         Assert.True(recovered.TryReadActive(Device, out var binding));
         Assert.Equal(Sha256Hex(leftBom), binding!.ReleaseBomSha256);
         Assert.Equal(winnerReceipt, Assert.Single(recovered.ReadReceipts(Device)));
+    }
+
+    [Theory, Trait("Category", "Integration")]
+    [InlineData("activation")]
+    [InlineData("revocation")]
+    [InlineData("rollback")]
+    public async Task TwoStaleAuthoritiesExactlyRedeliverOneDurableTransition(
+        string transitionKind)
+    {
+        await using var database = await ReleaseBindingTestDatabase.CreateAsync(Token);
+        using var signer = new BomSigner();
+        var writerStore = database.CreateStore();
+        var commitThenTimeoutStore =
+            new PostgresCommitThenTimeoutTruthStore(writerStore);
+        var writer = new ActiveReleaseBindingAuthority(
+            [signer.TrustKey], commitThenTimeoutStore, () => Now);
+
+        Func<ReleaseBindingReceiptV1> exactWriter;
+        Func<ReleaseBindingReceiptV1> exactStale;
+        Func<ReleaseBindingReceiptV1> conflictingStale;
+        ActiveReleaseBindingAuthority stale;
+
+        switch (transitionKind)
+        {
+            case "activation":
+            {
+                stale = new ActiveReleaseBindingAuthority(
+                    [signer.TrustKey], database.CreateStore(), () => Now);
+                var (bom, token) = signer.SignBom("bom-target", 1, null);
+                var (conflictingBom, conflictingToken) =
+                    signer.SignBom("bom-conflict", 1, null);
+                exactWriter = () => writer.Activate(Device, bom, token);
+                exactStale = () => stale.Activate(Device, bom, token);
+                conflictingStale = () => stale.Activate(
+                    Device,
+                    conflictingBom,
+                    conflictingToken);
+                break;
+            }
+            case "revocation":
+            {
+                var (bom, token) = signer.SignBom("bom-active", 1, null);
+                writer.Activate(Device, bom, token);
+                stale = new ActiveReleaseBindingAuthority(
+                    [signer.TrustKey], database.CreateStore(), () => Now);
+                exactWriter = () => writer.Revoke(Device, 1);
+                exactStale = () => stale.Revoke(Device, 1);
+                conflictingStale = () => stale.Revoke(Device, 2);
+                break;
+            }
+            case "rollback":
+            {
+                var (firstBom, firstToken) =
+                    signer.SignBom("bom-first", 1, null);
+                writer.Activate(Device, firstBom, firstToken);
+                var (secondBom, secondToken) =
+                    signer.SignBom("bom-second", 2, firstBom);
+                writer.Activate(
+                    Device,
+                    secondBom,
+                    signer.StableTwin(firstBom),
+                    secondToken);
+                writer.Revoke(Device, 2);
+                stale = new ActiveReleaseBindingAuthority(
+                    [signer.TrustKey], database.CreateStore(), () => Now);
+                exactWriter = () => writer.Rollback(Device, firstToken);
+                exactStale = () => stale.Rollback(Device, firstToken);
+                conflictingStale =
+                    () => stale.Rollback(Device, Token("wrong-rollback"));
+                break;
+            }
+            default:
+                throw new ArgumentOutOfRangeException(
+                    nameof(transitionKind),
+                    transitionKind,
+                    "unknown transition kind");
+        }
+
+        var rowsBefore = await writerStore.CountJournalAsync(Token);
+        commitThenTimeoutStore.TimeoutAfterNextCommit();
+        Assert.Throws<TimeoutException>(() => exactWriter());
+        var committed = writerStore.LoadAll()[^1].Receipt;
+        var replayed = exactStale();
+
+        Assert.Equal(committed, replayed);
+        Assert.Equal(rowsBefore + 1, await writerStore.CountJournalAsync(Token));
+        Assert.Equal(writer.ReadReceipts(Device), stale.ReadReceipts(Device));
+
+        Assert.Throws<ActiveReleaseBindingException>(() => conflictingStale());
+        Assert.Equal(rowsBefore + 1, await writerStore.CountJournalAsync(Token));
     }
 
     [Fact, Trait("Category", "Integration")]
@@ -125,7 +425,11 @@ public sealed class PostgresReleaseBindingTruthStoreIntegrationTests
         // must NEVER serve A again — the resync serves B's exact
         // generation/digest/token and the receipt trails converge.
         var (bomB, tokenB) = signer.SignBom("bom-b", 2, bomA);
-        var supersedingReceipt = one.Activate(Device, bomB, tokenB);
+        var supersedingReceipt = one.Activate(
+            Device,
+            bomB,
+            signer.StableTwin(bomA),
+            tokenB);
         Assert.True(two.TryReadActive(Device, out var bTwo));
         Assert.Equal(Sha256Hex(bomB), bTwo!.ReleaseBomSha256);
         Assert.Equal(2, bTwo.Generation);
@@ -183,7 +487,7 @@ public sealed class PostgresReleaseBindingTruthStoreIntegrationTests
 
         Assert.Equal(1, results.Count(static result => result is null));
         var loser = Assert.Single(results, static result => result is not null);
-        Assert.IsType<ReleaseBindingTruthConflictException>(loser);
+        Assert.IsAssignableFrom<ActiveReleaseBindingException>(loser);
         Assert.Equal(1, await store.CountJournalAsync(Token));
     }
 
@@ -197,14 +501,14 @@ public sealed class PostgresReleaseBindingTruthStoreIntegrationTests
         var (bom1, token1) = signer.SignBom("bom-1", 1, null);
         authority.Activate(Device, bom1, token1);
         var (bom2, token2) = signer.SignBom("bom-2", 2, bom1);
-        authority.Activate(Device, bom2, token2);
+        authority.Activate(Device, bom2, signer.StableTwin(bom1), token2);
         Assert.True(authority.TryReadActive(Device, out var active));
         authority.Revoke(Device, active!.Generation);
 
         // Activating over the revoked binding drops every rollback path
         // (the demoted bom-1 included) — the anti-resurrection rule.
         var (bom3, token3) = signer.SignBom("bom-3", 3, bom2);
-        authority.Activate(Device, bom3, token3);
+        authority.Activate(Device, bom3, signer.StableTwin(bom2), token3);
 
         // Restart: the revocation and the dropped rollback paths are
         // durable — neither the revoked bom-2 nor the pre-revocation bom-1
@@ -266,7 +570,7 @@ public sealed class PostgresReleaseBindingTruthStoreIntegrationTests
         // and the abandoned issuance leaves no residue.
         var staleFence = store.IssueRecoveryFence(Device);
         var (bom2, token2) = signer.SignBom("bom-2", 2, bom1);
-        authority.Activate(Device, bom2, token2);
+        authority.Activate(Device, bom2, signer.StableTwin(bom1), token2);
         Assert.Throws<ReleaseBindingRecoveryFenceConflictException>(
             () => store.CommitRecoveryFence(
                 staleFence,
@@ -366,7 +670,7 @@ public sealed class PostgresReleaseBindingTruthStoreIntegrationTests
         frozenHarness.RecoverySigner.WhileSigning = () =>
         {
             var (bom2, token2) = signer.SignBom("bom-2", 2, bom1);
-            authority.Activate(Device, bom2, token2);
+            authority.Activate(Device, bom2, signer.StableTwin(bom1), token2);
         };
         await Assert.ThrowsAsync<ReleaseBindingRecoveryFenceConflictException>(() =>
             frozenHarness.RecoverAsync(RecoveryRequest(
@@ -434,6 +738,77 @@ public sealed class PostgresReleaseBindingTruthStoreIntegrationTests
         catch (Exception exception)
         {
             return exception;
+        }
+    }
+
+    /// <summary>
+    /// Wraps the real PostgreSQL transition scope and loses only the
+    /// acknowledgement after its Append has returned. The inner Append has
+    /// already committed the real transaction and released its advisory lock,
+    /// so this models the ambiguous client outcome without simulating the
+    /// durable write itself.
+    /// </summary>
+    private sealed class PostgresCommitThenTimeoutTruthStore(
+        PostgresReleaseBindingTruthStore inner)
+        : IReleaseBindingTruthStore,
+          IActiveReleaseBindingRecoveryCoordinator
+    {
+        private int _timeoutAfterNextCommit;
+
+        internal void TimeoutAfterNextCommit()
+            => Interlocked.Exchange(ref _timeoutAfterNextCommit, 1);
+
+        public void Append(ReleaseBindingTruthRecord record)
+            => inner.Append(record);
+
+        public IReadOnlyList<ReleaseBindingTruthRecord> LoadAll()
+            => inner.LoadAll();
+
+        public long LoadDeviceHeadSequence(string deviceBindingId)
+            => inner.LoadDeviceHeadSequence(deviceBindingId);
+
+        public IReadOnlyList<ReleaseBindingTruthRecord> LoadAfter(
+            string deviceBindingId,
+            long afterSequence)
+            => inner.LoadAfter(deviceBindingId, afterSequence);
+
+        public ReleaseBindingJournalSnapshot LoadSnapshotAfter(
+            string deviceBindingId,
+            long afterSequence)
+            => inner.LoadSnapshotAfter(deviceBindingId, afterSequence);
+
+        public IReleaseBindingTransitionScope BeginTransition(
+            string deviceBindingId)
+            => new PostgresCommitThenTimeoutScope(
+                this,
+                inner.BeginTransition(deviceBindingId));
+
+        ValueTask<IActiveReleaseBindingRecoveryScope>
+            IActiveReleaseBindingRecoveryCoordinator.AcquireAsync(
+                string deviceBindingId,
+                CancellationToken cancellationToken)
+            => ((IActiveReleaseBindingRecoveryCoordinator)inner).AcquireAsync(
+                deviceBindingId,
+                cancellationToken);
+
+        private sealed class PostgresCommitThenTimeoutScope(
+            PostgresCommitThenTimeoutTruthStore owner,
+            IReleaseBindingTransitionScope innerScope)
+            : IReleaseBindingTransitionScope
+        {
+            public void Append(ReleaseBindingTruthRecord record)
+            {
+                innerScope.Append(record);
+                if (Interlocked.Exchange(
+                        ref owner._timeoutAfterNextCommit,
+                        0) == 1)
+                {
+                    throw new TimeoutException(
+                        "simulated response loss after the PostgreSQL commit");
+                }
+            }
+
+            public void Dispose() => innerScope.Dispose();
         }
     }
 
@@ -595,6 +970,41 @@ public sealed class PostgresReleaseBindingTruthStoreIntegrationTests
                 _schemaName,
                 _runtimeRoleName,
                 _migrationRoleName));
+
+        internal string MigrationConnectionString => _migrationConnectionString;
+
+        internal string SchemaName => _schemaName;
+
+        internal async Task ReapplyOverLegacyOneMiBSignedBomConstraintAsync(
+            CancellationToken cancellationToken)
+        {
+            var quotedSchema =
+                new NpgsqlCommandBuilder().QuoteIdentifier(_schemaName);
+            await using (var admin =
+                new NpgsqlConnection(_migrationConnectionString))
+            {
+                await admin.OpenAsync(cancellationToken);
+                await using var legacyConstraint = new NpgsqlCommand(
+                    $"""
+                    ALTER TABLE {quotedSchema}.release_binding_journal
+                        DROP CONSTRAINT release_binding_journal_bom_bytes;
+                    ALTER TABLE {quotedSchema}.release_binding_journal
+                        ADD CONSTRAINT release_binding_journal_bom_bytes CHECK (
+                            signed_bom_wire IS NULL
+                            OR (octet_length(signed_bom_wire) >= 1
+                                AND octet_length(signed_bom_wire) <= 1048576));
+                    """,
+                    admin);
+                await legacyConstraint.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            var migrator = new PostgresReleaseBindingTruthMigrator(
+                new PostgresReleaseBindingMigrationOptions(
+                    _migrationConnectionString,
+                    _schemaName,
+                    _runtimeRoleName));
+            await migrator.InitializeAsync(cancellationToken);
+        }
 
         /// <summary>
         /// Severs the runtime role's LOGIN right — a real PostgreSQL-level

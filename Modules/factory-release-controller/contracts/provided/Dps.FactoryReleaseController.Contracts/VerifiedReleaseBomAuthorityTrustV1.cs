@@ -1,7 +1,7 @@
 using System.Globalization;
+using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -24,7 +24,9 @@ public sealed class ReleaseBomAuthorityTrustAnchorsV1
         BomSignerKeyId = bomSignerKeyId;
         AuthorityReceiptSignerKeyId = authorityReceiptSignerKeyId;
         BomSignerSubjectPublicKeyInfo = RequireCanonicalRsaSpki(
-            bomSignerSubjectPublicKeyInfo, nameof(bomSignerSubjectPublicKeyInfo));
+            bomSignerSubjectPublicKeyInfo,
+            nameof(bomSignerSubjectPublicKeyInfo),
+            requireBomSignerExponent65537: true);
         AuthorityReceiptSignerSubjectPublicKeyInfo = RequireCanonicalRsaSpki(
             authorityReceiptSignerSubjectPublicKeyInfo,
             nameof(authorityReceiptSignerSubjectPublicKeyInfo));
@@ -47,7 +49,10 @@ public sealed class ReleaseBomAuthorityTrustAnchorsV1
     internal byte[] BomSignerSubjectPublicKeyInfo { get; }
     internal byte[] AuthorityReceiptSignerSubjectPublicKeyInfo { get; }
 
-    private static byte[] RequireCanonicalRsaSpki(ReadOnlySpan<byte> raw, string name)
+    private static byte[] RequireCanonicalRsaSpki(
+        ReadOnlySpan<byte> raw,
+        string name,
+        bool requireBomSignerExponent65537 = false)
     {
         if (raw.IsEmpty || raw.Length > 4096)
             throw new InvalidDataException($"{name} is absent or oversized.");
@@ -58,6 +63,16 @@ public sealed class ReleaseBomAuthorityTrustAnchorsV1
             var canonical = rsa.ExportSubjectPublicKeyInfo();
             if (bytesRead != raw.Length || rsa.KeySize < 2048 || !raw.SequenceEqual(canonical))
                 throw new InvalidDataException($"{name} is not canonical RSA SPKI or is below 2048 bits.");
+            if (requireBomSignerExponent65537)
+            {
+                var exponent = rsa.ExportParameters(false).Exponent;
+                if (exponent is null ||
+                    !exponent.AsSpan().SequenceEqual(new byte[] { 0x01, 0x00, 0x01 }))
+                {
+                    throw new InvalidDataException(
+                        $"{name} must use the Release BOM public exponent 65537.");
+                }
+            }
             return canonical;
         }
         catch (CryptographicException exception)
@@ -227,6 +242,13 @@ public sealed class VerifiedReleaseBomAuthorityTrustV1
 
 public static class ReleaseBomAuthorityTrustVerifierV1
 {
+    private const int MaxCanonicalNumberDigits = 4_300;
+
+    private static readonly IComparer<string> UnicodeScalarComparer =
+        Comparer<string>.Create(CompareUnicodeScalars);
+
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
+
     private static readonly HashSet<string> BomFields = new(StringComparer.Ordinal)
     {
         "schema_version", "bom_id", "status", "integration_commit", "created_at",
@@ -245,11 +267,6 @@ public static class ReleaseBomAuthorityTrustVerifierV1
         ReadCommentHandling = JsonCommentHandling.Disallow,
         AllowTrailingCommas = false,
         MaxDepth = 48,
-    };
-
-    private static readonly JsonSerializerOptions CanonicalStringJson = new()
-    {
-        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
     public static VerifiedReleaseBomAuthorityTrustV1 Verify(
@@ -283,7 +300,11 @@ public static class ReleaseBomAuthorityTrustVerifierV1
         RequireExactObject(document.RootElement, BomFields, "Release BOM");
         RejectDuplicateMembers(document.RootElement);
         var root = document.RootElement;
+        if (!bomBytes.SequenceEqual(CanonicalizeExactJson(root)))
+            throw new InvalidDataException(
+                "Signed Release BOM must be the canonical sorted compact wire.");
         RequireString(root, "schema_version", "dps.release-bom/v1");
+        RequireString(root, "status", "SIGNED");
         RequireString(root, "bom_id", receipt.ReleaseBomId);
         RequireString(root, "integration_commit", receipt.IntegrationCommit);
         RequireString(root, "activation_token_sha256", receipt.ActivationTokenSha256);
@@ -296,7 +317,7 @@ public static class ReleaseBomAuthorityTrustVerifierV1
         RequireString(signatureElement, "algorithm", "rsa-pss-sha256");
         RequireString(signatureElement, "key_id", anchors.BomSignerKeyId);
         using var payload = BuildBomPayloadWithoutSignature(root);
-        var canonicalPayload = Canonicalize(payload.RootElement);
+        var canonicalPayload = CanonicalizeExactJson(payload.RootElement);
         var bomMessage = Encoding.UTF8.GetBytes("dps-release-bom/v1\n")
             .Concat(canonicalPayload).ToArray();
         VerifyRsaPss(
@@ -387,12 +408,15 @@ public static class ReleaseBomAuthorityTrustVerifierV1
         return JsonDocument.Parse(stream.ToArray());
     }
 
-    private static byte[] Canonicalize(JsonElement element)
+    internal static byte[] CanonicalizeExactJson(JsonElement element)
     {
         using var stream = new MemoryStream();
         WriteCanonical(element, stream);
         return stream.ToArray();
     }
+
+    internal static byte[] CanonicalizeForContractTests(JsonElement element)
+        => CanonicalizeExactJson(element);
 
     private static void WriteCanonical(JsonElement element, Stream destination)
     {
@@ -401,11 +425,11 @@ public static class ReleaseBomAuthorityTrustVerifierV1
             case JsonValueKind.Object:
                 WriteAscii(destination, "{");
                 var properties = element.EnumerateObject()
-                    .OrderBy(property => property.Name, StringComparer.Ordinal).ToArray();
+                    .OrderBy(property => property.Name, UnicodeScalarComparer).ToArray();
                 for (var index = 0; index < properties.Length; index++)
                 {
                     if (index > 0) WriteAscii(destination, ",");
-                    WriteAscii(destination, JsonSerializer.Serialize(properties[index].Name, CanonicalStringJson));
+                    WriteString(destination, properties[index].Name);
                     WriteAscii(destination, ":");
                     WriteCanonical(properties[index].Value, destination);
                 }
@@ -423,7 +447,10 @@ public static class ReleaseBomAuthorityTrustVerifierV1
                 WriteAscii(destination, "]");
                 break;
             case JsonValueKind.String:
-                WriteAscii(destination, JsonSerializer.Serialize(element.GetString(), CanonicalStringJson));
+                WriteString(
+                    destination,
+                    element.GetString()
+                        ?? throw new InvalidDataException("Signed BOM JSON string decoded to null."));
                 break;
             case JsonValueKind.Number:
                 WriteAscii(destination, CanonicalNumber(element));
@@ -444,17 +471,207 @@ public static class ReleaseBomAuthorityTrustVerifierV1
 
     private static string CanonicalNumber(JsonElement element)
     {
-        if (element.TryGetInt64(out var integer))
+        var raw = element.GetRawText();
+        if (raw.Count(char.IsAsciiDigit) > MaxCanonicalNumberDigits)
+            throw new InvalidDataException(
+                "Signed BOM number exceeds the 4300-digit limit.");
+        if (!raw.AsSpan().ContainsAny(".eE"))
+        {
+            if (!BigInteger.TryParse(
+                    raw,
+                    NumberStyles.AllowLeadingSign,
+                    CultureInfo.InvariantCulture,
+                    out var integer))
+                throw new InvalidDataException("Signed BOM contains an unsupported JSON integer.");
             return integer.ToString(CultureInfo.InvariantCulture);
-        if (!element.TryGetDouble(out var value) || double.IsNaN(value) || double.IsInfinity(value))
-            throw new InvalidDataException("Signed BOM contains an unsupported JSON number.");
-        return value.ToString("R", CultureInfo.InvariantCulture).ToLowerInvariant();
+        }
+
+        if (!element.TryGetDouble(out var floatingPoint) || !double.IsFinite(floatingPoint))
+            throw new InvalidDataException("Signed BOM contains a non-finite JSON number.");
+        return FormatPythonFloat(floatingPoint);
+    }
+
+    private static string FormatPythonFloat(double value)
+    {
+        if (value == 0d)
+            return BitConverter.DoubleToInt64Bits(value) < 0 ? "-0.0" : "0.0";
+
+        var rendered = value.ToString("R", CultureInfo.InvariantCulture).ToLowerInvariant();
+        var exponentMarker = rendered.IndexOf('e');
+        if (exponentMarker >= 0)
+        {
+            var mantissa = rendered[..exponentMarker];
+            var exponent = int.Parse(
+                rendered[(exponentMarker + 1)..],
+                NumberStyles.AllowLeadingSign,
+                CultureInfo.InvariantCulture);
+            if (exponent >= -4 && exponent < 16)
+                return ScientificToFixed(mantissa, exponent);
+            return mantissa + FormatExponent(exponent);
+        }
+
+        var unsigned = rendered[0] == '-' ? rendered[1..] : rendered;
+        var decimalPoint = unsigned.IndexOf('.');
+        var integerPart = decimalPoint >= 0 ? unsigned[..decimalPoint] : unsigned;
+        int decimalExponent;
+        if (integerPart.Any(character => character != '0'))
+        {
+            decimalExponent = integerPart.TrimStart('0').Length - 1;
+        }
+        else
+        {
+            var fractionalPart = decimalPoint >= 0 ? unsigned[(decimalPoint + 1)..] : string.Empty;
+            var firstNonZero = fractionalPart.IndexOfAny(
+                ['1', '2', '3', '4', '5', '6', '7', '8', '9']);
+            if (firstNonZero < 0)
+                throw new InvalidDataException("Signed BOM float formatting lost a non-zero value.");
+            decimalExponent = -(firstNonZero + 1);
+        }
+
+        if (decimalExponent >= 16 || decimalExponent < -4)
+            return FixedToScientific(rendered, decimalExponent);
+        return decimalPoint >= 0 ? rendered : rendered + ".0";
+    }
+
+    private static string FixedToScientific(string rendered, int exponent)
+    {
+        var negative = rendered[0] == '-';
+        var unsigned = negative ? rendered[1..] : rendered;
+        var digits = unsigned.Replace(".", string.Empty, StringComparison.Ordinal)
+            .TrimStart('0').TrimEnd('0');
+        if (digits.Length == 0)
+            throw new InvalidDataException("Signed BOM float formatting produced no significant digits.");
+        var mantissa = digits.Length == 1
+            ? digits
+            : digits[0] + "." + digits[1..];
+        return (negative ? "-" : string.Empty) + mantissa + FormatExponent(exponent);
+    }
+
+    private static string ScientificToFixed(string mantissa, int exponent)
+    {
+        var negative = mantissa[0] == '-';
+        var unsigned = negative ? mantissa[1..] : mantissa;
+        var digits = unsigned.Replace(".", string.Empty, StringComparison.Ordinal);
+        var decimalPosition = exponent + 1;
+        string fixedPoint;
+        if (decimalPosition <= 0)
+            fixedPoint = "0." + new string('0', -decimalPosition) + digits;
+        else if (decimalPosition >= digits.Length)
+            fixedPoint = digits + new string('0', decimalPosition - digits.Length) + ".0";
+        else
+            fixedPoint = digits[..decimalPosition] + "." + digits[decimalPosition..];
+        return (negative ? "-" : string.Empty) + fixedPoint;
+    }
+
+    private static string FormatExponent(int exponent)
+        => "e" + (exponent >= 0 ? "+" : "-")
+            + Math.Abs(exponent).ToString("D2", CultureInfo.InvariantCulture);
+
+    private static int CompareUnicodeScalars(string? left, string? right)
+    {
+        if (ReferenceEquals(left, right))
+            return 0;
+        if (left is null)
+            return -1;
+        if (right is null)
+            return 1;
+
+        var leftIndex = 0;
+        var rightIndex = 0;
+        while (leftIndex < left.Length && rightIndex < right.Length)
+        {
+            var leftScalar = char.ConvertToUtf32(left, leftIndex);
+            var rightScalar = char.ConvertToUtf32(right, rightIndex);
+            if (leftScalar != rightScalar)
+                return leftScalar < rightScalar ? -1 : 1;
+            leftIndex += char.IsHighSurrogate(left[leftIndex]) ? 2 : 1;
+            rightIndex += char.IsHighSurrogate(right[rightIndex]) ? 2 : 1;
+        }
+        if (leftIndex == left.Length && rightIndex == right.Length)
+            return 0;
+        return leftIndex == left.Length ? -1 : 1;
     }
 
     private static void WriteAscii(Stream destination, string value)
     {
-        var bytes = Encoding.UTF8.GetBytes(value);
+        byte[] bytes;
+        try
+        {
+            bytes = StrictUtf8.GetBytes(value);
+        }
+        catch (EncoderFallbackException exception)
+        {
+            throw new InvalidDataException(
+                "Signed BOM contains an invalid Unicode scalar sequence.",
+                exception);
+        }
         destination.Write(bytes);
+    }
+
+    private static void WriteString(Stream destination, string value)
+    {
+        using var escaped = new MemoryStream();
+        WriteAscii(escaped, "\"");
+        for (var index = 0; index < value.Length; index++)
+        {
+            var character = value[index];
+            switch (character)
+            {
+                case '"':
+                    WriteAscii(escaped, "\\\"");
+                    break;
+                case '\\':
+                    WriteAscii(escaped, "\\\\");
+                    break;
+                case '\n':
+                    WriteAscii(escaped, "\\n");
+                    break;
+                case '\r':
+                    WriteAscii(escaped, "\\r");
+                    break;
+                case '\t':
+                    WriteAscii(escaped, "\\t");
+                    break;
+                case '\b':
+                    WriteAscii(escaped, "\\b");
+                    break;
+                case '\f':
+                    WriteAscii(escaped, "\\f");
+                    break;
+                default:
+                    if (character < 0x20)
+                    {
+                        WriteAscii(
+                            escaped,
+                            "\\u" + ((int)character).ToString(
+                                "x4",
+                                CultureInfo.InvariantCulture));
+                    }
+                    else if (char.IsHighSurrogate(character))
+                    {
+                        if (index + 1 >= value.Length || !char.IsLowSurrogate(value[index + 1]))
+                        {
+                            throw new InvalidDataException(
+                                "Signed BOM contains an invalid Unicode scalar sequence.");
+                        }
+                        WriteAscii(escaped, value.Substring(index, 2));
+                        index++;
+                    }
+                    else if (char.IsLowSurrogate(character))
+                    {
+                        throw new InvalidDataException(
+                            "Signed BOM contains an invalid Unicode scalar sequence.");
+                    }
+                    else
+                    {
+                        WriteAscii(escaped, character.ToString());
+                    }
+                    break;
+            }
+        }
+        WriteAscii(escaped, "\"");
+        escaped.Position = 0;
+        escaped.CopyTo(destination);
     }
 
     private static void VerifyRsaPss(
@@ -472,11 +689,41 @@ public static class ReleaseBomAuthorityTrustVerifierV1
         {
             throw new InvalidDataException($"{label} signature is not base64.", exception);
         }
+        if (!string.Equals(
+                Convert.ToBase64String(signature),
+                signatureBase64,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidDataException($"{label} signature is not canonical base64.");
+        }
         using var rsa = RSA.Create();
         rsa.ImportSubjectPublicKeyInfo(subjectPublicKeyInfo, out var bytesRead);
+        var modulus = rsa.ExportParameters(false).Modulus
+            ?? throw new InvalidDataException($"{label} RSA modulus is missing.");
+        if (signature.Length != modulus.Length ||
+            !UnsignedBigEndianLessThan(signature, modulus))
+        {
+            throw new InvalidDataException(
+                $"{label} signature is not a canonical RSA representative.");
+        }
         if (bytesRead != subjectPublicKeyInfo.Length ||
             !rsa.VerifyData(message, signature, HashAlgorithmName.SHA256, RSASignaturePadding.Pss))
             throw new InvalidDataException($"{label} RSA-PSS signature is invalid.");
+    }
+
+    private static bool UnsignedBigEndianLessThan(
+        ReadOnlySpan<byte> value,
+        ReadOnlySpan<byte> upperExclusive)
+    {
+        if (value.Length != upperExclusive.Length)
+            return false;
+        for (var index = 0; index < value.Length; index++)
+        {
+            if (value[index] == upperExclusive[index])
+                continue;
+            return value[index] < upperExclusive[index];
+        }
+        return false;
     }
 
     private static void RequireActive(

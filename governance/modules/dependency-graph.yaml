@@ -162,7 +162,7 @@
     {
       "consumer": "factory-control-plane-host",
       "provider": "factory-release-controller",
-      "reason": "signed-BOM rollout state enforcement and signed public native-stop authority trust receipt"
+      "reason": "signed-BOM rollout state enforcement"
     },
     {
       "consumer": "factory-control-plane-host",
@@ -187,17 +187,17 @@
     {
       "consumer": "factory-impact-analyzer",
       "provider": "factory-instruction-resolver",
-      "reason": "sealed current instruction.receipt/v2, exact write paths and baseline facts"
+      "reason": "fresh instruction and consumer binding"
     },
     {
       "consumer": "factory-impact-analyzer",
       "provider": "factory-upgrade-intake",
-      "reason": "sealed canonical upgrade.intent/v2 and full request digest"
+      "reason": "validated upgrade scope"
     },
     {
       "consumer": "factory-instruction-resolver",
       "provider": "factory-upgrade-intake",
-      "reason": "sealed requester and Manifest authority proofs plus canonical upgrade.intent/v2"
+      "reason": "validated upgrade identity and declared scope"
     },
     {
       "consumer": "factory-merge-controller",
@@ -218,6 +218,11 @@
       "consumer": "factory-release-controller",
       "provider": "factory-merge-controller",
       "reason": "merge-head decision"
+    },
+    {
+      "consumer": "factory-release-controller",
+      "provider": "factory-upgrade-intake",
+      "reason": "normalized upgrade identity and risk"
     },
     {
       "consumer": "factory-rollback-controller",
@@ -263,16 +268,6 @@
       "consumer": "interest-reducer",
       "provider": "memory-event-ledger",
       "reason": "verified append-only event input"
-    },
-    {
-      "consumer": "memory-event-ledger",
-      "provider": "command-orchestrator",
-      "reason": "owner of the canonical signed command receipt protocol"
-    },
-    {
-      "consumer": "memory-event-ledger",
-      "provider": "executor-gateway",
-      "reason": "independent signer of native and postcondition verified observation receipts"
     },
     {
       "consumer": "memory-event-ledger",
@@ -322,7 +317,7 @@
     {
       "consumer": "windows-edge-worker",
       "provider": "executor-gateway",
-      "reason": "owner of the byte-frozen legacy native.stop.proof/v1 Schema and strict codec used only for bounded quarantine classification; no runtime issuance edge exists"
+      "reason": "owner of native.stop.proof/v1 Schema, DTO, evidence digest, canonical signing bytes, and strict JSON codec"
     },
     {
       "consumer": "windows-edge-worker",
@@ -344,6 +339,7 @@
     ],
     [
       "factory-instruction-resolver",
+      "memory-event-ledger",
       "platform-account-registry",
       "policy-approval",
       "windows-edge-supervisor"
@@ -351,38 +347,37 @@
     [
       "binding",
       "factory-impact-analyzer",
+      "interest-reducer",
       "operation-compiler"
     ],
     [
       "command-orchestrator",
       "factory-worktree-manager",
+      "gbrain-projector",
       "persona-store"
     ],
     [
       "audit-metrics",
-      "executor-gateway",
-      "factory-trusted-runner"
-    ],
-    [
-      "factory-merge-controller",
-      "memory-event-ledger",
-      "windows-edge-worker"
-    ],
-    [
-      "factory-artifact-builder",
-      "interest-reducer"
-    ],
-    [
-      "factory-release-controller",
-      "gbrain-projector"
-    ],
-    [
       "evidence-service",
-      "factory-rollback-controller",
+      "executor-gateway",
+      "factory-trusted-runner",
       "soul-memory-adapter"
     ],
     [
       "control-plane-host",
+      "factory-merge-controller",
+      "windows-edge-worker"
+    ],
+    [
+      "factory-artifact-builder"
+    ],
+    [
+      "factory-release-controller"
+    ],
+    [
+      "factory-rollback-controller"
+    ],
+    [
       "factory-control-plane-host"
     ]
   ]

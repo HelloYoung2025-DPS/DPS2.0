@@ -14,7 +14,10 @@ namespace Dps.ControlPlaneHost.Contracts;
 /// signer's ordinal carried inside the signed BOM (rollback may revert it).
 /// The execution token is signer-committed: it is canonical Base64 for
 /// exactly 32 opaque bytes and its SHA-256 equals ActivationTokenSha256,
-/// the digest the signer pre-committed inside the signed BOM.
+/// the digest the signer pre-committed inside the signed BOM. Control Plane
+/// Host persists the raw token in its append-only binding journal as a
+/// durable at-rest secret so the exact retained previous binding can be
+/// restored; readers must keep the value opaque and never log it.
 /// </summary>
 public sealed record ActiveReleaseBindingV1(
     [property: JsonPropertyName("schema_version")] string SchemaVersion,
@@ -78,10 +81,11 @@ public sealed record ActiveReleaseBindingV1(
     }
 
     /// <summary>
-    /// The execution token is an ephemeral secret: the record's printed form
-    /// redacts it so logs, exception messages, and debugger dumps never carry
-    /// the raw token (the executor-gateway wire DTO redacts identically).
-    /// Value-based record equality still covers ExecutionTokenBase64.
+    /// The execution token is a durable append-only at-rest secret in
+    /// Control Plane Host. The record's printed form redacts it so logs,
+    /// exception messages, and debugger dumps never carry the raw token
+    /// (the executor-gateway wire DTO redacts identically). Value-based
+    /// record equality still covers ExecutionTokenBase64.
     /// </summary>
     public override string ToString()
         => $"{nameof(ActiveReleaseBindingV1)} {{ SchemaVersion = {SchemaVersion}, ContractId = {ContractId}, ProducerModule = {ProducerModule}, SoulId = {SoulId ?? "null"}, DeviceBindingId = {DeviceBindingId}, PlatformAccountId = {PlatformAccountId ?? "null"}, TraceId = {TraceId ?? "null"}, IdempotencyKey = {IdempotencyKey ?? "null"}, OccurredAt = {OccurredAt:O}, PrivacyClass = {PrivacyClass}, ReleaseBomSha256 = {ReleaseBomSha256}, Generation = {Generation}, ReleaseBomGeneration = {ReleaseBomGeneration}, ExecutionTokenBase64 = [REDACTED], ActivationTokenSha256 = {ActivationTokenSha256}, Status = {Status}, SignerIdentity = {SignerIdentity}, SignerKeyId = {SignerKeyId}, BomSignatureSha256 = {BomSignatureSha256}, ActivatedAt = {ActivatedAt:O}, ReceiptId = {ReceiptId} }}";

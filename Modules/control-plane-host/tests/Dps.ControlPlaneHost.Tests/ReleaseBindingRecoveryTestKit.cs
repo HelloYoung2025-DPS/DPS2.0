@@ -323,6 +323,8 @@ internal static class ReleaseBindingRecoveryTestKit
     internal sealed class BomSigner : IDisposable
     {
         private readonly RSA _rsa = RSA.Create(2048);
+        private readonly Dictionary<string, byte[]> _stableTwins =
+            new(StringComparer.Ordinal);
 
         internal string KeyId { get; }
         internal string Identity { get; }
@@ -348,17 +350,32 @@ internal static class ReleaseBindingRecoveryTestKit
             }
         }
 
+        private static string WireBomId(string bomId)
+            => bomId.Length >= 8 ? bomId : "test-" + bomId;
+
         internal (byte[] Bom, string Token) SignBom(
             string bomId,
             long signerGeneration,
-            byte[]? previousBom)
+            byte[]? previousBom,
+            int? exactWireBytes = null)
         {
             var token = Token(bomId);
             var tokenBytes = Convert.FromBase64String(token);
+            var previousStable = previousBom is null
+                ? null
+                : StableTwin(previousBom);
+            string? previousStableBomId = null;
+            if (previousStable is not null)
+            {
+                using var previousDocument = JsonDocument.Parse(previousStable);
+                previousStableBomId = previousDocument.RootElement
+                    .GetProperty("bom_id")
+                    .GetString();
+            }
             var payload = new JsonObject
             {
                 ["schema_version"] = "dps.release-bom/v1",
-                ["bom_id"] = bomId,
+                ["bom_id"] = WireBomId(bomId),
                 ["status"] = "SIGNED",
                 ["integration_commit"] = new string('a', 40),
                 ["created_at"] = "2026-07-14T00:00:00.0000001Z",
@@ -378,16 +395,70 @@ internal static class ReleaseBindingRecoveryTestKit
                 ["release_approval"] = new JsonObject(),
                 ["rollout"] = new JsonObject(),
                 ["rollback"] = new JsonObject(),
-                ["previous_stable_bom"] = previousBom is null
+                ["previous_stable_bom"] = previousStable is null
                     ? null
-                    : (JsonNode)("bom-previous-" + bomId),
-                ["previous_stable_bom_sha256"] = previousBom is null
+                    : (JsonNode)previousStableBomId!,
+                ["previous_stable_bom_sha256"] = previousStable is null
                     ? null
-                    : Sha256Hex(previousBom),
+                    : Sha256Hex(previousStable),
                 ["native_stop_authorities"] = new JsonArray(),
                 ["device_route_assignment_authorities"] = new JsonArray(),
                 ["native_stop_challenge_authorities"] = new JsonArray()
             };
+
+            byte[] CompleteWire()
+            {
+                payload.Remove("signature");
+                using var payloadDocument = JsonDocument.Parse(payload.ToJsonString());
+                var canonical = ReleaseBomCanonicalJson.Serialize(payloadDocument.RootElement);
+                var message = Encoding.ASCII.GetBytes("dps-release-bom/v1\n")
+                    .Concat(canonical)
+                    .ToArray();
+                var signature = _rsa.SignData(
+                    message,
+                    HashAlgorithmName.SHA256,
+                    RSASignaturePadding.Pss);
+                payload["signature"] = new JsonObject
+                {
+                    ["algorithm"] = "rsa-pss-sha256",
+                    ["key_id"] = KeyId,
+                    ["value"] = Convert.ToBase64String(signature)
+                };
+                using var fullDocument = JsonDocument.Parse(payload.ToJsonString());
+                return ReleaseBomCanonicalJson.Serialize(fullDocument.RootElement);
+            }
+
+            if (exactWireBytes is null)
+                return (CompleteWire(), token);
+            payload["feature_flags"] = new JsonObject { ["padding"] = string.Empty };
+            var emptyPaddingWire = CompleteWire();
+            var paddingLength = exactWireBytes.Value - emptyPaddingWire.Length;
+            if (paddingLength < 0)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(exactWireBytes),
+                    "target wire is smaller than the minimal signed BOM");
+            }
+            payload["feature_flags"]!["padding"] = new string('x', paddingLength);
+            var exactWire = CompleteWire();
+            if (exactWire.Length != exactWireBytes.Value)
+            {
+                throw new InvalidOperationException(
+                    "exact signed BOM fixture length calculation drifted");
+            }
+            return (exactWire, token);
+        }
+
+        internal byte[] StableTwin(byte[] signedBom)
+        {
+            var cacheKey = Sha256Hex(signedBom);
+            if (_stableTwins.TryGetValue(cacheKey, out var cached))
+            {
+                return cached;
+            }
+            var payload = JsonNode.Parse(signedBom)!.AsObject();
+            payload["status"] = "STABLE";
+            payload.Remove("signature");
             using var payloadDocument = JsonDocument.Parse(payload.ToJsonString());
             var canonical = ReleaseBomCanonicalJson.Serialize(payloadDocument.RootElement);
             var message = Encoding.ASCII.GetBytes("dps-release-bom/v1\n")
@@ -404,7 +475,9 @@ internal static class ReleaseBindingRecoveryTestKit
                 ["value"] = Convert.ToBase64String(signature)
             };
             using var fullDocument = JsonDocument.Parse(payload.ToJsonString());
-            return (ReleaseBomCanonicalJson.Serialize(fullDocument.RootElement), token);
+            var stable = ReleaseBomCanonicalJson.Serialize(fullDocument.RootElement);
+            _stableTwins.Add(cacheKey, stable);
+            return stable;
         }
 
         public void Dispose() => _rsa.Dispose();

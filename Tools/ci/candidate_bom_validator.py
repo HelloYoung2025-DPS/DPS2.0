@@ -30,6 +30,7 @@ import binascii
 import hashlib
 import hmac
 import json
+import math
 import os
 import re
 import shutil
@@ -78,6 +79,7 @@ _MAX_ARTIFACT_BYTES = 512 * 1024 * 1024
 _MAX_JSON_DEPTH = 48
 _MAX_JSON_NODES = 100_000
 _MAX_JSON_COLLECTION_ITEMS = 20_000
+_MAX_CANONICAL_NUMBER_DIGITS = 4_300
 _MAX_MODULES = 256
 _MAX_INSTRUCTION_HASHES = 4_096
 _MAX_CONTRACTS = 4_096
@@ -230,6 +232,24 @@ def _reject_json_constant(value: str) -> None:
     raise ValueError(f"non-finite JSON number: {value}")
 
 
+def _require_canonical_number_digit_budget(value: str) -> None:
+    if sum(character.isdigit() for character in value) > _MAX_CANONICAL_NUMBER_DIGITS:
+        raise ValueError("JSON number exceeds the canonical digit limit")
+
+
+def _strict_json_integer(value: str) -> int:
+    _require_canonical_number_digit_budget(value)
+    return int(value, 10)
+
+
+def _strict_json_float(value: str) -> float:
+    _require_canonical_number_digit_budget(value)
+    parsed = float(value)
+    if not math.isfinite(parsed):
+        raise ValueError("JSON float is not finite")
+    return parsed
+
+
 def _validate_json_budget(value: Any, label: str) -> None:
     stack: list[tuple[Any, int]] = [(value, 1)]
     nodes = 0
@@ -243,13 +263,31 @@ def _validate_json_budget(value: Any, label: str) -> None:
         if isinstance(current, Mapping):
             if len(current) > _MAX_JSON_COLLECTION_ITEMS:
                 raise CandidateBomError(f"{label} contains an oversized object")
-            stack.extend((item, depth + 1) for item in current.values())
+            for key, item in current.items():
+                try:
+                    encoded_key_length = len(key.encode("utf-8"))
+                except (AttributeError, UnicodeEncodeError) as exc:
+                    raise CandidateBomError(
+                        f"{label} contains an invalid Unicode scalar sequence"
+                    ) from exc
+                if encoded_key_length > _MAX_CONTROL_JSON_BYTES:
+                    raise CandidateBomError(
+                        f"{label} contains an oversized object member name"
+                    )
+                stack.append((item, depth + 1))
         elif isinstance(current, Sequence) and not isinstance(current, (str, bytes, bytearray)):
             if len(current) > _MAX_JSON_COLLECTION_ITEMS:
                 raise CandidateBomError(f"{label} contains an oversized array")
             stack.extend((item, depth + 1) for item in current)
-        elif isinstance(current, str) and len(current.encode("utf-8")) > _MAX_CONTROL_JSON_BYTES:
-            raise CandidateBomError(f"{label} contains an oversized string")
+        elif isinstance(current, str):
+            try:
+                encoded_length = len(current.encode("utf-8"))
+            except UnicodeEncodeError as exc:
+                raise CandidateBomError(
+                    f"{label} contains an invalid Unicode scalar sequence"
+                ) from exc
+            if encoded_length > _MAX_CONTROL_JSON_BYTES:
+                raise CandidateBomError(f"{label} contains an oversized string")
 
 
 def _strict_json_loads(raw: bytes, label: str) -> Any:
@@ -259,6 +297,8 @@ def _strict_json_loads(raw: bytes, label: str) -> Any:
             text,
             object_pairs_hook=_strict_json_object,
             parse_constant=_reject_json_constant,
+            parse_int=_strict_json_integer,
+            parse_float=_strict_json_float,
         )
     except (UnicodeDecodeError, json.JSONDecodeError, _DuplicateJsonKey, ValueError) as exc:
         raise CandidateBomError(f"{label} is not strict JSON") from exc
@@ -415,7 +455,50 @@ def _version_satisfies_range(version: str, version_range: str) -> bool:
 
 
 def canonical_bytes(value: Any) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    stack = [value]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, Mapping):
+            stack.extend(current.values())
+        elif isinstance(current, Sequence) and not isinstance(
+            current, (str, bytes, bytearray)
+        ):
+            stack.extend(current)
+        elif isinstance(current, bool) or current is None:
+            continue
+        elif isinstance(current, int):
+            try:
+                digits = str(abs(current))
+            except ValueError as exc:
+                raise ValueError(
+                    "JSON integer exceeds the canonical digit limit"
+                ) from exc
+            if len(digits) > _MAX_CANONICAL_NUMBER_DIGITS:
+                raise ValueError("JSON integer exceeds the canonical digit limit")
+        elif isinstance(current, float) and not math.isfinite(current):
+            raise ValueError("JSON float is not finite")
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+
+
+def _require_canonical_bom_wire(
+    value: Mapping[str, Any], exact_bytes: bytes, label: str
+) -> None:
+    try:
+        canonical = canonical_bytes(value)
+    except (OverflowError, ValueError) as exc:
+        raise CandidateBomError(
+            f"{label} contains a number outside the canonical JSON domain"
+        ) from exc
+    if exact_bytes != canonical:
+        raise CandidateBomError(
+            f"{label} must be the canonical sorted compact JSON wire"
+        )
 
 
 def sha256_bytes(value: bytes) -> str:
@@ -630,6 +713,9 @@ def build_native_stop_trust_receipt_payload(
     """
     if not isinstance(exact_bom_bytes, bytes) or not exact_bom_bytes:
         raise CandidateBomError("exact Release BOM bytes are required for the trust receipt")
+    if not isinstance(bom, Mapping):
+        raise CandidateBomError("signed Release BOM must be one JSON object")
+    _require_canonical_bom_wire(bom, exact_bom_bytes, "signed Release BOM")
     if not isinstance(receipt_id, str) or not re.fullmatch(
         r"native-stop-trust-[0-9a-f]{32}", receipt_id
     ):
@@ -767,7 +853,12 @@ def _verify_rsa_pss(message: bytes, signature: bytes, modulus: int, exponent: in
     em_length = (em_bits + 7) // 8
     if len(signature) != (modulus.bit_length() + 7) // 8:
         return False
-    encoded = pow(int.from_bytes(signature, "big"), exponent, modulus).to_bytes(em_length, "big")
+    signature_representative = int.from_bytes(signature, "big")
+    if signature_representative >= modulus:
+        return False
+    encoded = pow(signature_representative, exponent, modulus).to_bytes(
+        em_length, "big"
+    )
     digest_length = hashlib.sha256().digest_size
     salt_length = digest_length
     if em_length < digest_length + salt_length + 2 or encoded[-1] != 0xBC:
@@ -897,6 +988,16 @@ class ReleaseTrustPolicy:
                 or modulus.bit_length() < 1024
             ):
                 raise CandidateBomError("trusted RSA modulus must be at least 1024 bits")
+            if "bom" in purposes and (
+                raw_purposes != ["bom"]
+                or key.get("algorithm") != "rsa-pss-sha256"
+                or not re.fullmatch(r"[1-9a-f][0-9a-f]*", key["modulus_hex"])
+                or (modulus.bit_length() + 7) // 8 < 256
+                or exponent != 65537
+            ):
+                raise CandidateBomError(
+                    "BOM trust key does not match the external signer profile"
+                )
             prior_identity = key_material_identities.get((modulus, exponent))
             if prior_identity is not None and prior_identity != identity:
                 raise CandidateBomError("one public key cannot represent multiple separated identities")
@@ -941,9 +1042,12 @@ class ReleaseTrustPolicy:
         if trusted is None or purpose not in trusted[3]:
             raise CandidateBomError(f"signature key is not trusted for {purpose}")
         try:
-            raw_signature = base64.b64decode(str(signature.get("value")), validate=True)
+            signature_value = str(signature.get("value"))
+            raw_signature = base64.b64decode(signature_value, validate=True)
         except (binascii.Error, ValueError) as exc:
             raise CandidateBomError("signature value is not valid base64") from exc
+        if base64.b64encode(raw_signature).decode("ascii") != signature_value:
+            raise CandidateBomError("signature value is not canonical base64")
         identity, modulus, exponent, _ = trusted
         if not _verify_rsa_pss(message, raw_signature, modulus, exponent):
             raise CandidateBomError(f"{purpose} signature verification failed")
@@ -2899,6 +3003,16 @@ class CandidateBomValidator:
             _strict_json_loads(receipt_bytes, "native stop authority trust receipt"),
             "native stop authority trust receipt",
         )
+        try:
+            canonical_receipt_bytes = canonical_bytes(receipt)
+        except (OverflowError, UnicodeEncodeError, ValueError) as exc:
+            raise CandidateBomError(
+                "native stop authority trust receipt is outside the canonical JSON domain"
+            ) from exc
+        if receipt_bytes != canonical_receipt_bytes:
+            raise CandidateBomError(
+                "native stop authority trust receipt must be the canonical sorted compact JSON wire"
+            )
         _require_exact(
             receipt,
             _NATIVE_STOP_TRUST_RECEIPT_FIELDS,
@@ -3308,6 +3422,7 @@ class CandidateBomValidator:
             "previous stable BOM",
         )
         self._validate_exact_shape(previous, expected_status="STABLE")
+        _require_canonical_bom_wire(previous, previous_bytes, "previous stable BOM")
         if previous.get("bom_id") != previous_id or previous_id == bom["bom_id"]:
             raise CandidateBomError("previous stable BOM identity or status mismatch")
         if previous.get("previous_stable_bom") == previous_id:
@@ -3342,6 +3457,7 @@ class CandidateBomValidator:
             "candidate Release BOM",
         )
         self._validate_exact_shape(bom)
+        _require_canonical_bom_wire(bom, bom_bytes, "candidate Release BOM")
         signed_payload = {key: value for key, value in bom.items() if key != "signature"}
         bom_signer = self._trust.verify_signature(
             bom["signature"], b"dps-release-bom/v1\n" + canonical_bytes(signed_payload), "bom"

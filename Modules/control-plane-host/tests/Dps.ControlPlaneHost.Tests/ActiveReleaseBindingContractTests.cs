@@ -132,9 +132,10 @@ public sealed class ActiveReleaseBindingContractTests
 
         var (firstBom, firstToken) = SignBom(rsa, key.KeyId, "bom-1", 1, null);
         authority.Activate(Device, firstBom, firstToken);
+        var firstStableBom = SignStableTwin(rsa, key.KeyId, firstBom);
         var (secondBom, secondToken) = SignBom(
-            rsa, key.KeyId, "bom-2", 2, Convert.ToHexStringLower(SHA256.HashData(firstBom)));
-        authority.Activate(Device, secondBom, secondToken);
+            rsa, key.KeyId, "bom-2", 2, firstStableBom);
+        authority.Activate(Device, secondBom, firstStableBom, secondToken);
         authority.Rollback(Device, firstToken);
         Assert.True(authority.TryReadActive(Device, out var binding));
         authority.Revoke(Device, binding!.Generation);
@@ -281,13 +282,22 @@ public sealed class ActiveReleaseBindingContractTests
         string keyId,
         string bomId,
         long signerGeneration,
-        string? previousSha)
+        byte[]? previousStableBom)
     {
         var token = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes("token:" + bomId)));
+        var wireBomId = bomId.Length >= 8 ? bomId : "test-" + bomId;
+        string? previousStableBomId = null;
+        if (previousStableBom is not null)
+        {
+            using var previousDocument = JsonDocument.Parse(previousStableBom);
+            previousStableBomId = previousDocument.RootElement
+                .GetProperty("bom_id")
+                .GetString();
+        }
         var payload = new JsonObject
         {
             ["schema_version"] = "dps.release-bom/v1",
-            ["bom_id"] = bomId,
+            ["bom_id"] = wireBomId,
             ["status"] = "SIGNED",
             ["integration_commit"] = new string('a', 40),
             ["created_at"] = "2026-07-14T00:00:00.0000001Z",
@@ -308,16 +318,37 @@ public sealed class ActiveReleaseBindingContractTests
             ["release_approval"] = new JsonObject(),
             ["rollout"] = new JsonObject(),
             ["rollback"] = new JsonObject(),
-            ["previous_stable_bom"] = previousSha is null ? null : (JsonNode)("bom-previous-" + bomId),
-            ["previous_stable_bom_sha256"] = previousSha,
+            ["previous_stable_bom"] = previousStableBomId,
+            ["previous_stable_bom_sha256"] = previousStableBom is null
+                ? null
+                : Convert.ToHexStringLower(SHA256.HashData(previousStableBom)),
             ["native_stop_authorities"] = new JsonArray(),
             ["device_route_assignment_authorities"] = new JsonArray(),
             ["native_stop_challenge_authorities"] = new JsonArray()
         };
+        return (SignPayload(rsa, keyId, payload), token);
+    }
+
+    private static byte[] SignStableTwin(RSA rsa, string keyId, byte[] signedBom)
+    {
+        var payload = JsonNode.Parse(signedBom)!.AsObject();
+        payload["status"] = "STABLE";
+        payload.Remove("signature");
+        return SignPayload(rsa, keyId, payload);
+    }
+
+    private static byte[] SignPayload(RSA rsa, string keyId, JsonObject payload)
+    {
+        payload.Remove("signature");
         using var payloadDocument = JsonDocument.Parse(payload.ToJsonString());
         var canonical = ReleaseBomCanonicalJson.Serialize(payloadDocument.RootElement);
-        var message = Encoding.ASCII.GetBytes("dps-release-bom/v1\n").Concat(canonical).ToArray();
-        var signature = rsa.SignData(message, HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+        var message = Encoding.ASCII.GetBytes("dps-release-bom/v1\n")
+            .Concat(canonical)
+            .ToArray();
+        var signature = rsa.SignData(
+            message,
+            HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pss);
         payload["signature"] = new JsonObject
         {
             ["algorithm"] = "rsa-pss-sha256",
@@ -325,6 +356,6 @@ public sealed class ActiveReleaseBindingContractTests
             ["value"] = Convert.ToBase64String(signature)
         };
         using var fullDocument = JsonDocument.Parse(payload.ToJsonString());
-        return (ReleaseBomCanonicalJson.Serialize(fullDocument.RootElement), token);
+        return ReleaseBomCanonicalJson.Serialize(fullDocument.RootElement);
     }
 }

@@ -44,6 +44,9 @@ DEPLOYED_POLICY_PATH = (
 )
 VALIDATOR_PATH = ROOT / "Tools" / "ci" / "candidate_bom_validator.py"
 SUITE_PATH = ROOT / "Tests" / "ci" / "test_candidate_bom_validator.py"
+UNSIGNED_RECEIPT_GENERATOR_PATH = (
+    FIXTURES / "generate_unsigned_receipt.py"
+)
 
 # Deterministic commit identity, pinned so the synthetic integration commit
 # sha reproduces exactly (a git commit is a pure function of tree, parents,
@@ -82,6 +85,55 @@ sha256_bytes = SUBJECT.sha256_bytes
 
 
 class CandidateBomValidatorMainEndToEndTests(unittest.TestCase):
+    def test_pinned_bom_fixtures_match_external_signer_profile(self) -> None:
+        trust = SUBJECT.ReleaseTrustPolicy(self._synthetic_anchor_policy())
+        verified = {}
+        for filename, expected_status in (
+            ("previous-bom.json", "STABLE"),
+            ("bom.json", "SIGNED"),
+        ):
+            wire = (FIXTURES / filename).read_bytes()
+            bom = SUBJECT._strict_json_loads(wire, f"{filename} fixture")
+            self.assertEqual(expected_status, bom["status"])
+            signer = trust.verify_signature(
+                bom["signature"],
+                b"dps-release-bom/v1\n"
+                + canonical_bytes(
+                    {
+                        key: value
+                        for key, value in bom.items()
+                        if key != "signature"
+                    }
+                ),
+                "bom",
+            )
+            self.assertEqual("external-release-signer", signer)
+            verified[filename] = (wire, bom)
+        self.assertEqual(
+            sha256_bytes(verified["previous-bom.json"][0]),
+            verified["bom.json"][1]["previous_stable_bom_sha256"],
+        )
+
+    def test_unsigned_owner_receipt_fixture_is_production_builder_output(self) -> None:
+        completed = subprocess.run(
+            [sys.executable, str(UNSIGNED_RECEIPT_GENERATOR_PATH)],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        self.assertEqual(
+            0,
+            completed.returncode,
+            f"fixture generator exit {completed.returncode}\n"
+            f"stdout: {completed.stdout}\nstderr: {completed.stderr}",
+        )
+        report = json.loads(completed.stdout)
+        payload = json.loads((FIXTURES / "receipt-payload.json").read_bytes())
+        self.assertEqual(payload["receipt_id"], report["receipt_id"])
+        self.assertEqual(payload["idempotency_key"], report["idempotency_key"])
+        self.assertEqual(872, report["signing_bytes_length"])
+
     def test_main_happy_path_with_owner_signed_receipt_passes(self) -> None:
         signature = self._owner_signature()
         with tempfile.TemporaryDirectory() as directory:
@@ -113,7 +165,7 @@ class CandidateBomValidatorMainEndToEndTests(unittest.TestCase):
             payload = json.loads((FIXTURES / "receipt-payload.json").read_bytes())
             receipt = dict(payload)
             receipt["signature"] = signature
-            receipt_bytes = canonical_bytes(receipt) + b"\n"
+            receipt_bytes = canonical_bytes(receipt)
             receipt_path.write_bytes(receipt_bytes)
             result = subprocess.run(
                 [
@@ -213,7 +265,8 @@ class CandidateBomValidatorMainEndToEndTests(unittest.TestCase):
         # deployed anchor's classic private halves were discarded by design.
         policy, owner_entry = self._owner_key_entry()
         classic = {
-            "controller-key": ("release-controller", ["artifact", "bom"]),
+            "controller-key": ("release-controller", ["artifact"]),
+            "external-bom-test-key": ("external-release-signer", ["bom"]),
             "evidence-key": ("evidence-issuer", ["evidence"]),
             "approval-key": ("human-approver", ["approval"]),
         }
@@ -223,7 +276,10 @@ class CandidateBomValidatorMainEndToEndTests(unittest.TestCase):
             "required_gates": policy["required_gates"],
             "implementer_identities": ["module-builder"],
             "evidence_issuer_identities": ["evidence-issuer"],
-            "release_controller_identities": ["release-controller"],
+            "release_controller_identities": [
+                "release-controller",
+                "external-release-signer",
+            ],
             "release_approver_identities": ["human-approver"],
             "native_stop_trust_signer_identities": (
                 policy["native_stop_trust_signer_identities"]

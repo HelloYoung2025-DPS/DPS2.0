@@ -34,7 +34,7 @@
       "suiteId": "control-plane-host.contract",
       "testTarget": "Modules/control-plane-host/tests/Dps.ControlPlaneHost.Tests/Dps.ControlPlaneHost.Tests.csproj",
       "testCategory": "Contract",
-      "minimumExecutedTests": 27
+      "minimumExecutedTests": 31
     },
     {
       "moduleId": "control-plane-host",
@@ -126,6 +126,13 @@
       "testTarget": "Modules/factory-release-controller/tests/test_contracts.py",
       "testCategory": "Contract",
       "minimumExecutedTests": 4
+    },
+    {
+      "moduleId": "factory-release-controller",
+      "suiteId": "factory-release-controller.release-bom-contract-dotnet",
+      "testTarget": "Modules/factory-release-controller/tests/Dps.FactoryReleaseController.Contracts.Tests/Dps.FactoryReleaseController.Contracts.Tests.csproj",
+      "testCategory": "Contract",
+      "minimumExecutedTests": 6
     },
     {
       "moduleId": "factory-rollback-controller",
@@ -337,7 +344,7 @@
       "evidenceKind": "REAL_POSTGRESQL",
       "testTarget": "Modules/control-plane-host/tests/Dps.ControlPlaneHost.Tests/Dps.ControlPlaneHost.Tests.csproj",
       "testCategory": "Integration",
-      "minimumExecutedTests": 66,
+      "minimumExecutedTests": 74,
       "requiredEnvironment": [
         "DPS_TEST_POSTGRES"
       ]

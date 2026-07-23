@@ -51,6 +51,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         await using var context = await RecoveryRaceContext.CreateAsync(
             "race-activation-wins", 1, cancellationToken);
         var (bom2, token2) = context.BomSigner.SignBom("race-activation-wins-bom-2", 2, context.Bom(1));
+        var previousStableBom = context.BomSigner.StableTwin(context.Bom(1));
         var recovery = SignRecovery(context.RecoverySigner, RecoveryPinnedToLiveBinding(
             context.Intent,
             context.Reconciliation,
@@ -67,7 +68,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         // Queue the activation first, the recovery behind it; releasing the
         // blocker then commits the transition before the recovery compares.
         var transitionTask = Task.Run(
-            () => context.Authority.Activate(DeviceA, bom2, token2),
+            () => context.Authority.Activate(DeviceA, bom2, previousStableBom, token2),
             cancellationToken);
         await WaitForAdvisoryWaitersAsync(observer, DeviceA, 1, cancellationToken);
         var recoveryTask = context.RecoveryClient.AuthorizeSubmissionRecoveryAsync(recovery, cancellationToken);
@@ -97,6 +98,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         await using var context = await RecoveryRaceContext.CreateAsync(
             "race-recovery-wins-activation", 1, cancellationToken);
         var (bom2, token2) = context.BomSigner.SignBom("race-recovery-wins-activation-bom-2", 2, context.Bom(1));
+        var previousStableBom = context.BomSigner.StableTwin(context.Bom(1));
         var recovery = SignRecovery(context.RecoverySigner, RecoveryPinnedToLiveBinding(
             context.Intent,
             context.Reconciliation,
@@ -116,7 +118,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         var recoveryTask = context.RecoveryClient.AuthorizeSubmissionRecoveryAsync(recovery, cancellationToken);
         await WaitForAdvisoryWaitersAsync(observer, DeviceA, 1, cancellationToken);
         var transitionTask = Task.Run(
-            () => context.Authority.Activate(DeviceA, bom2, token2),
+            () => context.Authority.Activate(DeviceA, bom2, previousStableBom, token2),
             cancellationToken);
         await WaitForAdvisoryWaitersAsync(observer, DeviceA, 2, cancellationToken);
         await blockerTransaction.RollbackAsync(cancellationToken);
@@ -537,9 +539,28 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
                         label + "-bom-" + index,
                         index,
                         index == 1 ? null : boms[^1]);
-                    authority.Activate(DeviceA, bom, token);
+                    if (index == 1)
+                    {
+                        authority.Activate(DeviceA, bom, token);
+                    }
+                    else
+                    {
+                        authority.Activate(
+                            DeviceA,
+                            bom,
+                            bomSigner.StableTwin(boms[^1]),
+                            token);
+                    }
                     boms.Add(bom);
                     tokens.Add(token);
+                    if (index == 2)
+                    {
+                        Assert.True(authority.TryReadActive(DeviceA, out var generationTwo));
+                        Assert.Equal(2, generationTwo!.Generation);
+                        Assert.Equal(
+                            SameInstanceBomSigner.Sha256Hex(bom),
+                            generationTwo.ReleaseBomSha256);
+                    }
                 }
                 var liveReleaseBomSha256 = SameInstanceBomSigner.Sha256Hex(boms[^1]);
                 var prepared = await PrepareSameInstanceRecoverableSubmissionAsync(

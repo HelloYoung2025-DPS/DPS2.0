@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Expanded the candidate trust closure for R0-C to bind the canonical-number corpus, owner-receipt E2E and reproducible unsigned generator, Release BOM field-set dual pin, and both Control Plane and Release Controller C# contract test surfaces. These bytes are instruction-receipt inputs; this entry does not claim their tests or the batch gate passed.
+
 ## 0.4.0 - 2026-07-15
 
 - Replaced bare-JSON receipt currentness input with Resolver-private, process-bound `VerifiedInstructionReceiptV2`; it binds canonical bytes, full digest, receipt ID, issuer, audience, issue/expiry time, nonce, generation, producer/major, and status.

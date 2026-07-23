@@ -1,0 +1,1 @@
+# windows-edge-worker rules

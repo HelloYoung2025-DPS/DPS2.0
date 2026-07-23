@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS __SCHEMA__.release_binding_journal
     last_activation_signer_generation bigint NOT NULL,
     request_sha256 text COLLATE "C" NOT NULL,
     signed_bom_wire bytea,
+    previous_stable_bom_wire bytea,
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     CONSTRAINT release_binding_journal_pkey PRIMARY KEY (device_binding_id, sequence),
     CONSTRAINT release_binding_journal_device CHECK (
@@ -65,8 +66,36 @@ CREATE TABLE IF NOT EXISTS __SCHEMA__.release_binding_journal
     CONSTRAINT release_binding_journal_bom_bytes CHECK (
         signed_bom_wire IS NULL
         OR (octet_length(signed_bom_wire) >= 1
-            AND octet_length(signed_bom_wire) <= 1048576))
+            AND octet_length(signed_bom_wire) <= 4194304))
 );
+
+-- This migration is deliberately re-runnable against an already marked
+-- R0-C development schema. CREATE TABLE IF NOT EXISTS cannot add a later
+-- column, so add it explicitly and replace both constraints with their exact
+-- fail-closed definitions. Existing rows that cannot prove the new invariant
+-- make the migration fail instead of being grandfathered.
+ALTER TABLE __SCHEMA__.release_binding_journal
+    ADD COLUMN IF NOT EXISTS previous_stable_bom_wire bytea;
+ALTER TABLE __SCHEMA__.release_binding_journal
+    DROP CONSTRAINT IF EXISTS release_binding_journal_bom_bytes;
+ALTER TABLE __SCHEMA__.release_binding_journal
+    ADD CONSTRAINT release_binding_journal_bom_bytes CHECK (
+        signed_bom_wire IS NULL
+        OR (octet_length(signed_bom_wire) >= 1
+            AND octet_length(signed_bom_wire) <= 4194304));
+ALTER TABLE __SCHEMA__.release_binding_journal
+    DROP CONSTRAINT IF EXISTS release_binding_journal_previous_stable_bom_shape;
+ALTER TABLE __SCHEMA__.release_binding_journal
+    ADD CONSTRAINT release_binding_journal_previous_stable_bom_shape CHECK (
+        (previous_stable_bom_wire IS NOT NULL)
+        = (receipt_kind = 'activation' AND sequence > 1));
+ALTER TABLE __SCHEMA__.release_binding_journal
+    DROP CONSTRAINT IF EXISTS release_binding_journal_previous_stable_bom_bytes;
+ALTER TABLE __SCHEMA__.release_binding_journal
+    ADD CONSTRAINT release_binding_journal_previous_stable_bom_bytes CHECK (
+        previous_stable_bom_wire IS NULL
+        OR (octet_length(previous_stable_bom_wire) >= 1
+            AND octet_length(previous_stable_bom_wire) <= 4194304));
 
 CREATE TABLE IF NOT EXISTS __SCHEMA__.release_binding_recovery_fences
 (
@@ -140,6 +169,13 @@ BEGIN
 END;
 $append_only_triggers$;
 
+-- A changed input signature creates a PostgreSQL overload rather than
+-- replacing the old SECURITY DEFINER function. Remove the exact legacy
+-- overload so the runtime retains one unambiguous least-privilege append
+-- surface.
+DROP FUNCTION IF EXISTS __SCHEMA__.append_release_binding_record(
+    text, bigint, text, bytea, bytea, bytea, bigint, text, bytea);
+
 CREATE OR REPLACE FUNCTION __SCHEMA__.append_release_binding_record(
     p_device_binding_id text,
     p_sequence bigint,
@@ -149,7 +185,8 @@ CREATE OR REPLACE FUNCTION __SCHEMA__.append_release_binding_record(
     p_previous_binding_wire bytea,
     p_last_activation_signer_generation bigint,
     p_request_sha256 text,
-    p_signed_bom_wire bytea)
+    p_signed_bom_wire bytea,
+    p_previous_stable_bom_wire bytea)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -191,12 +228,13 @@ BEGIN
     INSERT INTO __SCHEMA__.release_binding_journal
         (device_binding_id, sequence, receipt_kind, receipt_wire,
          current_binding_wire, previous_binding_wire,
-         last_activation_signer_generation, request_sha256, signed_bom_wire)
+         last_activation_signer_generation, request_sha256, signed_bom_wire,
+         previous_stable_bom_wire)
     VALUES
         (p_device_binding_id, p_sequence, p_receipt_kind, p_receipt_wire,
          p_current_binding_wire, p_previous_binding_wire,
          p_last_activation_signer_generation, p_request_sha256,
-         p_signed_bom_wire);
+         p_signed_bom_wire, p_previous_stable_bom_wire);
 END;
 $function$;
 
@@ -292,7 +330,7 @@ GRANT USAGE ON SCHEMA __SCHEMA__ TO __RUNTIME_ROLE__;
 GRANT SELECT ON __SCHEMA__.release_binding_journal TO __RUNTIME_ROLE__;
 GRANT SELECT ON __SCHEMA__.release_binding_recovery_fences TO __RUNTIME_ROLE__;
 GRANT EXECUTE ON FUNCTION __SCHEMA__.append_release_binding_record(
-    text, bigint, text, bytea, bytea, bytea, bigint, text, bytea)
+    text, bigint, text, bytea, bytea, bytea, bigint, text, bytea, bytea)
     TO __RUNTIME_ROLE__;
 GRANT EXECUTE ON FUNCTION __SCHEMA__.commit_release_binding_recovery_fence(
     text, bigint, text, bigint, uuid, text) TO __RUNTIME_ROLE__;

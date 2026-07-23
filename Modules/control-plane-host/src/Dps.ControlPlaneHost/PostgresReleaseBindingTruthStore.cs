@@ -471,7 +471,8 @@ public sealed class PostgresReleaseBindingTruthStore
         var command = Command(
             $"SELECT {_qualifiedAppend}(@device_binding_id, @sequence, @receipt_kind, "
             + "@receipt_wire, @current_binding_wire, @previous_binding_wire, "
-            + "@last_activation_signer_generation, @request_sha256, @signed_bom_wire)",
+            + "@last_activation_signer_generation, @request_sha256, @signed_bom_wire, "
+            + "@previous_stable_bom_wire)",
             connection,
             transaction);
         command.Parameters.AddWithValue("device_binding_id", record.DeviceBindingId);
@@ -489,6 +490,9 @@ public sealed class PostgresReleaseBindingTruthStore
         command.Parameters.AddWithValue(
             "signed_bom_wire",
             (object?)record.SignedBomBytes ?? DBNull.Value);
+        command.Parameters.AddWithValue(
+            "previous_stable_bom_wire",
+            (object?)record.PreviousStableBomBytes ?? DBNull.Value);
         return command;
     }
 
@@ -620,7 +624,7 @@ public sealed class PostgresReleaseBindingTruthStore
             SELECT device_binding_id, sequence, receipt_kind, receipt_wire,
                    current_binding_wire, previous_binding_wire,
                    last_activation_signer_generation, request_sha256,
-                   signed_bom_wire
+                   signed_bom_wire, previous_stable_bom_wire
             FROM {_qualifiedJournal}
             ORDER BY device_binding_id, sequence
             """,
@@ -654,7 +658,7 @@ public sealed class PostgresReleaseBindingTruthStore
             SELECT device_binding_id, sequence, receipt_kind, receipt_wire,
                    current_binding_wire, previous_binding_wire,
                    last_activation_signer_generation, request_sha256,
-                   signed_bom_wire
+                   signed_bom_wire, previous_stable_bom_wire
             FROM {_qualifiedJournal}
             WHERE device_binding_id = @device_binding_id
               AND sequence > @after_sequence
@@ -694,7 +698,7 @@ public sealed class PostgresReleaseBindingTruthStore
             SELECT device_binding_id, sequence, receipt_kind, receipt_wire,
                    current_binding_wire, previous_binding_wire,
                    last_activation_signer_generation, request_sha256,
-                   signed_bom_wire
+                   signed_bom_wire, previous_stable_bom_wire
             FROM {_qualifiedJournal}
             WHERE device_binding_id = @device_binding_id
               AND sequence > @after_sequence
@@ -743,7 +747,8 @@ public sealed class PostgresReleaseBindingTruthStore
                 previous,
                 reader.GetInt64(6),
                 reader.GetString(7),
-                reader.IsDBNull(8) ? null : reader.GetFieldValue<byte[]>(8)));
+                reader.IsDBNull(8) ? null : reader.GetFieldValue<byte[]>(8),
+                reader.IsDBNull(9) ? null : reader.GetFieldValue<byte[]>(9)));
         }
 
         return records;

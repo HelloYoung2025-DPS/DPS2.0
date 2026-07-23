@@ -5,6 +5,8 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -18,7 +20,29 @@ from pathlib import Path
 # is ordinary Tools/ci gate code and must survive that module's R0-D deletion.
 ROOT = Path(__file__).resolve(strict=True).parents[2]
 SOURCE_PATH = ROOT / "Tools" / "ci" / "candidate_bom_validator.py"
+CANONICAL_NUMBER_CORPUS_PATH = (
+    ROOT
+    / "governance"
+    / "verification"
+    / "release-bom.canonical-number.v1.corpus.json"
+)
+CANONICAL_STRING_CORPUS_PATH = (
+    ROOT
+    / "governance"
+    / "verification"
+    / "release-bom.canonical-string.v1.corpus.json"
+)
+CANONICAL_NUMBER_CORPUS_SHA256 = (
+    "14f115b4acb3b11e4cc97b4fd657eea6b112841b3ee7bdc6b293e9fae4add4d3"
+)
+CANONICAL_STRING_CORPUS_SHA256 = (
+    "a7a132a48170ce6495af87706faa722670d4ceb856620436b5906e78d1ee42f9"
+)
 SUBJECT_NAME = "_dps_toolsci_candidate_bom_validator_subject"
+RELEASE_BINDING_COMPAT_CORPUS_ROOT = (
+    ROOT / "Tests" / "ci" / "fixtures" / "r0c_release_binding_compat"
+)
+FIXTURE_GIT_DATE = "2026-07-14T00:00:00Z"
 
 
 def load_subject():
@@ -45,6 +69,14 @@ KEYS = {
     "controller-key": (
         int("d558ac64db3f45412cda262c2d9bc4d28aa5cc0b3f0e839fdf6689809133f0a7e73fcda74f1222650189276dc5043cedb3e3026227dd366abcad140d562da829b83cf4578a4e7070100874a151552fc41e295d435e19df44b76a6704cb6df1c071fd7baf2834b28e02d6be84c3a6528d8bd501bdb8f7cbba32e7ac63c2102aa1", 16),
         int("7f39d4048922a0000fe93f9e54cc718144a13e9eee498f80c54e766d2f2a14376c9605e3e229644d6baf08ce531105ec92bbab6e316b9fc9e31e2bb9104d45dc14763250168949a3f3516fa690baebf60aa1ddf82cce3e0dc99483fc00b8e8fd60492b2432dc8e3b62ef0a7979b4bd46f63e632e7a83ca9f5d0b803c31bab3a9", 16),
+    ),
+    # TEST ONLY: this fixed synthetic 2048-bit key is not trusted by the
+    # deployed policy.  Its private component exists solely so BomFixture can
+    # produce deterministic unit-test signatures; it is absent from every
+    # production artifact, signer contract, and compatibility corpus.
+    "external-bom-test-key": (
+        int("b9b9543f12b6e26e7adb927254d4f9059a8ec34440100df3b13d0783597205d38de65933ec8d53cb8845123c103f847cefc93cda9e66edda9d915c443fb716cef66a5453db6568a6b7487906462c246a340922c4a5b30f1306fd63fc8a6e226399afdb3bd5a2b5bc87b6892c3db86e2a6f715b81d7d10b2bfc22ced70078c9720d1dce9e23bc5d21a06314a0df5a1cd0edbf663a9606bd1b471e2b0344ae0b9090ac9800a082b576a3d96d2378380e88d6088ef294a9f7ad26ff066831ac5175c6468e6980fe68f7395ba9ebc35a9a84cd2f1a8e2a80a7d2899d0e47ab338285efe41d46c81234fd2c60ddefc9a3ed9de69138efb85bde58b435856c5155098d", 16),
+        int("2b44b44e2279c58c782675fa996d699ba6dbaa3dd90ff47428ff5f23f87f72408c6f552a5deaba1231abe7d8e2ef2d5a5f11dad1d2f40767766ca25a8b1e885b8cb88e6f5fee83004e347def9a8317b3bf6e3e71a269f231dc5fc5bed4f05e2626acbbee7771da15b367711343c8d72f9f398158617383ff0a1580eb41a2a2497fa357daedf81539117967511812f493e2eb4417ace03d678b7fd1fc01063a1a1312ee3aa7f4aa4724d321c36b20c61117b4a6848746a4825bfe9500cdbc3d321e320202cfb02f579bbf1bc94d66cf5ef705e720e3a30228285da9e3bd5b541b980222c62e9181de4f7cebd7c2387c65f89cff77c470bb71efdb14d337bd5461", 16),
     ),
     "evidence-key": (
         int("b0ad7dfaf32a99daecfe456959a57e743610c8d811d9ae383d9d3dcc4da74adbce538ac052b6fa46faab70ccacfc65a6a4e2aa9496c8d97de366c4cda27391bca41f2bdae3ba5c224aa48a418967e7acc6c7135d85fb87e9957f46cb370f7e6cc7b73924bceb7da79bbaf74daecfa07c4435c602a9d42d2430421a2b1b1e51db", 16),
@@ -95,10 +127,30 @@ def _sign(key_id, message):
     }
 
 
-def _git(root, *args):
+def _noncanonical_base64_pad_alias(value):
+    alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    padding = len(value) - len(value.rstrip("="))
+    if padding not in (1, 2):
+        raise AssertionError("fixture signature must contain Base64 padding")
+    index = len(value) - padding - 1
+    replacement = alphabet[alphabet.index(value[index]) ^ 1]
+    alias = value[:index] + replacement + value[index + 1:]
+    if base64.b64decode(alias, validate=True) != base64.b64decode(
+        value, validate=True
+    ):
+        raise AssertionError("constructed Base64 alias changed decoded bytes")
+    return alias
+
+
+def _git(root, *args, environment=None):
+    process_environment = None
+    if environment is not None:
+        process_environment = dict(os.environ)
+        process_environment.update(environment)
     result = subprocess.run(
         ["git", "-C", str(root), *args], check=True,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        env=process_environment,
     )
     return result.stdout.decode().strip()
 
@@ -106,6 +158,20 @@ def _git(root, *args):
 def _write_json(path, value):
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = canonical_bytes(value) + b"\n"
+    path.write_bytes(payload)
+    return payload
+
+
+def _write_bom_wire(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = canonical_bytes(value)
+    path.write_bytes(payload)
+    return payload
+
+
+def _write_receipt_wire(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = canonical_bytes(value)
     path.write_bytes(payload)
     return payload
 
@@ -122,8 +188,36 @@ PRODUCTION_BUILDER_ID = "dps:factory-artifact-builder:0.1.0"
 
 
 class BomFixture:
-    def __init__(self, root):
+    def __init__(
+        self,
+        root,
+        *,
+        candidate_activation_token_sha256="b" * 64,
+        previous_activation_token_sha256="a" * 64,
+        bom_signing_key_id="external-bom-test-key",
+        bom_signer_identity="external-release-signer",
+    ):
         root = Path(root)
+        for label, digest in (
+            ("candidate activation token", candidate_activation_token_sha256),
+            ("previous activation token", previous_activation_token_sha256),
+        ):
+            if (
+                not isinstance(digest, str)
+                or len(digest) != 64
+                or any(character not in "0123456789abcdef" for character in digest)
+            ):
+                raise ValueError(f"{label} SHA-256 must be lowercase hexadecimal")
+        if bom_signing_key_id not in KEYS:
+            raise ValueError("BOM signing key is not available to this test fixture")
+        if bom_signing_key_id == "controller-key":
+            raise ValueError(
+                "BOM signing key must be separate from the artifact signing key"
+            )
+        self.bom_signing_key_id = bom_signing_key_id
+        self.bom_signer_identity = bom_signer_identity
+        self.candidate_activation_token_sha256 = candidate_activation_token_sha256
+        self.previous_activation_token_sha256 = previous_activation_token_sha256
         self.repo = root / "repo"
         self.bundle = root / "bundle"
         self.repo.mkdir()
@@ -170,7 +264,17 @@ class BomFixture:
         _git(self.repo, "config", "user.email", "release-tests@dps.invalid")
         _git(self.repo, "config", "user.name", "DPS Release Tests")
         _git(self.repo, "add", ".")
-        _git(self.repo, "commit", "-q", "-m", "authority fixture")
+        _git(
+            self.repo,
+            "commit",
+            "-q",
+            "-m",
+            "authority fixture",
+            environment={
+                "GIT_AUTHOR_DATE": FIXTURE_GIT_DATE,
+                "GIT_COMMITTER_DATE": FIXTURE_GIT_DATE,
+            },
+        )
         self.commit = _git(self.repo, "rev-parse", "HEAD")
         self.schema_sha = sha256_bytes(schema_path.read_bytes())
         self.root_agents_sha = sha256_bytes((self.repo / "AGENTS.md").read_bytes())
@@ -190,18 +294,26 @@ class BomFixture:
             self.bundle / "evidence" / "gate-integration-001.json",
             self.evidence_receipt,
         )
-        self.bom = self._make_bom(2, "b" * 64, "candidate-bom-001", "SIGNED")
+        self.bom = self._make_bom(
+            2,
+            self.candidate_activation_token_sha256,
+            "candidate-bom-001",
+            "SIGNED",
+        )
         self._write_approval(self.bom)
         self.previous = copy.deepcopy(self.bom)
         self.previous.update({
             "bom_id": "previous-bom-001", "status": "STABLE",
-            "release_bom_generation": 1, "activation_token_sha256": "a" * 64,
+            "release_bom_generation": 1,
+            "activation_token_sha256": self.previous_activation_token_sha256,
             "previous_stable_bom": None, "previous_stable_bom_sha256": None,
         })
-        self.previous.update(self._authorities(1, "a" * 64))
+        self.previous.update(
+            self._authorities(1, self.previous_activation_token_sha256)
+        )
         self.previous["signature"] = self._sign_bom(self.previous)
         self.previous_path = self.bundle / "previous-bom.json"
-        self.previous_bytes = _write_json(self.previous_path, self.previous)
+        self.previous_bytes = _write_bom_wire(self.previous_path, self.previous)
         self.bom["previous_stable_bom"] = self.previous["bom_id"]
         self.bom["previous_stable_bom_sha256"] = sha256_bytes(self.previous_bytes)
         self.bom_path = self.bundle / "candidate-bom.json"
@@ -320,11 +432,18 @@ class BomFixture:
 
     def _policy(self):
         identities = {
-            "controller-key": ("release-controller", ["artifact", "bom"]),
+            "controller-key": ("release-controller", ["artifact"]),
             "evidence-key": ("evidence-issuer", ["evidence"]),
             "approval-key": ("human-approver", ["approval"]),
             "trust-receipt-key": ("authority-trust-signer", ["native-stop-trust"]),
         }
+        identities[self.bom_signing_key_id] = (
+            self.bom_signer_identity,
+            ["bom"],
+        )
+        release_controllers = ["release-controller"]
+        if self.bom_signer_identity not in release_controllers:
+            release_controllers.append(self.bom_signer_identity)
         return {
             "schema_version": "dps.release-trust-policy/v1",
             "policy_id": "release-policy-001",
@@ -333,7 +452,7 @@ class BomFixture:
             }},
             "implementer_identities": ["module-builder"],
             "evidence_issuer_identities": ["evidence-issuer"],
-            "release_controller_identities": ["release-controller"],
+            "release_controller_identities": release_controllers,
             "release_approver_identities": ["human-approver"],
             "native_stop_trust_signer_identities": ["authority-trust-signer"],
             "allow_bootstrap": False,
@@ -473,9 +592,8 @@ class BomFixture:
             "signature": _sign("approval-key", b"dps-release-approval/v1\n" + raw),
         }
 
-    @staticmethod
-    def _sign_bom(bom):
-        return _sign("controller-key", b"dps-release-bom/v1\n" + canonical_bytes({
+    def _sign_bom(self, bom):
+        return _sign(self.bom_signing_key_id, b"dps-release-bom/v1\n" + canonical_bytes({
             key: value for key, value in bom.items() if key != "signature"
         }))
 
@@ -483,7 +601,7 @@ class BomFixture:
         if update_scope:
             self._write_approval(self.bom)
         self.bom["signature"] = self._sign_bom(self.bom)
-        bom_bytes = _write_json(self.bom_path, self.bom)
+        bom_bytes = _write_bom_wire(self.bom_path, self.bom)
         if update_receipt:
             payload = SUBJECT.build_native_stop_trust_receipt_payload(
                 self.bom, bom_bytes, self.policy["policy_id"],
@@ -494,7 +612,7 @@ class BomFixture:
             receipt["signature"] = _sign(
                 "trust-receipt-key", SUBJECT.native_stop_trust_signing_bytes(payload)
             )
-            _write_json(self.receipt_path, receipt)
+            _write_receipt_wire(self.receipt_path, receipt)
 
     def rehash_authorities(self):
         for authority in self.bom["native_stop_authorities"]:
@@ -518,7 +636,7 @@ class BomFixture:
                 SUBJECT._canonical_challenge_authority_hash(authority)
             )
         self.previous["signature"] = self._sign_bom(self.previous)
-        self.previous_bytes = _write_json(self.previous_path, self.previous)
+        self.previous_bytes = _write_bom_wire(self.previous_path, self.previous)
         self.bom["previous_stable_bom_sha256"] = sha256_bytes(self.previous_bytes)
         self.rewrite_candidate(update_scope=False)
 
@@ -591,10 +709,11 @@ class ReleaseCliEntryTests(unittest.TestCase):
         # The deployed anchor is live (the owner provisioned the
         # native-stop-trust signer on 2026-07-21), so a complete argv now gets
         # past argparse AND the anchor constructor, then dies in validate():
-        # the fixture BOM is signed by the test-suite controller-key, which
-        # the deployed policy does not trust for "bom".  The CLI must report
-        # that as a JSON FAIL on stdout with exit 1, not a traceback -- the
-        # structured-error contract release.sh relies on.
+        # the fixture BOM is signed by the synthetic test-only
+        # external-bom-test-key, which the deployed policy does not trust for
+        # "bom".  The CLI must report that as a JSON FAIL on stdout with exit
+        # 1, not a traceback -- the structured-error contract release.sh
+        # relies on.
         schema_sha = hashlib.sha256(
             (ROOT / "governance" / "schemas" / "release-bom.schema.json").read_bytes()
         ).hexdigest()
@@ -810,6 +929,172 @@ class MigrationFidelityTests(unittest.TestCase):
 
 
 class CandidateBomValidatorTests(unittest.TestCase):
+    def test_shared_release_binding_compat_corpus_passes_real_validator(self):
+        corpus_root = RELEASE_BINDING_COMPAT_CORPUS_ROOT
+        metadata_path = corpus_root / "corpus.json"
+        metadata = json.loads(metadata_path.read_bytes())
+        self.assertEqual(
+            "dps.r0c-release-binding-compat-corpus/v1",
+            metadata["schema_version"],
+        )
+        self.assertEqual(
+            "generated once with a 2048-bit test-only RSA key held only in volatile "
+            "process memory; the signing component was discarded and is absent "
+            "from this corpus and repository",
+            metadata["ephemeral_signing_component_disposition"],
+        )
+        public_key = metadata["controller_public_key"]
+        self.assertEqual("rsa-pss-sha256", public_key["algorithm"])
+        self.assertEqual(["bom"], public_key["purposes"])
+        self.assertEqual(65537, public_key["exponent"])
+        self.assertEqual(256, public_key["unsigned_modulus_octets"])
+        self.assertEqual(
+            256,
+            (int(public_key["modulus_hex"], 16).bit_length() + 7) // 8,
+        )
+
+        expected_files = {
+            item["path"]: item for item in metadata["files"]
+        }
+        self.assertEqual(len(expected_files), len(metadata["files"]))
+        actual_files = {
+            path.relative_to(corpus_root).as_posix()
+            for path in corpus_root.rglob("*")
+            if path.is_file() and path != metadata_path
+        }
+        self.assertEqual(set(expected_files), actual_files)
+        for relative, expected in expected_files.items():
+            with self.subTest(path=relative):
+                raw = (corpus_root / relative).read_bytes()
+                self.assertEqual(expected["size_bytes"], len(raw))
+                self.assertEqual(expected["sha256"], sha256_bytes(raw))
+
+        token_path = corpus_root / metadata["token_preimages_file"]
+        tokens = json.loads(token_path.read_bytes())
+        self.assertEqual(
+            "dps.r0c-release-binding-token-preimages/v1",
+            tokens["schema_version"],
+        )
+        previous_token = base64.b64decode(
+            tokens["previous_execution_token_base64"], validate=True
+        )
+        candidate_token = base64.b64decode(
+            tokens["candidate_execution_token_base64"], validate=True
+        )
+        self.assertEqual(32, len(previous_token))
+        self.assertEqual(32, len(candidate_token))
+        self.assertNotEqual(previous_token, candidate_token)
+
+        wire_files = metadata["wire_files"]
+        previous_signed_bytes = (
+            corpus_root / wire_files["previous_signed"]["path"]
+        ).read_bytes()
+        previous_stable_bytes = (
+            corpus_root / wire_files["previous_stable"]["path"]
+        ).read_bytes()
+        candidate_bytes = (
+            corpus_root / wire_files["candidate"]["path"]
+        ).read_bytes()
+        previous_signed = json.loads(previous_signed_bytes)
+        previous_stable = json.loads(previous_stable_bytes)
+        candidate = json.loads(candidate_bytes)
+        self.assertEqual("SIGNED", previous_signed["status"])
+        self.assertEqual("STABLE", previous_stable["status"])
+        self.assertEqual("SIGNED", candidate["status"])
+        self.assertEqual(
+            {"status", "signature"},
+            {
+                key
+                for key in previous_signed
+                if previous_signed[key] != previous_stable[key]
+            },
+        )
+        self.assertEqual(
+            hashlib.sha256(previous_token).hexdigest(),
+            previous_signed["activation_token_sha256"],
+        )
+        self.assertEqual(
+            hashlib.sha256(candidate_token).hexdigest(),
+            candidate["activation_token_sha256"],
+        )
+        self.assertEqual(
+            previous_stable["bom_id"],
+            candidate["previous_stable_bom"],
+        )
+        self.assertEqual(
+            sha256_bytes(previous_stable_bytes),
+            candidate["previous_stable_bom_sha256"],
+        )
+
+        with tempfile.TemporaryDirectory(
+            prefix="dps-r0c-release-binding-compat-"
+        ) as directory:
+            materialized_root = Path(directory)
+            repo = materialized_root / "repo"
+            bundle = materialized_root / "bundle"
+            shutil.copytree(corpus_root / "repo-content", repo)
+            shutil.copytree(corpus_root / "bundle", bundle)
+            git_fixture = metadata["git_fixture"]
+            _git(repo, "init", "-q")
+            _git(repo, "config", "user.email", git_fixture["author_email"])
+            _git(repo, "config", "user.name", git_fixture["author_name"])
+            _git(repo, "add", ".")
+            _git(
+                repo,
+                "commit",
+                "-q",
+                "-m",
+                git_fixture["commit_message"],
+                environment={
+                    "GIT_AUTHOR_DATE": git_fixture["author_date"],
+                    "GIT_COMMITTER_DATE": git_fixture["committer_date"],
+                },
+            )
+            self.assertEqual(
+                git_fixture["expected_commit"],
+                _git(repo, "rev-parse", "HEAD"),
+            )
+            self.assertEqual("", _git(repo, "status", "--porcelain"))
+
+            policy = json.loads(
+                (corpus_root / metadata["trust_policy_file"]).read_bytes()
+            )
+            bom_key = next(
+                key
+                for key in policy["keys"]
+                if key["key_id"] == public_key["key_id"]
+            )
+            self.assertEqual(
+                {
+                    key: value
+                    for key, value in public_key.items()
+                    if key != "unsigned_modulus_octets"
+                },
+                bom_key,
+            )
+            schema_path = (
+                repo / "governance" / "schemas" / "release-bom.schema.json"
+            )
+            validator = CandidateBomValidator(
+                repo,
+                bundle,
+                policy,
+                sha256_bytes(canonical_bytes(policy)),
+                sha256_bytes(schema_path.read_bytes()),
+                validation_time="2026-07-14T00:00:00Z",
+            )
+            result = validator.validate(
+                bundle / "candidate-bom.json",
+                bundle / "previous-stable-bom.json",
+                bundle / "authority-trust-receipt.json",
+            )
+
+        self.assertEqual("PASS", result["result"])
+        self.assertEqual(
+            "INTEGRATION_VERIFIED",
+            result["verification_ceiling"],
+        )
+
     def test_full_signed_bom_three_authorities_and_external_receipt_pass(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = BomFixture(directory)
@@ -824,6 +1109,194 @@ class CandidateBomValidatorTests(unittest.TestCase):
             self.assertFalse(result["canary_verified"])
             self.assertFalse(result["scale_verified"])
 
+    def test_candidate_and_previous_bom_require_exact_canonical_wire(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            fixture.bom_path.write_bytes(canonical_bytes(fixture.bom) + b"\n")
+            with self.assertRaisesRegex(
+                CandidateBomError,
+                "candidate Release BOM must be the canonical sorted compact JSON wire",
+            ):
+                fixture.validate()
+
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            reversed_previous = dict(reversed(list(fixture.previous.items())))
+            noncanonical_previous = json.dumps(
+                reversed_previous,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            ).encode("utf-8")
+            self.assertNotEqual(canonical_bytes(fixture.previous), noncanonical_previous)
+            fixture.previous_path.write_bytes(noncanonical_previous)
+            fixture.bom["previous_stable_bom_sha256"] = sha256_bytes(
+                noncanonical_previous
+            )
+            fixture.rewrite_candidate()
+            with self.assertRaisesRegex(
+                CandidateBomError,
+                "previous stable BOM must be the canonical sorted compact JSON wire",
+            ):
+                fixture.validate()
+
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            fixture.bom["feature_flags"]["invalid"] = "\ud800"
+            fixture.bom_path.write_bytes(
+                json.dumps(
+                    fixture.bom,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=True,
+                ).encode("utf-8")
+            )
+            with self.assertRaisesRegex(
+                CandidateBomError,
+                "candidate Release BOM contains an invalid Unicode scalar sequence",
+            ):
+                fixture.validate()
+
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            fixture.bom["feature_flags"] = {"\ud800": False}
+            fixture.bom_path.write_bytes(
+                json.dumps(
+                    fixture.bom,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=True,
+                ).encode("utf-8")
+            )
+            with self.assertRaisesRegex(
+                CandidateBomError,
+                "candidate Release BOM contains an invalid Unicode scalar sequence",
+            ):
+                fixture.validate()
+
+    def test_native_stop_receipt_signer_payload_builder_requires_the_exact_canonical_bom(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            common = (
+                fixture.policy["policy_id"],
+                "native-stop-trust-" + "9" * 32,
+                "trace_" + "8" * 32,
+                "2026-07-14T00:00:00.0000001Z",
+            )
+            payload = SUBJECT.build_native_stop_trust_receipt_payload(
+                fixture.bom, fixture.bom_path.read_bytes(), *common
+            )
+            self.assertEqual(
+                sha256_bytes(fixture.bom_path.read_bytes()),
+                payload["release_bom_sha256"],
+            )
+
+            with self.assertRaisesRegex(
+                CandidateBomError,
+                "signed Release BOM must be the canonical sorted compact JSON wire",
+            ):
+                SUBJECT.build_native_stop_trust_receipt_payload(
+                    fixture.bom, fixture.bom_path.read_bytes() + b"\n", *common
+                )
+
+            mismatched = copy.deepcopy(fixture.bom)
+            mismatched["bom_id"] = "different-bom-001"
+            with self.assertRaisesRegex(
+                CandidateBomError,
+                "signed Release BOM must be the canonical sorted compact JSON wire",
+            ):
+                SUBJECT.build_native_stop_trust_receipt_payload(
+                    mismatched, fixture.bom_path.read_bytes(), *common
+                )
+
+    def test_canonical_number_corpus_matches_cross_language_contract(self):
+        corpus_bytes = CANONICAL_NUMBER_CORPUS_PATH.read_bytes()
+        self.assertEqual(
+            CANONICAL_NUMBER_CORPUS_SHA256,
+            hashlib.sha256(corpus_bytes).hexdigest(),
+        )
+        corpus = json.loads(corpus_bytes)
+        self.assertEqual(
+            "dps.release-bom-canonical-number-corpus/v1",
+            corpus["schema_version"],
+        )
+        self.assertEqual(62, len(corpus["cases"]))
+        self.assertEqual(
+            {"accept": 18, "normalize": 35, "reject": 9},
+            {
+                outcome: sum(
+                    item.get("outcome") == outcome for item in corpus["cases"]
+                )
+                for outcome in ("accept", "normalize", "reject")
+            },
+        )
+        self.assertEqual(
+            {"accept", "normalize", "reject"},
+            {item.get("outcome") for item in corpus["cases"]},
+        )
+        for item in corpus["cases"]:
+            with self.subTest(wire=item["wire"]):
+                raw = ('{"n":' + item["wire"] + "}").encode("ascii")
+                if item["outcome"] == "reject":
+                    with self.assertRaises(CandidateBomError):
+                        SUBJECT._strict_json_loads(raw, "number corpus")
+                    continue
+                parsed = SUBJECT._strict_json_loads(raw, "number corpus")
+                actual = canonical_bytes(parsed)
+                expected = ('{"n":' + item["canonical"] + "}").encode("ascii")
+                self.assertEqual(expected, actual)
+                self.assertEqual(item["outcome"] == "accept", raw == actual)
+
+    def test_canonical_string_corpus_matches_cross_language_contract(self):
+        corpus_bytes = CANONICAL_STRING_CORPUS_PATH.read_bytes()
+        self.assertEqual(
+            CANONICAL_STRING_CORPUS_SHA256,
+            hashlib.sha256(corpus_bytes).hexdigest(),
+        )
+        corpus = json.loads(corpus_bytes)
+        self.assertEqual(
+            "dps.release-bom-canonical-string-corpus/v1",
+            corpus["schema_version"],
+        )
+        self.assertEqual(4, len(corpus["cases"]))
+        self.assertEqual(4, len({item.get("id") for item in corpus["cases"]}))
+        for item in corpus["cases"]:
+            with self.subTest(case=item["id"]):
+                wire = base64.b64decode(item["wire_base64"], validate=True)
+                expected = base64.b64decode(
+                    item["canonical_base64"], validate=True
+                )
+                parsed = SUBJECT._strict_json_loads(wire, "string corpus")
+                self.assertEqual(expected, canonical_bytes(parsed))
+
+    def test_canonical_number_limits_and_nonfinite_builder_inputs_fail_closed(self):
+        accepted = "1" + "0" * 4_299
+        self.assertEqual(
+            ('{"n":' + accepted + "}").encode("ascii"),
+            canonical_bytes(
+                SUBJECT._strict_json_loads(
+                    ('{"n":' + accepted + "}").encode("ascii"),
+                    "4300-digit number",
+                )
+            ),
+        )
+        rejected = "1" + "0" * 4_300
+        with self.assertRaisesRegex(CandidateBomError, "strict JSON"):
+            SUBJECT._strict_json_loads(
+                ('{"n":' + rejected + "}").encode("ascii"),
+                "4301-digit number",
+            )
+
+        for invalid in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(invalid=invalid):
+                with self.assertRaisesRegex(ValueError, "finite"):
+                    canonical_bytes({"n": invalid})
+                with self.assertRaisesRegex(CandidateBomError, "canonical JSON domain"):
+                    SUBJECT._require_canonical_bom_wire(
+                        {"feature_flags": {"invalid": invalid}},
+                        b"{}",
+                        "signed Release BOM",
+                    )
+
     def test_missing_or_tampered_external_receipt_fails_closed(self):
         with tempfile.TemporaryDirectory() as directory:
             fixture = BomFixture(directory)
@@ -835,7 +1308,7 @@ class CandidateBomValidatorTests(unittest.TestCase):
             receipt["signature"] = _sign(
                 "trust-receipt-key", SUBJECT.native_stop_trust_signing_bytes(payload)
             )
-            _write_json(fixture.receipt_path, receipt)
+            _write_receipt_wire(fixture.receipt_path, receipt)
             with self.assertRaisesRegex(CandidateBomError, "receipt mismatch"):
                 fixture.validate()
 
@@ -848,7 +1321,7 @@ class CandidateBomValidatorTests(unittest.TestCase):
             receipt["signature"] = _sign(
                 "trust-receipt-key", SUBJECT.native_stop_trust_signing_bytes(payload)
             )
-            _write_json(fixture.receipt_path, receipt)
+            _write_receipt_wire(fixture.receipt_path, receipt)
             with self.assertRaisesRegex(CandidateBomError, "envelope"):
                 fixture.validator()._validate_native_stop_trust_receipt(
                     fixture.bom,
@@ -968,8 +1441,74 @@ class CandidateBomValidatorTests(unittest.TestCase):
             fixture.receipt_path.write_bytes(
                 b'{"authorities_sha256":"' + b"0" * 64 + b'",' + canonical_bytes(receipt)[1:]
             )
-            with self.assertRaisesRegex(CandidateBomError, "strict JSON|invalid fields"):
+            with self.assertRaisesRegex(
+                CandidateBomError, "strict JSON|invalid fields|canonical sorted compact"
+            ):
                 fixture.validate()
+
+    def test_noncanonical_receipt_wires_fail_closed_with_the_same_signature(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            canonical = fixture.receipt_path.read_bytes()
+            receipt = json.loads(canonical)
+            variants = {
+                "trailing-lf": canonical + b"\n",
+                "whitespace": json.dumps(
+                    receipt, ensure_ascii=False, indent=2
+                ).encode("utf-8"),
+                "reordered": json.dumps(
+                    dict(reversed(list(receipt.items()))),
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                    sort_keys=False,
+                ).encode("utf-8"),
+            }
+            for label, wire in variants.items():
+                with self.subTest(label=label):
+                    self.assertNotEqual(canonical, wire)
+                    fixture.receipt_path.write_bytes(wire)
+                    with self.assertRaisesRegex(
+                        CandidateBomError, "canonical sorted compact JSON wire"
+                    ):
+                        fixture.validate()
+
+    def test_noncanonical_receipt_signature_base64_alias_fails_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            receipt = json.loads(fixture.receipt_path.read_bytes())
+            original = receipt["signature"]["value"]
+            receipt["signature"]["value"] = _noncanonical_base64_pad_alias(original)
+            self.assertNotEqual(original, receipt["signature"]["value"])
+            _write_receipt_wire(fixture.receipt_path, receipt)
+            with self.assertRaisesRegex(
+                CandidateBomError, "signature value is not canonical base64"
+            ):
+                fixture.validate()
+
+    def test_rsa_signature_representative_must_be_less_than_modulus(self):
+        modulus, _ = KEYS["trust-receipt-key"]
+        for counter in range(1_000):
+            message = (
+                b"rsa-representative-range-regression:"
+                + str(counter).encode("ascii")
+            )
+            signature = base64.b64decode(
+                _sign("trust-receipt-key", message)["value"], validate=True
+            )
+            representative = int.from_bytes(signature, "big")
+            alias = representative + modulus
+            if alias < 1 << (8 * len(signature)):
+                break
+        else:
+            self.fail("unable to construct the deterministic s+n regression")
+        alias_bytes = alias.to_bytes(len(signature), "big")
+        self.assertNotEqual(signature, alias_bytes)
+        self.assertTrue(
+            SUBJECT._verify_rsa_pss(message, signature, modulus, 65537)
+        )
+        self.assertFalse(
+            SUBJECT._verify_rsa_pss(message, alias_bytes, modulus, 65537)
+        )
 
     def test_policy_roles_and_key_purposes_are_separated(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -982,8 +1521,50 @@ class CandidateBomValidatorTests(unittest.TestCase):
             for key in policy["keys"]:
                 if key["key_id"] == "trust-receipt-key":
                     key["purposes"].append("bom")
-            with self.assertRaisesRegex(CandidateBomError, "assigned to bom|cannot be reused"):
+            with self.assertRaisesRegex(
+                CandidateBomError,
+                "external signer profile|assigned to bom|cannot be reused",
+            ):
                 fixture.validator(policy=policy)
+
+            def bom_key(value):
+                return next(
+                    key
+                    for key in value["keys"]
+                    if key["key_id"] == "external-bom-test-key"
+                )
+
+            profile_mutations = {
+                "multi-purpose": lambda key: key["purposes"].append("artifact"),
+                "duplicate-purpose": lambda key: key.update(
+                    purposes=["bom", "bom"]
+                ),
+                "wrong-algorithm": lambda key: key.update(
+                    algorithm="rsa-pkcs1v15-sha256"
+                ),
+                "1024-bit-modulus": lambda key: key.update(
+                    modulus_hex="a" + "1" * 255
+                ),
+                "public-exponent-3": lambda key: key.update(exponent=3),
+                "leading-zero-modulus": lambda key: key.update(
+                    modulus_hex="0" + key["modulus_hex"]
+                ),
+                "uppercase-modulus": lambda key: key.update(
+                    modulus_hex=key["modulus_hex"].upper()
+                ),
+            }
+            for label, mutate in profile_mutations.items():
+                with self.subTest(external_bom_key_profile=label):
+                    policy = copy.deepcopy(fixture.policy)
+                    mutate(bom_key(policy))
+                    with self.assertRaisesRegex(
+                        CandidateBomError,
+                        "external signer profile|invalid or duplicate trust key|"
+                        "trusted RSA modulus",
+                    ):
+                        # This is the production parser path, not a test helper:
+                        # CandidateBomValidator constructs ReleaseTrustPolicy.
+                        fixture.validator(policy=policy)
 
 
 class RuntimeAuthorityCurrencyTests(unittest.TestCase):

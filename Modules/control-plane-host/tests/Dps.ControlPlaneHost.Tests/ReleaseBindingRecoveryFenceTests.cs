@@ -78,7 +78,11 @@ public sealed class ReleaseBindingRecoveryFenceTests
         harness.RecoverySigner.WhileSigning = () =>
         {
             var (nextBom, nextToken) = signer.SignBom("bom-2", 2, firstBom);
-            authority.Activate(Device, nextBom, nextToken);
+            authority.Activate(
+                Device,
+                nextBom,
+                signer.StableTwin(firstBom),
+                nextToken);
         };
 
         await Assert.ThrowsAsync<ReleaseBindingRecoveryFenceConflictException>(() =>
@@ -151,7 +155,7 @@ public sealed class ReleaseBindingRecoveryFenceTests
         // The journal advances (activation then rollback): the stale fence
         // loses its commit; a freshly issued fence commits at the new head.
         var (bom2, token2) = signer.SignBom("bom-2", 2, bom1);
-        authority.Activate(Device, bom2, token2);
+        authority.Activate(Device, bom2, signer.StableTwin(bom1), token2);
         var staleFence = store.IssueRecoveryFence(Device);
         authority.Rollback(Device, token1);
         Assert.Throws<ReleaseBindingRecoveryFenceConflictException>(

@@ -1,4 +1,6 @@
+using System.Buffers.Binary;
 using System.Globalization;
+using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -32,6 +34,7 @@ public static class ReleaseBomWireContract
     // Matches candidate_bom_validator._validate_exact_shape(expected_status="SIGNED"):
     // the runtime activates exactly the signed candidate wire status.
     public const string ExpectedStatus = "SIGNED";
+    public const string PreviousStableStatus = "STABLE";
     public const int ExecutionTokenSizeBytes = 32;
 
     public static readonly IReadOnlySet<string> RequiredTopLevelFields = new HashSet<string>(StringComparer.Ordinal)
@@ -76,6 +79,96 @@ public sealed record ReleaseBomTrustKey(
     string ModulusHex,
     int Exponent)
 {
+    public const string RequiredAlgorithm = "rsa-pss-sha256";
+    private static readonly IReadOnlyList<string> BomOnlyPurposes =
+        Array.AsReadOnly(new[] { "bom" });
+
+    /// <summary>
+    /// The four-argument constructor is the safe BOM-only convenience shape.
+    /// Callers that materialize the complete policy tuple use the overload
+    /// below; both shapes are revalidated by the authority before trust.
+    /// </summary>
+    public string Algorithm { get; } = RequiredAlgorithm;
+    public IReadOnlyList<string> Purposes { get; } = BomOnlyPurposes;
+
+    public ReleaseBomTrustKey(
+        string keyId,
+        string identity,
+        string modulusHex,
+        int exponent,
+        string algorithm,
+        IReadOnlyList<string> purposes)
+        : this(keyId, identity, modulusHex, exponent)
+    {
+        Algorithm = algorithm;
+        Purposes = purposes;
+    }
+
+    /// <summary>
+    /// Enforces the deployed BOM verifier key profile and snapshots the
+    /// caller-owned purposes collection. This is deliberately shared by the
+    /// JSON policy parser and the authority's public constructor, so directly
+    /// constructing this record cannot bypass release-policy restrictions.
+    /// </summary>
+    internal static ReleaseBomTrustKey ValidateAndSnapshot(
+        ReleaseBomTrustKey? key)
+    {
+        if (key is null)
+        {
+            throw new ActiveReleaseBindingException("bom trust key is null");
+        }
+        if (string.IsNullOrEmpty(key.KeyId))
+        {
+            throw new ActiveReleaseBindingException("bom key_id is missing");
+        }
+        if (string.IsNullOrEmpty(key.Identity))
+        {
+            throw new ActiveReleaseBindingException("bom key identity is missing");
+        }
+        if (key.Purposes is null
+            || key.Purposes.Count != 1
+            || !string.Equals(key.Purposes[0], "bom", StringComparison.Ordinal))
+        {
+            throw new ActiveReleaseBindingException(
+                "bom key purposes must be the exact singleton array ['bom']");
+        }
+        if (!string.Equals(
+                key.Algorithm,
+                RequiredAlgorithm,
+                StringComparison.Ordinal))
+        {
+            throw new ActiveReleaseBindingException(
+                "bom key algorithm must be rsa-pss-sha256");
+        }
+        if (string.IsNullOrEmpty(key.ModulusHex)
+            || key.ModulusHex[0] == '0'
+            || key.ModulusHex.Any(static character =>
+                character is not (>= '0' and <= '9')
+                && character is not (>= 'a' and <= 'f')))
+        {
+            throw new ActiveReleaseBindingException(
+                "bom key modulus must be canonical lowercase unsigned hexadecimal");
+        }
+        var unsignedModulusOctets = checked((key.ModulusHex.Length + 1) / 2);
+        if (unsignedModulusOctets < 256)
+        {
+            throw new ActiveReleaseBindingException(
+                "bom key modulus must occupy at least 256 unsigned octets");
+        }
+        if (key.Exponent != 65537)
+        {
+            throw new ActiveReleaseBindingException(
+                "bom key exponent must be 65537");
+        }
+        return new ReleaseBomTrustKey(
+            key.KeyId,
+            key.Identity,
+            key.ModulusHex,
+            key.Exponent,
+            key.Algorithm,
+            BomOnlyPurposes);
+    }
+
     /// <summary>
     /// Parses the deployed release trust policy document (the JSON shape of
     /// governance/policies/deployed-release-trust-policy.v1.json) and keeps
@@ -95,24 +188,41 @@ public sealed record ReleaseBomTrustKey(
         {
             if (key.ValueKind != JsonValueKind.Object
                 || !key.TryGetProperty("purposes", out var purposes)
-                || purposes.ValueKind != JsonValueKind.Array
-                || !purposes.EnumerateArray().Any(static value =>
-                    value.ValueKind == JsonValueKind.String && value.GetString() == "bom"))
+                || purposes.ValueKind != JsonValueKind.Array)
             {
                 continue;
             }
-            if (key.GetProperty("algorithm").GetString() != "rsa-pss-sha256")
+            var purposeValues = purposes.EnumerateArray().ToArray();
+            if (!purposeValues.Any(static value =>
+                    value.ValueKind == JsonValueKind.String
+                    && value.GetString() == "bom"))
             {
-                throw new ActiveReleaseBindingException("bom key algorithm must be rsa-pss-sha256");
+                continue;
             }
-            parsed.Add(new ReleaseBomTrustKey(
+            if (purposeValues.Length != 1
+                || purposeValues[0].ValueKind != JsonValueKind.String
+                || purposeValues[0].GetString() != "bom")
+            {
+                throw new ActiveReleaseBindingException(
+                    "bom key purposes must be the exact singleton array ['bom']");
+            }
+            var modulusHex = key.GetProperty("modulus_hex").GetString()
+                ?? throw new ActiveReleaseBindingException("bom key modulus is missing");
+            var exponent = key.GetProperty("exponent").GetInt32();
+            parsed.Add(ValidateAndSnapshot(new ReleaseBomTrustKey(
                 key.GetProperty("key_id").GetString()
                     ?? throw new ActiveReleaseBindingException("bom key_id is missing"),
                 key.GetProperty("identity").GetString()
                     ?? throw new ActiveReleaseBindingException("bom key identity is missing"),
-                key.GetProperty("modulus_hex").GetString()
-                    ?? throw new ActiveReleaseBindingException("bom key modulus is missing"),
-                key.GetProperty("exponent").GetInt32()));
+                modulusHex,
+                exponent,
+                key.GetProperty("algorithm").GetString()
+                    ?? throw new ActiveReleaseBindingException("bom key algorithm is missing"),
+                purposeValues.Select(static value =>
+                        value.ValueKind == JsonValueKind.String
+                            ? value.GetString()!
+                            : string.Empty)
+                    .ToArray())));
         }
         if (parsed.Count == 0)
         {
@@ -129,7 +239,9 @@ public sealed record ReleaseBomTrustKey(
 /// transition activated (activation and rollback); it is null only for
 /// revocation. Recovery re-runs the full signature and token binding over
 /// these bytes, so a journal cannot smuggle a binding that no signed BOM
-/// backs.
+/// backs. PreviousStableBomBytes carries the exact externally signed STABLE
+/// lifecycle twin referenced by a non-bootstrap activation. It is null for
+/// bootstrap activation, revocation, and rollback.
 /// </summary>
 public sealed record ReleaseBindingTruthRecord(
     string DeviceBindingId,
@@ -138,7 +250,8 @@ public sealed record ReleaseBindingTruthRecord(
     ActiveReleaseBindingV1? PreviousBinding,
     long LastActivationSignerGeneration,
     string RequestSha256,
-    byte[]? SignedBomBytes);
+    byte[]? SignedBomBytes,
+    byte[]? PreviousStableBomBytes);
 
 /// <summary>
 /// One atomic per-device journal snapshot. HeadSequence and Records are read
@@ -155,8 +268,11 @@ public sealed record ReleaseBindingJournalSnapshot(
 /// the authority's in-process gate so the durable lock is always acquired
 /// BEFORE the gate (the global lock order documented on
 /// <see cref="IReleaseBindingTruthStore.BeginTransition"/>). The authority
-/// disposes the scope after the transition publishes; an unused or faulted
-/// scope persists nothing and releases the durable lock.
+/// disposes the scope after the transition publishes. An unused scope persists
+/// nothing. An exceptional append is an ambiguous acknowledgement outcome: it
+/// may have committed before the caller observed the exception, so the
+/// authority publishes nothing locally and an exact retry must first
+/// synchronize the durable head.
 /// </summary>
 public interface IReleaseBindingTransitionScope : IDisposable
 {
@@ -164,8 +280,9 @@ public interface IReleaseBindingTransitionScope : IDisposable
     /// Appends the transition's journal record inside the scope's
     /// linearization window. On a successful return the record is durable
     /// (for the durable store, committed) and the per-device serialization
-    /// may be released; any exception persists nothing the caller could
-    /// observe as a landed transition.
+    /// may be released. An exception does not prove absence: the durable store
+    /// may have committed before its acknowledgement was lost. Callers must
+    /// leave local state unpublished and recover the exact durable result.
     /// </summary>
     void Append(ReleaseBindingTruthRecord record);
 }
@@ -599,12 +716,12 @@ public sealed class InMemoryReleaseBindingTruthStore
 ///   6. signer-ordinal anti-rollback: release_bom_generation strictly
 ///      greater than the last activation's for this device (Rollback may
 ///      revert the ordinal, Activate never may);
-///   7. previous_stable_bom_sha256 chain: equal to the current binding's
-///      ReleaseBomSha256 when the device has binding history, and JSON null
-///      (together with previous_stable_bom null) when it has none —
-///      mirroring candidate_bom_validator._validate_previous_bom lines
-///      3210-3215 where a null previous id requires a null previous sha
-///      (bootstrap shape).
+///   7. previous stable chain: on non-bootstrap activation the caller supplies
+///      the exact externally signed STABLE lifecycle twin of the current
+///      activated SIGNED BOM. Its exact-wire digest/id must equal the new
+///      candidate's previous_stable_bom_sha256/id, and every signed field
+///      other than status/signature must equal the current SIGNED wire.
+///      Bootstrap requires both previous fields and previous bytes absent.
 ///
 /// State is recovered from the injected truth store at construction: the
 /// journal is replayed with sequence/generation/receipt-identity
@@ -616,8 +733,10 @@ public sealed class InMemoryReleaseBindingTruthStore
 /// behind the cached view, or a delta record that fails validation fails
 /// the read closed — TryReadActive returns false, ReadReceipts throws, and
 /// no stale or superseded binding is ever served. All public members share
-/// one lock; byte-identical re-submissions return the original receipt
-/// without state change and conflicting re-submissions fail closed.
+/// one lock. A byte-identical re-submission returns its original receipt only
+/// while that receipt's postcondition remains current; once superseded, the
+/// consumed request fails closed and can never execute as a fresh transition.
+/// Conflicting re-submissions also fail closed.
 /// </summary>
 public sealed class ActiveReleaseBindingAuthority
     : IActiveReleaseBindingRecoveryCapabilityIssuer,
@@ -663,7 +782,8 @@ public sealed class ActiveReleaseBindingAuthority
         var keys = new Dictionary<string, ReleaseBomTrustKey>(StringComparer.Ordinal);
         foreach (var key in bomKeys)
         {
-            if (!keys.TryAdd(key.KeyId, key))
+            var trustedKey = ReleaseBomTrustKey.ValidateAndSnapshot(key);
+            if (!keys.TryAdd(trustedKey.KeyId, trustedKey))
             {
                 throw new ActiveReleaseBindingException("duplicate bom trust key id");
             }
@@ -821,24 +941,86 @@ public sealed class ActiveReleaseBindingAuthority
             && synced.Sequence == snapshot.HeadSequence;
     }
 
+    /// <summary>
+    /// Transition-time durable resync. The caller already holds the store's
+    /// per-device transition scope and this authority's gate, so no competing
+    /// transition for this device can advance the journal between this replay
+    /// and the following append. This closes both acknowledgement-loss and
+    /// stale-authority windows: a committed exact request is first recovered
+    /// through <see cref="ApplyRecord"/> and can return its durable receipt;
+    /// an uncommitted request continues normally. Failure to prove the exact
+    /// durable head is an exception, never an empty-state fallback.
+    /// </summary>
+    private DeviceState SynchronizeForTransition(string deviceBindingId)
+    {
+        _devices.TryGetValue(deviceBindingId, out var cached);
+        if (!TrySynchronizeDevice(deviceBindingId, cached))
+        {
+            throw new ActiveReleaseBindingException(
+                "release binding transition cannot prove the durable journal head; refusing to mutate");
+        }
+        return _devices.TryGetValue(deviceBindingId, out var synchronized)
+            ? synchronized
+            : new DeviceState();
+    }
+
     public ReleaseBindingReceiptV1 Activate(
         string deviceBindingId,
         ReadOnlySpan<byte> signedBomBytes,
         string executionTokenBase64)
+        => Activate(
+            deviceBindingId,
+            signedBomBytes,
+            ReadOnlySpan<byte>.Empty,
+            executionTokenBase64);
+
+    /// <summary>
+    /// Activates one exact externally signed SIGNED candidate. Every
+    /// non-bootstrap activation must also carry the exact externally signed
+    /// STABLE lifecycle twin of the currently bound SIGNED BOM. The stable
+    /// twin is evidence for the candidate's previous_stable_bom reference;
+    /// Control Plane Host verifies and journals it but never creates or signs
+    /// it.
+    /// </summary>
+    public ReleaseBindingReceiptV1 Activate(
+        string deviceBindingId,
+        ReadOnlySpan<byte> signedBomBytes,
+        ReadOnlySpan<byte> previousStableBomBytes,
+        string executionTokenBase64)
     {
         ControlContractValidation.RequireDeviceBindingId(deviceBindingId);
-        var facts = VerifySignedBom(signedBomBytes);
+        // Snapshot caller-owned spans before any verification. A caller may
+        // back ReadOnlySpan with a mutable array; every signature check,
+        // digest, idempotency identity, and persisted byte must therefore
+        // observe this one immutable method-entry copy.
+        var bomBytesCopy = signedBomBytes.ToArray();
+        var previousStableBomBytesCopy = previousStableBomBytes.IsEmpty
+            ? null
+            : previousStableBomBytes.ToArray();
+        ReadOnlySpan<byte> previousStableSnapshot =
+            previousStableBomBytesCopy is null
+                ? ReadOnlySpan<byte>.Empty
+                : previousStableBomBytesCopy;
+        var facts = VerifyReleaseBom(
+            bomBytesCopy,
+            ReleaseBomWireContract.ExpectedStatus);
+        var previousStableFacts = previousStableBomBytesCopy is null
+            ? null
+            : VerifyReleaseBom(
+                previousStableBomBytesCopy,
+                ReleaseBomWireContract.PreviousStableStatus);
         var tokenSha256 = RequireCanonicalTokenSha256(executionTokenBase64);
         if (!string.Equals(tokenSha256, facts.ActivationTokenSha256, StringComparison.Ordinal))
         {
             throw new ActiveReleaseBindingException(
                 "execution token does not match the signer-committed activation_token_sha256");
         }
-        var bomSha256 = Convert.ToHexStringLower(SHA256.HashData(signedBomBytes));
-        var requestSha256 = RequestHash(
-            "dps.release.binding.activate/v1", signedBomBytes, executionTokenBase64);
-
-        var bomBytesCopy = signedBomBytes.ToArray();
+        var bomSha256 = Convert.ToHexStringLower(SHA256.HashData(bomBytesCopy));
+        var requestSha256 = ActivationRequestHash(
+            deviceBindingId,
+            bomBytesCopy,
+            previousStableSnapshot,
+            executionTokenBase64);
 
         // Global lock order (see IReleaseBindingTruthStore.BeginTransition):
         // the per-device durable serialization is acquired BEFORE _gate,
@@ -850,15 +1032,17 @@ public sealed class ActiveReleaseBindingAuthority
         using var transition = _store.BeginTransition(deviceBindingId);
         lock (_gate)
         {
-            var state = _devices.TryGetValue(deviceBindingId, out var existing)
-                ? existing
-                : new DeviceState();
+            var state = SynchronizeForTransition(deviceBindingId);
             // A digest hit alone is not a replay: the original receipt's
             // postcondition must still be the device's current truth,
             // otherwise the state has moved on and returning the old receipt
             // would report a success that no longer holds.
-            if (state.RequestReceipts.TryGetValue(requestSha256, out var replayed)
-                && IsReplayPostconditionIntact(replayed, state))
+            if (TryReplayExactRequest(
+                    deviceBindingId,
+                    requestSha256,
+                    "activation",
+                    state,
+                    out var replayed))
             {
                 return replayed;
             }
@@ -869,19 +1053,11 @@ public sealed class ActiveReleaseBindingAuthority
                         ? "conflicting re-submission: same signer release_bom_generation with different bytes or token"
                         : "signer release_bom_generation must strictly exceed the last activation (anti-rollback)");
             }
-            if (state.Current is { } current)
-            {
-                if (!string.Equals(facts.PreviousStableBomSha256, current.ReleaseBomSha256, StringComparison.Ordinal))
-                {
-                    throw new ActiveReleaseBindingException(
-                        "previous_stable_bom_sha256 must equal the device's current binding digest");
-                }
-            }
-            else if (facts.PreviousStableBomSha256 is not null)
-            {
-                throw new ActiveReleaseBindingException(
-                    "previous_stable_bom_sha256 must be null for a device with no binding history");
-            }
+            RequirePreviousStableChain(
+                facts,
+                previousStableFacts,
+                previousStableSnapshot,
+                state);
 
             var generation = checked(state.RuntimeGeneration + 1);
             var now = RequireUtc(_utcNow());
@@ -941,7 +1117,8 @@ public sealed class ActiveReleaseBindingAuthority
             // surfaces.
             transition.Append(new ReleaseBindingTruthRecord(
                 deviceBindingId, receipt, binding, demoted,
-                facts.SignerGeneration, requestSha256, bomBytesCopy));
+                facts.SignerGeneration, requestSha256, bomBytesCopy,
+                previousStableBomBytesCopy));
             state.RuntimeGeneration = generation;
             state.Previous = demoted;
             state.PreviousBomBytes = demoted is not null ? state.CurrentBomBytes : null;
@@ -951,6 +1128,76 @@ public sealed class ActiveReleaseBindingAuthority
             state.LastActivationSignerGeneration = facts.SignerGeneration;
             Publish(deviceBindingId, state, receipt, requestSha256);
             return receipt;
+        }
+    }
+
+    private void RequirePreviousStableChain(
+        ReleaseBomFacts candidate,
+        ReleaseBomFacts? previousStable,
+        ReadOnlySpan<byte> previousStableBomBytes,
+        DeviceState state)
+    {
+        if (state.Current is null)
+        {
+            if (candidate.PreviousStableBomId is not null
+                || candidate.PreviousStableBomSha256 is not null
+                || previousStable is not null
+                || !previousStableBomBytes.IsEmpty)
+            {
+                throw new ActiveReleaseBindingException(
+                    "bootstrap activation requires null previous stable references and no previous stable BOM bytes");
+            }
+            return;
+        }
+
+        if (candidate.PreviousStableBomId is null
+            || candidate.PreviousStableBomSha256 is null
+            || previousStable is null
+            || previousStableBomBytes.IsEmpty)
+        {
+            throw new ActiveReleaseBindingException(
+                "non-bootstrap activation requires the exact externally signed previous STABLE BOM wire");
+        }
+        var previousStableSha256 =
+            Convert.ToHexStringLower(SHA256.HashData(previousStableBomBytes));
+        if (!string.Equals(
+                candidate.PreviousStableBomSha256,
+                previousStableSha256,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                candidate.PreviousStableBomId,
+                previousStable.BomId,
+                StringComparison.Ordinal))
+        {
+            throw new ActiveReleaseBindingException(
+                "candidate previous stable BOM reference does not bind the supplied STABLE wire");
+        }
+        if (string.Equals(candidate.BomId, previousStable.BomId, StringComparison.Ordinal))
+        {
+            throw new ActiveReleaseBindingException(
+                "candidate BOM cannot identify itself as its previous stable BOM");
+        }
+
+        var currentSignedBomBytes = state.CurrentBomBytes
+            ?? throw new ActiveReleaseBindingException(
+                "current binding has no exact signed BOM wire for previous stable verification");
+        var currentSignedFacts = VerifyReleaseBom(
+            currentSignedBomBytes,
+            ReleaseBomWireContract.ExpectedStatus);
+        if (!string.Equals(
+                state.Current.ReleaseBomSha256,
+                Convert.ToHexStringLower(SHA256.HashData(currentSignedBomBytes)),
+                StringComparison.Ordinal)
+            || !string.Equals(
+                currentSignedFacts.BomId,
+                previousStable.BomId,
+                StringComparison.Ordinal)
+            || !CryptographicOperations.FixedTimeEquals(
+                Convert.FromHexString(currentSignedFacts.LifecycleIdentitySha256),
+                Convert.FromHexString(previousStable.LifecycleIdentitySha256)))
+        {
+            throw new ActiveReleaseBindingException(
+                "supplied previous STABLE BOM is not the lifecycle twin of the current SIGNED binding");
         }
     }
 
@@ -966,13 +1213,17 @@ public sealed class ActiveReleaseBindingAuthority
                 "dps.release.binding.revoke/v1",
                 [],
                 deviceBindingId + "\n" + generation.ToString(CultureInfo.InvariantCulture));
-            if (_devices.TryGetValue(deviceBindingId, out var state)
-                && state.RequestReceipts.TryGetValue(requestSha256, out var replayed)
-                && IsReplayPostconditionIntact(replayed, state))
+            var state = SynchronizeForTransition(deviceBindingId);
+            if (TryReplayExactRequest(
+                    deviceBindingId,
+                    requestSha256,
+                    "revocation",
+                    state,
+                    out var replayed))
             {
                 return replayed;
             }
-            if (state is null || state.Current is not { Status: "active" } active)
+            if (state.Current is not { Status: "active" } active)
             {
                 throw new ActiveReleaseBindingException("no active release binding to revoke");
             }
@@ -994,7 +1245,9 @@ public sealed class ActiveReleaseBindingAuthority
             // Durability first (see Activate): append, then publish.
             transition.Append(new ReleaseBindingTruthRecord(
                 deviceBindingId, receipt, revoked, state.Previous,
-                state.LastActivationSignerGeneration, requestSha256, SignedBomBytes: null));
+                state.LastActivationSignerGeneration, requestSha256,
+                SignedBomBytes: null,
+                PreviousStableBomBytes: null));
             state.Current = revoked;
             state.Sequence = receipt.Sequence;
             Publish(deviceBindingId, state, receipt, requestSha256);
@@ -1019,19 +1272,23 @@ public sealed class ActiveReleaseBindingAuthority
                 "dps.release.binding.rollback/v1",
                 [],
                 deviceBindingId + "\n" + executionTokenBase64);
+            var state = SynchronizeForTransition(deviceBindingId);
             // A digest hit alone is NOT a replay: a later activation may have
             // superseded the rolled-back binding, and reporting the stale
             // rollback as success would lie about the active BOM. Only when
             // the original receipt's postcondition is still the current truth
             // is this an idempotent replay; otherwise fall through to the
             // normal fail-closed path (the previous slot is spent).
-            if (_devices.TryGetValue(deviceBindingId, out var state)
-                && state.RequestReceipts.TryGetValue(requestSha256, out var replayed)
-                && IsReplayPostconditionIntact(replayed, state))
+            if (TryReplayExactRequest(
+                    deviceBindingId,
+                    requestSha256,
+                    "rollback",
+                    state,
+                    out var replayed))
             {
                 return replayed;
             }
-            if (state is null || state.Previous is not { Status: "previous" } previous)
+            if (state.Previous is not { Status: "previous" } previous)
             {
                 throw new ActiveReleaseBindingException("no previous signed release binding to roll back to");
             }
@@ -1084,7 +1341,9 @@ public sealed class ActiveReleaseBindingAuthority
             // Durability first (see Activate): append, then publish.
             transition.Append(new ReleaseBindingTruthRecord(
                 deviceBindingId, receipt, binding, PreviousBinding: null,
-                state.LastActivationSignerGeneration, requestSha256, restoredBomBytes));
+                state.LastActivationSignerGeneration, requestSha256,
+                restoredBomBytes,
+                PreviousStableBomBytes: null));
             state.RuntimeGeneration = generation;
             state.Current = binding;
             state.CurrentBomBytes = restoredBomBytes;
@@ -1104,14 +1363,55 @@ public sealed class ActiveReleaseBindingAuthority
            && current.Generation == receipt.To.Generation
            && string.Equals(current.Status, receipt.To.Status, StringComparison.Ordinal);
 
+    private static bool TryReplayExactRequest(
+        string deviceBindingId,
+        string requestSha256,
+        string receiptKind,
+        DeviceState state,
+        out ReleaseBindingReceiptV1 receipt)
+    {
+        if (!state.RequestReceipts.TryGetValue(
+                requestSha256,
+                out var candidate))
+        {
+            receipt = null!;
+            return false;
+        }
+        if (!string.Equals(
+                candidate.DeviceBindingId,
+                deviceBindingId,
+                StringComparison.Ordinal)
+            || !string.Equals(
+                candidate.ReceiptKind,
+                receiptKind,
+                StringComparison.Ordinal))
+        {
+            throw new ActiveReleaseBindingException(
+                "committed release-binding request digest resolves to a different device or transition kind");
+        }
+        if (!IsReplayPostconditionIntact(candidate, state))
+        {
+            throw new ActiveReleaseBindingException(
+                "exact release-binding request was already committed but its postcondition has been superseded");
+        }
+
+        receipt = candidate;
+        return true;
+    }
+
     private void Publish(
         string deviceBindingId,
         DeviceState state,
         ReleaseBindingReceiptV1 receipt,
         string requestSha256)
     {
+        if (state.RequestReceipts.ContainsKey(requestSha256))
+        {
+            throw new ActiveReleaseBindingException(
+                "release-binding request digest was committed more than once");
+        }
+        state.RequestReceipts.Add(requestSha256, receipt);
         state.Receipts.Add(receipt);
-        state.RequestReceipts[requestSha256] = receipt;
         _devices[deviceBindingId] = state;
     }
 
@@ -1143,6 +1443,14 @@ public sealed class ActiveReleaseBindingAuthority
         {
             throw new ActiveReleaseBindingException("truth store journal contains a null record");
         }
+        // Store implementations return caller-owned record objects. Snapshot
+        // both raw byte fields before validation so recovery cannot verify one
+        // byte sequence and later publish a concurrently mutated sequence.
+        record = record with
+        {
+            SignedBomBytes = record.SignedBomBytes?.ToArray(),
+            PreviousStableBomBytes = record.PreviousStableBomBytes?.ToArray()
+        };
         var receipt = record.Receipt
             ?? throw new ActiveReleaseBindingException("truth store record has no receipt");
         var current = record.CurrentBinding
@@ -1162,6 +1470,8 @@ public sealed class ActiveReleaseBindingAuthority
         var priorPrevious = state.Previous;
         var priorCurrentBytes = state.CurrentBomBytes;
         var priorPreviousBytes = state.PreviousBomBytes;
+        var nextCurrentBytes = priorCurrentBytes;
+        var nextPreviousBytes = priorPreviousBytes;
         if (receipt.Sequence != state.Sequence + 1)
         {
             throw new ActiveReleaseBindingException(
@@ -1209,6 +1519,7 @@ public sealed class ActiveReleaseBindingAuthority
             throw new ActiveReleaseBindingException(
                 "truth store journal from endpoint does not project the prior binding");
         }
+        string expectedRequestSha256;
         switch (receipt.ReceiptKind)
         {
             case "activation":
@@ -1220,23 +1531,18 @@ public sealed class ActiveReleaseBindingAuthority
                     throw new ActiveReleaseBindingException(
                         "truth store journal signer generation regressed on activation");
                 }
-                // Live Activate previous-chain invariant, replayed
-                // verbatim: a device with binding history (active or
-                // revoked alike) requires the BOM to chain to the
-                // current binding digest; a first activation requires
-                // an explicit null chain. Without this, a validly
-                // signed BOM from another chain position could be
-                // journaled into a position live Activate would refuse.
-                if (priorCurrent is null
-                    ? facts.PreviousStableBomSha256 is not null
-                    : !string.Equals(
-                        facts.PreviousStableBomSha256,
-                        priorCurrent.ReleaseBomSha256,
-                        StringComparison.Ordinal))
-                {
-                    throw new ActiveReleaseBindingException(
-                        "truth store journal activation breaks the previous stable BOM chain");
-                }
+                var previousStableFacts = record.PreviousStableBomBytes is null
+                    ? null
+                    : VerifyReleaseBom(
+                        record.PreviousStableBomBytes,
+                        ReleaseBomWireContract.PreviousStableStatus);
+                RequirePreviousStableChain(
+                    facts,
+                    previousStableFacts,
+                    record.PreviousStableBomBytes is null
+                        ? ReadOnlySpan<byte>.Empty
+                        : record.PreviousStableBomBytes,
+                    state);
                 if (priorCurrent is { Status: "active" })
                 {
                     // Activation over an active binding demotes it.
@@ -1246,7 +1552,7 @@ public sealed class ActiveReleaseBindingAuthority
                         throw new ActiveReleaseBindingException(
                             "truth store journal previous binding does not match the demoted active");
                     }
-                    state.PreviousBomBytes = priorCurrentBytes;
+                    nextPreviousBytes = priorCurrentBytes;
                 }
                 else
                 {
@@ -1259,22 +1565,30 @@ public sealed class ActiveReleaseBindingAuthority
                         throw new ActiveReleaseBindingException(
                             "truth store journal resurrects a rollback path across revocation");
                     }
-                    state.PreviousBomBytes = null;
+                    nextPreviousBytes = null;
                 }
                 if (!string.Equals(receipt.ReceiptId, current.ReceiptId, StringComparison.Ordinal))
                 {
                     throw new ActiveReleaseBindingException(
                         "truth store journal binding receipt identity fork");
                 }
-                state.CurrentBomBytes = record.SignedBomBytes;
+                nextCurrentBytes = record.SignedBomBytes;
+                expectedRequestSha256 = ActivationRequestHash(
+                    record.DeviceBindingId,
+                    record.SignedBomBytes!,
+                    record.PreviousStableBomBytes is null
+                        ? ReadOnlySpan<byte>.Empty
+                        : record.PreviousStableBomBytes,
+                    current.ExecutionTokenBase64);
                 break;
             }
             case "revocation":
             {
-                if (record.SignedBomBytes is not null)
+                if (record.SignedBomBytes is not null
+                    || record.PreviousStableBomBytes is not null)
                 {
                     throw new ActiveReleaseBindingException(
-                        "truth store journal revocation must not carry signed BOM bytes");
+                        "truth store journal revocation must not carry Release BOM bytes");
                 }
                 if (priorCurrent is not { Status: "active" }
                     || !string.Equals(receipt.From!.Status, "active", StringComparison.Ordinal)
@@ -1285,6 +1599,12 @@ public sealed class ActiveReleaseBindingAuthority
                     throw new ActiveReleaseBindingException(
                         "truth store journal revocation does not follow from the prior state");
                 }
+                expectedRequestSha256 = RequestHash(
+                    "dps.release.binding.revoke/v1",
+                    [],
+                    record.DeviceBindingId
+                    + "\n"
+                    + receipt.From!.Generation.ToString(CultureInfo.InvariantCulture));
                 break;
             }
             case "rollback":
@@ -1298,6 +1618,7 @@ public sealed class ActiveReleaseBindingAuthority
                     || current.ReleaseBomGeneration != priorPrevious.ReleaseBomGeneration
                     || !string.Equals(receipt.From!.Status, "revoked", StringComparison.Ordinal)
                     || record.PreviousBinding is not null
+                    || record.PreviousStableBomBytes is not null
                     || record.LastActivationSignerGeneration != state.LastActivationSignerGeneration
                     || facts.SignerGeneration != priorPrevious.ReleaseBomGeneration)
                 {
@@ -1309,23 +1630,34 @@ public sealed class ActiveReleaseBindingAuthority
                     throw new ActiveReleaseBindingException(
                         "truth store journal binding receipt identity fork");
                 }
-                state.CurrentBomBytes = record.SignedBomBytes;
-                state.PreviousBomBytes = null;
+                nextCurrentBytes = record.SignedBomBytes;
+                nextPreviousBytes = null;
+                expectedRequestSha256 = RequestHash(
+                    "dps.release.binding.rollback/v1",
+                    [],
+                    record.DeviceBindingId + "\n" + current.ExecutionTokenBase64);
                 break;
             }
             default:
                 throw new ActiveReleaseBindingException("truth store journal receipt kind is unknown");
         }
-        if (string.IsNullOrEmpty(record.RequestSha256))
+        if (!IsLowercaseHex64(record.RequestSha256)
+            || !string.Equals(
+                record.RequestSha256,
+                expectedRequestSha256,
+                StringComparison.Ordinal))
         {
-            throw new ActiveReleaseBindingException("truth store journal request digest is missing");
+            throw new ActiveReleaseBindingException(
+                "truth store journal request digest does not bind the recorded transition");
         }
-        // Mirror runtime semantics: a later legitimate transition with
-        // the same request digest (e.g. rolling back to the same BOM
-        // twice across an intervening activation) supersedes the older
-        // idempotency entry. Duplicated or forked records are already
-        // rejected by the sequence and receipt-identity checks above.
-        state.RequestReceipts[record.RequestSha256] = receipt;
+        if (state.RequestReceipts.ContainsKey(record.RequestSha256))
+        {
+            throw new ActiveReleaseBindingException(
+                "truth store journal reuses a committed request digest");
+        }
+        state.RequestReceipts.Add(record.RequestSha256, receipt);
+        state.CurrentBomBytes = nextCurrentBytes;
+        state.PreviousBomBytes = nextPreviousBytes;
         state.Current = current;
         state.Previous = record.PreviousBinding;
         state.RuntimeGeneration = expectedRuntimeGeneration;
@@ -1342,7 +1674,7 @@ public sealed class ActiveReleaseBindingAuthority
     /// verification, digest, signer ordinal, committed token digest, signer
     /// identity/key, and signature digest all re-checked.
     /// </summary>
-    private SignedBomFacts RequireRecordedSignedBom(
+    private ReleaseBomFacts RequireRecordedSignedBom(
         ReleaseBindingTruthRecord record,
         ActiveReleaseBindingV1 binding)
     {
@@ -1351,7 +1683,9 @@ public sealed class ActiveReleaseBindingAuthority
             throw new ActiveReleaseBindingException(
                 "truth store journal record has no signed BOM bytes to re-verify");
         }
-        var facts = VerifySignedBom(record.SignedBomBytes);
+        var facts = VerifyReleaseBom(
+            record.SignedBomBytes,
+            ReleaseBomWireContract.ExpectedStatus);
         if (!string.Equals(
                 binding.ReleaseBomSha256,
                 Convert.ToHexStringLower(SHA256.HashData(record.SignedBomBytes)),
@@ -1417,11 +1751,57 @@ public sealed class ActiveReleaseBindingAuthority
     {
         var prefix = Encoding.UTF8.GetBytes(domain + "\n");
         var tail = Encoding.UTF8.GetBytes("\n" + suffix);
-        var material = new byte[prefix.Length + body.Length + tail.Length];
-        prefix.CopyTo(material, 0);
-        body.CopyTo(material.AsSpan(prefix.Length));
-        tail.CopyTo(material.AsSpan(prefix.Length + body.Length));
-        return Convert.ToHexStringLower(SHA256.HashData(material));
+        try
+        {
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            hash.AppendData(prefix);
+            hash.AppendData(body);
+            hash.AppendData(tail);
+            return Convert.ToHexStringLower(hash.GetHashAndReset());
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(prefix);
+            CryptographicOperations.ZeroMemory(tail);
+        }
+    }
+
+    private static string ActivationRequestHash(
+        string deviceBindingId,
+        ReadOnlySpan<byte> signedBomBytes,
+        ReadOnlySpan<byte> previousStableBomBytes,
+        string executionTokenBase64)
+    {
+        var domain = Encoding.UTF8.GetBytes("dps.release.binding.activate/v2\n");
+        var device = Encoding.UTF8.GetBytes(deviceBindingId);
+        var token = Encoding.UTF8.GetBytes(executionTokenBase64);
+        try
+        {
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            hash.AppendData(domain);
+            AppendLengthPrefixed(hash, device);
+            AppendLengthPrefixed(hash, signedBomBytes);
+            AppendLengthPrefixed(hash, previousStableBomBytes);
+            AppendLengthPrefixed(hash, token);
+            return Convert.ToHexStringLower(hash.GetHashAndReset());
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(domain);
+            CryptographicOperations.ZeroMemory(device);
+            CryptographicOperations.ZeroMemory(token);
+        }
+    }
+
+    private static void AppendLengthPrefixed(
+        IncrementalHash hash,
+        ReadOnlySpan<byte> value)
+    {
+        Span<byte> length = stackalloc byte[sizeof(long)];
+        BinaryPrimitives.WriteInt64BigEndian(length, value.Length);
+        hash.AppendData(length);
+        hash.AppendData(value);
+        CryptographicOperations.ZeroMemory(length);
     }
 
     private static string RequireCanonicalTokenSha256(string executionTokenBase64)
@@ -1462,15 +1842,33 @@ public sealed class ActiveReleaseBindingAuthority
         return value;
     }
 
-    private sealed record SignedBomFacts(
+    private sealed record ReleaseBomFacts(
+        string BomId,
+        string Status,
         long SignerGeneration,
         string ActivationTokenSha256,
+        string? PreviousStableBomId,
         string? PreviousStableBomSha256,
+        string LifecycleIdentitySha256,
         string SignatureSha256,
         ReleaseBomTrustKey Key);
 
-    private SignedBomFacts VerifySignedBom(ReadOnlySpan<byte> signedBomBytes)
+    private ReleaseBomFacts VerifyReleaseBom(
+        ReadOnlySpan<byte> signedBomBytes,
+        string expectedStatus)
     {
+        if (expectedStatus is not ReleaseBomWireContract.ExpectedStatus
+            and not ReleaseBomWireContract.PreviousStableStatus)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(expectedStatus),
+                "Release BOM verification status must be SIGNED or STABLE.");
+        }
+        if (signedBomBytes.IsEmpty || signedBomBytes.Length > 4 * 1024 * 1024)
+        {
+            throw new ActiveReleaseBindingException(
+                "signed release BOM is absent or exceeds the 4 MiB limit");
+        }
         JsonDocument document;
         try
         {
@@ -1530,11 +1928,18 @@ public sealed class ActiveReleaseBindingAuthority
                 throw new ActiveReleaseBindingException(
                     "signed release BOM schema_version must be dps.release-bom/v1");
             }
-            if (root.GetProperty("status").GetString() != ReleaseBomWireContract.ExpectedStatus)
+            if (root.GetProperty("status").GetString() != expectedStatus)
             {
                 throw new ActiveReleaseBindingException(
-                    "signed release BOM status must be SIGNED");
+                    $"signed release BOM status must be {expectedStatus}");
             }
+            var bomIdElement = root.GetProperty("bom_id");
+            if (bomIdElement.ValueKind != JsonValueKind.String
+                || string.IsNullOrEmpty(bomIdElement.GetString()))
+            {
+                throw new ActiveReleaseBindingException("bom_id is invalid");
+            }
+            var bomId = bomIdElement.GetString()!;
             var generationElement = root.GetProperty("release_bom_generation");
             if (generationElement.ValueKind != JsonValueKind.Number
                 || !generationElement.TryGetInt64(out var signerGeneration)
@@ -1552,6 +1957,7 @@ public sealed class ActiveReleaseBindingAuthority
             }
             var previousId = root.GetProperty("previous_stable_bom");
             var previousSha = root.GetProperty("previous_stable_bom_sha256");
+            string? previousStableBomId;
             string? previousStableBomSha256;
             if (previousId.ValueKind == JsonValueKind.Null)
             {
@@ -1562,6 +1968,7 @@ public sealed class ActiveReleaseBindingAuthority
                     throw new ActiveReleaseBindingException(
                         "previous_stable_bom_sha256 must be null when previous_stable_bom is null");
                 }
+                previousStableBomId = null;
                 previousStableBomSha256 = null;
             }
             else
@@ -1573,6 +1980,7 @@ public sealed class ActiveReleaseBindingAuthority
                 {
                     throw new ActiveReleaseBindingException("previous stable BOM reference is invalid");
                 }
+                previousStableBomId = previousId.GetString();
                 previousStableBomSha256 = previousSha.GetString();
             }
 
@@ -1619,23 +2027,41 @@ public sealed class ActiveReleaseBindingAuthority
             {
                 throw new ActiveReleaseBindingException("BOM signature value is not canonical base64");
             }
+            var modulusHex = key.ModulusHex.Length % 2 == 0
+                ? key.ModulusHex
+                : "0" + key.ModulusHex;
+            var modulus = Convert.FromHexString(modulusHex);
+            if (signatureBytes.Length != modulus.Length
+                || !UnsignedBigEndianLessThan(signatureBytes, modulus))
+            {
+                throw new ActiveReleaseBindingException(
+                    "BOM signature is not a canonical RSA representative");
+            }
             var payloadCanonical = ReleaseBomCanonicalJson.SerializeObjectWithout(root, "signature");
             var message = new byte[SignatureDomain.Length + payloadCanonical.Length];
             SignatureDomain.CopyTo(message, 0);
             payloadCanonical.CopyTo(message, SignatureDomain.Length);
             using var rsa = RSA.Create(new RSAParameters
             {
-                Modulus = Convert.FromHexString(key.ModulusHex),
+                Modulus = modulus,
                 Exponent = ExponentBytes(key.Exponent)
             });
             if (!rsa.VerifyData(message, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pss))
             {
                 throw new ActiveReleaseBindingException("bom signature verification failed");
             }
-            return new SignedBomFacts(
+            var lifecycleIdentity = ReleaseBomCanonicalJson.SerializeObjectWithout(
+                root,
+                "signature",
+                "status");
+            return new ReleaseBomFacts(
+                bomId,
+                expectedStatus,
                 signerGeneration,
                 activationToken.GetString()!,
+                previousStableBomId,
                 previousStableBomSha256,
+                Convert.ToHexStringLower(SHA256.HashData(lifecycleIdentity)),
                 Convert.ToHexStringLower(SHA256.HashData(signatureBytes)),
                 key);
         }
@@ -1643,6 +2069,21 @@ public sealed class ActiveReleaseBindingAuthority
 
     private static bool IsLowercaseHex64(string value)
         => value.Length == 64 && !value.AsSpan().ContainsAnyExcept("0123456789abcdef");
+
+    private static bool UnsignedBigEndianLessThan(
+        ReadOnlySpan<byte> value,
+        ReadOnlySpan<byte> upperExclusive)
+    {
+        if (value.Length != upperExclusive.Length)
+            return false;
+        for (var index = 0; index < value.Length; index++)
+        {
+            if (value[index] == upperExclusive[index])
+                continue;
+            return value[index] < upperExclusive[index];
+        }
+        return false;
+    }
 
     private static byte[] ExponentBytes(int exponent)
     {
@@ -1665,20 +2106,36 @@ public sealed class ActiveReleaseBindingAuthority
 /// Canonical JSON identical to the python reference
 /// Tools/ci/candidate_bom_validator.py::canonical_bytes — json.dumps with
 /// sort_keys=True, separators=(",", ":"), ensure_ascii=False, UTF-8 encoded.
-/// Integers render invariantly; non-integer numbers pass through as raw
-/// text (the signature round trip pins the single signed encoding — see
-/// the number case below).
+/// Plain JSON integers retain Python's arbitrary precision. JSON float
+/// tokens are parsed as IEEE-754 doubles and rendered with Python's repr
+/// thresholds, including negative zero and exponent formatting.
 /// </summary>
 public static class ReleaseBomCanonicalJson
 {
-    public static byte[] SerializeObjectWithout(JsonElement root, string excludedProperty)
+    private const int MaxCanonicalNumberDigits = 4_300;
+
+    private static readonly IComparer<string> UnicodeScalarComparer =
+        Comparer<string>.Create(CompareUnicodeScalars);
+
+    public static byte[] SerializeObjectWithout(
+        JsonElement root,
+        params string[] excludedProperties)
     {
         if (root.ValueKind != JsonValueKind.Object)
         {
             throw new ActiveReleaseBindingException("canonical JSON root must be an object");
         }
+        ArgumentNullException.ThrowIfNull(excludedProperties);
+        var excluded = new HashSet<string>(excludedProperties, StringComparer.Ordinal);
+        if (excluded.Count != excludedProperties.Length
+            || excluded.Any(string.IsNullOrEmpty))
+        {
+            throw new ArgumentException(
+                "canonical JSON exclusions must be unique non-empty property names",
+                nameof(excludedProperties));
+        }
         var builder = new StringBuilder(4096);
-        WriteObject(builder, root, excludedProperty);
+        WriteObject(builder, root, excluded);
         return Encoding.UTF8.GetBytes(builder.ToString());
     }
 
@@ -1689,11 +2146,19 @@ public static class ReleaseBomCanonicalJson
         return Encoding.UTF8.GetBytes(builder.ToString());
     }
 
-    private static void WriteObject(StringBuilder builder, JsonElement value, string? excludedProperty)
+    private static void WriteObject(
+        StringBuilder builder,
+        JsonElement value,
+        IReadOnlySet<string>? excludedProperties)
     {
         builder.Append('{');
         var first = true;
-        var names = new SortedSet<string>(StringComparer.Ordinal);
+        // Python's json.dumps(sort_keys=True) orders Unicode strings by
+        // scalar value. StringComparer.Ordinal orders UTF-16 code units and
+        // disagrees when a BMP key at U+E000..U+FFFF is compared with an
+        // astral key. The activation reader must reproduce the candidate
+        // validator's exact ordering for every schema-admitted map key.
+        var names = new SortedSet<string>(UnicodeScalarComparer);
         foreach (var property in value.EnumerateObject())
         {
             if (!names.Add(property.Name))
@@ -1703,7 +2168,7 @@ public static class ReleaseBomCanonicalJson
         }
         foreach (var name in names)
         {
-            if (excludedProperty is not null && name == excludedProperty)
+            if (excludedProperties?.Contains(name) == true)
             {
                 continue;
             }
@@ -1717,6 +2182,41 @@ public static class ReleaseBomCanonicalJson
             WriteValue(builder, value.GetProperty(name));
         }
         builder.Append('}');
+    }
+
+    private static int CompareUnicodeScalars(string? left, string? right)
+    {
+        if (ReferenceEquals(left, right))
+        {
+            return 0;
+        }
+        if (left is null)
+        {
+            return -1;
+        }
+        if (right is null)
+        {
+            return 1;
+        }
+
+        var leftIndex = 0;
+        var rightIndex = 0;
+        while (leftIndex < left.Length && rightIndex < right.Length)
+        {
+            var leftScalar = char.ConvertToUtf32(left, leftIndex);
+            var rightScalar = char.ConvertToUtf32(right, rightIndex);
+            if (leftScalar != rightScalar)
+            {
+                return leftScalar < rightScalar ? -1 : 1;
+            }
+            leftIndex += char.IsHighSurrogate(left[leftIndex]) ? 2 : 1;
+            rightIndex += char.IsHighSurrogate(right[rightIndex]) ? 2 : 1;
+        }
+        if (leftIndex == left.Length && rightIndex == right.Length)
+        {
+            return 0;
+        }
+        return leftIndex == left.Length ? -1 : 1;
     }
 
     private static void WriteValue(StringBuilder builder, JsonElement value)
@@ -1733,26 +2233,7 @@ public static class ReleaseBomCanonicalJson
                 builder.Append("false");
                 break;
             case JsonValueKind.Number:
-                if (value.TryGetInt64(out var integer)
-                    && !value.GetRawText().AsSpan().ContainsAny(".eE"))
-                {
-                    builder.Append(integer.ToString(CultureInfo.InvariantCulture));
-                }
-                else
-                {
-                    // Non-integer numbers (legal e.g. as float feature
-                    // flags, admitted by candidate_bom_validator.py:1684)
-                    // pass through as their exact raw text. Uniqueness is
-                    // guaranteed end-to-end by the signature: the verified
-                    // message is THIS canonical serialization and the input
-                    // bytes must equal it byte-for-byte, so a re-encoded
-                    // float (0.5 -> 5e-1) survives the round-trip check but
-                    // changes the message away from the bytes the signer
-                    // actually signed and fails RSA-PSS verification. The
-                    // published digest therefore always names the single
-                    // signed encoding.
-                    builder.Append(value.GetRawText());
-                }
+                builder.Append(CanonicalNumber(value));
                 break;
             case JsonValueKind.String:
                 WriteString(builder, value.GetString()!);
@@ -1778,6 +2259,130 @@ public static class ReleaseBomCanonicalJson
                 throw new ActiveReleaseBindingException("canonical JSON value kind is unsupported");
         }
     }
+
+    private static string CanonicalNumber(JsonElement value)
+    {
+        var raw = value.GetRawText();
+        if (raw.Count(char.IsAsciiDigit) > MaxCanonicalNumberDigits)
+        {
+            throw new ActiveReleaseBindingException(
+                "canonical JSON number exceeds the 4300-digit limit");
+        }
+        if (!raw.AsSpan().ContainsAny(".eE"))
+        {
+            if (!BigInteger.TryParse(
+                    raw,
+                    NumberStyles.AllowLeadingSign,
+                    CultureInfo.InvariantCulture,
+                    out var integer))
+            {
+                throw new ActiveReleaseBindingException(
+                    "canonical JSON integer is unsupported");
+            }
+            return integer.ToString(CultureInfo.InvariantCulture);
+        }
+
+        if (!value.TryGetDouble(out var floatingPoint) || !double.IsFinite(floatingPoint))
+        {
+            throw new ActiveReleaseBindingException(
+                "canonical JSON float must be finite");
+        }
+        return FormatPythonFloat(floatingPoint);
+    }
+
+    private static string FormatPythonFloat(double value)
+    {
+        if (value == 0d)
+        {
+            return BitConverter.DoubleToInt64Bits(value) < 0 ? "-0.0" : "0.0";
+        }
+
+        var rendered = value.ToString("R", CultureInfo.InvariantCulture).ToLowerInvariant();
+        var exponentMarker = rendered.IndexOf('e');
+        if (exponentMarker >= 0)
+        {
+            var mantissa = rendered[..exponentMarker];
+            var exponent = int.Parse(
+                rendered[(exponentMarker + 1)..],
+                NumberStyles.AllowLeadingSign,
+                CultureInfo.InvariantCulture);
+            if (exponent >= -4 && exponent < 16)
+            {
+                return ScientificToFixed(mantissa, exponent);
+            }
+            return mantissa + FormatExponent(exponent);
+        }
+
+        var unsigned = rendered[0] == '-' ? rendered[1..] : rendered;
+        var decimalPoint = unsigned.IndexOf('.');
+        var integerPart = decimalPoint >= 0 ? unsigned[..decimalPoint] : unsigned;
+        int decimalExponent;
+        if (integerPart.Any(character => character != '0'))
+        {
+            decimalExponent = integerPart.TrimStart('0').Length - 1;
+        }
+        else
+        {
+            var fractionalPart = decimalPoint >= 0 ? unsigned[(decimalPoint + 1)..] : string.Empty;
+            var firstNonZero = fractionalPart.IndexOfAny(
+                ['1', '2', '3', '4', '5', '6', '7', '8', '9']);
+            if (firstNonZero < 0)
+            {
+                throw new ActiveReleaseBindingException(
+                    "canonical JSON float formatting lost a non-zero value");
+            }
+            decimalExponent = -(firstNonZero + 1);
+        }
+
+        if (decimalExponent >= 16 || decimalExponent < -4)
+        {
+            return FixedToScientific(rendered, decimalExponent);
+        }
+        return decimalPoint >= 0 ? rendered : rendered + ".0";
+    }
+
+    private static string FixedToScientific(string rendered, int exponent)
+    {
+        var negative = rendered[0] == '-';
+        var unsigned = negative ? rendered[1..] : rendered;
+        var digits = unsigned.Replace(".", string.Empty, StringComparison.Ordinal)
+            .TrimStart('0').TrimEnd('0');
+        if (digits.Length == 0)
+        {
+            throw new ActiveReleaseBindingException(
+                "canonical JSON float formatting produced no significant digits");
+        }
+        var mantissa = digits.Length == 1
+            ? digits
+            : digits[0] + "." + digits[1..];
+        return (negative ? "-" : string.Empty) + mantissa + FormatExponent(exponent);
+    }
+
+    private static string ScientificToFixed(string mantissa, int exponent)
+    {
+        var negative = mantissa[0] == '-';
+        var unsigned = negative ? mantissa[1..] : mantissa;
+        var digits = unsigned.Replace(".", string.Empty, StringComparison.Ordinal);
+        var decimalPosition = exponent + 1;
+        string fixedPoint;
+        if (decimalPosition <= 0)
+        {
+            fixedPoint = "0." + new string('0', -decimalPosition) + digits;
+        }
+        else if (decimalPosition >= digits.Length)
+        {
+            fixedPoint = digits + new string('0', decimalPosition - digits.Length) + ".0";
+        }
+        else
+        {
+            fixedPoint = digits[..decimalPosition] + "." + digits[decimalPosition..];
+        }
+        return (negative ? "-" : string.Empty) + fixedPoint;
+    }
+
+    private static string FormatExponent(int exponent)
+        => "e" + (exponent >= 0 ? "+" : "-")
+            + Math.Abs(exponent).ToString("D2", CultureInfo.InvariantCulture);
 
     private static void WriteString(StringBuilder builder, string value)
     {

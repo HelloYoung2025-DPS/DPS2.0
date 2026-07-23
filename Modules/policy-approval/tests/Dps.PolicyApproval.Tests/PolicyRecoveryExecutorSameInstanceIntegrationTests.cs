@@ -192,7 +192,7 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         // Real activation of BOM2 on the SAME running instance; the runtime
         // generation advances to 2 before the stale envelope commits.
         var (bom2, token2) = bomSigner.SignBom("policy-sameinst-bom-2", 2, bom1);
-        authority.Activate(DeviceA, bom2, token2);
+        authority.Activate(DeviceA, bom2, bomSigner.StableTwin(bom1), token2);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
             recoveryClient.AuthorizeSubmissionRecoveryAsync(staleRecovery, cancellationToken));
@@ -287,8 +287,11 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         // generation; both consumers then observe the identical live truth
         // and the re-pinned envelope is accepted through the same instance.
         var (bom2, token2) = bomSigner.SignBom("policy-sameinst-bom-2", 2, bom1);
-        restarted.Activate(DeviceA, bom2, token2);
+        restarted.Activate(DeviceA, bom2, bomSigner.StableTwin(bom1), token2);
         var bom2Sha256 = SameInstanceBomSigner.Sha256Hex(bom2);
+        Assert.True(restarted.TryReadActive(DeviceA, out var generationTwo));
+        Assert.Equal(2, generationTwo!.Generation);
+        Assert.Equal(bom2Sha256, generationTwo.ReleaseBomSha256);
         using var restartedRecoveryClient = CreateRecoveryClient(
             database,
             authorityTopology,
@@ -350,7 +353,10 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
         var (bom1, token1) = bomSigner.SignBom("policy-sameinst-rollback-bom-1", 1, null);
         authority.Activate(DeviceA, bom1, token1);
         var (bom2, token2) = bomSigner.SignBom("policy-sameinst-rollback-bom-2", 2, bom1);
-        authority.Activate(DeviceA, bom2, token2);
+        authority.Activate(DeviceA, bom2, bomSigner.StableTwin(bom1), token2);
+        Assert.True(authority.TryReadActive(DeviceA, out var generationTwo));
+        Assert.Equal(2, generationTwo!.Generation);
+        Assert.Equal(SameInstanceBomSigner.Sha256Hex(bom2), generationTwo.ReleaseBomSha256);
         authority.Revoke(DeviceA, 2);
         authority.Rollback(DeviceA, token1);
         var bom1Sha256 = SameInstanceBomSigner.Sha256Hex(bom1);
@@ -627,6 +633,8 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
     private sealed class SameInstanceBomSigner : IDisposable
     {
         private readonly RSA _rsa = RSA.Create(2048);
+        private readonly Dictionary<string, byte[]> _stableTwins =
+            new(StringComparer.Ordinal);
 
         internal SameInstanceBomSigner(
             string keyId = "test-bom-key-v1",
@@ -660,13 +668,23 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             long signerGeneration,
             byte[]? previousBom)
         {
+            var wireBomId = bomId.Length >= 8 ? bomId : "test-" + bomId;
+            var previousStable = previousBom is null ? null : StableTwin(previousBom);
+            string? previousStableBomId = null;
+            if (previousStable is not null)
+            {
+                using var previousDocument = JsonDocument.Parse(previousStable);
+                previousStableBomId = previousDocument.RootElement
+                    .GetProperty("bom_id")
+                    .GetString();
+            }
             var token = Convert.ToBase64String(
                 SHA256.HashData(Encoding.UTF8.GetBytes("token:" + bomId)));
             var tokenBytes = Convert.FromBase64String(token);
             var payload = new JsonObject
             {
                 ["schema_version"] = "dps.release-bom/v1",
-                ["bom_id"] = bomId,
+                ["bom_id"] = wireBomId,
                 ["status"] = "SIGNED",
                 ["integration_commit"] = new string('a', 40),
                 ["created_at"] = "2026-07-14T00:00:00.0000001Z",
@@ -686,12 +704,12 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
                 ["release_approval"] = new JsonObject(),
                 ["rollout"] = new JsonObject(),
                 ["rollback"] = new JsonObject(),
-                ["previous_stable_bom"] = previousBom is null
+                ["previous_stable_bom"] = previousStable is null
                     ? null
-                    : (JsonNode)("bom-previous-" + bomId),
-                ["previous_stable_bom_sha256"] = previousBom is null
+                    : (JsonNode)previousStableBomId!,
+                ["previous_stable_bom_sha256"] = previousStable is null
                     ? null
-                    : Sha256Hex(previousBom),
+                    : Sha256Hex(previousStable),
                 ["native_stop_authorities"] = new JsonArray(),
                 ["device_route_assignment_authorities"] = new JsonArray(),
                 ["native_stop_challenge_authorities"] = new JsonArray()
@@ -713,6 +731,38 @@ public sealed partial class PostgresPolicyApprovalIntegrationTests
             };
             using var fullDocument = JsonDocument.Parse(payload.ToJsonString());
             return (ReleaseBomCanonicalJson.Serialize(fullDocument.RootElement), token);
+        }
+
+        internal byte[] StableTwin(byte[] signedBom)
+        {
+            var cacheKey = Sha256Hex(signedBom);
+            if (_stableTwins.TryGetValue(cacheKey, out var cached))
+            {
+                return cached;
+            }
+
+            var payload = JsonNode.Parse(signedBom)!.AsObject();
+            payload["status"] = "STABLE";
+            payload.Remove("signature");
+            using var payloadDocument = JsonDocument.Parse(payload.ToJsonString());
+            var canonical = ReleaseBomCanonicalJson.Serialize(payloadDocument.RootElement);
+            var message = Encoding.ASCII.GetBytes("dps-release-bom/v1\n")
+                .Concat(canonical)
+                .ToArray();
+            var signature = _rsa.SignData(
+                message,
+                HashAlgorithmName.SHA256,
+                RSASignaturePadding.Pss);
+            payload["signature"] = new JsonObject
+            {
+                ["algorithm"] = "rsa-pss-sha256",
+                ["key_id"] = KeyId,
+                ["value"] = Convert.ToBase64String(signature)
+            };
+            using var fullDocument = JsonDocument.Parse(payload.ToJsonString());
+            var stable = ReleaseBomCanonicalJson.Serialize(fullDocument.RootElement);
+            _stableTwins.Add(cacheKey, stable);
+            return stable;
         }
 
         public void Dispose() => _rsa.Dispose();

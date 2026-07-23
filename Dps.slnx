@@ -91,6 +91,14 @@
   <Folder Name="/Modules/executor-gateway/tests/Dps.ExecutorGateway.NativeFixture/">
     <Project Path="Modules/executor-gateway/tests/Dps.ExecutorGateway.NativeFixture/Dps.ExecutorGateway.NativeFixture.csproj" />
   </Folder>
+  <Folder Name="/Modules/factory-release-controller/" />
+  <Folder Name="/Modules/factory-release-controller/contracts/" />
+  <Folder Name="/Modules/factory-release-controller/contracts/provided/">
+    <Project Path="Modules/factory-release-controller/contracts/provided/Dps.FactoryReleaseController.Contracts/Dps.FactoryReleaseController.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Modules/factory-release-controller/tests/">
+    <Project Path="Modules/factory-release-controller/tests/Dps.FactoryReleaseController.Contracts.Tests/Dps.FactoryReleaseController.Contracts.Tests.csproj" />
+  </Folder>
   <Folder Name="/Modules/gbrain-projector/" />
   <Folder Name="/Modules/gbrain-projector/contracts/">
     <Project Path="Modules/gbrain-projector/contracts/Dps.GBrainProjector.Contracts.csproj" />

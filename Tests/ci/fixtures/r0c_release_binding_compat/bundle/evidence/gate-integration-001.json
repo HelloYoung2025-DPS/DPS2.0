@@ -1,0 +1,1 @@
+{"evidence_id":"gate-integration-001","issuer_identity":"evidence-issuer","kind":"INTEGRATION","required":true,"result":"PASS","schema_version":"dps.release-evidence/v1","tested_commit":"37c167e44b62dd462bdc993152e2405607744a83","verification_level":"INTEGRATION_VERIFIED"}

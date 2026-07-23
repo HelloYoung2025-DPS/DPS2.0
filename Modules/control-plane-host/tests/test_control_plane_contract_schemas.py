@@ -324,9 +324,33 @@ class ProvidedContractSchemaTests(unittest.TestCase):
     def test_19_release_binding_ownership_is_fixed(self) -> None:
         binding = _load(CONTRACTS[5][1])["properties"]
         receipt = _load(CONTRACTS[6][1])["properties"]
+        manifest = _load(MODULE_ROOT / "module.yaml")
         self.assertEqual("active.release.binding/v1", binding["contract_id"]["const"])
         self.assertEqual("control-plane-host", binding["producer_module"]["const"])
         self.assertEqual(["active", "previous", "revoked"], binding["status"]["enum"])
+        # R0-C stores the raw token in the append-only binding journal so an
+        # exact prior binding can be restored. Its wire privacy class remains
+        # the v1 value "internal"; storage durability is declared separately
+        # as a secret scope and must never be mislabeled ephemeral.
+        self.assertEqual("internal", binding["privacy_class"]["const"])
+        secret_scopes = manifest["security"]["secretScopes"]
+        self.assertEqual(
+            [
+                "durable append-only active-release-binding execution token at rest; "
+                "redacted from text output and readable only through the "
+                "composition-fixed authority"
+            ],
+            secret_scopes,
+        )
+        self.assertNotIn("ephemeral", " ".join(secret_scopes).lower())
+        retention = manifest["data"]["retention"].lower()
+        for term in (
+            "raw active-release-binding execution tokens",
+            "append-only postgresql truth",
+            "durable at-rest secrets",
+        ):
+            with self.subTest(retention_term=term):
+                self.assertIn(term, retention)
         self.assertEqual("release.binding.receipt/v1", receipt["contract_id"]["const"])
         self.assertEqual("control-plane-host", receipt["producer_module"]["const"])
         self.assertEqual(["activation", "revocation", "rollback"], receipt["receipt_kind"]["enum"])

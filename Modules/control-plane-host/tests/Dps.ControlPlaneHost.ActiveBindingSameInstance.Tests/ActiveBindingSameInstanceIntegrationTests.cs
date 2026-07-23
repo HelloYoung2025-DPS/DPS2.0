@@ -101,11 +101,12 @@ public sealed class ActiveBindingSameInstanceIntegrationTests
         var (bom1, token1) = signer.SignBom("bom-1", 1, null);
         authority.Activate(Device, bom1, token1);
         var (bom2, token2) = signer.SignBom("bom-2", 2, bom1);
-        authority.Activate(Device, bom2, token2);
+        authority.Activate(Device, bom2, signer.StableTwin(bom1), token2);
         var executorReader = new ControlPlaneHostActiveReleaseBomReader(authority.RecoveryCapability);
         using var policyRecovery = CreatePolicyRecoveryClient(authority.RecoveryCapability);
         Assert.True(authority.TryReadActive(Device, out var active));
         Assert.Equal(2, active!.Generation);
+        Assert.Equal(SameInstanceBomSigner.Sha256Hex(bom2), active.ReleaseBomSha256);
 
         // Revocation: the executor adapter goes fail-closed (null) and the
         // same instance reports no readable active binding to the policy
@@ -149,8 +150,10 @@ public sealed class ActiveBindingSameInstanceIntegrationTests
         var (bom1, token1) = signer.SignBom("bom-1", 1, null);
         first.Activate(Device, bom1, token1);
         var (bom2, token2) = signer.SignBom("bom-2", 2, bom1);
-        first.Activate(Device, bom2, token2);
+        first.Activate(Device, bom2, signer.StableTwin(bom1), token2);
         Assert.True(first.TryReadActive(Device, out var active));
+        Assert.Equal(2, active!.Generation);
+        Assert.Equal(SameInstanceBomSigner.Sha256Hex(bom2), active.ReleaseBomSha256);
         first.Revoke(Device, active!.Generation);
         first.Rollback(Device, token1);
         Assert.True(first.TryReadActive(Device, out var beforeRestart));
@@ -264,6 +267,8 @@ public sealed class ActiveBindingSameInstanceIntegrationTests
     private sealed class SameInstanceBomSigner : IDisposable
     {
         private readonly RSA _rsa = RSA.Create(2048);
+        private readonly Dictionary<string, byte[]> _stableTwins =
+            new(StringComparer.Ordinal);
 
         internal SameInstanceBomSigner(
             string keyId = "test-bom-key-v1",
@@ -297,13 +302,23 @@ public sealed class ActiveBindingSameInstanceIntegrationTests
             long signerGeneration,
             byte[]? previousBom)
         {
+            var wireBomId = bomId.Length >= 8 ? bomId : "test-" + bomId;
+            var previousStable = previousBom is null ? null : StableTwin(previousBom);
+            string? previousStableBomId = null;
+            if (previousStable is not null)
+            {
+                using var previousDocument = JsonDocument.Parse(previousStable);
+                previousStableBomId = previousDocument.RootElement
+                    .GetProperty("bom_id")
+                    .GetString();
+            }
             var token = Convert.ToBase64String(
                 SHA256.HashData(Encoding.UTF8.GetBytes("token:" + bomId)));
             var tokenBytes = Convert.FromBase64String(token);
             var payload = new JsonObject
             {
                 ["schema_version"] = "dps.release-bom/v1",
-                ["bom_id"] = bomId,
+                ["bom_id"] = wireBomId,
                 ["status"] = "SIGNED",
                 ["integration_commit"] = new string('a', 40),
                 ["created_at"] = "2026-07-14T00:00:00.0000001Z",
@@ -323,12 +338,12 @@ public sealed class ActiveBindingSameInstanceIntegrationTests
                 ["release_approval"] = new JsonObject(),
                 ["rollout"] = new JsonObject(),
                 ["rollback"] = new JsonObject(),
-                ["previous_stable_bom"] = previousBom is null
+                ["previous_stable_bom"] = previousStable is null
                     ? null
-                    : (JsonNode)("bom-previous-" + bomId),
-                ["previous_stable_bom_sha256"] = previousBom is null
+                    : (JsonNode)previousStableBomId!,
+                ["previous_stable_bom_sha256"] = previousStable is null
                     ? null
-                    : Sha256Hex(previousBom),
+                    : Sha256Hex(previousStable),
                 ["native_stop_authorities"] = new JsonArray(),
                 ["device_route_assignment_authorities"] = new JsonArray(),
                 ["native_stop_challenge_authorities"] = new JsonArray()
@@ -350,6 +365,38 @@ public sealed class ActiveBindingSameInstanceIntegrationTests
             };
             using var fullDocument = JsonDocument.Parse(payload.ToJsonString());
             return (ReleaseBomCanonicalJson.Serialize(fullDocument.RootElement), token);
+        }
+
+        internal byte[] StableTwin(byte[] signedBom)
+        {
+            var cacheKey = Sha256Hex(signedBom);
+            if (_stableTwins.TryGetValue(cacheKey, out var cached))
+            {
+                return cached;
+            }
+
+            var payload = JsonNode.Parse(signedBom)!.AsObject();
+            payload["status"] = "STABLE";
+            payload.Remove("signature");
+            using var payloadDocument = JsonDocument.Parse(payload.ToJsonString());
+            var canonical = ReleaseBomCanonicalJson.Serialize(payloadDocument.RootElement);
+            var message = Encoding.ASCII.GetBytes("dps-release-bom/v1\n")
+                .Concat(canonical)
+                .ToArray();
+            var signature = _rsa.SignData(
+                message,
+                HashAlgorithmName.SHA256,
+                RSASignaturePadding.Pss);
+            payload["signature"] = new JsonObject
+            {
+                ["algorithm"] = "rsa-pss-sha256",
+                ["key_id"] = KeyId,
+                ["value"] = Convert.ToBase64String(signature)
+            };
+            using var fullDocument = JsonDocument.Parse(payload.ToJsonString());
+            var stable = ReleaseBomCanonicalJson.Serialize(fullDocument.RootElement);
+            _stableTwins.Add(cacheKey, stable);
+            return stable;
         }
 
         public void Dispose() => _rsa.Dispose();

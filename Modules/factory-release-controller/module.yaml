@@ -30,7 +30,7 @@
       "id": "dps.factory-release-controller.contracts",
       "kind": "contract-pack",
       "status": "proposed",
-      "build": null,
+      "build": "scripts/dotnet-pinned.sh restore Modules/factory-release-controller/contracts/provided/Dps.FactoryReleaseController.Contracts/Dps.FactoryReleaseController.Contracts.csproj --locked-mode && scripts/dotnet-pinned.sh build Modules/factory-release-controller/contracts/provided/Dps.FactoryReleaseController.Contracts/Dps.FactoryReleaseController.Contracts.csproj --configuration Release --no-restore",
       "versioning": "semver"
     }
   ],
@@ -316,6 +316,14 @@
         "required": true,
         "command": "PYTHONPATH=Modules/factory-release-controller/src python3.12 -m unittest discover -s Modules/factory-release-controller/tests -p 'test_contracts.py'",
         "environment": "Python 3.12 and jsonschema from root requirements-ci.txt hash lock; v1 byte freeze/quarantine plus active v2 positive and adversarial instances",
+        "evidenceLevel": "CONTRACT_VERIFIED"
+      },
+      {
+        "id": "factory-release-controller.release-bom-contract-dotnet",
+        "type": "contract",
+        "required": true,
+        "command": "scripts/dotnet-pinned.sh restore Modules/factory-release-controller/tests/Dps.FactoryReleaseController.Contracts.Tests/Dps.FactoryReleaseController.Contracts.Tests.csproj --locked-mode && scripts/dotnet-pinned.sh test Modules/factory-release-controller/tests/Dps.FactoryReleaseController.Contracts.Tests/Dps.FactoryReleaseController.Contracts.Tests.csproj --configuration Release --no-restore -- --filter-trait Category=Contract --minimum-expected-tests 6 --fail-skips on",
+        "environment": "macos-or-hosted pinned .NET 10; digest-pinned cross-language Release BOM canonical number/string corpora, exact 4300-digit bound, unique receipt wire, and canonical Base64",
         "evidenceLevel": "CONTRACT_VERIFIED"
       },
       {

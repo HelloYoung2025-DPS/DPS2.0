@@ -305,6 +305,13 @@ public static partial class NativeStopAuthorityTrustProtocolV1
                 RequireExactObject(authority, ChallengeAuthorityFields, "challenge authority");
             RequireExactObject(document.RootElement.GetProperty("signature"), SignatureFields, "signature");
             RejectDuplicateMembers(document.RootElement);
+            if (!exactUtf8Json.SequenceEqual(
+                    ReleaseBomAuthorityTrustVerifierV1.CanonicalizeExactJson(
+                        document.RootElement)))
+            {
+                throw new InvalidDataException(
+                    "Native stop trust receipt must be the canonical sorted compact JSON wire.");
+            }
         }
 
         ReleaseBomNativeStopAuthorityTrustReceiptV1? receipt;

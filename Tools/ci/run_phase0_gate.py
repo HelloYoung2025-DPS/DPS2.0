@@ -286,7 +286,7 @@ R0B_FROZEN_BASELINE_COMMIT = "8f63593d4f262ec1496b05300da75a71b86eaab4"
 
 
 def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
-    minimum_adversarial_tests = 138
+    minimum_adversarial_tests = 156
     required_inventory = {
         "test_missing_standard_module_layout_is_rejected",
         "test_placeholder_only_src_is_rejected",
@@ -429,6 +429,11 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         # the same reason the file is byte-bound: an emptied body must not
         # keep reading as green.
         "test_full_signed_bom_three_authorities_and_external_receipt_pass",
+        # One static byte-for-byte composition corpus is consumed independently
+        # by the ordinary Tools/ci validator and the Control Plane authority.
+        # Naming the Python side here prevents a future candidate from deleting
+        # the only proof that the full gate-valid tree reaches generation 2.
+        "test_shared_release_binding_compat_corpus_passes_real_validator",
         "test_missing_or_tampered_external_receipt_fails_closed",
         "test_unpublished_hyphenated_trust_contract_identity_is_rejected",
         "test_worker_authority_must_match_manifest_descriptor_artifact",
@@ -457,6 +462,33 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         # TODAY-reachable behaviour of the actual CLI entry release.sh invokes.
         "test_the_cli_refuses_to_start_without_the_receipt_argument",
         "test_the_cli_reports_an_untrusted_bom_signer_as_a_structured_fail",
+        # The candidate verdict and the native-stop trust receipt signer payload
+        # must name the
+        # exact canonical full signed BOM bytes that activation consumes.  A
+        # signature over a canonical payload cannot bless a reordered or
+        # trailing-LF full wire with a different digest.
+        "test_candidate_and_previous_bom_require_exact_canonical_wire",
+        "test_native_stop_receipt_signer_payload_builder_requires_the_exact_canonical_bom",
+        "test_canonical_number_corpus_matches_cross_language_contract",
+        "test_canonical_string_corpus_matches_cross_language_contract",
+        "test_canonical_number_limits_and_nonfinite_builder_inputs_fail_closed",
+        "test_noncanonical_receipt_wires_fail_closed_with_the_same_signature",
+        "test_noncanonical_receipt_signature_base64_alias_fails_closed",
+        "test_rsa_signature_representative_must_be_less_than_modulus",
+        "test_unsigned_owner_receipt_fixture_is_production_builder_output",
+        "test_field_sets_are_identical",
+        "test_signature_field_is_pinned_on_both_sides",
+        # R0-C external Release BOM signer contract: repository code receives
+        # only the exact public profile and conformance vectors.  All eight
+        # invariants are required inventory, not optional documentation.
+        "test_01_auth_spec_is_exactly_the_r0c_deployed_rsa_pss_profile",
+        "test_02_private_key_and_exact_crypto_boundaries_are_normative",
+        "test_03_canonical_final_wire_is_persisted_and_reused",
+        "test_04_auth_spec_and_canonicalization_corpora_are_hash_bound",
+        "test_05_deployed_policy_exposes_one_public_bom_key_in_profile",
+        "test_06_public_positive_vectors_prove_signed_and_stable_pair",
+        "test_07_every_adversarial_vector_fails_its_bound_invariant",
+        "test_08_repository_contract_artifacts_contain_no_private_key",
         # R0-C F1 completion: the end-to-end main() happy path with the
         # owner-signed native-stop-trust receipt fixture (signer provisioned
         # 2026-07-21) -- pinned so an emptied body cannot read as green.
