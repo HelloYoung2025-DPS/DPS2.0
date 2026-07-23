@@ -1,1 +1,0 @@
-# windows-edge-supervisor rules

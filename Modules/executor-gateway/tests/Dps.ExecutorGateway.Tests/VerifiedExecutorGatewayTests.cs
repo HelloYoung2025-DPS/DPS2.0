@@ -453,7 +453,7 @@ public sealed class VerifiedExecutorGatewayTests
     [Trait("Category", "Unit")]
     public async Task ProcessGuardianIsOnlyStrongRootAcrossDisposeAndForcedGc()
     {
-        var (weakLease, retentionId) = await CreateOrphanedRetainedGuardAsync();
+        var (weakLease, retentionId) = CreateOrphanedRetainedGuard();
         ForceFullGc();
         await AssertGuardianRootedAndDisposeBlockedAsync(weakLease);
         ForceFullGc();
@@ -468,6 +468,11 @@ public sealed class VerifiedExecutorGatewayTests
         }
         Assert.False(IsAlive(weakLease));
     }
+
+    [MethodImpl(MethodImplOptions.NoInlining)]
+    private static (WeakReference<FakeApprovalExecutionFenceLease> WeakLease, Guid RetentionId)
+        CreateOrphanedRetainedGuard() =>
+        Task.Run(CreateOrphanedRetainedGuardAsync).GetAwaiter().GetResult();
 
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static async Task<(WeakReference<FakeApprovalExecutionFenceLease> WeakLease, Guid RetentionId)>
@@ -492,13 +497,15 @@ public sealed class VerifiedExecutorGatewayTests
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    private static async Task AssertGuardianRootedAndDisposeBlockedAsync(
+    private static Task AssertGuardianRootedAndDisposeBlockedAsync(
         WeakReference<FakeApprovalExecutionFenceLease> weakLease)
     {
         Assert.True(weakLease.TryGetTarget(out var rootedLease));
         Assert.NotNull(rootedLease);
         Assert.True(rootedLease.GuardHeld);
-        await Assert.ThrowsAsync<InvalidOperationException>(() => rootedLease.DisposeAsync().AsTask());
+        var disposal = rootedLease.DisposeAsync().AsTask();
+        rootedLease = null;
+        return Assert.ThrowsAsync<InvalidOperationException>(() => disposal);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -1936,6 +1943,7 @@ public sealed class VerifiedExecutorGatewayTests
             }
         }
 
+        [MethodImpl(MethodImplOptions.NoInlining)]
         public static void SimulateGuardedProcessDeath(Guid retentionId)
         {
             if (!ProcessGuardian.TryGetValue(retentionId, out var roots) ||

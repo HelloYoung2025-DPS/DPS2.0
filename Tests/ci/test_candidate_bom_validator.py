@@ -176,6 +176,17 @@ def _write_receipt_wire(path, value):
     return payload
 
 
+def _materialize_synthetic_repository_metadata(corpus_root, repo):
+    """Create reserved governance paths only inside the disposable fixture repo."""
+    metadata = json.loads(
+        (corpus_root / "synthetic-repo-metadata.json").read_text(encoding="utf-8")
+    )
+    for relative, content in metadata.items():
+        destination = repo / relative
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(content, encoding="utf-8")
+
+
 MODULE_SPECS = {
     "policy-approval": ("dps.policy-approval", "assembly", "modular-monolith"),
     "windows-edge-supervisor": (
@@ -1033,6 +1044,7 @@ class CandidateBomValidatorTests(unittest.TestCase):
             repo = materialized_root / "repo"
             bundle = materialized_root / "bundle"
             shutil.copytree(corpus_root / "repo-content", repo)
+            _materialize_synthetic_repository_metadata(corpus_root, repo)
             shutil.copytree(corpus_root / "bundle", bundle)
             git_fixture = metadata["git_fixture"]
             _git(repo, "init", "-q")
