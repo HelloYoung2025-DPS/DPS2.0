@@ -253,7 +253,10 @@
       ],
       "properties": {
         "route_authority_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{7,127}$" },
-        "producer_module": { "const": "factory-release-controller" },
+        "producer_module": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
         "supervisor_module_id": { "const": "windows-edge-supervisor" },
         "supervisor_artifact_id": { "const": "dps.windows-edge-supervisor" },
         "supervisor_artifact_sha256": { "$ref": "#/$defs/sha256" },

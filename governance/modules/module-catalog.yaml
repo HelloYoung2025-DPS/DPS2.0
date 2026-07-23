@@ -85,116 +85,6 @@
       "riskTier": "R3"
     },
     {
-      "id": "factory-artifact-builder",
-      "actualRoot": "Modules/factory-artifact-builder",
-      "canonicalRoot": "modules/factory-artifact-builder",
-      "manifest": "Modules/factory-artifact-builder/module.yaml",
-      "agents": "Modules/factory-artifact-builder/AGENTS.md",
-      "lifecycle": "proposed",
-      "runtimeState": "proposed",
-      "riskTier": "R2"
-    },
-    {
-      "id": "factory-control-plane-host",
-      "actualRoot": "Modules/factory-control-plane-host",
-      "canonicalRoot": "modules/factory-control-plane-host",
-      "manifest": "Modules/factory-control-plane-host/module.yaml",
-      "agents": "Modules/factory-control-plane-host/AGENTS.md",
-      "lifecycle": "proposed",
-      "runtimeState": "proposed",
-      "riskTier": "R3"
-    },
-    {
-      "id": "factory-evidence-ledger",
-      "actualRoot": "Modules/factory-evidence-ledger",
-      "canonicalRoot": "modules/factory-evidence-ledger",
-      "manifest": "Modules/factory-evidence-ledger/module.yaml",
-      "agents": "Modules/factory-evidence-ledger/AGENTS.md",
-      "lifecycle": "proposed",
-      "runtimeState": "proposed",
-      "riskTier": "R3"
-    },
-    {
-      "id": "factory-impact-analyzer",
-      "actualRoot": "Modules/factory-impact-analyzer",
-      "canonicalRoot": "modules/factory-impact-analyzer",
-      "manifest": "Modules/factory-impact-analyzer/module.yaml",
-      "agents": "Modules/factory-impact-analyzer/AGENTS.md",
-      "lifecycle": "proposed",
-      "runtimeState": "proposed",
-      "riskTier": "R3"
-    },
-    {
-      "id": "factory-instruction-resolver",
-      "actualRoot": "Modules/factory-instruction-resolver",
-      "canonicalRoot": "modules/factory-instruction-resolver",
-      "manifest": "Modules/factory-instruction-resolver/module.yaml",
-      "agents": "Modules/factory-instruction-resolver/AGENTS.md",
-      "lifecycle": "proposed",
-      "runtimeState": "proposed",
-      "riskTier": "R3"
-    },
-    {
-      "id": "factory-merge-controller",
-      "actualRoot": "Modules/factory-merge-controller",
-      "canonicalRoot": "modules/factory-merge-controller",
-      "manifest": "Modules/factory-merge-controller/module.yaml",
-      "agents": "Modules/factory-merge-controller/AGENTS.md",
-      "lifecycle": "proposed",
-      "runtimeState": "proposed",
-      "riskTier": "R2"
-    },
-    {
-      "id": "factory-release-controller",
-      "actualRoot": "Modules/factory-release-controller",
-      "canonicalRoot": "modules/factory-release-controller",
-      "manifest": "Modules/factory-release-controller/module.yaml",
-      "agents": "Modules/factory-release-controller/AGENTS.md",
-      "lifecycle": "proposed",
-      "runtimeState": "proposed",
-      "riskTier": "R3"
-    },
-    {
-      "id": "factory-rollback-controller",
-      "actualRoot": "Modules/factory-rollback-controller",
-      "canonicalRoot": "modules/factory-rollback-controller",
-      "manifest": "Modules/factory-rollback-controller/module.yaml",
-      "agents": "Modules/factory-rollback-controller/AGENTS.md",
-      "lifecycle": "proposed",
-      "runtimeState": "proposed",
-      "riskTier": "R3"
-    },
-    {
-      "id": "factory-trusted-runner",
-      "actualRoot": "Modules/factory-trusted-runner",
-      "canonicalRoot": "modules/factory-trusted-runner",
-      "manifest": "Modules/factory-trusted-runner/module.yaml",
-      "agents": "Modules/factory-trusted-runner/AGENTS.md",
-      "lifecycle": "proposed",
-      "runtimeState": "proposed",
-      "riskTier": "R3"
-    },
-    {
-      "id": "factory-upgrade-intake",
-      "actualRoot": "Modules/factory-upgrade-intake",
-      "canonicalRoot": "modules/factory-upgrade-intake",
-      "manifest": "Modules/factory-upgrade-intake/module.yaml",
-      "agents": "Modules/factory-upgrade-intake/AGENTS.md",
-      "lifecycle": "proposed",
-      "runtimeState": "proposed",
-      "riskTier": "R3"
-    },
-    {
-      "id": "factory-worktree-manager",
-      "actualRoot": "Modules/factory-worktree-manager",
-      "canonicalRoot": "modules/factory-worktree-manager",
-      "manifest": "Modules/factory-worktree-manager/module.yaml",
-      "agents": "Modules/factory-worktree-manager/AGENTS.md",
-      "lifecycle": "proposed",
-      "runtimeState": "proposed",
-      "riskTier": "R3"
-    },
-    {
       "id": "gbrain-projector",
       "actualRoot": "Modules/gbrain-projector",
       "canonicalRoot": "modules/gbrain-projector",
@@ -202,7 +92,7 @@
       "agents": "Modules/gbrain-projector/AGENTS.md",
       "lifecycle": "proposed",
       "runtimeState": "proposed",
-      "riskTier": "R2"
+      "riskTier": "R3"
     },
     {
       "id": "interest-reducer",

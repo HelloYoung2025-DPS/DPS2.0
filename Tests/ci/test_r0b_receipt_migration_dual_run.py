@@ -46,7 +46,21 @@ LIVE_SCHEMA_PATH = ROOT / "governance" / "schemas" / "module-manifest.schema.jso
 LIVE_V2_SCHEMA_PATH = LIVE_SCHEMA_PATH
 LIVE_V1_SCHEMA_PATH = ROOT / "governance" / "schemas" / "module-manifest.v1.schema.json"
 VERIFICATION_DIRECTORY = ROOT / "Tools" / "verification"
-EXPECTED_MODULE_COUNT = 34
+EXPECTED_BASELINE_MODULE_COUNT = 34
+EXPECTED_LIVE_MODULE_COUNT = 23
+RETIRED_FACTORY_MODULES = {
+    "factory-artifact-builder",
+    "factory-control-plane-host",
+    "factory-evidence-ledger",
+    "factory-impact-analyzer",
+    "factory-instruction-resolver",
+    "factory-merge-controller",
+    "factory-release-controller",
+    "factory-rollback-controller",
+    "factory-trusted-runner",
+    "factory-upgrade-intake",
+    "factory-worktree-manager",
+}
 
 _ORIGINAL_IMPORT_PATH = list(sys.path)
 try:
@@ -252,10 +266,14 @@ class FrozenCorpusIntegrityTest(unittest.TestCase):
             self.provenance["corpus"],
             "dps.r0b-instruction-receipt-migration-corpus/v1",
         )
-        self.assertEqual(self.provenance["module_count"], EXPECTED_MODULE_COUNT)
+        self.assertEqual(
+            self.provenance["module_count"], EXPECTED_BASELINE_MODULE_COUNT
+        )
         self.assertRegex(self.provenance["baseline_commit"], r"^[0-9a-f]{40}$")
         # One schema plus one manifest per registered module.
-        self.assertEqual(len(self.provenance["files"]), EXPECTED_MODULE_COUNT + 1)
+        self.assertEqual(
+            len(self.provenance["files"]), EXPECTED_BASELINE_MODULE_COUNT + 1
+        )
 
     def test_every_frozen_file_matches_its_recorded_digest(self) -> None:
         recorded = self.provenance["files"]
@@ -274,11 +292,13 @@ class FrozenCorpusIntegrityTest(unittest.TestCase):
         ]
         self.assertEqual([], mismatched, "frozen dual-run corpus was altered")
 
-    def test_frozen_baseline_covers_exactly_the_registered_modules(self) -> None:
+    def test_frozen_baseline_covers_live_and_exactly_the_retired_modules(self) -> None:
         frozen = {_module_id_of_baseline(path) for path in _baseline_manifest_paths()}
         live = {path.parent.name for path in _current_manifest_paths()}
-        self.assertEqual(EXPECTED_MODULE_COUNT, len(frozen))
-        self.assertEqual(live, frozen)
+        self.assertEqual(EXPECTED_BASELINE_MODULE_COUNT, len(frozen))
+        self.assertEqual(EXPECTED_LIVE_MODULE_COUNT, len(live))
+        self.assertEqual(RETIRED_FACTORY_MODULES, frozen.difference(live))
+        self.assertEqual(set(), live.difference(frozen))
 
 
 class SchemaRuleChangeTest(unittest.TestCase):
@@ -365,7 +385,9 @@ class DualRunAcceptanceMatrixTest(unittest.TestCase):
             for module_id, manifest in sorted(self.old_manifests.items())
             if validate_json_schema(manifest, self.old_schema)
         }
-        self.assertEqual(EXPECTED_MODULE_COUNT, len(self.old_manifests))
+        self.assertEqual(
+            EXPECTED_BASELINE_MODULE_COUNT, len(self.old_manifests)
+        )
         self.assertEqual({}, rejected, "old schema must accept the pre-migration corpus")
 
     def test_new_schema_accepts_every_current_manifest(self) -> None:
@@ -374,10 +396,10 @@ class DualRunAcceptanceMatrixTest(unittest.TestCase):
             for module_id, manifest in sorted(self.new_manifests.items())
             if validate_json_schema(manifest, self.new_schema)
         }
-        self.assertEqual(EXPECTED_MODULE_COUNT, len(self.new_manifests))
+        self.assertEqual(EXPECTED_LIVE_MODULE_COUNT, len(self.new_manifests))
         self.assertEqual({}, rejected, "new schema must accept the migrated corpus")
 
-    def test_old_schema_rejects_all_34_current_manifests(self) -> None:
+    def test_old_schema_rejects_all_current_manifests(self) -> None:
         """Half of the mutual-rejection fact: no migrated manifest passes the old rules."""
 
         accepted: List[str] = []
@@ -389,7 +411,7 @@ class DualRunAcceptanceMatrixTest(unittest.TestCase):
                 continue
             if not any("$.agents: missing required property resolver" == e for e in errors):
                 wrong_reason.append("{0}: {1}".format(module_id, errors))
-        self.assertEqual(EXPECTED_MODULE_COUNT, len(self.new_manifests))
+        self.assertEqual(EXPECTED_LIVE_MODULE_COUNT, len(self.new_manifests))
         self.assertEqual([], accepted, "old schema must reject every migrated manifest")
         self.assertEqual([], wrong_reason)
 
@@ -405,7 +427,9 @@ class DualRunAcceptanceMatrixTest(unittest.TestCase):
                 continue
             if not any("$.agents: unexpected property resolver" == e for e in errors):
                 wrong_reason.append("{0}: {1}".format(module_id, errors))
-        self.assertEqual(EXPECTED_MODULE_COUNT, len(self.old_manifests))
+        self.assertEqual(
+            EXPECTED_BASELINE_MODULE_COUNT, len(self.old_manifests)
+        )
         self.assertEqual([], accepted, "new schema must reject every pre-migration manifest")
         self.assertEqual([], wrong_reason)
 
@@ -1015,13 +1039,6 @@ class BaselineAuthorityFailClosedTest(unittest.TestCase):
         # candidate-writable code, where any older ancestor would do.
         runner = ROOT / "Tools" / "ci" / "run_phase0_gate.py"
         gate_source = (ROOT / "Tools" / "ci" / "run_candidate_gate.py").read_text(encoding="utf-8")
-        resolver_source = (
-            ROOT
-            / "Modules"
-            / "factory-instruction-resolver"
-            / "src"
-            / "instruction_resolver.py"
-        ).read_text(encoding="utf-8")
         # Anchoring the constant is only part of it.  Everything this batch made
         # trust-bearing has to be byte-bound, or the guarantee can be removed
         # without the anchor noticing: the suites that enforce it (the runner only
@@ -1046,14 +1063,13 @@ class BaselineAuthorityFailClosedTest(unittest.TestCase):
             '"governance/verification/f9-scale-input.v1.schema.json"',
             '"governance/verification/f9-scale-input.v2.schema.json"',
         )
-        for source, label in ((gate_source, "run_candidate_gate"), (resolver_source, "instruction_resolver")):
-            for path in anchored:
-                self.assertIn(
-                    path,
-                    source,
-                    "{0} must keep {1} byte-bound, or the frozen baseline stops "
-                    "being enforced".format(label, path),
-                )
+        for path in anchored:
+            self.assertIn(
+                path,
+                gate_source,
+                "run_candidate_gate must keep {0} byte-bound, or the frozen "
+                "baseline stops being enforced".format(path),
+            )
 
         module_source = Path(__file__).read_text(encoding="utf-8")
         self.assertNotIn(
@@ -1283,12 +1299,14 @@ class MajorCoexistenceDispatchTest(unittest.TestCase):
             for module_id, manifest in sorted(self.baseline_manifests.items())
             if validate_json_schema(manifest, self.live_v1)
         }
-        self.assertEqual(EXPECTED_MODULE_COUNT, len(self.baseline_manifests))
+        self.assertEqual(
+            EXPECTED_BASELINE_MODULE_COUNT, len(self.baseline_manifests)
+        )
         self.assertEqual({}, rejected, "live v1 schema must accept the frozen v1 corpus")
 
     def test_v2_schema_accepts_the_current_v2_manifests(self) -> None:
         # proof-obligation 2
-        self.assertEqual(EXPECTED_MODULE_COUNT, len(self.live_manifests))
+        self.assertEqual(EXPECTED_LIVE_MODULE_COUNT, len(self.live_manifests))
         wrong_major = {
             module_id: manifest.get("schemaVersion")
             for module_id, manifest in sorted(self.live_manifests.items())

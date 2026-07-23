@@ -11,17 +11,6 @@
     "edge-local-journal",
     "evidence-service",
     "executor-gateway",
-    "factory-artifact-builder",
-    "factory-control-plane-host",
-    "factory-evidence-ledger",
-    "factory-impact-analyzer",
-    "factory-instruction-resolver",
-    "factory-merge-controller",
-    "factory-release-controller",
-    "factory-rollback-controller",
-    "factory-trusted-runner",
-    "factory-upgrade-intake",
-    "factory-worktree-manager",
     "gbrain-projector",
     "interest-reducer",
     "legacy-runtime-adapter",
@@ -130,131 +119,6 @@
       "reason": "owner of the approval fence and durable submission intent, acknowledgement, and state lifecycle"
     },
     {
-      "consumer": "factory-artifact-builder",
-      "provider": "factory-merge-controller",
-      "reason": "approved merge-head decision"
-    },
-    {
-      "consumer": "factory-control-plane-host",
-      "provider": "factory-artifact-builder",
-      "reason": "immutable candidate artifact descriptor"
-    },
-    {
-      "consumer": "factory-control-plane-host",
-      "provider": "factory-evidence-ledger",
-      "reason": "independent Factory evidence replay"
-    },
-    {
-      "consumer": "factory-control-plane-host",
-      "provider": "factory-impact-analyzer",
-      "reason": "trusted impact plan and dependency waves"
-    },
-    {
-      "consumer": "factory-control-plane-host",
-      "provider": "factory-instruction-resolver",
-      "reason": "fresh bound instructions"
-    },
-    {
-      "consumer": "factory-control-plane-host",
-      "provider": "factory-merge-controller",
-      "reason": "merge-head decision"
-    },
-    {
-      "consumer": "factory-control-plane-host",
-      "provider": "factory-release-controller",
-      "reason": "signed-BOM rollout state enforcement"
-    },
-    {
-      "consumer": "factory-control-plane-host",
-      "provider": "factory-rollback-controller",
-      "reason": "bounded verified rollback"
-    },
-    {
-      "consumer": "factory-control-plane-host",
-      "provider": "factory-trusted-runner",
-      "reason": "independent exact-argv evidence"
-    },
-    {
-      "consumer": "factory-control-plane-host",
-      "provider": "factory-upgrade-intake",
-      "reason": "validated upgrade intent"
-    },
-    {
-      "consumer": "factory-control-plane-host",
-      "provider": "factory-worktree-manager",
-      "reason": "one-writer worktrees and fenced leases"
-    },
-    {
-      "consumer": "factory-impact-analyzer",
-      "provider": "factory-instruction-resolver",
-      "reason": "fresh instruction and consumer binding"
-    },
-    {
-      "consumer": "factory-impact-analyzer",
-      "provider": "factory-upgrade-intake",
-      "reason": "validated upgrade scope"
-    },
-    {
-      "consumer": "factory-instruction-resolver",
-      "provider": "factory-upgrade-intake",
-      "reason": "validated upgrade identity and declared scope"
-    },
-    {
-      "consumer": "factory-merge-controller",
-      "provider": "factory-trusted-runner",
-      "reason": "independent merge-head test evidence"
-    },
-    {
-      "consumer": "factory-release-controller",
-      "provider": "factory-artifact-builder",
-      "reason": "immutable artifact descriptor"
-    },
-    {
-      "consumer": "factory-release-controller",
-      "provider": "factory-evidence-ledger",
-      "reason": "durable rollout state recovery"
-    },
-    {
-      "consumer": "factory-release-controller",
-      "provider": "factory-merge-controller",
-      "reason": "merge-head decision"
-    },
-    {
-      "consumer": "factory-release-controller",
-      "provider": "factory-upgrade-intake",
-      "reason": "normalized upgrade identity and risk"
-    },
-    {
-      "consumer": "factory-rollback-controller",
-      "provider": "factory-evidence-ledger",
-      "reason": "append-only plan and result evidence"
-    },
-    {
-      "consumer": "factory-rollback-controller",
-      "provider": "factory-release-controller",
-      "reason": "versioned ROLLBACK_REQUIRED event and previous BOM reference"
-    },
-    {
-      "consumer": "factory-trusted-runner",
-      "provider": "factory-instruction-resolver",
-      "reason": "fresh instruction receipt"
-    },
-    {
-      "consumer": "factory-trusted-runner",
-      "provider": "factory-worktree-manager",
-      "reason": "owned plan and active fenced lease"
-    },
-    {
-      "consumer": "factory-worktree-manager",
-      "provider": "factory-impact-analyzer",
-      "reason": "Manifest-owned dependency-safe plan"
-    },
-    {
-      "consumer": "factory-worktree-manager",
-      "provider": "factory-instruction-resolver",
-      "reason": "fresh bound instructions"
-    },
-    {
       "consumer": "gbrain-projector",
       "provider": "interest-reducer",
       "reason": "Soul-scoped interest snapshot"
@@ -268,6 +132,16 @@
       "consumer": "interest-reducer",
       "provider": "memory-event-ledger",
       "reason": "verified append-only event input"
+    },
+    {
+      "consumer": "memory-event-ledger",
+      "provider": "command-orchestrator",
+      "reason": "owner of the canonical signed command receipt protocol"
+    },
+    {
+      "consumer": "memory-event-ledger",
+      "provider": "executor-gateway",
+      "reason": "independent signer of native and postcondition verified observation receipts"
     },
     {
       "consumer": "memory-event-ledger",
@@ -317,7 +191,7 @@
     {
       "consumer": "windows-edge-worker",
       "provider": "executor-gateway",
-      "reason": "owner of native.stop.proof/v1 Schema, DTO, evidence digest, canonical signing bytes, and strict JSON codec"
+      "reason": "owner of the byte-frozen legacy native.stop.proof/v1 Schema and strict codec used only for bounded quarantine classification; no runtime issuance edge exists"
     },
     {
       "consumer": "windows-edge-worker",
@@ -329,8 +203,6 @@
     [
       "device-registry",
       "edge-local-journal",
-      "factory-evidence-ledger",
-      "factory-upgrade-intake",
       "legacy-runtime-adapter",
       "planner",
       "platform-authorization-authority",
@@ -338,47 +210,38 @@
       "zenno-bridge"
     ],
     [
-      "factory-instruction-resolver",
-      "memory-event-ledger",
       "platform-account-registry",
       "policy-approval",
       "windows-edge-supervisor"
     ],
     [
       "binding",
-      "factory-impact-analyzer",
-      "interest-reducer",
       "operation-compiler"
     ],
     [
       "command-orchestrator",
-      "factory-worktree-manager",
-      "gbrain-projector",
       "persona-store"
     ],
     [
       "audit-metrics",
-      "evidence-service",
-      "executor-gateway",
-      "factory-trusted-runner",
-      "soul-memory-adapter"
+      "executor-gateway"
     ],
     [
-      "control-plane-host",
-      "factory-merge-controller",
+      "memory-event-ledger",
       "windows-edge-worker"
     ],
     [
-      "factory-artifact-builder"
+      "interest-reducer"
     ],
     [
-      "factory-release-controller"
+      "gbrain-projector"
     ],
     [
-      "factory-rollback-controller"
+      "evidence-service",
+      "soul-memory-adapter"
     ],
     [
-      "factory-control-plane-host"
+      "control-plane-host"
     ]
   ]
 }

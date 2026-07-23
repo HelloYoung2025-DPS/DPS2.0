@@ -16,7 +16,7 @@
 | [PlatformTemplate_平台模块模板.md](PlatformTemplate_平台模块模板.md) | 新平台接入模板（配置驱动优先） | 开发者 |
 | [EngineeringStandards_工程标准.md](EngineeringStandards_工程标准.md) | 构建、测试、CI、安全、发布和 Definition of Done | 所有贡献者 |
 | [Architecture/TargetArchitecture_目标架构.md](Architecture/TargetArchitecture_目标架构.md) | GBrain Soul 记忆与 ZennoDroid 薄执行器目标架构 | 架构与开发人员 |
-| [Operations/RepositoryProtection_仓库保护.md](Operations/RepositoryProtection_仓库保护.md) | Factory 治理路径, 两人审批, 受保护工作流和外部信任根要求 | 仓库与发布管理员 |
+| [Operations/RepositoryProtection_仓库保护.md](Operations/RepositoryProtection_仓库保护.md) | 治理路径, 两人审批, 受保护工作流和外部发布信任根要求 | 仓库与发布管理员 |
 | [Operations/GBrainCompany_LocalNonProduction_本地非生产.md](Operations/GBrainCompany_LocalNonProduction_本地非生产.md) | GBrain Company 的本机 PostgreSQL, Voyage, Source/OAuth 和证据边界 | 运维与测试管理员 |
 | [Operations/ExternalReview_外审机制.md](Operations/ExternalReview_外审机制.md) | 重构批次/会话/里程碑三级 Codex 外审程序与意见处置纪律（DeepSeek/GLM 属 §9.1 运行时安全网，不参与开发期投票） | 所有贡献者与批准者 |
 | [Operations/RebuildSessionPrompts_施工会话提示词.md](Operations/RebuildSessionPrompts_施工会话提示词.md) | 重构全程零填空施工会话模板（T0 补证 + T1-T19 + 兜底），按文件内「执行顺序（依赖 DAG）」挑对应 T# 整块粘贴 | 施工发起人 |
@@ -33,7 +33,7 @@
 | 想接入一个新平台 | [PlatformTemplate_平台模块模板.md](PlatformTemplate_平台模块模板.md) + [App Onboarder README](../Tools/app_onboarder/README.md) |
 | 想了解项目未来如何重构 | [RebuildPlan_重构计划书.md](RebuildPlan_重构计划书.md) + [Architecture/TargetArchitecture_目标架构.md](Architecture/TargetArchitecture_目标架构.md) |
 | 想知道现代工程的验收标准 | [EngineeringStandards_工程标准.md](EngineeringStandards_工程标准.md) |
-| 想配置 AI Factory 的权限分离 | [Operations/RepositoryProtection_仓库保护.md](Operations/RepositoryProtection_仓库保护.md) |
+| 想配置仓库与外部发布权威的权限分离 | [Operations/RepositoryProtection_仓库保护.md](Operations/RepositoryProtection_仓库保护.md) |
 | 想配置本地 Company GBrain | [Operations/GBrainCompany_LocalNonProduction_本地非生产.md](Operations/GBrainCompany_LocalNonProduction_本地非生产.md) |
 | 重构批次收尾要跑外审 | [Operations/ExternalReview_外审机制.md](Operations/ExternalReview_外审机制.md) |
 | 要开新施工会话，找开工提示词 | [Operations/RebuildSessionPrompts_施工会话提示词.md](Operations/RebuildSessionPrompts_施工会话提示词.md) |
@@ -92,7 +92,7 @@ Docs/
 ├── EngineeringStandards_工程标准.md — 工程质量和发布标准
 ├── Operations/
 │   ├── GBrainCompany_LocalNonProduction_本地非生产.md — 本机 Company GBrain 安全边界
-│   └── RepositoryProtection_仓库保护.md — Factory 权限分离与仓库保护
+│   └── RepositoryProtection_仓库保护.md — 发布权限分离与仓库保护
 ├── TechManual_技术手册.md           — 架构与参考手册
 ├── GitWorkflow_Git工作流.md         — Git 工作流
 ├── PlatformTemplate_平台模块模板.md — 平台模块模板

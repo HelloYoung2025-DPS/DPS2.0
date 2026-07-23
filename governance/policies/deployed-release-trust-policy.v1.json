@@ -2,15 +2,15 @@
   "schema_version": "dps.release-trust-policy/v1",
   "policy_id": "dps-deployed-release-anchor-v1",
   "required_gates": {
-    "factory-phase0-static": {
+    "repository-static": {
       "kind": "REPOSITORY",
       "minimum_verification_level": "REPOSITORY_STATIC_VERIFIED"
     },
-    "factory-contract": {
+    "contract-verification": {
       "kind": "CONTRACT",
       "minimum_verification_level": "CONTRACT_VERIFIED"
     },
-    "factory-integration": {
+    "integration-verification": {
       "kind": "INTEGRATION",
       "minimum_verification_level": "INTEGRATION_VERIFIED"
     }

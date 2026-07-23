@@ -15,9 +15,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-# R0-C: this suite migrated from Modules/factory-release-controller/tests/
-# together with the validator itself (RebuildPlan 4.3) -- candidate validation
-# is ordinary Tools/ci gate code and must survive that module's R0-D deletion.
+# R0-C migrated this suite and validator into ordinary Tools/ci gate code
+# (RebuildPlan 4.3); R0-D retains this non-signing validation capability.
 ROOT = Path(__file__).resolve(strict=True).parents[2]
 SOURCE_PATH = ROOT / "Tools" / "ci" / "candidate_bom_validator.py"
 CANONICAL_NUMBER_CORPUS_PATH = (
@@ -195,7 +194,7 @@ MODULE_SPECS = {
     "windows-edge-worker": ("dps.windows-edge-worker", "service", "out-of-process"),
 }
 
-PRODUCTION_BUILDER_ID = "dps:factory-artifact-builder:0.1.0"
+PRODUCTION_BUILDER_ID = "dps:external-artifact-builder:1.0.0"
 
 
 class BomFixture:
@@ -403,7 +402,7 @@ class BomFixture:
         )
         descriptor = {
             "schema_version": "1.0.0", "contract_id": "artifact.descriptor/v1",
-            "producer_module": "factory-artifact-builder", "soul_id": None,
+            "producer_module": "external-artifact-builder", "soul_id": None,
             "device_binding_id": None, "platform_account_id": None,
             "trace_id": "trace_" + hashlib.sha256(module_id.encode()).hexdigest()[:32],
             "idempotency_key": "idem_" + artifact_sha, "occurred_at": "2026-07-14T00:00:00Z",
@@ -496,7 +495,7 @@ class BomFixture:
         route_spki = "4" * 64
         route = {
             "route_authority_id": "device-route-authority-a",
-            "producer_module": "factory-release-controller",
+            "producer_module": "windows-edge-supervisor",
             "supervisor_module_id": "windows-edge-supervisor",
             "supervisor_artifact_id": "dps.windows-edge-supervisor",
             "supervisor_artifact_sha256": by_id["windows-edge-supervisor"]["sha256"],
@@ -799,118 +798,16 @@ class ReleaseCliEntryTests(unittest.TestCase):
         self.assertIn("positive integer", stderr.getvalue())
 
 
-class MigrationFidelityTests(unittest.TestCase):
-    """R0-C moved the validator; until R0-D deletes the module-side original,
-    nothing may drift between the two copies except the three declared edits
-    (docstring, policy path, --repo-root depth)."""
+class OperationalAnchorTests(unittest.TestCase):
+    POLICY = ROOT / "governance" / "policies" / "deployed-release-trust-policy.v1.json"
 
-    MODULE_SOURCE = ROOT / "Modules" / "factory-release-controller" / "src" / "candidate_bom_validator.py"
-    MODULE_POLICY = (
-        ROOT / "Modules" / "factory-release-controller" / "operations" / "deployed-release-trust-policy.v1.json"
-    )
-    MIGRATED_POLICY = ROOT / "governance" / "policies" / "deployed-release-trust-policy.v1.json"
-
-    def test_the_validator_sources_differ_only_by_the_three_declared_migration_edits(self) -> None:
-        module_docstring = (
-            b'"""Fail-closed signed Release BOM validator used by the root release gate.\n'
-            b"\n"
-            b"The module intentionally exposes no command execution surface.  It verifies\n"
-            b"fixed JSON shapes, repository Git objects, immutable bundle bytes, RSA-PSS\n"
-            b"signatures, independent evidence, risk approval, and the previous stable BOM.\n"
-            b'"""\n'
-        )
-        tools_docstring = (
-            b'"""Fail-closed signed Release BOM validator used by the root release gate.\n'
-            b"\n"
-            b"The module intentionally exposes no command execution surface.  It verifies\n"
-            b"fixed JSON shapes, repository Git objects, immutable bundle bytes, RSA-PSS\n"
-            b"signatures, independent evidence, risk approval, and the previous stable BOM.\n"
-            b"\n"
-            b"R0-C (RebuildPlan 4.3) migrated this validator here from\n"
-            b"Modules/factory-release-controller/src/ -- candidate validation is ordinary\n"
-            b"gate code and must survive that module's R0-D deletion.  It validates only:\n"
-            b"no signing, no deployment, no runtime state.  This copy is the one\n"
-            b"scripts/release.sh invokes and the one the Phase 0 CI-integrity allowlist\n"
-            b"pins; its code-bound trust policy lives under governance/policies/.  The\n"
-            b"module-side original matches this copy after exactly the three declared\n"
-            b"migration edits until R0-D removes it.\n"
-            b"\n"
-            b"The owner provisioned the native-stop-trust signer out-of-repo on\n"
-            b"2026-07-21: the deployed trust policy now carries the\n"
-            b"native_stop_trust_signer_identities group (owner-native-stop-trust-signer-1)\n"
-            b"and the single-purpose native-stop-trust key native-stop-trust-owner-key-1,\n"
-            b"and the code-bound digest was re-anchored to the patched policy, so\n"
-            b"from_deployed_anchor constructs the release validator against the live\n"
-            b"anchor.\n"
-            b'"""\n'
-        )
-        module_policy_path = (
-            b'_DEPLOYED_TRUST_POLICY_RELATIVE = (\n'
-            b'    "Modules/factory-release-controller/operations/"\n'
-            b'    "deployed-release-trust-policy.v1.json"\n'
-            b')\n'
-        )
-        tools_policy_path = (
-            b'_DEPLOYED_TRUST_POLICY_RELATIVE = (\n'
-            b'    "governance/policies/deployed-release-trust-policy.v1.json"\n'
-            b')\n'
-        )
-        module_repo_root = (
-            b'    parser.add_argument("--repo-root", '
-            b'default=str(Path(__file__).resolve().parents[3]))\n'
-        )
-        tools_repo_root = (
-            b'    # Tools/ci/<this file> -> parents[2] is the repository root.\n'
-            b'    parser.add_argument("--repo-root", '
-            b'default=str(Path(__file__).resolve().parents[2]))\n'
-        )
-        declared_edits = (
-            (tools_docstring, module_docstring),
-            (tools_policy_path, module_policy_path),
-            (tools_repo_root, module_repo_root),
-        )
-        normalized_tools = SOURCE_PATH.read_bytes()
-        module_source = self.MODULE_SOURCE.read_bytes()
-        for tools_block, module_block in declared_edits:
-            self.assertEqual(1, normalized_tools.count(tools_block))
-            self.assertEqual(1, module_source.count(module_block))
-            normalized_tools = normalized_tools.replace(tools_block, module_block, 1)
-        self.assertEqual(module_source, normalized_tools)
-
-    def test_the_trust_policy_bytes_are_identical_in_both_homes(self) -> None:
-        self.assertEqual(self.MODULE_POLICY.read_bytes(), self.MIGRATED_POLICY.read_bytes())
-
-    def test_the_code_bound_policy_digest_did_not_change_in_migration(self) -> None:
-        # Same bytes, same canonical digest: the migration re-pointed the path
-        # but deliberately did not re-anchor trust.
-        policy = json.loads(self.MIGRATED_POLICY.read_bytes())
+    def test_the_code_bound_policy_digest_matches_the_retained_policy(self) -> None:
+        policy = json.loads(self.POLICY.read_bytes())
         self.assertEqual(
             SUBJECT._DEPLOYED_TRUST_POLICY_SHA256,
             sha256_bytes(canonical_bytes(dict(policy))),
         )
         self.assertEqual(SUBJECT._DEPLOYED_TRUST_POLICY_ID, policy.get("policy_id"))
-
-    def test_the_operational_anchor_entry_behaves_identically_in_both_copies(self) -> None:
-        # Migration fidelity only: whatever from_deployed_anchor does, it must do
-        # the same thing in both homes until R0-D deletes the original.  This
-        # test takes NO position on whether the entry works.
-        import importlib.util
-
-        spec = importlib.util.spec_from_file_location("_dps_module_side_cbv_subject", self.MODULE_SOURCE)
-        original = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(original)
-        schema_sha = hashlib.sha256(
-            (ROOT / "governance" / "schemas" / "release-bom.schema.json").read_bytes()
-        ).hexdigest()
-        outcomes = []
-        for subject in (SUBJECT, original):
-            with tempfile.TemporaryDirectory() as bundle:
-                try:
-                    subject.CandidateBomValidator.from_deployed_anchor(ROOT, bundle, schema_sha)
-                    outcomes.append(None)
-                except subject.CandidateBomError as exc:
-                    outcomes.append(str(exc))
-        self.assertEqual(outcomes[0], outcomes[1])
 
     def test_the_operational_anchor_entry_constructs_the_release_validator(self) -> None:
         # RESOLVED 2026-07-21: the owner provisioned the native-stop-trust
@@ -1424,7 +1321,7 @@ class CandidateBomValidatorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             fixture = BomFixture(directory)
             fixture.rewrite_module_builder_id(
-                "policy-approval", "dps:test-builder:1.0.0"
+                "policy-approval", "not-a-valid-builder-identity"
             )
             with self.assertRaisesRegex(
                 CandidateBomError, "provenance run identity mismatch"

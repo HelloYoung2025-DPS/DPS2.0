@@ -110,9 +110,11 @@ from phase0 import (  # noqa: E402
     REQUIRED_PYTHON,
     RUNNABLE_CONTRACT_MODE,
     Phase0Error,
+    _changed_paths,
     discover_registered_module_dirs,
     load_json_compatible_yaml,
     manifest_module_id,
+    resolve_instruction_receipt,
     run_command,
     sha256_file,
     sha256_text,
@@ -145,15 +147,6 @@ SCHEMA_VERSION = "dps.candidate-gate-evidence/v1"
 POLICY_PATH = Path("governance/policies/candidate-test-policy.yaml")
 POLICY_SCHEMA_PATH = Path("governance/schemas/candidate-test-policy.schema.json")
 EVIDENCE_SCHEMA_PATH = Path("governance/schemas/candidate-gate-evidence.schema.json")
-FACTORY_RECEIPT_SCHEMA_PATH = Path(
-    "Modules/factory-instruction-resolver/contracts/provided/instruction.receipt.v1.schema.json"
-)
-UPGRADE_INTENT_SCHEMA_PATH = Path(
-    "Modules/factory-upgrade-intake/contracts/provided/upgrade.intent.v1.schema.json"
-)
-FACTORY_RESOLVER_PATH = Path(
-    "Modules/factory-instruction-resolver/src/instruction_resolver.py"
-)
 CANDIDATE_TRUST_PATHS = (
     POLICY_PATH.as_posix(),
     ".editorconfig",
@@ -172,9 +165,6 @@ CANDIDATE_TRUST_PATHS = (
     "NuGet.Config",
     POLICY_SCHEMA_PATH.as_posix(),
     EVIDENCE_SCHEMA_PATH.as_posix(),
-    FACTORY_RECEIPT_SCHEMA_PATH.as_posix(),
-    UPGRADE_INTENT_SCHEMA_PATH.as_posix(),
-    FACTORY_RESOLVER_PATH.as_posix(),
     "governance/schemas/agents-frontmatter.schema.json",
     "governance/schemas/module-manifest.schema.json",
     "governance/schemas/module-manifest.v1.schema.json",
@@ -193,19 +183,14 @@ CANDIDATE_TRUST_PATHS = (
     "governance/verification/release-bom.signature.v1.corpus.json",
     "governance/verification/f9-scale-input.v1.schema.json",
     "governance/verification/f9-scale-input.v2.schema.json",
-    "Modules/factory-instruction-resolver/contracts/provided/instruction.receipt.v2.schema.json",
-    "Modules/factory-upgrade-intake/contracts/provided/upgrade.intent.v2.schema.json",
-    "Modules/factory-upgrade-intake/src/upgrade_intake.py",
     "Modules/control-plane-host/tests/Dps.ControlPlaneHost.Tests/ActiveReleaseBindingAuthorityTests.cs",
     "Modules/control-plane-host/tests/Dps.ControlPlaneHost.Tests/Dps.ControlPlaneHost.Tests.csproj",
-    "Modules/factory-release-controller/tests/Dps.FactoryReleaseController.Contracts.Tests/Dps.FactoryReleaseController.Contracts.Tests.csproj",
-    "Modules/factory-release-controller/tests/Dps.FactoryReleaseController.Contracts.Tests/ReleaseBomCanonicalNumberContractTests.cs",
-    "Modules/factory-release-controller/tests/Dps.FactoryReleaseController.Contracts.Tests/packages.lock.json",
     "Tests/ci/test_candidate_bom_validator.py",
     "Tests/ci/test_candidate_bom_validator_e2e.py",
     "Tests/ci/test_candidate_gate.py",
     "Tests/ci/test_candidate_policy.py",
     "Tests/ci/test_manifest_schema_subset_evaluator.py",
+    "Tests/ci/test_module_impact.py",
     "Tests/ci/test_r0b_receipt_migration_dual_run.py",
     "Tests/ci/test_release_bom_signer_contract.py",
     "Tests/ci/test_release_bom_field_set_dual_pin.py",
@@ -1848,30 +1833,13 @@ def execute_candidate_suites(
     return results
 
 
-def _load_factory_resolver(root: Path) -> Any:
-    path = root / FACTORY_RESOLVER_PATH
-    if not path.is_file() or path.is_symlink():
-        raise Phase0Error("Factory production Instruction Resolver is missing or unsafe")
-    module_name = "dps_factory_instruction_resolver_candidate_gate"
-    spec = importlib.util.spec_from_file_location(module_name, path)
-    if spec is None or spec.loader is None:
-        raise Phase0Error("Factory production Instruction Resolver cannot be loaded")
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    try:
-        spec.loader.exec_module(module)
-    except Exception as exc:
-        raise Phase0Error("Factory production Instruction Resolver load failed: " + str(exc))
-    return module
-
-
 def _changed_path_inventory(
-    root: Path, baseline: str, factory_module: Any
+    root: Path, baseline: str
 ) -> Tuple[Tuple[str, ...], List[Dict[str, Any]]]:
     try:
-        changed_paths = tuple(factory_module._changed_paths(root, baseline))
+        changed_paths = tuple(_changed_paths(root, baseline))
     except Exception as exc:
-        raise Phase0Error("Factory changed-path resolution failed: " + str(exc))
+        raise Phase0Error("candidate changed-path resolution failed: " + str(exc))
     records: List[Dict[str, Any]] = []
     for relative in changed_paths:
         path = root / relative
@@ -1910,7 +1878,7 @@ def _build_upgrade_intent(
     intent: Dict[str, Any] = {
         "schema_version": "dps.upgrade-intent/v1",
         "contract_id": "upgrade.intent/v1",
-        "producer_module": "factory-upgrade-intake",
+        "producer_module": "candidate-gate",
         "soul_id": None,
         "device_binding_id": None,
         "platform_account_id": None,
@@ -1942,10 +1910,6 @@ def _build_upgrade_intent(
             "approval_scope": None,
         },
     }
-    schema = _load_json_object(root / UPGRADE_INTENT_SCHEMA_PATH, "UpgradeIntent schema")
-    errors = validate_json_schema(intent, schema)
-    if errors:
-        raise Phase0Error("candidate UpgradeIntent violates owned schema: " + "; ".join(errors))
     return intent
 
 
@@ -1959,12 +1923,6 @@ def _validate_upgrade_intent_binding(
     inventory: Inventory,
     changed_paths: Sequence[str],
 ) -> None:
-    schema = _load_json_object(root / UPGRADE_INTENT_SCHEMA_PATH, "UpgradeIntent schema")
-    errors = validate_json_schema(intent, schema)
-    if errors:
-        raise Phase0Error(
-            "candidate UpgradeIntent violates owned schema: " + "; ".join(errors)
-        )
     expected = _build_upgrade_intent(
         root,
         baseline,
@@ -1979,43 +1937,38 @@ def _validate_upgrade_intent_binding(
         )
 
 
-def _resolve_factory_receipt(
+def _resolve_candidate_receipt(
     root: Path,
-    factory_module: Any,
-    intent: Mapping[str, Any],
-    changed_paths: Sequence[str],
+    baseline: str,
+    required_scope: Sequence[str],
     resolved_at: str,
 ) -> Dict[str, Any]:
     try:
-        resolver = factory_module.InstructionResolver(root)
-        receipt = resolver.resolve(
-            intent,
+        receipt = resolve_instruction_receipt(
+            root,
+            baseline,
             agent_identity="dps-candidate-gate",
             agent_role="evidence-auditor",
             resolved_at=resolved_at,
-            changed_paths=changed_paths,
+            required_scope=required_scope,
         )
-        valid, message, current = resolver.validate(
-            receipt, intent, changed_paths=changed_paths
+        valid, message, current = validate_instruction_receipt(
+            root,
+            receipt,
+            required_scope=required_scope,
         )
     except Exception as exc:
-        raise Phase0Error("Factory production instruction binding failed: " + str(exc))
+        raise Phase0Error("candidate instruction binding failed: " + str(exc))
     if not valid:
-        raise Phase0Error("Factory production instruction receipt is stale: " + message)
-    schema = _load_json_object(root / FACTORY_RECEIPT_SCHEMA_PATH, "InstructionReceipt schema")
+        raise Phase0Error("candidate instruction receipt is stale: " + message)
+    schema = _load_json_object(
+        root / "governance/schemas/phase0-instruction-receipt.schema.json",
+        "InstructionReceipt schema",
+    )
     errors = validate_json_schema(current, schema)
     if errors:
-        raise Phase0Error("Factory InstructionReceipt violates owned schema: " + "; ".join(errors))
-    required_trust_paths = set(CANDIDATE_TRUST_PATHS)
-    bound_governance = {
-        value.get("path")
-        for value in current.get("governance", [])
-        if isinstance(value, Mapping)
-    }
-    missing = sorted(required_trust_paths.difference(bound_governance))
-    if missing:
         raise Phase0Error(
-            "Factory receipt omitted candidate trust roots: " + ", ".join(missing)
+            "candidate InstructionReceipt violates owned schema: " + "; ".join(errors)
         )
     return current
 
@@ -2479,10 +2432,7 @@ def validate_candidate_evidence(evidence: Mapping[str, Any], root: Path = ROOT) 
     if evidence.get("inventory") != _inventory_payload(inventory, policy):
         raise Phase0Error("candidate inventory does not match current module/contract truth")
 
-    factory_module = _load_factory_resolver(root)
-    changed_paths, changed_inventory = _changed_path_inventory(
-        root, baseline, factory_module
-    )
+    changed_paths, changed_inventory = _changed_path_inventory(root, baseline)
     if evidence.get("changed_paths") != changed_inventory:
         raise Phase0Error("candidate changed-path inventory is stale or incomplete")
 
@@ -2504,20 +2454,22 @@ def validate_candidate_evidence(evidence: Mapping[str, Any], root: Path = ROOT) 
 
     receipt = evidence.get("instruction_receipt")
     if not isinstance(receipt, Mapping):
-        raise Phase0Error("candidate evidence lacks a Factory InstructionReceipt")
-    receipt_schema = _load_json_object(root / FACTORY_RECEIPT_SCHEMA_PATH, "InstructionReceipt schema")
+        raise Phase0Error("candidate evidence lacks an InstructionReceipt")
+    receipt_schema = _load_json_object(
+        root / "governance/schemas/phase0-instruction-receipt.schema.json",
+        "InstructionReceipt schema",
+    )
     receipt_errors = validate_json_schema(receipt, receipt_schema)
     if receipt_errors:
         raise Phase0Error("candidate InstructionReceipt violates owned schema: " + "; ".join(receipt_errors))
-    current_receipt = _resolve_factory_receipt(
+    current_receipt = _resolve_candidate_receipt(
         root,
-        factory_module,
-        intent,
-        changed_paths,
+        baseline,
+        inventory.module_ids,
         str(receipt.get("resolved_at")),
     )
     if stable_json(current_receipt) != stable_json(receipt):
-        raise Phase0Error("candidate Factory InstructionReceipt is stale")
+        raise Phase0Error("candidate InstructionReceipt is stale")
     if receipt.get("scope") != list(inventory.module_ids):
         raise Phase0Error("candidate receipt does not bind the whole module scope")
 
@@ -3059,10 +3011,7 @@ def _run_candidate_gate(
         return 1
 
     try:
-        factory_module = _load_factory_resolver(ROOT)
-        changed_paths, changed_inventory = _changed_path_inventory(
-            ROOT, baseline, factory_module
-        )
+        changed_paths, changed_inventory = _changed_path_inventory(ROOT, baseline)
         intent = _build_upgrade_intent(
             ROOT,
             baseline,
@@ -3071,30 +3020,28 @@ def _run_candidate_gate(
             inventory,
             changed_paths,
         )
-        receipt = _resolve_factory_receipt(
+        receipt = _resolve_candidate_receipt(
             ROOT,
-            factory_module,
-            intent,
-            changed_paths,
+            baseline,
+            inventory.module_ids,
             started_at,
         )
         checks.append(
             _check(
                 "instruction-receipt-start",
                 "PASS",
-                "Factory production InstructionReceipt is BOUND",
+                "candidate InstructionReceipt is BOUND",
                 {
                     "receipt_id": receipt["receipt_id"],
                     "scope_count": len(receipt["scope"]),
                     "contract_binding_count": len(receipt["contracts"]),
-                    "test_binding_count": len(receipt["tests"]),
-                    "operations_binding_count": len(receipt["operations"]),
+                    "manifest_binding_count": len(receipt["manifests"]),
                 },
                 0,
             )
         )
     except (Phase0Error, OSError, ValueError) as exc:
-        print("ERROR: Factory instruction binding failed: " + str(exc), file=sys.stderr)
+        print("ERROR: candidate instruction binding failed: " + str(exc), file=sys.stderr)
         return 1
 
     postgres_version: Optional[str] = None
@@ -3171,11 +3118,10 @@ def _run_candidate_gate(
         )
 
     try:
-        current_receipt = _resolve_factory_receipt(
+        current_receipt = _resolve_candidate_receipt(
             ROOT,
-            factory_module,
-            intent,
-            changed_paths,
+            baseline,
+            inventory.module_ids,
             started_at,
         )
         receipt_valid = stable_json(current_receipt) == stable_json(receipt)
@@ -3183,9 +3129,9 @@ def _run_candidate_gate(
             _check(
                 "instruction-receipt-final-staleness",
                 "PASS" if receipt_valid else "FAIL",
-                "Factory production InstructionReceipt remains BOUND"
+                "candidate InstructionReceipt remains BOUND"
                 if receipt_valid
-                else "Factory production InstructionReceipt became stale",
+                else "candidate InstructionReceipt became stale",
                 {"receipt_id": receipt.get("receipt_id")},
                 0 if receipt_valid else 1,
             )

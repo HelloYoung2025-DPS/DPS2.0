@@ -2,6 +2,16 @@
 
 ## [Unreleased] - 2026-07-17
 
+### R0-D factory module retirement
+
+#### Removed
+
+- 删除 `factory-artifact-builder`、`factory-control-plane-host`、`factory-evidence-ledger`、`factory-impact-analyzer`、`factory-instruction-resolver`、`factory-merge-controller`、`factory-release-controller`、`factory-rollback-controller`、`factory-trusted-runner`、`factory-upgrade-intake` 与 `factory-worktree-manager` 十一个模块目录，并从 catalog、Manifest 快照、DAG、compatibility、候选测试策略、CODEOWNERS、CI、README 与 operations 中移除其专属权威引用；保留模块登记收敛为 23 个。
+
+#### Changed
+
+- instruction receipt 解析与候选变更影响计算继续由唯一 Phase 0 gate 提供；候选 Release BOM 校验器、外部 signer 合同、Control Plane active release binding、activation/revocation/rollback 与精确重投恢复能力保留在已迁入的普通工具和保留模块中。静态 CI 在唯一 required job 内新增 fail-closed `module-impact` 步骤，并支持 GitHub `merge_group` 事件。
+
 ### R0-C Release BOM authority migration
 
 #### Changed
