@@ -67,21 +67,47 @@ jobs:
         run: |
           set -euo pipefail
           export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+          materialize_stage=0
+          materialize_step() {
+            materialize_stage="$1"
+            printf 'MATERIALIZE_STAGE=%03d\n' "$materialize_stage"
+          }
+          on_materialize_err() {
+            materialize_status=$?
+            trap - ERR
+            printf 'MATERIALIZE_FAIL stage=%03d rc=%d\n' \
+              "$materialize_stage" "$materialize_status" >&2
+            exit "$materialize_status"
+          }
+          trap on_materialize_err ERR
+          materialize_step 101
           test -n "${DPS_LEGACY_BASELINE_ANCHOR_B64:-}"
+          materialize_step 102
           anchor_staging="$(/usr/bin/mktemp "$RUNNER_TEMP/dps-legacy-anchor.XXXXXX")"
+          materialize_step 103
           wrapper_staging="$(/usr/bin/mktemp "$RUNNER_TEMP/dps-phase0-shell.XXXXXX")"
+          materialize_step 104
           trap '/usr/bin/rm -f "$anchor_staging" "$wrapper_staging"' EXIT
+          materialize_step 105
           if ! printf '%s' "$DPS_LEGACY_BASELINE_ANCHOR_B64" | /usr/bin/base64 --decode > "$anchor_staging"; then
-            exit 1
+            /usr/bin/false
           fi
+          materialize_step 106
           anchor_sha256="$(/usr/bin/sha256sum "$anchor_staging" | /usr/bin/awk '{print $1}')"
+          materialize_step 107
           test "$anchor_sha256" = "1b2d69e8ca5bdbd5a790dfd55d42704d710104faf3888bdb206462f6449c69fb"
+          materialize_step 108
           if /usr/bin/id -u dps-phase0 >/dev/null 2>&1; then
-            exit 1
+            materialize_step 109
+            /usr/bin/false
           fi
+          materialize_step 110
           /usr/bin/sudo /usr/sbin/useradd --system --create-home --shell /usr/sbin/nologin dps-phase0
+          materialize_step 111
           /usr/bin/sudo /usr/bin/install -d -o root -g root -m 0555 /opt/dps-protected
+          materialize_step 112
           /usr/bin/sudo /usr/bin/install -o root -g root -m 0444 "$anchor_staging" /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json
+          materialize_step 113
           /usr/bin/cat <<'DPS_PHASE0_WRAPPER' > "$wrapper_staging"
           #!/bin/bash
           set -euo pipefail
@@ -151,52 +177,91 @@ jobs:
           /usr/bin/sudo /usr/bin/rm -f "$protected_script"
           exit "$status"
           DPS_PHASE0_WRAPPER
+          materialize_step 114
           /usr/bin/sudo /usr/bin/install -o root -g root -m 0555 "$wrapper_staging" /opt/dps-protected/dps-phase0-shell
+          materialize_step 115
           /usr/bin/rm -f "$anchor_staging" "$wrapper_staging"
+          materialize_step 116
           trap - EXIT
+          materialize_step 117
           test "$(/usr/bin/stat -c '%U:%G:%a' /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json)" = "root:root:444"
+          materialize_step 118
           test "$(/usr/bin/stat -c '%U:%G:%a' /opt/dps-protected/dps-phase0-shell)" = "root:root:555"
+          materialize_step 119
           /usr/bin/sudo --user=dps-phase0 /usr/bin/test -r /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json
+          materialize_step 120
           /usr/bin/sudo --user=dps-phase0 /usr/bin/test ! -w /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json
+          materialize_step 121
           /usr/bin/sudo --user=dps-phase0 /usr/bin/test ! -w /opt/dps-protected
+          materialize_step 122
           if /usr/bin/sudo --user=dps-phase0 /usr/bin/sudo --non-interactive /usr/bin/true >/dev/null 2>&1; then
-            exit 1
+            materialize_step 123
+            /usr/bin/false
           fi
+          materialize_step 124
           if /usr/bin/git config --local --get-regexp '^http\..*\.extraheader$' >/dev/null 2>&1; then
-            exit 1
+            materialize_step 125
+            /usr/bin/false
           fi
+          materialize_step 126
           /usr/bin/test -x /usr/bin/setfacl
+          materialize_step 127
           /usr/bin/test -x /usr/bin/getfacl
+          materialize_step 201
           workspace_real="$(/usr/bin/realpath -e -- "$GITHUB_WORKSPACE")"
+          materialize_step 202
           test "$workspace_real" = "$GITHUB_WORKSPACE"
+          materialize_step 203
           case "$workspace_real" in
             /home/runner/work/*/*) ;;
-            *) exit 1 ;;
+            *)
+              materialize_step 204
+              /usr/bin/false
+              ;;
           esac
           workspace_relative="${workspace_real#/home/runner/work/}"
+          materialize_step 205
           [[ "$workspace_relative" == */* ]]
+          materialize_step 206
           [[ "${workspace_relative#*/}" != */* ]]
+          materialize_step 207
           workspace_parent="$(/usr/bin/dirname -- "$workspace_real")"
+          materialize_step 208
           test "$workspace_parent" = "/home/runner/work/${workspace_relative%%/*}"
+          materialize_step 209
           [[ "${DPS_EXPECTED_HEAD_COMMIT:?}" =~ ^[0-9a-f]{40}$ ]]
+          materialize_step 210
           checkout_head="$(/usr/bin/git -C "$workspace_real" rev-parse HEAD^{commit})"
+          materialize_step 211
           test "$checkout_head" = "$DPS_EXPECTED_HEAD_COMMIT"
           reports_dir="$workspace_real/Reports"
           evidence_dir="$reports_dir/ci"
           if [[ -e "$reports_dir" || -L "$reports_dir" ]]; then
+            materialize_step 213
             test -d "$reports_dir"
+            materialize_step 214
             test ! -L "$reports_dir"
+            materialize_step 215
             test "$(/usr/bin/realpath -e -- "$reports_dir")" = "$reports_dir"
+            materialize_step 216
             test "$(/usr/bin/stat -c '%U:%G:%a' "$reports_dir")" = "root:root:755"
           else
+            materialize_step 217
             /usr/bin/sudo /usr/bin/install -d -o root -g root -m 0755 "$reports_dir"
           fi
+          materialize_step 218
           test ! -e "$evidence_dir"
+          materialize_step 219
           test ! -L "$evidence_dir"
+          materialize_step 220
           runner_gid="$(/usr/bin/id -g)"
+          materialize_step 221
           /usr/bin/sudo /usr/bin/install -d -o dps-phase0 -g "$runner_gid" -m 0750 "$evidence_dir"
+          materialize_step 222
           evidence_real="$(/usr/bin/realpath -e -- "$evidence_dir")"
+          materialize_step 223
           test "$evidence_real" = "$evidence_dir"
+          materialize_step 224
           dps_uid="$(/usr/bin/id -u dps-phase0)"
           acl_directories=(
             /home
@@ -206,55 +271,93 @@ jobs:
             "$workspace_real"
             "$reports_dir"
           )
+          acl_index=0
           for directory in "${acl_directories[@]}"; do
+            acl_stage_base=$((700 + acl_index * 20))
+            materialize_step $((acl_stage_base + 1))
             test -d "$directory"
+            materialize_step $((acl_stage_base + 2))
             test ! -L "$directory"
+            materialize_step $((acl_stage_base + 3))
             test "$(/usr/bin/realpath -e -- "$directory")" = "$directory"
+            materialize_step $((acl_stage_base + 4))
             acl_before="$(/usr/bin/sudo /usr/bin/getfacl --absolute-names --numeric --omit-header -- "$directory")"
+            materialize_step $((acl_stage_base + 5))
             if printf '%s\n' "$acl_before" | /usr/bin/grep -Eq "^default:"; then
-              exit 1
+              materialize_step $((acl_stage_base + 6))
+              /usr/bin/false
             fi
+            materialize_step $((acl_stage_base + 7))
             /usr/bin/sudo /usr/bin/setfacl --modify 'u:dps-phase0:r-x' -- "$directory"
+            materialize_step $((acl_stage_base + 8))
             acl_after="$(/usr/bin/sudo /usr/bin/getfacl --absolute-names --numeric --omit-header -- "$directory")"
+            materialize_step $((acl_stage_base + 9))
             printf '%s\n' "$acl_after" | /usr/bin/grep -Fx "user:${dps_uid}:r-x" >/dev/null
+            materialize_step $((acl_stage_base + 10))
             test "$(printf '%s\n' "$acl_after" | /usr/bin/grep -Fxc "user:${dps_uid}:r-x")" = "1"
+            materialize_step $((acl_stage_base + 11))
             if printf '%s\n' "$acl_after" | /usr/bin/grep -Eq "^default:"; then
-              exit 1
+              materialize_step $((acl_stage_base + 12))
+              /usr/bin/false
             fi
+            materialize_step $((acl_stage_base + 13))
             /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -r "$directory"
+            materialize_step $((acl_stage_base + 14))
             /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -x "$directory"
+            materialize_step $((acl_stage_base + 15))
             /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$directory"
+            acl_index=$((acl_index + 1))
           done
+          materialize_step 900
           evidence_acl="$(/usr/bin/sudo /usr/bin/getfacl --absolute-names --numeric --omit-header -- "$evidence_real")"
+          materialize_step 901
           if printf '%s\n' "$evidence_acl" | /usr/bin/grep -Eq "^(default:|user:${dps_uid}:)"; then
-            exit 1
+            materialize_step 902
+            /usr/bin/false
           fi
+          materialize_step 903
           test "$(/usr/bin/stat -c '%u:%g:%a' "$evidence_real")" = "${dps_uid}:${runner_gid}:750"
+          materialize_step 904
           /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -r "$evidence_real"
+          materialize_step 905
           /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -x "$evidence_real"
+          materialize_step 906
           /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -w "$evidence_real"
+          materialize_step 907
           /usr/bin/test -r "$evidence_real"
+          materialize_step 908
           /usr/bin/test -x "$evidence_real"
+          materialize_step 909
           /usr/bin/test ! -w "$evidence_real"
+          materialize_step 910
           /usr/bin/sudo /usr/bin/git config --system --add safe.directory "$GITHUB_WORKSPACE"
+          materialize_step 911
           dps_home="$(/usr/bin/getent passwd dps-phase0 | /usr/bin/cut -d: -f6)"
+          materialize_step 912
           test -n "$dps_home"
+          materialize_step 913
           restricted_checkout_head="$(
             /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
               HOME="$dps_home" \
               PATH=/usr/bin:/bin \
               /usr/bin/git -C "$workspace_real" rev-parse HEAD^{commit}
           )"
+          materialize_step 914
           test "$restricted_checkout_head" = "$checkout_head"
+          materialize_step 915
           test "$restricted_checkout_head" = "$DPS_EXPECTED_HEAD_COMMIT"
+          materialize_step 916
           gate_source_sha256="$(/usr/bin/sha256sum "$workspace_real/Tools/ci/run_phase0_gate.py" | /usr/bin/awk '{print $1}')"
+          materialize_step 917
           restricted_gate_source_sha256="$(
             /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
               PATH=/usr/bin:/bin \
               /usr/bin/sha256sum "$workspace_real/Tools/ci/run_phase0_gate.py" |
               /usr/bin/awk '{print $1}'
           )"
+          materialize_step 918
           test "$restricted_gate_source_sha256" = "$gate_source_sha256"
+          materialize_step 919
           /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
             HOME="$dps_home" \
             PATH=/usr/bin:/bin \
@@ -262,6 +365,7 @@ jobs:
             "$workspace_real/.venv/bin/python" -I -c \
             'import platform; assert platform.python_version() == "3.12.13"'
           expected_chain=("${acl_directories[@]}" "$evidence_real")
+          materialize_step 921
           /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
             HOME="$dps_home" \
             PATH=/usr/bin:/bin \
@@ -289,13 +393,21 @@ jobs:
           if observed != expected:
               raise SystemExit("unexpected evidence ancestor chain")
           ' "$evidence_real" "${expected_chain[@]}"
+          materialize_step 922
           if /usr/bin/sudo --user=dps-phase0 /usr/bin/sudo --non-interactive /usr/bin/true >/dev/null 2>&1; then
-            exit 1
+            materialize_step 923
+            /usr/bin/false
           fi
+          materialize_step 924
           /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$workspace_real"
+          materialize_step 925
           /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$workspace_real/.git"
+          materialize_step 926
           /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$workspace_real/.venv"
+          materialize_step 927
           /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$workspace_real/Tools/ci/run_phase0_gate.py"
+          materialize_step 928
+          trap - ERR
 
       - name: Run the unique Phase 0 gate
         shell: /opt/dps-protected/dps-phase0-shell {0}
