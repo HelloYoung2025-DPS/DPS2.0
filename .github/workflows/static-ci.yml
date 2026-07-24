@@ -283,10 +283,9 @@ jobs:
             materialize_step $((acl_stage_base + 4))
             acl_before="$(/usr/bin/sudo /usr/bin/getfacl --absolute-names --numeric --omit-header -- "$directory")"
             materialize_step $((acl_stage_base + 5))
-            if printf '%s\n' "$acl_before" | /usr/bin/grep -Eq "^default:"; then
-              materialize_step $((acl_stage_base + 6))
-              /usr/bin/false
-            fi
+            default_acl_before="$(
+              printf '%s\n' "$acl_before" | /usr/bin/awk '/^default:/'
+            )"
             materialize_step $((acl_stage_base + 7))
             /usr/bin/sudo /usr/bin/setfacl --modify 'u:dps-phase0:r-x' -- "$directory"
             materialize_step $((acl_stage_base + 8))
@@ -296,10 +295,11 @@ jobs:
             materialize_step $((acl_stage_base + 10))
             test "$(printf '%s\n' "$acl_after" | /usr/bin/grep -Fxc "user:${dps_uid}:r-x")" = "1"
             materialize_step $((acl_stage_base + 11))
-            if printf '%s\n' "$acl_after" | /usr/bin/grep -Eq "^default:"; then
-              materialize_step $((acl_stage_base + 12))
-              /usr/bin/false
-            fi
+            default_acl_after="$(
+              printf '%s\n' "$acl_after" | /usr/bin/awk '/^default:/'
+            )"
+            materialize_step $((acl_stage_base + 12))
+            test "$default_acl_after" = "$default_acl_before"
             materialize_step $((acl_stage_base + 13))
             /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -r "$directory"
             materialize_step $((acl_stage_base + 14))
