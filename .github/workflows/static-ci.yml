@@ -22,6 +22,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
 
       - name: Set up pinned Python
         uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
@@ -160,8 +161,65 @@ jobs:
           if /usr/bin/sudo --user=dps-phase0 /usr/bin/sudo --non-interactive /usr/bin/true >/dev/null 2>&1; then
             exit 1
           fi
+          if /usr/bin/git config --local --get-regexp '^http\..*\.extraheader$' >/dev/null 2>&1; then
+            exit 1
+          fi
+          /usr/bin/test -x /usr/bin/setfacl
+          workspace_real="$(/usr/bin/realpath -e -- "$GITHUB_WORKSPACE")"
+          workspace_ancestor="$workspace_real"
+          while [[ "$workspace_ancestor" != "/" ]]; do
+            /usr/bin/sudo /usr/bin/setfacl --modify 'u:dps-phase0:--x' "$workspace_ancestor"
+            workspace_ancestor="$(/usr/bin/dirname -- "$workspace_ancestor")"
+          done
+          /usr/bin/sudo /usr/bin/setfacl --physical --recursive --modify 'u:dps-phase0:r-X' "$workspace_real"
           /usr/bin/sudo /usr/bin/git config --system --add safe.directory "$GITHUB_WORKSPACE"
+          dps_home="$(/usr/bin/getent passwd dps-phase0 | /usr/bin/cut -d: -f6)"
+          test -n "$dps_home"
+          checkout_head="$(/usr/bin/git -C "$workspace_real" rev-parse HEAD^{commit})"
+          restricted_checkout_head="$(
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
+              HOME="$dps_home" \
+              PATH=/usr/bin:/bin \
+              /usr/bin/git -C "$workspace_real" rev-parse HEAD^{commit}
+          )"
+          test "$restricted_checkout_head" = "$checkout_head"
+          gate_source_sha256="$(/usr/bin/sha256sum "$workspace_real/Tools/ci/run_phase0_gate.py" | /usr/bin/awk '{print $1}')"
+          restricted_gate_source_sha256="$(
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
+              PATH=/usr/bin:/bin \
+              /usr/bin/sha256sum "$workspace_real/Tools/ci/run_phase0_gate.py" |
+              /usr/bin/awk '{print $1}'
+          )"
+          test "$restricted_gate_source_sha256" = "$gate_source_sha256"
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
+            HOME="$dps_home" \
+            PATH=/usr/bin:/bin \
+            PYTHONDONTWRITEBYTECODE=1 \
+            "$workspace_real/.venv/bin/python" -I -c \
+            'import platform; assert platform.python_version() == "3.12.13"'
+          unreadable_path="$(
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
+              PATH=/usr/bin:/bin \
+              /usr/bin/find "$workspace_real" -xdev \
+              \( -type d \( ! -readable -o ! -executable \) -o -type f ! -readable \) \
+              -print -quit
+          )"
+          test -z "$unreadable_path"
+          writable_path="$(
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
+              PATH=/usr/bin:/bin \
+              /usr/bin/find "$workspace_real" -xdev \
+              \( -type d -o -type f \) -writable -print -quit
+          )"
+          test -z "$writable_path"
           /usr/bin/sudo /usr/bin/install -d -o dps-phase0 -g dps-phase0 -m 0700 "$GITHUB_WORKSPACE/Reports/ci"
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -r "$GITHUB_WORKSPACE/Reports/ci"
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -x "$GITHUB_WORKSPACE/Reports/ci"
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -w "$GITHUB_WORKSPACE/Reports/ci"
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$workspace_real"
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$workspace_real/.git"
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$workspace_real/.venv"
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$workspace_real/Tools/ci/run_phase0_gate.py"
 
       - name: Run the unique Phase 0 gate
         shell: /opt/dps-protected/dps-phase0-shell {0}
