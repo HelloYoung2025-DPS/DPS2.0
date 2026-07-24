@@ -232,6 +232,9 @@ ALLOWED_RUNTIME_ENVIRONMENT = (
     "DPS_TEST_PLATFORM_AUTHORITY_PKCS8_FILE",
     "DPS_PSQL",
 )
+PHASE0_PREREQUISITE_RUNTIME_ENVIRONMENT = (
+    "DPS_LEGACY_BASELINE_ANCHOR",
+)
 POSTGRES_CONNECTION_ENVIRONMENT = (
     "DPS_TEST_POSTGRES",
     "DPS_TEST_POSTGRES_ADMIN_URI",
@@ -2097,6 +2100,17 @@ def _phase0_companion_evidence_path(
     return _safe_evidence_path(root, companion, allow_reserved_companion=True)
 
 
+def _phase0_prerequisite_runtime_environment(
+    ambient: Optional[Mapping[str, str]] = None,
+) -> Dict[str, str]:
+    source = os.environ if ambient is None else ambient
+    return {
+        key: source[key]
+        for key in PHASE0_PREREQUISITE_RUNTIME_ENVIRONMENT
+        if source.get(key)
+    }
+
+
 def _phase0_prerequisite(
     root: Path,
     candidate_evidence_path: Path,
@@ -2121,7 +2135,11 @@ def _phase0_prerequisite(
     ]
     if diagnostic:
         command.append("--diagnostic-workspace")
-    with _trusted_test_environment_scope({}) as environment:
+    phase0_environment = {}
+    legacy_anchor = runtime_environment.get("DPS_LEGACY_BASELINE_ANCHOR")
+    if legacy_anchor:
+        phase0_environment["DPS_LEGACY_BASELINE_ANCHOR"] = legacy_anchor
+    with _trusted_test_environment_scope(phase0_environment) as environment:
         result = run_command(
             command,
             root,
@@ -3002,7 +3020,7 @@ def _run_candidate_gate(
         head,
         str(start_workspace["digest"]),
         diagnostic_run,
-        runtime_environment,
+        _phase0_prerequisite_runtime_environment(),
         evidence_publication.run_id,
     )
     checks.append(phase0_check)

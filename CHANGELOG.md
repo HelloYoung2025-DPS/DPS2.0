@@ -8,6 +8,12 @@
 
 - 为唯一的 R0-B 历史 base `8f63593d4f262ec1496b05300da75a71b86eaab4`、head `2ce0d14744ea8d25db2e963d4902cb0430b70cc4`、merge commit `8165fedbd44ecb8388c4dfce5e44e8753af21daf` 增加窄化 §4.5 step 1 再基线规则；仅在原 formal raw/publication 字节持久可读可校验、非 OpenAI 独立外审明确批准且 Owner 合入后记为 `REBASELINED`，不把 formal 改称 diagnostic，不改变原始 `39 PASS / 14 FAIL / 0 INFRA_ERROR`，也不外推其他批次或自动改变 T4/M1 裁决。
 
+### R0-B legacy baseline hosted gate
+
+#### Changed
+
+- Hosted Static CI 现在从受保护的 `DPS_LEGACY_BASELINE_ANCHOR_B64` secret 恢复固定 SHA-256 的仓外 legacy baseline anchor，并把 GitHub 生成的唯一 gate 脚本封装成 root-owned 只读输入，再以无 sudo 权限的专用执行身份运行精确 PR head。Phase 0 仅接受受保护 Manifest 现有的精确 `.venv/bin/python -I` 形状，将无参数 `test_*.py` 作为 isolated unittest 执行，并只向 `legacy-runtime-adapter.static` 转发该 trusted-executor ambient 输入；candidate gate 也只通过专用窄 allowlist 将同一 ambient anchor 传给 cumulative Phase 0 prerequisite。缺失、Manifest 自声明、仓内、可写或同身份控制的 anchor 均失败关闭。此接口只建立 hosted required-path 与本批 §4.5 取证的受支持执行链，不改变产品能力或既有 raw gate 状态。
+
 ### R0-D factory module retirement
 
 #### Removed

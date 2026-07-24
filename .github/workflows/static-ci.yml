@@ -21,6 +21,7 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up pinned Python
         uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
@@ -37,9 +38,16 @@ jobs:
         with:
           dotnet-version: "10.0.301"
 
+      - name: Create pinned repository virtual environment
+        run: |
+          set -euo pipefail
+          python -m venv --copies .venv
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+          .venv/bin/python -I -c 'import platform; assert platform.python_version() == "3.12.13"'
+
       - name: Install hash-locked Python gate dependencies
         run: >-
-          python -m pip install
+          .venv/bin/python -m pip install
           --disable-pip-version-check
           --require-hashes
           --requirement requirements-ci.txt
@@ -51,19 +59,134 @@ jobs:
           -p test_module_impact.py
           -v
 
+      - name: Materialize protected legacy baseline anchor
+        env:
+          DPS_LEGACY_BASELINE_ANCHOR_B64: ${{ secrets.DPS_LEGACY_BASELINE_ANCHOR_B64 }}
+        run: |
+          set -euo pipefail
+          export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+          test -n "${DPS_LEGACY_BASELINE_ANCHOR_B64:-}"
+          anchor_staging="$(/usr/bin/mktemp "$RUNNER_TEMP/dps-legacy-anchor.XXXXXX")"
+          wrapper_staging="$(/usr/bin/mktemp "$RUNNER_TEMP/dps-phase0-shell.XXXXXX")"
+          trap '/usr/bin/rm -f "$anchor_staging" "$wrapper_staging"' EXIT
+          if ! printf '%s' "$DPS_LEGACY_BASELINE_ANCHOR_B64" | /usr/bin/base64 --decode > "$anchor_staging"; then
+            exit 1
+          fi
+          anchor_sha256="$(/usr/bin/sha256sum "$anchor_staging" | /usr/bin/awk '{print $1}')"
+          test "$anchor_sha256" = "1b2d69e8ca5bdbd5a790dfd55d42704d710104faf3888bdb206462f6449c69fb"
+          if /usr/bin/id -u dps-phase0 >/dev/null 2>&1; then
+            exit 1
+          fi
+          /usr/bin/sudo /usr/sbin/useradd --system --create-home --shell /usr/sbin/nologin dps-phase0
+          /usr/bin/sudo /usr/bin/install -d -o root -g root -m 0555 /opt/dps-protected
+          /usr/bin/sudo /usr/bin/install -o root -g root -m 0444 "$anchor_staging" /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json
+          /usr/bin/cat <<'DPS_PHASE0_WRAPPER' > "$wrapper_staging"
+          #!/bin/bash
+          set -euo pipefail
+          export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+          if [[ "$#" -ne 1 ]]; then
+            exit 64
+          fi
+          source_script="$1"
+          if [[ -L "$source_script" ]]; then
+            exit 65
+          fi
+          source_real="$(/usr/bin/realpath -e -- "$source_script")"
+          runner_temp_real="$(/usr/bin/realpath -e -- "${RUNNER_TEMP:?}")"
+          case "$source_real" in
+            "$runner_temp_real"/*) ;;
+            *) exit 66 ;;
+          esac
+          test -f "$source_real"
+          test "$(/usr/bin/stat -c '%u' "$source_real")" = "$(/usr/bin/id -u)"
+          source_mode="$(/usr/bin/stat -c '%a' "$source_real")"
+          if (( (8#$source_mode & 022) != 0 )); then
+            exit 67
+          fi
+          workspace_real="$(/usr/bin/realpath -e -- "${GITHUB_WORKSPACE:?}")"
+          test "$(/usr/bin/realpath -e -- "$PWD")" = "$workspace_real"
+          [[ "${DPS_EXPECTED_HEAD_COMMIT:?}" =~ ^[0-9a-f]{40}$ ]]
+          test "$(/usr/bin/git rev-parse HEAD^{commit})" = "$DPS_EXPECTED_HEAD_COMMIT"
+          [[ "${DPS_BASELINE_COMMIT:?}" =~ ^[0-9a-f]{40}$ ]]
+          anchor="/opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json"
+          test "${DPS_LEGACY_BASELINE_ANCHOR:?}" = "$anchor"
+          node_real=""
+          for node_candidate in \
+            /opt/hostedtoolcache/node/24.18.0/x64/bin/node \
+            /opt/hostedtoolcache/node/24.18.0/arm64/bin/node
+          do
+            if [[ -x "$node_candidate" ]]; then
+              node_real="$(/usr/bin/realpath -e -- "$node_candidate")"
+              break
+            fi
+          done
+          test -n "$node_real"
+          protected_script="/opt/dps-protected/github-phase0-step.sh"
+          test ! -e "$protected_script"
+          /usr/bin/sudo /usr/bin/install -o root -g root -m 0444 "$source_real" "$protected_script"
+          test "$(/usr/bin/stat -c '%U:%G:%a' "$protected_script")" = "root:root:444"
+          /usr/bin/cmp --silent "$source_real" "$protected_script"
+          dps_home="$(/usr/bin/getent passwd dps-phase0 | /usr/bin/cut -d: -f6)"
+          test -n "$dps_home"
+          status=0
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
+            HOME="$dps_home" \
+            USER=dps-phase0 \
+            LOGNAME=dps-phase0 \
+            PATH="$workspace_real/.venv/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+            PYTHONDONTWRITEBYTECODE=1 \
+            LANG=C \
+            LC_ALL=C \
+            DPS_BASELINE_COMMIT="$DPS_BASELINE_COMMIT" \
+            DPS_LEGACY_BASELINE_ANCHOR="$anchor" \
+            DPS_NODE="$node_real" \
+            GITHUB_ACTIONS="${GITHUB_ACTIONS:-true}" \
+            RUNNER_OS="${RUNNER_OS:-Linux}" \
+            RUNNER_ARCH="${RUNNER_ARCH:-X64}" \
+            ImageOS="${ImageOS:-}" \
+            ImageVersion="${ImageVersion:-}" \
+            /bin/bash --noprofile --norc -eo pipefail "$protected_script" || status=$?
+          /usr/bin/sudo /usr/bin/rm -f "$protected_script"
+          exit "$status"
+          DPS_PHASE0_WRAPPER
+          /usr/bin/sudo /usr/bin/install -o root -g root -m 0555 "$wrapper_staging" /opt/dps-protected/dps-phase0-shell
+          /usr/bin/rm -f "$anchor_staging" "$wrapper_staging"
+          trap - EXIT
+          test "$(/usr/bin/stat -c '%U:%G:%a' /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json)" = "root:root:444"
+          test "$(/usr/bin/stat -c '%U:%G:%a' /opt/dps-protected/dps-phase0-shell)" = "root:root:555"
+          /usr/bin/sudo --user=dps-phase0 /usr/bin/test -r /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json
+          /usr/bin/sudo --user=dps-phase0 /usr/bin/test ! -w /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json
+          /usr/bin/sudo --user=dps-phase0 /usr/bin/test ! -w /opt/dps-protected
+          if /usr/bin/sudo --user=dps-phase0 /usr/bin/sudo --non-interactive /usr/bin/true >/dev/null 2>&1; then
+            exit 1
+          fi
+          /usr/bin/sudo /usr/bin/git config --system --add safe.directory "$GITHUB_WORKSPACE"
+          /usr/bin/sudo /usr/bin/install -d -o dps-phase0 -g dps-phase0 -m 0700 "$GITHUB_WORKSPACE/Reports/ci"
+
       - name: Run the unique Phase 0 gate
+        shell: /opt/dps-protected/dps-phase0-shell {0}
         env:
           DPS_BASELINE_COMMIT: ${{ github.event.pull_request.base.sha || github.event.before }}
+          DPS_EXPECTED_HEAD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          DPS_LEGACY_BASELINE_ANCHOR: /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json
         run: >-
           python Tools/ci/run_phase0_gate.py
-          --node "$(command -v node)"
+          --node "$DPS_NODE"
           --evidence Reports/ci/phase0-evidence/phase0-evidence.json
+
+      - name: Seal Phase 0 evidence for artifact upload
+        if: always()
+        run: |
+          set -euo pipefail
+          sudo chown -R root:root Reports/ci
+          sudo find Reports/ci -type d -exec chmod 0555 {} +
+          sudo find Reports/ci -type f -exec chmod 0444 {} +
 
       - name: Upload raw Phase 0 evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: dps-phase0-evidence-${{ github.sha }}
+          name: dps-phase0-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             Reports/ci/phase0-evidence/
             Reports/ci/playwright-config.json
