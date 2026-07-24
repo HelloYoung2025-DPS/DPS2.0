@@ -44,6 +44,7 @@ try:
     )
     from run_phase0_gate import (  # noqa: E402
         EvidencePublication,
+        TrustedSuitePlan,
         _default_phase0_evidence_path,
         _load_committed_json_object_with_sha,
         _new_publication_run_id,
@@ -52,6 +53,7 @@ try:
         _safe_phase0_output_path,
         _trusted_dotnet_executable,
         _trusted_node_executable,
+        _trusted_suite_plan_with_ambient_environment,
         _trusted_test_environment,
         _trusted_test_environment_scope,
         evidence_classification,
@@ -1541,6 +1543,39 @@ bash scripts/dotnet-pinned.sh test Modules/alpha/tests/Alpha.Tests.csproj --conf
         self.assertEqual("PASS", check["status"])
         self.assertEqual(1, check["details"]["executed_tests"])
 
+    def test_repository_venv_direct_test_runs_isolated_unittest(self):
+        plan = self.parse(
+            ".venv/bin/python -I Modules/alpha/tests/test_smoke.py",
+            "static",
+        )
+        invocation = plan.invocations[0]
+        self.assertEqual("python-unittest", invocation.kind)
+        self.assertEqual([sys.executable, "-I", "-m", "unittest"], list(invocation.argv[:4]))
+        check = execute_manifest_suite(self.fixture.root, plan)
+        self.assertEqual("PASS", check["status"])
+        self.assertTrue(check["details"]["python_interpreter"]["isolated"])
+
+    def test_repository_venv_requires_isolated_mode(self):
+        with self.assertRaisesRegex(Phase0Error, "must declare isolated mode"):
+            self.parse(
+                ".venv/bin/python Modules/alpha/tests/test_smoke.py",
+                "unit",
+            )
+
+    def test_unknown_repository_venv_interpreter_is_rejected(self):
+        with self.assertRaisesRegex(Phase0Error, "unknown or untrusted"):
+            self.parse(
+                ".venv/bin/python3 -I Modules/alpha/tests/test_smoke.py",
+                "unit",
+            )
+
+    def test_repository_venv_direct_test_rejects_extra_arguments(self):
+        with self.assertRaisesRegex(Phase0Error, "allowed only for static suites"):
+            self.parse(
+                ".venv/bin/python -I Modules/alpha/tests/test_smoke.py --verbose",
+                "unit",
+            )
+
     def test_shell_metacharacter_is_rejected(self):
         with self.assertRaisesRegex(Phase0Error, "metacharacters"):
             self.parse(
@@ -1566,6 +1601,93 @@ bash scripts/dotnet-pinned.sh test Modules/alpha/tests/Alpha.Tests.csproj --conf
                     key
                     + "=untrusted python3 -m unittest discover "
                     + "-s Modules/alpha/tests -p 'test_*.py'"
+                )
+
+    def test_manifest_cannot_declare_legacy_baseline_anchor(self):
+        with self.assertRaisesRegex(
+            Phase0Error,
+            "unknown manifest test environment variable: DPS_LEGACY_BASELINE_ANCHOR",
+        ):
+            self.parse(
+                "DPS_LEGACY_BASELINE_ANCHOR=/tmp/untrusted "
+                "python3 -m unittest discover "
+                "-s Modules/alpha/tests -p 'test_*.py'"
+            )
+
+    def test_legacy_anchor_is_injected_only_for_exact_static_suite(self):
+        ordinary = self.parse(
+            ".venv/bin/python -I Modules/alpha/tests/test_smoke.py",
+            "static",
+        )
+        target = TrustedSuitePlan(
+            module_id="legacy-runtime-adapter",
+            suite_id="legacy-runtime-adapter.static",
+            test_type=ordinary.test_type,
+            evidence_level=ordinary.evidence_level,
+            declared_command=ordinary.declared_command,
+            environment=ordinary.environment,
+            invocations=ordinary.invocations,
+        )
+        anchor = Path("/opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json")
+        with mock.patch(
+            "run_phase0_gate._validated_legacy_anchor_path",
+            return_value=anchor,
+        ) as validator:
+            injected = _trusted_suite_plan_with_ambient_environment(
+                self.fixture.root,
+                target,
+                {"DPS_LEGACY_BASELINE_ANCHOR": str(anchor)},
+            )
+            unchanged = _trusted_suite_plan_with_ambient_environment(
+                self.fixture.root,
+                ordinary,
+                {"DPS_LEGACY_BASELINE_ANCHOR": str(anchor)},
+            )
+        self.assertEqual(str(anchor), injected.environment["DPS_LEGACY_BASELINE_ANCHOR"])
+        self.assertIs(ordinary, unchanged)
+        validator.assert_called_once_with(self.fixture.root, str(anchor))
+
+    def test_missing_writable_and_repository_local_legacy_anchors_fail_closed(self):
+        ordinary = self.parse(
+            ".venv/bin/python -I Modules/alpha/tests/test_smoke.py",
+            "static",
+        )
+        target = TrustedSuitePlan(
+            module_id="legacy-runtime-adapter",
+            suite_id="legacy-runtime-adapter.static",
+            test_type=ordinary.test_type,
+            evidence_level=ordinary.evidence_level,
+            declared_command=ordinary.declared_command,
+            environment=ordinary.environment,
+            invocations=ordinary.invocations,
+        )
+        with self.assertRaisesRegex(Phase0Error, "anchor is missing"):
+            _trusted_suite_plan_with_ambient_environment(
+                self.fixture.root, target, {}
+            )
+        with self.assertRaisesRegex(Phase0Error, "must be absolute"):
+            _trusted_suite_plan_with_ambient_environment(
+                self.fixture.root,
+                target,
+                {"DPS_LEGACY_BASELINE_ANCHOR": "relative-anchor.json"},
+            )
+        repository_anchor = self.fixture.root.resolve() / "anchor.json"
+        repository_anchor.write_text("{}\n", encoding="utf-8")
+        repository_anchor.chmod(0o444)
+        with self.assertRaisesRegex(Phase0Error, "outside the repository"):
+            _trusted_suite_plan_with_ambient_environment(
+                self.fixture.root,
+                target,
+                {"DPS_LEGACY_BASELINE_ANCHOR": str(repository_anchor)},
+            )
+        with tempfile.TemporaryDirectory(prefix="dps-writable-anchor-") as temporary:
+            writable_anchor = Path(temporary).resolve() / "anchor.json"
+            writable_anchor.write_text("{}\n", encoding="utf-8")
+            with self.assertRaisesRegex(Phase0Error, "must be read-only"):
+                _trusted_suite_plan_with_ambient_environment(
+                    self.fixture.root,
+                    target,
+                    {"DPS_LEGACY_BASELINE_ANCHOR": str(writable_anchor)},
                 )
 
     def test_unknown_executable_is_rejected(self):
@@ -2498,6 +2620,44 @@ jobs:
         )
         self.assertIn(
             "            Reports/ci/phase0-evidence/\n", workflow
+        )
+
+    def test_repository_workflow_builds_venv_and_external_anchor_boundary(self):
+        workflow = (ROOT / ".github/workflows/static-ci.yml").read_text(
+            encoding="utf-8"
+        )
+        steps, runners = phase0_module._load_workflow_steps(workflow)
+        self.assertEqual(["ubuntu-24.04"], runners)
+        by_name = {str(step.get("name", "")): step for step in steps}
+        venv_step = by_name["Create pinned repository virtual environment"]
+        self.assertIn("python -m venv --copies .venv", str(venv_step["run"]))
+        self.assertIn(
+            'echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"',
+            str(venv_step["run"]),
+        )
+        anchor_step = by_name["Materialize protected legacy baseline anchor"]
+        self.assertEqual(
+            "${{ secrets.DPS_LEGACY_BASELINE_ANCHOR_B64 }}",
+            anchor_step["env"]["DPS_LEGACY_BASELINE_ANCHOR_B64"],
+        )
+        anchor_run = str(anchor_step["run"])
+        self.assertIn(
+            "1b2d69e8ca5bdbd5a790dfd55d42704d710104faf3888bdb206462f6449c69fb",
+            anchor_run,
+        )
+        self.assertIn("root -g root -m 0444", anchor_run)
+        self.assertIn("useradd --system", anchor_run)
+        self.assertIn("sudo -n true", anchor_run)
+        gate_step = by_name["Run the unique Phase 0 gate"]
+        self.assertIn("--user=dps-phase0", str(gate_step["shell"]))
+        self.assertEqual(
+            "/opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json",
+            gate_step["env"]["DPS_LEGACY_BASELINE_ANCHOR"],
+        )
+        self.assertTrue(
+            str(gate_step["run"]).lstrip().startswith(
+                "python Tools/ci/run_phase0_gate.py"
+            )
         )
 
     def test_workflow_missing_complete_evidence_directory_is_rejected(self):

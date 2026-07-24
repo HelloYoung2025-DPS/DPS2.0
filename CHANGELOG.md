@@ -2,6 +2,12 @@
 
 ## [Unreleased] - 2026-07-17
 
+### R0-B legacy baseline hosted gate
+
+#### Changed
+
+- Hosted Static CI 现在从受保护的 `DPS_LEGACY_BASELINE_ANCHOR_B64` secret 恢复固定 SHA-256 的仓外 legacy baseline anchor，并以无 sudo 权限的专用执行身份向唯一 Phase 0 gate 注入绝对只读路径。Phase 0 仅接受受保护 Manifest 现有的精确 `.venv/bin/python -I` 形状，将无参数 `test_*.py` 作为 isolated unittest 执行，并只向 `legacy-runtime-adapter.static` 转发该 trusted-executor ambient 输入；缺失、Manifest 自声明、仓内、可写或同身份控制的 anchor 均失败关闭。此接口只建立 hosted required-path 的受支持执行链，不改变产品能力或既有 raw gate 状态。
+
 ### R0-D factory module retirement
 
 #### Removed

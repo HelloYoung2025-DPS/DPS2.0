@@ -37,9 +37,16 @@ jobs:
         with:
           dotnet-version: "10.0.301"
 
+      - name: Create pinned repository virtual environment
+        run: |
+          set -euo pipefail
+          python -m venv --copies .venv
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+          .venv/bin/python -I -c 'import platform; assert platform.python_version() == "3.12.13"'
+
       - name: Install hash-locked Python gate dependencies
         run: >-
-          python -m pip install
+          .venv/bin/python -m pip install
           --disable-pip-version-check
           --require-hashes
           --requirement requirements-ci.txt
@@ -51,9 +58,43 @@ jobs:
           -p test_module_impact.py
           -v
 
+      - name: Materialize protected legacy baseline anchor
+        env:
+          DPS_LEGACY_BASELINE_ANCHOR_B64: ${{ secrets.DPS_LEGACY_BASELINE_ANCHOR_B64 }}
+        run: |
+          set -euo pipefail
+          test -n "${DPS_LEGACY_BASELINE_ANCHOR_B64:-}"
+          anchor_staging="$(mktemp "$RUNNER_TEMP/dps-legacy-anchor.XXXXXX")"
+          trap 'rm -f "$anchor_staging"' EXIT
+          if ! printf '%s' "$DPS_LEGACY_BASELINE_ANCHOR_B64" | base64 --decode > "$anchor_staging"; then
+            exit 1
+          fi
+          anchor_sha256="$(sha256sum "$anchor_staging" | awk '{print $1}')"
+          test "$anchor_sha256" = "1b2d69e8ca5bdbd5a790dfd55d42704d710104faf3888bdb206462f6449c69fb"
+          .venv/bin/python -I -m json.tool "$anchor_staging" >/dev/null
+          if id -u dps-phase0 >/dev/null 2>&1; then
+            exit 1
+          fi
+          sudo useradd --system --create-home --shell /usr/sbin/nologin dps-phase0
+          sudo install -d -o root -g root -m 0555 /opt/dps-protected
+          sudo install -o root -g root -m 0444 "$anchor_staging" /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json
+          rm -f "$anchor_staging"
+          trap - EXIT
+          test "$(stat -c '%U:%G:%a' /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json)" = "root:root:444"
+          sudo -u dps-phase0 test -r /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json
+          sudo -u dps-phase0 test ! -w /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json
+          sudo -u dps-phase0 test ! -w /opt/dps-protected
+          if sudo -u dps-phase0 sudo -n true >/dev/null 2>&1; then
+            exit 1
+          fi
+          sudo git config --system --add safe.directory "$GITHUB_WORKSPACE"
+          sudo install -d -o dps-phase0 -g dps-phase0 -m 0700 "$GITHUB_WORKSPACE/Reports/ci"
+
       - name: Run the unique Phase 0 gate
+        shell: sudo --non-interactive --preserve-env=PATH,DPS_BASELINE_COMMIT,DPS_LEGACY_BASELINE_ANCHOR --user=dps-phase0 bash --noprofile --norc -eo pipefail {0}
         env:
           DPS_BASELINE_COMMIT: ${{ github.event.pull_request.base.sha || github.event.before }}
+          DPS_LEGACY_BASELINE_ANCHOR: /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json
         run: >-
           python Tools/ci/run_phase0_gate.py
           --node "$(command -v node)"
