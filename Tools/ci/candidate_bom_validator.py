@@ -4,14 +4,10 @@ The module intentionally exposes no command execution surface.  It verifies
 fixed JSON shapes, repository Git objects, immutable bundle bytes, RSA-PSS
 signatures, independent evidence, risk approval, and the previous stable BOM.
 
-R0-C (RebuildPlan 4.3) migrated this validator here from
-Modules/factory-release-controller/src/ -- candidate validation is ordinary
-gate code and must survive that module's R0-D deletion.  It validates only:
-no signing, no deployment, no runtime state.  This copy is the one
-scripts/release.sh invokes and the one the Phase 0 CI-integrity allowlist
-pins; its code-bound trust policy lives under governance/policies/.  The
-module-side original matches this copy after exactly the three declared
-migration edits until R0-D removes it.
+R0-C (RebuildPlan 4.3) migrated this validator into ordinary gate code.  It
+validates only: no signing, no deployment, no runtime state.  This copy is the
+one scripts/release.sh invokes and the one the Phase 0 CI-integrity allowlist
+pins; its code-bound trust policy lives under governance/policies/.
 
 The owner provisioned the native-stop-trust signer out-of-repo on
 2026-07-21: the deployed trust policy now carries the
@@ -209,6 +205,12 @@ _DEPLOYED_TRUST_POLICY_RELATIVE = (
 _DEPLOYED_TRUST_POLICY_SHA256 = "e30c17a21db42d88861bfb4eeb33372e383067f07f804b7327dfa461b055121b"
 _DEPLOYED_TRUST_POLICY_ID = "dps-deployed-release-anchor-v1"
 _DEFAULT_MINIMUM_REMAINING_LIFETIME_SECONDS = 24 * 60 * 60
+_CURRENT_ROUTE_PRODUCER_MODULE = "windows-edge-supervisor"
+_HISTORICAL_ROUTE_PRODUCER_MODULE = "factory-release-controller"
+_CURRENT_DESCRIPTOR_PRODUCER_MODULE = "external-artifact-builder"
+_HISTORICAL_DESCRIPTOR_PRODUCER_MODULE = "factory-artifact-builder"
+_CURRENT_BUILDER_ID = "dps:external-artifact-builder:1.0.0"
+_HISTORICAL_BUILDER_ID = "dps:factory-artifact-builder:0.1.0"
 
 
 class CandidateBomError(RuntimeError):
@@ -738,6 +740,26 @@ def build_native_stop_trust_receipt_payload(
         challenge_authorities, (str, bytes, bytearray)
     ):
         raise CandidateBomError("native stop challenge authorities are required for the trust receipt")
+    route_producers = []
+    for authority in route_authorities:
+        if not isinstance(authority, Mapping):
+            raise CandidateBomError(
+                "device route authority must be one JSON object"
+            )
+        producer_module = authority.get("producer_module")
+        if (
+            not isinstance(producer_module, str)
+            or not _MODULE.fullmatch(producer_module)
+        ):
+            raise CandidateBomError(
+                "device route authority producer_module is invalid"
+            )
+        route_producers.append(producer_module)
+    if not route_producers or len(set(route_producers)) != 1:
+        raise CandidateBomError(
+            "device route authorities must have one producer_module"
+        )
+    receipt_producer_module = route_producers[0]
     native_digest = _canonical_authorities_hash(authorities)
     route_digest = _canonical_route_authorities_hash(route_authorities)
     challenge_digest = _canonical_challenge_authorities_hash(challenge_authorities)
@@ -750,7 +772,7 @@ def build_native_stop_trust_receipt_payload(
     payload = {
         "schema_version": "1.0.0",
         "contract_id": "release.bom.native.stop.authority.trust/v1",
-        "producer_module": "factory-release-controller",
+        "producer_module": receipt_producer_module,
         "soul_id": None,
         "device_binding_id": None,
         "platform_account_id": None,
@@ -1531,8 +1553,12 @@ class CandidateBomValidator:
             ):
                 if not isinstance(authority.get(field), str) or not _SHA256.fullmatch(authority[field]):
                     raise CandidateBomError(f"device route authority {field} is invalid")
+            allowed_route_producers = {
+                _CURRENT_ROUTE_PRODUCER_MODULE,
+                _HISTORICAL_ROUTE_PRODUCER_MODULE,
+            }
             if (
-                authority.get("producer_module") != "factory-release-controller"
+                authority.get("producer_module") not in allowed_route_producers
                 or authority.get("supervisor_module_id") != "windows-edge-supervisor"
                 or authority.get("supervisor_artifact_id") != "dps.windows-edge-supervisor"
                 or not isinstance(authority.get("supervisor_version"), str)
@@ -2254,6 +2280,10 @@ class CandidateBomValidator:
         artifact_size: int,
     ) -> None:
         module_id = str(module["module_id"])
+        allowed_descriptor_producers = {
+            _CURRENT_DESCRIPTOR_PRODUCER_MODULE,
+            _HISTORICAL_DESCRIPTOR_PRODUCER_MODULE,
+        }
         _require_exact(descriptor, _DESCRIPTOR_FIELDS, f"module {module_id} descriptor")
         nullable_ids = (
             ("soul_id", _SOUL_ID),
@@ -2267,7 +2297,7 @@ class CandidateBomValidator:
         if (
             descriptor.get("schema_version") != "1.0.0"
             or descriptor.get("contract_id") != "artifact.descriptor/v1"
-            or descriptor.get("producer_module") != "factory-artifact-builder"
+            or descriptor.get("producer_module") not in allowed_descriptor_producers
             or descriptor.get("module_id") != module_id
             or descriptor.get("module_version") != module["version"]
             or descriptor.get("integration_commit") != bom["integration_commit"]
@@ -2427,6 +2457,10 @@ class CandidateBomValidator:
         bom: Mapping[str, Any],
     ) -> None:
         module_id = str(module["module_id"])
+        allowed_builder_ids = {
+            _CURRENT_BUILDER_ID,
+            _HISTORICAL_BUILDER_ID,
+        }
         _require_exact(provenance, _PROVENANCE_FIELDS, f"module {module_id} provenance")
         subjects = list(_require_limited_sequence(
             provenance.get("subject"), f"module {module_id} provenance subjects", 64
@@ -2524,7 +2558,7 @@ class CandidateBomValidator:
         _require_exact(builder, {"id"}, f"module {module_id} builder")
         _require_exact(metadata, {"invocationId", "startedOn", "finishedOn"}, f"module {module_id} run metadata")
         if (
-            builder.get("id") != "dps:factory-artifact-builder:0.1.0"
+            builder.get("id") not in allowed_builder_ids
             or metadata.get("invocationId") != descriptor["build_id"]
         ):
             raise CandidateBomError(f"module {module_id} provenance run identity mismatch")
@@ -3018,10 +3052,16 @@ class CandidateBomValidator:
             _NATIVE_STOP_TRUST_RECEIPT_FIELDS,
             "native stop authority trust receipt",
         )
+        route_producers = {
+            authority.get("producer_module")
+            for authority in bom["device_route_assignment_authorities"]
+            if isinstance(authority, Mapping)
+        }
         if (
             receipt.get("schema_version") != "1.0.0"
             or receipt.get("contract_id") != "release.bom.native.stop.authority.trust/v1"
-            or receipt.get("producer_module") != "factory-release-controller"
+            or len(route_producers) != 1
+            or receipt.get("producer_module") != next(iter(route_producers), None)
             or any(receipt.get(field) is not None for field in (
                 "soul_id", "device_binding_id", "platform_account_id"
             ))

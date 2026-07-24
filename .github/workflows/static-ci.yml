@@ -2,6 +2,7 @@ name: DPS Phase 0 Static Gate
 
 on:
   pull_request:
+  merge_group:
   push:
     branches:
       - main
@@ -42,6 +43,13 @@ jobs:
           --disable-pip-version-check
           --require-hashes
           --requirement requirements-ci.txt
+
+      - name: Run M1C module-impact suite
+        run: >-
+          python -I -m unittest discover
+          -s Tests/ci
+          -p test_module_impact.py
+          -v
 
       - name: Run the unique Phase 0 gate
         env:

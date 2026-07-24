@@ -1,7 +1,0 @@
-# Operations
-
-`trusted-runner-policy.v1.json` is a non-production candidate template. The previous stable signed Runner artifact executes a candidate. Its supervisor binds an externally approved policy digest, runtime-fact authentication key, RSA signer, and downstream public-key trust store; repository content alone cannot authorize execution. Replacing the candidate policy or a candidate public key cannot change the running instance's process-bound digest or trust store. Policy changes remain pending until a separate release approves and deploys them. The runner uses exact argv with `shell=False`, a sanitized environment, bounded output, and active external fencing. Instruction, commit, workspace and lease facts come from process-bound verifiers. A process-bound RSA-PSS issuer signs the canonical result payload; downstream code verifies it through a fixed trust store.
-
-The reproducible entrypoint is `python3.12 Modules/factory-trusted-runner/src/cli.py`. Its input filenames are fixed under `DPS_RUNNER_INPUT_DIR`; repository/workspace roots, runner identity, policy digest, 256-bit runtime-fact HMAC key, RSA private-key path/key ID and OpenSSL path are process-bound environment values. It accepts no command argument. Success prints one `trusted.test.result/v1` JSON object containing hashes, metadata and signature, never raw process output. Invalid or missing trust input exits `2`.
-
-`factory_disable_trusted_execution` stops new processes. Rollback routes to the previous signed runner and preserves emitted hashes.

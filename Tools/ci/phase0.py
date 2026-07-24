@@ -3430,6 +3430,15 @@ def load_module_records_without_schema(root: Path) -> Dict[str, ModuleRecord]:
 
 
 def _changed_paths(root: Path, baseline_commit: str) -> List[str]:
+    unmerged = git_output(
+        root,
+        ["diff", "--name-only", "--diff-filter=U", "--"],
+    ).splitlines()
+    if unmerged:
+        raise Phase0Error(
+            "unmerged paths fail closed: "
+            + ", ".join(sorted(set(value.replace("\\", "/") for value in unmerged)))
+        )
     tracked = git_output(
         root,
         ["diff", "--name-only", "--diff-filter=ACDMRTUXB", baseline_commit, "--"],

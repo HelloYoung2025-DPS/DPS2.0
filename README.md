@@ -32,15 +32,16 @@ DPS 当前是一个正在重构的 ZennoDroid 设备自动化研究项目. 现�
 ### 目标边界, Proposed
 
 ```
-DPS AI Factory --upgrade artifacts and evidence--> DPS Control Plane
-                                                       |
-                                     +-----------------+-----------------+
-                                     |                                   |
-                             GBrain Company                       Windows Edge
-                          Persona and memory                 queue and A/B worker
-                                                                         |
-                                                                   ZennoDroid
-                                                            deterministic executor
+External build, review, and release authorities
+                    --signed artifacts and evidence--> DPS Control Plane
+                                                               |
+                                             +-----------------+-----------------+
+                                             |                                   |
+                                     GBrain Company                       Windows Edge
+                                  Persona and memory                 queue and A/B worker
+                                                                                 |
+                                                                           ZennoDroid
+                                                                    deterministic executor
 ```
 
 ### 当前现代化工作区事实
@@ -53,7 +54,7 @@ DPS AI Factory --upgrade artifacts and evidence--> DPS Control Plane
 | Contract candidate | 唯一候选 Runner 必须精确匹配当前 Manifest 清单、受信策略、收据、测试树和证据摘要；任一漂移均失败 | Runner 固定为 unsigned；`candidate_verification_level` 和 `verification_level` 均为 `null`，不构成 `CONTRACT_VERIFIED` |
 | Integration candidate | 套件明确区分真实 PostgreSQL、真实本地子进程、确定性模拟与外部设备；门禁从当前 Manifest 计算覆盖缺口 | 本机未配置受信 PostgreSQL；缺基础设施、覆盖缺口或任一必需套件非 `PASS` 时必须失败 |
 | F2 Soul vertical slice | 已有 Soul resolve、append-only event/outbox、interest decay、离线 GBrain projection 和 evidence bundle 的 PostgreSQL 实现与必需测试 | 本轮环境无法执行真实 PostgreSQL 套件；独立证据签发及生产数据库权限也未配置 |
-| F3-F4 AI Factory | 已实现外部 PostgreSQL lease/evidence、monotonic fence、真实临时 Git worktree 并行/依赖排序/合并头重测、受限 Runner、artifact/SBOM/provenance、BOM、发布与回滚状态机及故障注入模拟 | 当前模拟不是 100 台持续或 200 台突发真实并发；外部 signer、默认分支保护、两人审批和已部署上一稳定 Factory 尚未证明 |
+| F3-F4 Release governance | 候选 Release BOM 校验已迁入无签名、无部署、无运行状态的普通 `Tools/ci` 门禁；Control Plane 保留 active release binding、版本化 receipt、撤销和回滚真相；module-impact 套件验证 provider/consumer/DAG、并行冲突、merge HEAD 重跑与 rollback | 外部 signer、独立审查/证据签发、仓库保护和真实生产发布拓扑仍需仓外证据；本地或 hosted 模拟不构成生产发布证明 |
 | F5 Product modules | identity、device/account/binding、persona、planner/policy/compiler/orchestrator/executor/audit 等模块已有独立源码、合同、锁文件和分类测试 | Legacy SessionRunner 仅完成字节/签名/Golden Trace 静态冻结，尚未真实绞杀接线；需要 Integration 但没有套件的模块由门禁动态列为阻断；Bridge/Edge ABI 与后续迁移还需目标 Windows 探测 |
 | F6 Edge foundation | .NET 10 A/B Supervisor/Worker/Journal 与 `net40`/C# 5 Bridge 已有分层源码、合同与失败关闭测试；仍属候选基础 | 生产 Host/ABI 组合必须在目标 Windows 能力探测后定稿；真实 Windows、ZennoDroid、ADB、100 次切换、PID/启动时间不变和 24 小时证据为 `WAITING_EXTERNAL` |
 | F7-F9 External gates | GBrain/双非生产手机/30 台/200 台输入 Schema, 固定信任策略和失败关闭验证器已存在 | 实际 GBrain 读回, 真机, 灰度, 回滚演练, 72 小时和规模证据均为 `WAITING_EXTERNAL` |

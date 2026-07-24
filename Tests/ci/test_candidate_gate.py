@@ -224,19 +224,10 @@ class CandidateGateHardeningTests(unittest.TestCase):
         }
         self.assertEqual(set(policy.contract), contract_keys)
         self.assertEqual(set(policy.integration), integration_keys)
-        static_contract_errors = (
-            "factory-upgrade-intake.contract: evidenceLevel must be exactly "
-            "CONTRACT_VERIFIED",
-            "factory-upgrade-intake: public contract owner lacks required Contract suite",
-        )
-        self.assertEqual(static_contract_errors, contract.errors)
+        self.assertEqual((), contract.errors)
+        self.assertEqual((), contract.modules_without_contract)
         self.assertEqual(
-            ("factory-upgrade-intake",),
-            contract.modules_without_contract,
-        )
-        self.assertEqual(
-            static_contract_errors
-            + tuple(
+            tuple(
                 module_id
                 + ": minimumVerification requires a required Integration suite"
                 for module_id in integration.modules_without_integration
@@ -340,11 +331,15 @@ class CandidateGateHardeningTests(unittest.TestCase):
                 argv = list(invocation.argv)
                 self.assertEqual(["-I", "-m", "unittest", "discover"], argv[1:5])
 
-    def test_all_candidate_trust_paths_are_bound_by_production_resolver(self):
-        resolver = SUBJECT._load_factory_resolver(ROOT)
-        self.assertEqual(
-            set(SUBJECT.CANDIDATE_TRUST_PATHS),
-            set(resolver._CANDIDATE_TRUST_PATHS),
+    def test_candidate_trust_paths_are_retained_and_factory_independent(self):
+        self.assertFalse(
+            any(
+                path.startswith("Modules/factory-")
+                for path in SUBJECT.CANDIDATE_TRUST_PATHS
+            )
+        )
+        self.assertTrue(
+            all((ROOT / path).is_file() for path in SUBJECT.CANDIDATE_TRUST_PATHS)
         )
         self.assertTrue(
             {
