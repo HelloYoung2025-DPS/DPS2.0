@@ -2,6 +2,12 @@
 
 ## [Unreleased] - 2026-07-17
 
+### R0-B historical diagnostic governance rebaseline
+
+#### Changed
+
+- 为唯一的 R0-B 历史 base `8f63593d4f262ec1496b05300da75a71b86eaab4`、head `2ce0d14744ea8d25db2e963d4902cb0430b70cc4`、merge commit `8165fedbd44ecb8388c4dfce5e44e8753af21daf` 增加窄化 §4.5 step 1 再基线规则；仅在原 formal raw/publication 字节持久可读可校验、非 OpenAI 独立外审明确批准且 Owner 合入后记为 `REBASELINED`，不把 formal 改称 diagnostic，不改变原始 `39 PASS / 14 FAIL / 0 INFRA_ERROR`，也不外推其他批次或自动改变 T4/M1 裁决。
+
 ### R0-D factory module retirement
 
 #### Removed

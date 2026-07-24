@@ -209,6 +209,10 @@ R0-B/R0-C/R0-D 每一批都会改写候选门禁的信任根清单 `CANDIDATE_TR
 
 merge queue 对触碰信任根的批次按同一两段式取证。
 
+> **R0-B 历史 step 1 一次性再基线附则。** 仅对 base `8f63593d4f262ec1496b05300da75a71b86eaab4`、head `2ce0d14744ea8d25db2e963d4902cb0430b70cc4`、merge commit D `8165fedbd44ecb8388c4dfce5e44e8753af21daf` 这一组历史对象，因同期 step 1 diagnostic raw 已不可恢复，允许将其合入前 formal raw/publication 原字节对作为替代锚点：raw 必须保持 493225 bytes、文件 SHA-256 `440e5b893a4a0badca7e9983004435995aab36150e4bcd8e9b9e65556612edd4`、record self-hash `df92f5ea20197d4add500d60c5f82d0dd7b9649e8f40a202a83966bd9f66fa3b`；publication 必须保持 384 bytes、文件 SHA-256 `e922024ae89f361fff8fdce4850bfb71f8f81d6471256cbae9e06592c9c2a9a6`、record self-hash `01e775cd0527a159dc7d60df368dff215aa035f2ea9044384ab26a4827a3f4ac`，且 payload hash/size 必须回指该 raw。该 formal evidence 仍须如实标记 `diagnostic_workspace=false`、`formal_evidence_eligible=true`、`overall_status=FAIL` 和 `39 PASS / 14 FAIL / 0 INFRA_ERROR`，不得改称历史 diagnostic；当前复现、孤立 publication marker 或普通风险接受均不能替代上述原字节对。
+>
+> 本附则不是第 3 步、不是 `DEFERRED`、不是风险接受，也不适用于 R0-C、R0-D、新 CI 修复或未来任何批次。只有 Owner 对上述精确替代文字明确批准、raw/publication 原字节已持久发布且回读校验全部通过、该治理 diff 获非 OpenAI 独立外审明确 `GOVERNANCE_REBASELINE_DISPOSITION: APPROVED`，并由 Owner 合入独立治理 PR 后，硬规则 1 与 T4 才可将这一组历史对象的 §4.5 step 1 记为 `REBASELINED` satisfied。它不关闭 R0-B 原外审 veto，不豁免新修复自身的 §4.5 两段式取证，也不自动改变 T4 或 M1 裁决。
+
 ## 5. Soul、记忆、兴趣和行为
 
 ### 5.1 Persona 保持 v1
