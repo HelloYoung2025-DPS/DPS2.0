@@ -263,6 +263,134 @@ jobs:
           test "$evidence_real" = "$evidence_dir"
           materialize_step 224
           dps_uid="$(/usr/bin/id -u dps-phase0)"
+          materialize_step 301
+          project_list="$(/usr/bin/mktemp "$RUNNER_TEMP/dps-dotnet-projects.XXXXXX")"
+          allowed_writable_list="$(/usr/bin/mktemp "$RUNNER_TEMP/dps-writable-allowed.XXXXXX")"
+          observed_writable_list="$(/usr/bin/mktemp "$RUNNER_TEMP/dps-writable-observed.XXXXXX")"
+          trap '/usr/bin/rm -f "$project_list" "$allowed_writable_list" "$observed_writable_list"' EXIT
+          materialize_step 302
+          "$workspace_real/.venv/bin/python" -I - \
+            "$workspace_real" "$project_list" <<'PY'
+          import os
+          import pathlib
+          import re
+          import subprocess
+          import sys
+          import xml.etree.ElementTree as element_tree
+
+          root = pathlib.Path(sys.argv[1]).resolve(strict=True)
+          output = pathlib.Path(sys.argv[2])
+          output_stat = output.stat(follow_symlinks=False)
+          if output.is_symlink() or output_stat.st_uid != os.getuid():
+              raise SystemExit("unsafe project-list output")
+          if output_stat.st_mode & 0o077:
+              raise SystemExit("project-list output is not private")
+
+          tracked_raw = subprocess.run(
+              [
+                  "/usr/bin/git",
+                  "-C",
+                  str(root),
+                  "ls-files",
+                  "-z",
+                  "--",
+                  ":(glob)**/*.csproj",
+              ],
+              check=True,
+              stdout=subprocess.PIPE,
+          ).stdout
+          tracked_values = [
+              os.fsdecode(value)
+              for value in tracked_raw.split(b"\0")
+              if value
+          ]
+          if not tracked_values or len(tracked_values) != len(set(tracked_values)):
+              raise SystemExit("tracked project inventory is empty or duplicated")
+
+          solution = element_tree.parse(str(root / "Dps.slnx"))
+          solution_values = [
+              element.get("Path")
+              for element in solution.findall(".//Project")
+          ]
+          if (
+              any(not isinstance(value, str) for value in solution_values)
+              or len(solution_values) != len(set(solution_values))
+              or set(solution_values) != set(tracked_values)
+          ):
+              raise SystemExit(
+                  "Dps.slnx projects do not exactly match tracked csproj inventory"
+              )
+
+          project_parents = set()
+          for value in sorted(tracked_values):
+              raw_parts = value.split("/")
+              if (
+                  re.fullmatch(r"[A-Za-z0-9._/-]+\.csproj", value) is None
+                  or "\\" in value
+                  or any(part in ("", ".", "..") for part in raw_parts)
+              ):
+                  raise SystemExit("unsafe tracked project path")
+              relative = pathlib.PurePosixPath(value)
+              if relative.is_absolute() or ".." in relative.parts:
+                  raise SystemExit("unsafe tracked project path")
+              lexical = root.joinpath(*relative.parts)
+              resolved = lexical.resolve(strict=True)
+              if (
+                  resolved != lexical
+                  or not resolved.is_file()
+                  or resolved.is_symlink()
+                  or resolved.suffix.casefold() != ".csproj"
+              ):
+                  raise SystemExit("tracked project is missing, linked, or non-canonical")
+              parent = resolved.parent
+              if parent in project_parents:
+                  raise SystemExit("multiple projects share one output-island parent")
+              project_parents.add(parent)
+
+          descriptor = os.open(
+              output,
+              os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW,
+          )
+          try:
+              for value in sorted(tracked_values):
+                  os.write(descriptor, os.fsencode(value) + b"\0")
+          finally:
+              os.close(descriptor)
+          PY
+          materialize_step 303
+          project_count=0
+          output_island_count=0
+          while IFS= read -r -d '' project_relative; do
+            project_count=$((project_count + 1))
+            project_file="$workspace_real/$project_relative"
+            project_dir="$(/usr/bin/dirname -- "$project_file")"
+            materialize_step $((1000 + project_count * 20))
+            test -f "$project_file"
+            test ! -L "$project_file"
+            test "$(/usr/bin/realpath -e -- "$project_file")" = "$project_file"
+            test "$(/usr/bin/realpath -e -- "$project_dir")" = "$project_dir"
+            for output_name in bin obj; do
+              output_path="$project_dir/$output_name"
+              output_island_count=$((output_island_count + 1))
+              materialize_step $((1001 + project_count * 20 + (output_island_count - 1) % 2))
+              /usr/bin/git -C "$workspace_real" check-ignore --quiet --no-index -- "$output_path/probe"
+              test ! -e "$output_path"
+              test ! -L "$output_path"
+              /usr/bin/sudo /usr/bin/install -d \
+                -o dps-phase0 -g "$runner_gid" -m 0700 "$output_path"
+              test "$(/usr/bin/realpath -e -- "$output_path")" = "$output_path"
+              test "$(/usr/bin/stat -c '%u:%g:%a' "$output_path")" = "${dps_uid}:${runner_gid}:700"
+              output_acl="$(/usr/bin/sudo /usr/bin/getfacl --absolute-names --numeric --omit-header -- "$output_path")"
+              if printf '%s\n' "$output_acl" | /usr/bin/grep -Eq "^(default:|user:[0-9]+:|group:[0-9]+:)"; then
+                /usr/bin/false
+              fi
+              printf '%s\0' "$output_path" >> "$allowed_writable_list"
+            done
+          done < "$project_list"
+          materialize_step 304
+          test "$project_count" -gt 0
+          test "$output_island_count" = "$((project_count * 2))"
+          printf '%s\0' "$evidence_real" >> "$allowed_writable_list"
           acl_directories=(
             /home
             /home/runner
@@ -308,6 +436,53 @@ jobs:
             /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$directory"
             acl_index=$((acl_index + 1))
           done
+          materialize_step 305
+          while IFS= read -r -d '' project_relative; do
+            project_file="$workspace_real/$project_relative"
+            project_dir="$(/usr/bin/dirname -- "$project_file")"
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -r "$project_file"
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$project_file"
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$project_dir"
+            for output_name in bin obj; do
+              output_path="$project_dir/$output_name"
+              /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -r "$output_path"
+              /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -x "$output_path"
+              /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -w "$output_path"
+            done
+          done < "$project_list"
+          materialize_step 306
+          /usr/bin/sudo --non-interactive --user=dps-phase0 \
+            /usr/bin/find "$workspace_real" -xdev -type d -writable -print0 \
+            > "$observed_writable_list"
+          materialize_step 307
+          "$workspace_real/.venv/bin/python" -I - \
+            "$allowed_writable_list" "$observed_writable_list" <<'PY'
+          import os
+          import pathlib
+          import sys
+
+          def load(path):
+              values = pathlib.Path(path).read_bytes().split(b"\0")
+              decoded = [os.fsdecode(value) for value in values if value]
+              if len(decoded) != len(set(decoded)):
+                  raise SystemExit("duplicate writable-directory record")
+              return set(decoded)
+
+          allowed = load(sys.argv[1])
+          observed = load(sys.argv[2])
+          if observed != allowed:
+              unexpected = sorted(observed - allowed)
+              missing = sorted(allowed - observed)
+              raise SystemExit(
+                  "dedicated identity writable directory mismatch: "
+                  f"unexpected={unexpected}; missing={missing}"
+              )
+          PY
+          materialize_step 308
+          printf 'DPS_DOTNET_OUTPUT_ISLANDS projects=%d roots=%d\n' \
+            "$project_count" "$output_island_count"
+          /usr/bin/rm -f "$project_list" "$allowed_writable_list" "$observed_writable_list"
+          trap - EXIT
           materialize_step 900
           evidence_acl="$(/usr/bin/sudo /usr/bin/getfacl --absolute-names --numeric --omit-header -- "$evidence_real")"
           materialize_step 901
@@ -346,6 +521,16 @@ jobs:
           test "$restricted_checkout_head" = "$checkout_head"
           materialize_step 915
           test "$restricted_checkout_head" = "$DPS_EXPECTED_HEAD_COMMIT"
+          materialize_step 9151
+          restricted_workspace_status="$(
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
+              HOME="$dps_home" \
+              PATH=/usr/bin:/bin \
+              /usr/bin/git -C "$workspace_real" status \
+                --porcelain=v1 --untracked-files=all
+          )"
+          materialize_step 9152
+          test -z "$restricted_workspace_status"
           materialize_step 916
           gate_source_sha256="$(/usr/bin/sha256sum "$workspace_real/Tools/ci/run_phase0_gate.py" | /usr/bin/awk '{print $1}')"
           materialize_step 917

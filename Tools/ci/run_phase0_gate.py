@@ -292,7 +292,7 @@ R0B_FROZEN_BASELINE_COMMIT = "8f63593d4f262ec1496b05300da75a71b86eaab4"
 
 
 def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
-    minimum_adversarial_tests = 165
+    minimum_adversarial_tests = 167
     required_inventory = {
         "test_missing_standard_module_layout_is_rejected",
         "test_placeholder_only_src_is_rejected",
@@ -312,6 +312,8 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         "test_legacy_anchor_is_injected_only_for_exact_static_suite",
         "test_missing_writable_and_repository_local_legacy_anchors_fail_closed",
         "test_repository_workflow_builds_venv_and_external_anchor_boundary",
+        "test_repository_workflow_limits_dps_writes_to_exact_dotnet_output_islands",
+        "test_dotnet_output_islands_cover_exact_solution_project_set",
         "test_candidate_gate_forwards_only_legacy_anchor_to_cumulative_phase0",
         "test_path_traversal_is_rejected",
         "test_symlink_escape_is_rejected",

@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import xml.etree.ElementTree as element_tree
 from pathlib import Path
 from unittest import mock
 
@@ -2816,6 +2817,141 @@ jobs:
             "dps-phase0-evidence-${{ github.event.pull_request.head.sha || github.sha }}",
             upload_step["with"]["name"],
         )
+
+    def test_repository_workflow_limits_dps_writes_to_exact_dotnet_output_islands(self):
+        workflow = (ROOT / ".github/workflows/static-ci.yml").read_text(
+            encoding="utf-8"
+        )
+        steps, _ = phase0_module._load_workflow_steps(workflow)
+        by_name = {str(step.get("name", "")): step for step in steps}
+        materialize_run = str(
+            by_name["Materialize protected legacy baseline anchor"]["run"]
+        )
+
+        self.assertIn('":(glob)**/*.csproj"', materialize_run)
+        self.assertIn(
+            "Dps.slnx projects do not exactly match tracked csproj inventory",
+            materialize_run,
+        )
+        self.assertIn(
+            "or set(solution_values) != set(tracked_values)",
+            materialize_run,
+        )
+        self.assertIn(
+            "multiple projects share one output-island parent",
+            materialize_run,
+        )
+        self.assertIn(
+            'any(part in ("", ".", "..") for part in raw_parts)',
+            materialize_run,
+        )
+        self.assertIn("for output_name in bin obj; do", materialize_run)
+        self.assertIn(
+            'check-ignore --quiet --no-index -- "$output_path/probe"',
+            materialize_run,
+        )
+        self.assertIn('test ! -e "$output_path"', materialize_run)
+        self.assertIn('test ! -L "$output_path"', materialize_run)
+        self.assertIn(
+            '-o dps-phase0 -g "$runner_gid" -m 0700 "$output_path"',
+            materialize_run,
+        )
+        self.assertIn(
+            '"^(default:|user:[0-9]+:|group:[0-9]+:)"',
+            materialize_run,
+        )
+        self.assertIn(
+            '/usr/bin/test ! -w "$project_file"',
+            materialize_run,
+        )
+        self.assertIn(
+            '/usr/bin/test ! -w "$project_dir"',
+            materialize_run,
+        )
+        self.assertIn(
+            '/usr/bin/find "$workspace_real" -xdev -type d -writable -print0',
+            materialize_run,
+        )
+        self.assertIn(
+            "dedicated identity writable directory mismatch",
+            materialize_run,
+        )
+        self.assertIn("if observed != allowed:", materialize_run)
+        self.assertIn(
+            "DPS_DOTNET_OUTPUT_ISLANDS projects=%d roots=%d",
+            materialize_run,
+        )
+        self.assertIn(
+            "--porcelain=v1 --untracked-files=all",
+            materialize_run,
+        )
+        self.assertIn(
+            'test -z "$restricted_workspace_status"',
+            materialize_run,
+        )
+        self.assertLess(
+            materialize_run.index(
+                "/usr/bin/setfacl --modify 'u:dps-phase0:r-x'"
+            ),
+            materialize_run.rindex(
+                '/usr/bin/test -r "$project_file"'
+            ),
+        )
+        self.assertNotIn("setfacl --recursive", materialize_run)
+        self.assertNotIn("setfacl -R", materialize_run)
+        self.assertNotIn("--artifacts-path", materialize_run)
+
+    def test_dotnet_output_islands_cover_exact_solution_project_set(self):
+        tracked = set(
+            run_git(
+                ROOT,
+                "ls-files",
+                "--",
+                ":(glob)**/*.csproj",
+            ).splitlines()
+        )
+        solution = element_tree.parse(ROOT / "Dps.slnx")
+        declared_values = [
+            element.get("Path")
+            for element in solution.findall(".//Project")
+        ]
+        self.assertTrue(tracked)
+        self.assertTrue(all(isinstance(value, str) for value in declared_values))
+        declared = set(declared_values)
+        self.assertEqual(len(declared_values), len(declared))
+        self.assertEqual(tracked, declared)
+
+        parent_paths = set()
+        for relative_text in sorted(tracked):
+            self.assertFalse(relative_text.startswith("/"))
+            self.assertNotIn("\\", relative_text)
+            self.assertTrue(
+                all(
+                    part not in ("", ".", "..")
+                    for part in relative_text.split("/")
+                )
+            )
+            project = ROOT / relative_text
+            self.assertTrue(project.is_file())
+            self.assertFalse(project.is_symlink())
+            self.assertEqual(project, project.resolve(strict=True))
+            self.assertNotIn(project.parent, parent_paths)
+            parent_paths.add(project.parent)
+            for output_name in ("bin", "obj"):
+                ignored = subprocess.run(
+                    [
+                        "/usr/bin/git",
+                        "-C",
+                        str(ROOT),
+                        "check-ignore",
+                        "--quiet",
+                        "--no-index",
+                        "--",
+                        str(project.parent / output_name / "probe"),
+                    ],
+                    check=False,
+                )
+                self.assertEqual(0, ignored.returncode)
 
     def test_workflow_missing_complete_evidence_directory_is_rejected(self):
         self.workflow_path.write_text(
