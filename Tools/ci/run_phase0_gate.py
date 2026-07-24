@@ -352,7 +352,7 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         "test_workflow_pip_without_require_hashes_is_rejected",
         "test_workflow_diagnostic_mode_is_rejected",
         "test_candidate_level_is_schema_locked_to_null",
-        "test_all_candidate_trust_paths_are_bound_by_production_resolver",
+        "test_candidate_trust_paths_are_retained_and_factory_independent",
         "test_audit_contract_cannot_be_retargeted_to_production_source",
         "test_policy_floor_is_injected_into_every_effective_plan",
         "test_duplicate_unittest_summaries_cannot_raise_the_count_floor",
@@ -369,7 +369,7 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         # these here makes the frozen migration corpus load-bearing: deleting or
         # renaming it fails this gate instead of silently shrinking coverage.
         "test_every_frozen_file_matches_its_recorded_digest",
-        "test_old_schema_rejects_all_34_current_manifests",
+        "test_old_schema_rejects_all_current_manifests",
         "test_new_schema_rejects_all_34_baseline_manifests",
         "test_reintroducing_the_factory_resolver_breaks_the_new_gate",
         "test_stale_receipt_is_rejected_after_a_manifest_edit",
@@ -446,13 +446,10 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         "test_artifact_provenance_and_evidence_tampering_fail_closed",
         "test_duplicate_receipt_member_and_old_mixed_shape_fail_closed",
         "test_policy_roles_and_key_purposes_are_separated",
-        # Migration-fidelity pins: the module-side original may not drift from
-        # the Tools/ci copy before R0-D deletes it, and the operational anchor
-        # entry stays visibly registered, not silently green.
-        "test_the_validator_sources_differ_only_by_the_three_declared_migration_edits",
-        "test_the_trust_policy_bytes_are_identical_in_both_homes",
-        "test_the_code_bound_policy_digest_did_not_change_in_migration",
-        "test_the_operational_anchor_entry_behaves_identically_in_both_copies",
+        # R0-D retained-authority pin: the surviving Tools/ci validator remains
+        # bound to the retained deployed policy after the module-side copy is
+        # retired.  The operational anchor entry remains separately registered.
+        "test_the_code_bound_policy_digest_matches_the_retained_policy",
         # The owner provisioned the native-stop signer in the deployed policy
         # and re-anchored the code-bound digest on 2026-07-21, so this
         # constructor tripwire is green.  It proves constructor instantiation
