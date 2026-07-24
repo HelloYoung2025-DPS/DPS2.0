@@ -91,7 +91,7 @@ jobs:
           sudo install -d -o dps-phase0 -g dps-phase0 -m 0700 "$GITHUB_WORKSPACE/Reports/ci"
 
       - name: Run the unique Phase 0 gate
-        shell: sudo --non-interactive --preserve-env=PATH,DPS_BASELINE_COMMIT,DPS_LEGACY_BASELINE_ANCHOR --user=dps-phase0 bash --noprofile --norc -eo pipefail {0}
+        shell: bash --noprofile --norc -c 'chmod 0644 "$1"; exec sudo --non-interactive --preserve-env=PATH,DPS_BASELINE_COMMIT,DPS_LEGACY_BASELINE_ANCHOR --user=dps-phase0 bash --noprofile --norc -eo pipefail "$1"' -- {0}
         env:
           DPS_BASELINE_COMMIT: ${{ github.event.pull_request.base.sha || github.event.before }}
           DPS_LEGACY_BASELINE_ANCHOR: /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json
@@ -99,6 +99,14 @@ jobs:
           python Tools/ci/run_phase0_gate.py
           --node "$(command -v node)"
           --evidence Reports/ci/phase0-evidence/phase0-evidence.json
+
+      - name: Seal Phase 0 evidence for artifact upload
+        if: always()
+        run: |
+          set -euo pipefail
+          sudo chown -R root:root Reports/ci
+          sudo find Reports/ci -type d -exec chmod 0555 {} +
+          sudo find Reports/ci -type f -exec chmod 0444 {} +
 
       - name: Upload raw Phase 0 evidence
         if: always()

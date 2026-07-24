@@ -2649,7 +2649,9 @@ jobs:
         self.assertIn("useradd --system", anchor_run)
         self.assertIn("sudo -n true", anchor_run)
         gate_step = by_name["Run the unique Phase 0 gate"]
-        self.assertIn("--user=dps-phase0", str(gate_step["shell"]))
+        gate_shell = str(gate_step["shell"])
+        self.assertIn('chmod 0644 "$1"', gate_shell)
+        self.assertIn("--user=dps-phase0", gate_shell)
         self.assertEqual(
             "/opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json",
             gate_step["env"]["DPS_LEGACY_BASELINE_ANCHOR"],
@@ -2659,6 +2661,10 @@ jobs:
                 "python Tools/ci/run_phase0_gate.py"
             )
         )
+        seal_step = by_name["Seal Phase 0 evidence for artifact upload"]
+        self.assertEqual("always()", seal_step["if"])
+        self.assertIn("chown -R root:root Reports/ci", str(seal_step["run"]))
+        self.assertIn("chmod 0444", str(seal_step["run"]))
 
     def test_workflow_missing_complete_evidence_directory_is_rejected(self):
         self.workflow_path.write_text(
