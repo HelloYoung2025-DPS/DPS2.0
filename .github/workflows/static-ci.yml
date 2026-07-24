@@ -63,6 +63,7 @@ jobs:
       - name: Materialize protected legacy baseline anchor
         env:
           DPS_LEGACY_BASELINE_ANCHOR_B64: ${{ secrets.DPS_LEGACY_BASELINE_ANCHOR_B64 }}
+          DPS_EXPECTED_HEAD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           export PATH=/usr/bin:/bin:/usr/sbin:/sbin
@@ -165,24 +166,79 @@ jobs:
             exit 1
           fi
           /usr/bin/test -x /usr/bin/setfacl
+          /usr/bin/test -x /usr/bin/getfacl
           workspace_real="$(/usr/bin/realpath -e -- "$GITHUB_WORKSPACE")"
-          workspace_ancestor="$workspace_real"
-          while [[ "$workspace_ancestor" != "/home" ]]; do
-            /usr/bin/sudo /usr/bin/setfacl --modify 'u:dps-phase0:--x' "$workspace_ancestor"
-            workspace_ancestor="$(/usr/bin/dirname -- "$workspace_ancestor")"
+          test "$workspace_real" = "$GITHUB_WORKSPACE"
+          case "$workspace_real" in
+            /home/runner/work/*/*) ;;
+            *) exit 1 ;;
+          esac
+          workspace_relative="${workspace_real#/home/runner/work/}"
+          [[ "$workspace_relative" == */* ]]
+          [[ "${workspace_relative#*/}" != */* ]]
+          workspace_parent="$(/usr/bin/dirname -- "$workspace_real")"
+          test "$workspace_parent" = "/home/runner/work/${workspace_relative%%/*}"
+          [[ "${DPS_EXPECTED_HEAD_COMMIT:?}" =~ ^[0-9a-f]{40}$ ]]
+          checkout_head="$(/usr/bin/git -C "$workspace_real" rev-parse HEAD^{commit})"
+          test "$checkout_head" = "$DPS_EXPECTED_HEAD_COMMIT"
+          reports_dir="$workspace_real/Reports"
+          evidence_dir="$reports_dir/ci"
+          if [[ -e "$reports_dir" || -L "$reports_dir" ]]; then
+            test -d "$reports_dir"
+            test ! -L "$reports_dir"
+            test "$(/usr/bin/realpath -e -- "$reports_dir")" = "$reports_dir"
+            test "$(/usr/bin/stat -c '%U:%G:%a' "$reports_dir")" = "root:root:755"
+          else
+            /usr/bin/sudo /usr/bin/install -d -o root -g root -m 0755 "$reports_dir"
+          fi
+          test ! -e "$evidence_dir"
+          test ! -L "$evidence_dir"
+          runner_gid="$(/usr/bin/id -g)"
+          /usr/bin/sudo /usr/bin/install -d -o dps-phase0 -g "$runner_gid" -m 0750 "$evidence_dir"
+          evidence_real="$(/usr/bin/realpath -e -- "$evidence_dir")"
+          test "$evidence_real" = "$evidence_dir"
+          dps_uid="$(/usr/bin/id -u dps-phase0)"
+          acl_directories=(
+            /home
+            /home/runner
+            /home/runner/work
+            "$workspace_parent"
+            "$workspace_real"
+            "$reports_dir"
+          )
+          for directory in "${acl_directories[@]}"; do
+            test -d "$directory"
+            test ! -L "$directory"
+            test "$(/usr/bin/realpath -e -- "$directory")" = "$directory"
+            acl_before="$(/usr/bin/sudo /usr/bin/getfacl --absolute-names --numeric --omit-header -- "$directory")"
+            if printf '%s\n' "$acl_before" | /usr/bin/grep -Eq "^default:"; then
+              exit 1
+            fi
+            /usr/bin/sudo /usr/bin/setfacl --modify 'u:dps-phase0:r-x' -- "$directory"
+            acl_after="$(/usr/bin/sudo /usr/bin/getfacl --absolute-names --numeric --omit-header -- "$directory")"
+            printf '%s\n' "$acl_after" | /usr/bin/grep -Fx "user:${dps_uid}:r-x" >/dev/null
+            test "$(printf '%s\n' "$acl_after" | /usr/bin/grep -Fxc "user:${dps_uid}:r-x")" = "1"
+            if printf '%s\n' "$acl_after" | /usr/bin/grep -Eq "^default:"; then
+              exit 1
+            fi
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -r "$directory"
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -x "$directory"
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$directory"
           done
-          test "$workspace_ancestor" = "/home"
-          /usr/bin/sudo /usr/bin/chown root:root /home
-          /usr/bin/sudo /usr/bin/chmod 0755 /home
-          test "$(/usr/bin/stat -c '%U:%G:%a' /home)" = "root:root:755"
-          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -r /home
-          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -x /home
-          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w /home
-          /usr/bin/sudo /usr/bin/setfacl --physical --recursive --modify 'u:dps-phase0:r-X' "$workspace_real"
+          evidence_acl="$(/usr/bin/sudo /usr/bin/getfacl --absolute-names --numeric --omit-header -- "$evidence_real")"
+          if printf '%s\n' "$evidence_acl" | /usr/bin/grep -Eq "^(default:|user:${dps_uid}:)"; then
+            exit 1
+          fi
+          test "$(/usr/bin/stat -c '%u:%g:%a' "$evidence_real")" = "${dps_uid}:${runner_gid}:750"
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -r "$evidence_real"
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -x "$evidence_real"
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -w "$evidence_real"
+          /usr/bin/test -r "$evidence_real"
+          /usr/bin/test -x "$evidence_real"
+          /usr/bin/test ! -w "$evidence_real"
           /usr/bin/sudo /usr/bin/git config --system --add safe.directory "$GITHUB_WORKSPACE"
           dps_home="$(/usr/bin/getent passwd dps-phase0 | /usr/bin/cut -d: -f6)"
           test -n "$dps_home"
-          checkout_head="$(/usr/bin/git -C "$workspace_real" rev-parse HEAD^{commit})"
           restricted_checkout_head="$(
             /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
               HOME="$dps_home" \
@@ -190,6 +246,7 @@ jobs:
               /usr/bin/git -C "$workspace_real" rev-parse HEAD^{commit}
           )"
           test "$restricted_checkout_head" = "$checkout_head"
+          test "$restricted_checkout_head" = "$DPS_EXPECTED_HEAD_COMMIT"
           gate_source_sha256="$(/usr/bin/sha256sum "$workspace_real/Tools/ci/run_phase0_gate.py" | /usr/bin/awk '{print $1}')"
           restricted_gate_source_sha256="$(
             /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
@@ -204,25 +261,37 @@ jobs:
             PYTHONDONTWRITEBYTECODE=1 \
             "$workspace_real/.venv/bin/python" -I -c \
             'import platform; assert platform.python_version() == "3.12.13"'
-          unreadable_path="$(
-            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
-              PATH=/usr/bin:/bin \
-              /usr/bin/find "$workspace_real" -xdev \
-              \( -type d \( ! -readable -o ! -executable \) -o -type f ! -readable \) \
-              -print -quit
-          )"
-          test -z "$unreadable_path"
-          writable_path="$(
-            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
-              PATH=/usr/bin:/bin \
-              /usr/bin/find "$workspace_real" -xdev \
-              \( -type d -o -type f \) -writable -print -quit
-          )"
-          test -z "$writable_path"
-          /usr/bin/sudo /usr/bin/install -d -o dps-phase0 -g dps-phase0 -m 0700 "$GITHUB_WORKSPACE/Reports/ci"
-          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -r "$GITHUB_WORKSPACE/Reports/ci"
-          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -x "$GITHUB_WORKSPACE/Reports/ci"
-          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -w "$GITHUB_WORKSPACE/Reports/ci"
+          expected_chain=("${acl_directories[@]}" "$evidence_real")
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
+            HOME="$dps_home" \
+            PATH=/usr/bin:/bin \
+            PYTHONDONTWRITEBYTECODE=1 \
+            "$workspace_real/.venv/bin/python" -I -c '
+          import os
+          import pathlib
+          import sys
+
+          target = pathlib.Path(sys.argv[1])
+          expected = sys.argv[2:]
+          flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+          descriptor = os.open(target.anchor, flags)
+          observed = []
+          current = pathlib.Path(target.anchor)
+          try:
+              for component in target.parts[1:]:
+                  child = os.open(component, flags, dir_fd=descriptor)
+                  os.close(descriptor)
+                  descriptor = child
+                  current = current / component
+                  observed.append(str(current))
+          finally:
+              os.close(descriptor)
+          if observed != expected:
+              raise SystemExit("unexpected evidence ancestor chain")
+          ' "$evidence_real" "${expected_chain[@]}"
+          if /usr/bin/sudo --user=dps-phase0 /usr/bin/sudo --non-interactive /usr/bin/true >/dev/null 2>&1; then
+            exit 1
+          fi
           /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$workspace_real"
           /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$workspace_real/.git"
           /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$workspace_real/.venv"
@@ -243,9 +312,33 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
+          export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+          workspace_real="$(/usr/bin/realpath -e -- "$GITHUB_WORKSPACE")"
+          case "$workspace_real" in
+            /home/runner/work/*/*) ;;
+            *) exit 1 ;;
+          esac
+          evidence_dir="$workspace_real/Reports/ci"
+          test "$(/usr/bin/realpath -e -- "$PWD")" = "$workspace_real"
+          test "$(/usr/bin/realpath -e -- "$evidence_dir")" = "$evidence_dir"
+          test "$(/usr/bin/realpath -e -- Reports/ci)" = "$evidence_dir"
           sudo chown -R root:root Reports/ci
-          sudo find Reports/ci -type d -exec chmod 0555 {} +
-          sudo find Reports/ci -type f -exec chmod 0444 {} +
+          /usr/bin/sudo /usr/bin/find "$evidence_dir" -type d -exec /usr/bin/chmod 0555 {} +
+          /usr/bin/sudo /usr/bin/find "$evidence_dir" -type f -exec /usr/bin/chmod 0444 {} +
+          /usr/bin/test -r "$evidence_dir"
+          /usr/bin/test -x "$evidence_dir"
+          /usr/bin/test ! -w "$evidence_dir"
+          unreadable_path="$(
+            /usr/bin/find "$evidence_dir" \
+              \( -type d \( ! -readable -o ! -executable \) -o -type f ! -readable \) \
+              -print -quit
+          )"
+          test -z "$unreadable_path"
+          writable_path="$(
+            /usr/bin/find "$evidence_dir" \
+              \( -type d -o -type f \) -writable -print -quit
+          )"
+          test -z "$writable_path"
 
       - name: Upload raw Phase 0 evidence
         if: always()
