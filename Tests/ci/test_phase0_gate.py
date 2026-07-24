@@ -86,6 +86,150 @@ def run_git(root: Path, *arguments: str) -> str:
 
 
 class CandidatePhase0BridgeTests(unittest.TestCase):
+    def test_candidate_git_uses_canonical_safe_directory_with_system_config_disabled(
+        self,
+    ):
+        with tempfile.TemporaryDirectory(prefix="dps-candidate-git-") as temporary:
+            fixture = Path(temporary)
+            canonical_root = fixture / "repository"
+            canonical_root.mkdir()
+            lexical_root = fixture / "repository-link"
+            lexical_root.symlink_to(canonical_root, target_is_directory=True)
+            expected = CommandResult(
+                ["candidate-git-test"],
+                0,
+                1,
+                "candidate-git-ok",
+            )
+            poisoned = {
+                "GIT_CONFIG_COUNT": "1",
+                "GIT_CONFIG_KEY_0": "safe.directory",
+                "GIT_CONFIG_VALUE_0": "*",
+                "GIT_CONFIG_PARAMETERS": "'safe.directory=*'",
+                "GIT_DIR": "/tmp/candidate-controlled-git-dir",
+            }
+            with (
+                mock.patch.dict(os.environ, poisoned, clear=False),
+                mock.patch.object(
+                    candidate_gate_module,
+                    "run_command",
+                    return_value=expected,
+                ) as run,
+            ):
+                result = candidate_gate_module._candidate_git(
+                    lexical_root,
+                    ["rev-parse", "HEAD^{commit}"],
+                )
+
+            self.assertIs(expected, result)
+            run.assert_called_once()
+            command, cwd = run.call_args.args
+            environment = run.call_args.kwargs["env"]
+            self.assertEqual(canonical_root.resolve(), cwd)
+            self.assertEqual(
+                [
+                    str(candidate_gate_module.GIT_EXECUTABLE),
+                    "-c",
+                    "safe.directory=" + str(canonical_root.resolve()),
+                    "-c",
+                    "core.hooksPath=/dev/null",
+                    "-c",
+                    "core.fsmonitor=false",
+                    "rev-parse",
+                    "HEAD^{commit}",
+                ],
+                command,
+            )
+            self.assertEqual(
+                candidate_gate_module._candidate_git_environment(),
+                environment,
+            )
+            self.assertEqual("1", environment["GIT_CONFIG_NOSYSTEM"])
+            for name in poisoned:
+                self.assertNotIn(name, environment)
+            safe_directories = [
+                value
+                for value in command
+                if value.startswith("safe.directory=")
+            ]
+            self.assertEqual(
+                ["safe.directory=" + str(canonical_root.resolve())],
+                safe_directories,
+            )
+            self.assertNotIn("*", safe_directories[0])
+
+    def test_candidate_git_blob_uses_the_same_canonical_safe_directory(self):
+        with tempfile.TemporaryDirectory(prefix="dps-candidate-git-") as temporary:
+            fixture = Path(temporary)
+            canonical_root = fixture / "repository"
+            canonical_root.mkdir()
+            lexical_root = fixture / "repository-link"
+            lexical_root.symlink_to(canonical_root, target_is_directory=True)
+            completed = subprocess.CompletedProcess(
+                args=[],
+                returncode=0,
+                stdout=b"trusted blob",
+                stderr=b"",
+            )
+            poisoned = {
+                "GIT_CONFIG_COUNT": "1",
+                "GIT_CONFIG_KEY_0": "safe.directory",
+                "GIT_CONFIG_VALUE_0": "*",
+                "GIT_CONFIG_PARAMETERS": "'safe.directory=*'",
+                "GIT_DIR": "/tmp/candidate-controlled-git-dir",
+            }
+            with (
+                mock.patch.dict(os.environ, poisoned, clear=False),
+                mock.patch.object(
+                    candidate_gate_module.subprocess,
+                    "run",
+                    return_value=completed,
+                ) as run,
+            ):
+                blob = candidate_gate_module._candidate_git_blob(
+                    lexical_root,
+                    "HEAD:governance/schema.json",
+                )
+
+            self.assertEqual(b"trusted blob", blob)
+            run.assert_called_once()
+            command = run.call_args.args[0]
+            environment = run.call_args.kwargs["env"]
+            self.assertEqual(
+                [
+                    str(candidate_gate_module.GIT_EXECUTABLE),
+                    "-c",
+                    "safe.directory=" + str(canonical_root.resolve()),
+                    "-c",
+                    "core.hooksPath=/dev/null",
+                    "-c",
+                    "core.fsmonitor=false",
+                    "show",
+                    "HEAD:governance/schema.json",
+                ],
+                command,
+            )
+            self.assertEqual(
+                str(canonical_root.resolve()),
+                run.call_args.kwargs["cwd"],
+            )
+            self.assertEqual(
+                candidate_gate_module._candidate_git_environment(),
+                environment,
+            )
+            for name in poisoned:
+                self.assertNotIn(name, environment)
+            safe_directories = [
+                value
+                for value in command
+                if value.startswith("safe.directory=")
+            ]
+            self.assertEqual(
+                ["safe.directory=" + str(canonical_root.resolve())],
+                safe_directories,
+            )
+            self.assertNotIn("*", safe_directories[0])
+
     def test_candidate_gate_forwards_only_legacy_anchor_to_cumulative_phase0(self):
         captured = []
         selected = candidate_gate_module._phase0_prerequisite_runtime_environment(

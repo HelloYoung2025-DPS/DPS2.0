@@ -766,19 +766,36 @@ def _candidate_git_environment() -> Dict[str, str]:
     }
 
 
+def _candidate_git_invocation(
+    root: Path, args: Sequence[str]
+) -> Tuple[Path, List[str]]:
+    try:
+        canonical_root = root.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise Phase0Error("locked Git root cannot be resolved: " + str(exc))
+    if not canonical_root.is_dir():
+        raise Phase0Error(
+            "locked Git root is not a directory: " + str(canonical_root)
+        )
+    return canonical_root, [
+        str(GIT_EXECUTABLE),
+        "-c",
+        "safe.directory=" + str(canonical_root),
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "core.fsmonitor=false",
+        *args,
+    ]
+
+
 def _candidate_git(
     root: Path, args: Sequence[str], *, timeout_seconds: int = 30
 ) -> Any:
+    canonical_root, command = _candidate_git_invocation(root, args)
     return run_command(
-        [
-            str(GIT_EXECUTABLE),
-            "-c",
-            "core.hooksPath=/dev/null",
-            "-c",
-            "core.fsmonitor=false",
-            *args,
-        ],
-        root,
+        command,
+        canonical_root,
         timeout_seconds=timeout_seconds,
         env=_candidate_git_environment(),
     )
@@ -794,17 +811,13 @@ def _candidate_git_output(root: Path, args: Sequence[str]) -> str:
 
 
 def _candidate_git_blob(root: Path, revision_and_path: str) -> Optional[bytes]:
+    canonical_root, command = _candidate_git_invocation(
+        root,
+        ["show", revision_and_path],
+    )
     completed = subprocess.run(
-        [
-            str(GIT_EXECUTABLE),
-            "-c",
-            "core.hooksPath=/dev/null",
-            "-c",
-            "core.fsmonitor=false",
-            "show",
-            revision_and_path,
-        ],
-        cwd=str(root),
+        command,
+        cwd=str(canonical_root),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=False,
