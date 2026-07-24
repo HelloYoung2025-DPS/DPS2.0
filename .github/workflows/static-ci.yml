@@ -167,10 +167,17 @@ jobs:
           /usr/bin/test -x /usr/bin/setfacl
           workspace_real="$(/usr/bin/realpath -e -- "$GITHUB_WORKSPACE")"
           workspace_ancestor="$workspace_real"
-          while [[ "$workspace_ancestor" != "/" ]]; do
+          while [[ "$workspace_ancestor" != "/home" ]]; do
             /usr/bin/sudo /usr/bin/setfacl --modify 'u:dps-phase0:--x' "$workspace_ancestor"
             workspace_ancestor="$(/usr/bin/dirname -- "$workspace_ancestor")"
           done
+          test "$workspace_ancestor" = "/home"
+          /usr/bin/sudo /usr/bin/chown root:root /home
+          /usr/bin/sudo /usr/bin/chmod 0755 /home
+          test "$(/usr/bin/stat -c '%U:%G:%a' /home)" = "root:root:755"
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -r /home
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -x /home
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w /home
           /usr/bin/sudo /usr/bin/setfacl --physical --recursive --modify 'u:dps-phase0:r-X' "$workspace_real"
           /usr/bin/sudo /usr/bin/git config --system --add safe.directory "$GITHUB_WORKSPACE"
           dps_home="$(/usr/bin/getent passwd dps-phase0 | /usr/bin/cut -d: -f6)"
