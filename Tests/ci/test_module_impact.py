@@ -17,6 +17,7 @@ if str(CI) not in sys.path:
     sys.path.insert(0, str(CI))
 
 from phase0 import (  # noqa: E402
+    Phase0Error,
     build_dependency_graph_snapshot,
     load_module_records_without_schema,
     resolve_instruction_receipt,
@@ -170,9 +171,20 @@ class ImpactRepository:
         git(self.root, "commit", "-qm", title)
         return git(self.root, "rev-parse", "HEAD").stdout.strip()
 
-    def merge_provider_change(self) -> str:
-        self.commit_contract("provider-change", "provider-change")
+    def merge_provider_change(self) -> tuple[str, str, str]:
+        provider_head = self.commit_contract("provider-change", "provider-change")
         git(self.root, "checkout", "-q", "-B", "integration", self.base)
+        observer_manifest = self.root / "Modules" / "observer" / "module.yaml"
+        observer = manifest("observer")
+        observer["dependencies"]["runtime"] = ["provider"]
+        observer["contracts"]["consumes"] = [contract_item("provider")]
+        observer_manifest.write_text(
+            json.dumps(observer, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        git(self.root, "add", observer_manifest.relative_to(self.root).as_posix())
+        git(self.root, "commit", "-qm", "advance integration base")
+        integration_base = git(self.root, "rev-parse", "HEAD").stdout.strip()
         git(
             self.root,
             "merge",
@@ -181,7 +193,8 @@ class ImpactRepository:
             "merge provider change",
             "provider-change",
         )
-        return git(self.root, "rev-parse", "HEAD").stdout.strip()
+        merge_head = git(self.root, "rev-parse", "HEAD").stdout.strip()
+        return merge_head, integration_base, provider_head
 
 
 class ModuleImpactSuite(unittest.TestCase):
@@ -191,7 +204,11 @@ class ModuleImpactSuite(unittest.TestCase):
     def tearDown(self) -> None:
         self.repo.close()
 
-    def assert_provider_consumer_impact(self, baseline: str) -> dict:
+    def assert_impact(
+        self,
+        baseline: str,
+        expected_scope: list[str],
+    ) -> dict:
         receipt = resolve_instruction_receipt(
             self.repo.root,
             baseline,
@@ -199,7 +216,7 @@ class ModuleImpactSuite(unittest.TestCase):
             agent_role="evidence-auditor",
             resolved_at="2026-07-24T00:00:00Z",
         )
-        self.assertEqual(["consumer", "provider"], receipt["scope"])
+        self.assertEqual(expected_scope, receipt["scope"])
         valid, message, current = validate_instruction_receipt(
             self.repo.root,
             receipt,
@@ -220,7 +237,7 @@ class ModuleImpactSuite(unittest.TestCase):
             },
             graph["edges"],
         )
-        self.assert_provider_consumer_impact(self.repo.base)
+        self.assert_impact(self.repo.base, ["consumer", "provider"])
 
     def test_simulated_parallel_change_conflicts_fail_closed(self) -> None:
         self.repo.commit_contract("provider-change", "provider-change")
@@ -234,6 +251,9 @@ class ModuleImpactSuite(unittest.TestCase):
             "merge provider change",
             "provider-change",
         )
+        before_conflict = git(
+            self.repo.root, "rev-parse", "HEAD"
+        ).stdout.strip()
         conflict = git(
             self.repo.root,
             "merge",
@@ -245,28 +265,84 @@ class ModuleImpactSuite(unittest.TestCase):
         )
         self.assertNotEqual(0, conflict.returncode)
         self.assertIn("CONFLICT", conflict.stdout)
+        self.assertEqual(
+            before_conflict,
+            git(self.repo.root, "rev-parse", "HEAD").stdout.strip(),
+        )
+        with self.assertRaisesRegex(Phase0Error, "unmerged paths fail closed"):
+            resolve_instruction_receipt(
+                self.repo.root,
+                self.repo.base,
+                agent_identity="module-impact-suite",
+                agent_role="evidence-auditor",
+                resolved_at="2026-07-24T00:00:00Z",
+            )
         git(self.repo.root, "merge", "--abort")
+        self.assertEqual(
+            "",
+            git(self.repo.root, "status", "--porcelain").stdout.strip(),
+        )
 
     def test_exact_merge_head_is_rerun(self) -> None:
-        merge_head = self.repo.merge_provider_change()
+        provider_head = self.repo.commit_contract(
+            "provider-change", "provider-change"
+        )
+        self.assert_impact(self.repo.base, ["consumer", "provider"])
+        git(self.repo.root, "checkout", "-q", "-B", "integration", self.repo.base)
+        observer_manifest = self.repo.root / "Modules" / "observer" / "module.yaml"
+        observer = manifest("observer")
+        observer["dependencies"]["runtime"] = ["provider"]
+        observer["contracts"]["consumes"] = [contract_item("provider")]
+        observer_manifest.write_text(
+            json.dumps(observer, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        git(
+            self.repo.root,
+            "add",
+            observer_manifest.relative_to(self.repo.root).as_posix(),
+        )
+        git(self.repo.root, "commit", "-qm", "advance integration base")
+        integration_base = git(
+            self.repo.root, "rev-parse", "HEAD"
+        ).stdout.strip()
+        git(
+            self.repo.root,
+            "merge",
+            "--no-ff",
+            "-m",
+            "merge provider change",
+            provider_head,
+        )
+        merge_head = git(self.repo.root, "rev-parse", "HEAD").stdout.strip()
         parents = git(
             self.repo.root, "rev-list", "--parents", "-n", "1", merge_head
         ).stdout.split()
         self.assertEqual(3, len(parents))
-        receipt = self.assert_provider_consumer_impact(self.repo.base)
+        self.assertNotEqual(
+            git(self.repo.root, "rev-parse", provider_head + "^{tree}").stdout.strip(),
+            git(self.repo.root, "rev-parse", merge_head + "^{tree}").stdout.strip(),
+        )
+        receipt = self.assert_impact(
+            integration_base,
+            ["consumer", "observer", "provider"],
+        )
         self.assertEqual(
             merge_head,
             git(self.repo.root, "rev-parse", "HEAD").stdout.strip(),
         )
-        self.assertEqual(self.repo.base, receipt["baseline_commit"])
+        self.assertEqual(integration_base, receipt["baseline_commit"])
 
     def test_rollback_reverts_bytes_and_reruns_impact(self) -> None:
-        merge_head = self.repo.merge_provider_change()
+        merge_head, _, _ = self.repo.merge_provider_change()
         git(self.repo.root, "revert", "-m", "1", "--no-edit", merge_head)
         rollback_head = git(self.repo.root, "rev-parse", "HEAD").stdout.strip()
         self.assertNotEqual(merge_head, rollback_head)
         self.assertEqual("base", json.loads(self.repo.contract.read_text())["title"])
-        self.assert_provider_consumer_impact(merge_head)
+        self.assert_impact(
+            merge_head,
+            ["consumer", "observer", "provider"],
+        )
 
 
 if __name__ == "__main__":

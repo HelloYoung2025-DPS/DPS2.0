@@ -672,6 +672,22 @@ class BomFixture:
         )
         self.rewrite_candidate(update_scope=False)
 
+    def rewrite_module_descriptor_producer(self, module_id, producer_module):
+        module = next(item for item in self.bom["modules"] if item["module_id"] == module_id)
+        descriptor_path = self.bundle / module["descriptor_uri"]
+        descriptor = json.loads(descriptor_path.read_bytes())
+        descriptor["producer_module"] = producer_module
+        descriptor_bytes = _write_json(descriptor_path, descriptor)
+        module["descriptor_sha256"] = sha256_bytes(descriptor_bytes)
+        module["signature"] = _sign(
+            "controller-key",
+            b"dps-module-artifact-bom-entry/v1\n"
+            + canonical_bytes({
+                key: value for key, value in module.items() if key != "signature"
+            }),
+        )
+        self.rewrite_candidate(update_scope=False)
+
     def validator(
         self,
         policy=None,
@@ -1321,7 +1337,7 @@ class CandidateBomValidatorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             fixture = BomFixture(directory)
             fixture.rewrite_module_builder_id(
-                "policy-approval", "not-a-valid-builder-identity"
+                "policy-approval", "dps:anything-at-all:9.9.9"
             )
             with self.assertRaisesRegex(
                 CandidateBomError, "provenance run identity mismatch"
@@ -1341,6 +1357,43 @@ class CandidateBomValidatorTests(unittest.TestCase):
             )
             fixture.rewrite_candidate(update_scope=False)
             with self.assertRaisesRegex(CandidateBomError, "not PASS"):
+                fixture.validate()
+
+    def test_candidate_producer_and_builder_identities_fail_closed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            route = fixture.bom["device_route_assignment_authorities"][0]
+            route["producer_module"] = "attacker-router"
+            fixture.rehash_authorities()
+            fixture.rewrite_candidate()
+            with self.assertRaisesRegex(
+                CandidateBomError, "device route authority Supervisor"
+            ):
+                fixture.validate()
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            fixture.rewrite_module_descriptor_producer(
+                "policy-approval", "attacker-builder"
+            )
+            with self.assertRaisesRegex(
+                CandidateBomError, "descriptor linkage mismatch"
+            ):
+                fixture.validate()
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = BomFixture(directory)
+            receipt = json.loads(fixture.receipt_path.read_bytes())
+            receipt["producer_module"] = "attacker-receipt"
+            payload = {
+                key: value for key, value in receipt.items() if key != "signature"
+            }
+            receipt["signature"] = _sign(
+                "trust-receipt-key",
+                SUBJECT.native_stop_trust_signing_bytes(payload),
+            )
+            _write_receipt_wire(fixture.receipt_path, receipt)
+            with self.assertRaisesRegex(
+                CandidateBomError, "trust receipt envelope"
+            ):
                 fixture.validate()
 
     def test_duplicate_receipt_member_and_old_mixed_shape_fail_closed(self):

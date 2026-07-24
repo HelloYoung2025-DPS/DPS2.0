@@ -257,30 +257,13 @@ class CandidateBomValidatorMainEndToEndTests(unittest.TestCase):
         return signature
 
     def _synthetic_anchor_policy(self):
-        # Deployed anchor shape: its schema version, policy id,
-        # allow_bootstrap, and -- the genuine link under test -- the owner's
-        # native-stop-trust signer group and key entry are read from the live
-        # policy.  The signed R0-C BOM keeps its historical evidence IDs, so
-        # this disposable compatibility policy maps those IDs to the live
-        # policy's kind/verification requirements.  This keeps old signed
-        # evidence interpretable without making its retired IDs live policy
-        # authorities.  The classic roles are carried by the test-suite KEYS
-        # because the deployed anchor's classic private halves were discarded
-        # by design.
+        # Deployed anchor shape: its schema version, policy id, the three
+        # deployed required gates, allow_bootstrap, and -- the genuine link
+        # under test -- the owner's native-stop-trust signer group and key
+        # entry, all read from the live patched policy at test time.  The
+        # classic roles are carried by the test-suite KEYS because the
+        # deployed anchor's classic private halves were discarded by design.
         policy, owner_entry = self._owner_key_entry()
-        live_gate_by_kind = {
-            gate["kind"]: gate for gate in policy["required_gates"].values()
-        }
-        signed_bom = json.loads((FIXTURES / "bom.json").read_bytes())
-        required_gates = {
-            evidence["evidence_id"]: live_gate_by_kind[evidence["kind"]]
-            for evidence in signed_bom["evidence"]
-            if evidence["required"]
-        }
-        self.assertEqual(
-            set(live_gate_by_kind),
-            {evidence["kind"] for evidence in signed_bom["evidence"] if evidence["required"]},
-        )
         classic = {
             "controller-key": ("release-controller", ["artifact"]),
             "external-bom-test-key": ("external-release-signer", ["bom"]),
@@ -290,7 +273,7 @@ class CandidateBomValidatorMainEndToEndTests(unittest.TestCase):
         return {
             "schema_version": policy["schema_version"],
             "policy_id": policy["policy_id"],
-            "required_gates": required_gates,
+            "required_gates": policy["required_gates"],
             "implementer_identities": ["module-builder"],
             "evidence_issuer_identities": ["evidence-issuer"],
             "release_controller_identities": [

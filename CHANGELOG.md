@@ -11,6 +11,7 @@
 #### Changed
 
 - instruction receipt 解析与候选变更影响计算继续由唯一 Phase 0 gate 提供；候选 Release BOM 校验器、外部 signer 合同、Control Plane active release binding、activation/revocation/rollback 与精确重投恢复能力保留在已迁入的普通工具和保留模块中。静态 CI 在唯一 required job 内新增 fail-closed `module-impact` 步骤，并支持 GitHub `merge_group` 事件。
+- 最终异族外审收紧 Release BOM 的 route producer、descriptor producer 与 provenance builder 为当前/历史回滚身份的精确闭集，要求 native-stop trust receipt producer 与唯一 route producer 完全一致；Phase 0 instruction resolver 在 Git index 存在未解决冲突时失败关闭，module-impact 以不同 tree 的先进 base/merge HEAD 验证 consumer 扩展。R0-D 不自行签发新的 deployed trust anchor，相关 policy 与 validator pin 恢复 R0-C 已部署字节。
 
 ### R0-C Release BOM authority migration
 
