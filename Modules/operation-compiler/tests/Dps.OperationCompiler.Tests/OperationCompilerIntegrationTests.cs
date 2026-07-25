@@ -326,10 +326,10 @@ public sealed class OperationCompilerIntegrationTests
             quarantine,
             TimeSpan.FromMilliseconds(100));
 
-        await Assert.ThrowsAsync<TimeoutException>(() => boundary.CompileAndAcceptAsync(request));
+        await Assert.ThrowsAsync<TimeoutException>(() => boundary.CompileAndAcceptAsync(request, TestContext.Current.CancellationToken));
         Assert.True(reader.CancellationToken.IsCancellationRequested);
         reader.Complete(snapshot);
-        await boundary.DrainLateQuarantinesAsync();
+        await boundary.DrainLateQuarantinesAsync(TestContext.Current.CancellationToken);
 
         Assert.Null(consumer.Wire);
         var outcome = Assert.Single(quarantine.Outcomes);
@@ -361,11 +361,11 @@ public sealed class OperationCompilerIntegrationTests
             quarantine,
             TimeSpan.FromMilliseconds(100));
 
-        await Assert.ThrowsAsync<TimeoutException>(() => boundary.CompileAndAcceptAsync(request));
+        await Assert.ThrowsAsync<TimeoutException>(() => boundary.CompileAndAcceptAsync(request, TestContext.Current.CancellationToken));
         Assert.NotNull(consumer.Wire);
         Assert.True(consumer.CancellationToken.IsCancellationRequested);
         consumer.Complete();
-        await boundary.DrainLateQuarantinesAsync();
+        await boundary.DrainLateQuarantinesAsync(TestContext.Current.CancellationToken);
 
         var outcome = Assert.Single(quarantine.Outcomes);
         Assert.Equal("command-accept", outcome.Phase);
