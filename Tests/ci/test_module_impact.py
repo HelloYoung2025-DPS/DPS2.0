@@ -13,16 +13,21 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CI = ROOT / "Tools" / "ci"
-if str(CI) not in sys.path:
-    sys.path.insert(0, str(CI))
+_ORIGINAL_IMPORT_PATH = list(sys.path)
+try:
+    if str(CI) not in sys.path:
+        sys.path.insert(0, str(CI))
 
-from phase0 import (  # noqa: E402
-    Phase0Error,
-    build_dependency_graph_snapshot,
-    load_module_records_without_schema,
-    resolve_instruction_receipt,
-    validate_instruction_receipt,
-)
+    from phase0 import (  # noqa: E402
+        Phase0Error,
+        build_dependency_graph_snapshot,
+        load_module_records_without_schema,
+        resolve_instruction_receipt,
+        validate_instruction_receipt,
+    )
+finally:
+    sys.path[:] = _ORIGINAL_IMPORT_PATH
+    del _ORIGINAL_IMPORT_PATH
 
 
 def git(root: Path, *arguments: str, check: bool = True) -> subprocess.CompletedProcess[str]:
