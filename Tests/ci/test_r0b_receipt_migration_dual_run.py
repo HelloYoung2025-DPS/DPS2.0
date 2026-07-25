@@ -936,6 +936,23 @@ class BaselineAuthorityFailClosedTest(unittest.TestCase):
     def _unreferenced_commit(self) -> str:
         """A real commit object that is not on HEAD's ancestry."""
 
+        primary_raw = os.environ.get("GIT_OBJECT_DIRECTORY")
+        alternate_raw = os.environ.get("GIT_ALTERNATE_OBJECT_DIRECTORIES")
+        self.assertIsNotNone(primary_raw)
+        self.assertIsNotNone(alternate_raw)
+        primary = Path(str(primary_raw))
+        alternate = Path(str(alternate_raw))
+        self.assertTrue(primary.is_absolute())
+        self.assertTrue(alternate.is_absolute())
+        self.assertFalse(primary.is_symlink())
+        self.assertFalse(alternate.is_symlink())
+        self.assertEqual(primary, primary.resolve(strict=True))
+        self.assertEqual(alternate, alternate.resolve(strict=True))
+        self.assertEqual(os.getuid(), primary.stat().st_uid)
+        self.assertEqual(0o700, primary.stat().st_mode & 0o777)
+        with self.assertRaises(ValueError):
+            primary.relative_to(ROOT)
+
         tree = _run_trusted_git("hash-object", "-t", "tree", "-w", "--stdin")
         self.assertEqual(0, tree.returncode, tree.stderr.decode("utf-8", "replace"))
         created = subprocess.run(
@@ -944,7 +961,7 @@ class BaselineAuthorityFailClosedTest(unittest.TestCase):
                 "commit-tree",
                 tree.stdout.decode("ascii").strip(),
                 "-m",
-                "r0b baseline-authority ancestry probe",
+                "r0b baseline-authority isolated-object probe",
             ],
             cwd=str(ROOT),
             input=b"",
@@ -961,7 +978,14 @@ class BaselineAuthorityFailClosedTest(unittest.TestCase):
             ),
         )
         self.assertEqual(0, created.returncode, created.stderr.decode("utf-8", "replace"))
-        return created.stdout.decode("ascii").strip()
+        commit = created.stdout.decode("ascii").strip()
+        self.assertRegex(commit, r"^[0-9a-f]{40}$")
+        private_object = primary / commit[:2] / commit[2:]
+        alternate_object = alternate / commit[:2] / commit[2:]
+        self.assertTrue(private_object.is_file())
+        self.assertFalse(private_object.is_symlink())
+        self.assertFalse(alternate_object.exists())
+        return commit
 
     def test_absent_injection_fails_closed(self) -> None:
         with self._with_injection(None):
@@ -995,10 +1019,152 @@ class BaselineAuthorityFailClosedTest(unittest.TestCase):
         # clearest case -- this is also the shape of the planted-ancestor attack,
         # where the candidate declares a commit that exists only on its own branch
         # and is therefore absent from the base the runner names.
-        stranger = self._unreferenced_commit()
-        with self._with_injection(stranger):
-            with self.assertRaises(AssertionError) as raised:
-                _require_injected_baseline_commit()
+        clean_environment = dict(os.environ)
+        for name in (
+            "GIT_DIR",
+            "GIT_WORK_TREE",
+            "GIT_COMMON_DIR",
+            "GIT_INDEX_FILE",
+            "GIT_OBJECT_DIRECTORY",
+            "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+        ):
+            clean_environment.pop(name, None)
+        with mock.patch.dict(os.environ, clean_environment, clear=True):
+            head_before = self._head_commit()
+            status_before = _run_trusted_git(
+                "status",
+                "--porcelain=v1",
+                "--untracked-files=all",
+            )
+            self.assertEqual(
+                0,
+                status_before.returncode,
+                status_before.stderr.decode("utf-8", "replace"),
+            )
+            refs_before = _run_trusted_git(
+                "for-each-ref",
+                "--format=%(refname)%00%(objectname)",
+            )
+            self.assertEqual(
+                0,
+                refs_before.returncode,
+                refs_before.stderr.decode("utf-8", "replace"),
+            )
+            top_level = _run_trusted_git(
+                "rev-parse",
+                "--path-format=absolute",
+                "--show-toplevel",
+            )
+            self.assertEqual(
+                0,
+                top_level.returncode,
+                top_level.stderr.decode("utf-8", "replace"),
+            )
+            self.assertEqual(ROOT, Path(top_level.stdout.decode("utf-8").strip()))
+            common = _run_trusted_git(
+                "rev-parse",
+                "--path-format=absolute",
+                "--git-common-dir",
+            )
+            self.assertEqual(
+                0,
+                common.returncode,
+                common.stderr.decode("utf-8", "replace"),
+            )
+            common_directory = Path(
+                common.stdout.decode("utf-8").strip()
+            )
+            self.assertTrue(common_directory.is_absolute())
+            self.assertFalse(common_directory.is_symlink())
+            self.assertEqual(
+                common_directory,
+                common_directory.resolve(strict=True),
+            )
+            alternate_objects = common_directory / "objects"
+            self.assertTrue(alternate_objects.is_dir())
+            self.assertFalse(alternate_objects.is_symlink())
+            self.assertEqual(
+                alternate_objects,
+                alternate_objects.resolve(strict=True),
+            )
+            self.assertTrue(os.access(str(alternate_objects), os.R_OK | os.X_OK))
+            if alternate_objects.stat().st_uid != os.getuid():
+                self.assertFalse(os.access(str(alternate_objects), os.W_OK))
+
+            temporary_parent = Path(tempfile.gettempdir()).resolve(strict=True)
+            self.assertTrue(temporary_parent.is_dir())
+            self.assertFalse(temporary_parent.is_symlink())
+            with tempfile.TemporaryDirectory(
+                prefix="dps-r0b-git-objects-",
+                dir=str(temporary_parent),
+            ) as temporary:
+                private_state = Path(temporary)
+                self.assertEqual(os.getuid(), private_state.stat().st_uid)
+                self.assertEqual(0o700, private_state.stat().st_mode & 0o777)
+                with self.assertRaises(ValueError):
+                    private_state.relative_to(ROOT)
+                private_objects = private_state / "objects"
+                private_objects.mkdir(mode=0o700)
+                self.assertEqual(os.getuid(), private_objects.stat().st_uid)
+                self.assertEqual(0o700, private_objects.stat().st_mode & 0o777)
+                isolated_environment = dict(clean_environment)
+                isolated_environment.update(
+                    {
+                        "GIT_OBJECT_DIRECTORY": str(private_objects),
+                        "GIT_ALTERNATE_OBJECT_DIRECTORIES": str(
+                            alternate_objects
+                        ),
+                    }
+                )
+                with mock.patch.dict(
+                    os.environ,
+                    isolated_environment,
+                    clear=True,
+                ):
+                    stranger = self._unreferenced_commit()
+                    visible = _run_trusted_git(
+                        "cat-file",
+                        "-e",
+                        stranger + "^{commit}",
+                    )
+                    self.assertEqual(
+                        0,
+                        visible.returncode,
+                        visible.stderr.decode("utf-8", "replace"),
+                    )
+                    with self._with_injection(stranger):
+                        with self.assertRaises(AssertionError) as raised:
+                            _require_injected_baseline_commit()
+                private_state_path = private_state
+            self.assertFalse(private_state_path.exists())
+            canonical_visibility = _run_trusted_git(
+                "cat-file",
+                "-e",
+                stranger + "^{commit}",
+            )
+            self.assertNotEqual(0, canonical_visibility.returncode)
+            self.assertEqual(head_before, self._head_commit())
+            status_after = _run_trusted_git(
+                "status",
+                "--porcelain=v1",
+                "--untracked-files=all",
+            )
+            self.assertEqual(
+                0,
+                status_after.returncode,
+                status_after.stderr.decode("utf-8", "replace"),
+            )
+            self.assertEqual(status_before.stdout, status_after.stdout)
+            refs_after = _run_trusted_git(
+                "for-each-ref",
+                "--format=%(refname)%00%(objectname)",
+            )
+            self.assertEqual(
+                0,
+                refs_after.returncode,
+                refs_after.stderr.decode("utf-8", "replace"),
+            )
+            self.assertEqual(refs_before.stdout, refs_after.stdout)
         self.assertIn("does not descend from the frozen baseline", str(raised.exception))
 
     def test_a_baseline_older_than_the_corpus_fails_closed(self) -> None:
@@ -1140,7 +1306,50 @@ class GitAnchoringTrustBoundaryTest(unittest.TestCase):
         # Even a hostile git planted inside the repo tree (the most reachable
         # location for candidate code) and prepended to PATH is ignored, because
         # resolution is locked to the absolute path, not PATH order.
-        with tempfile.TemporaryDirectory(dir=str(ROOT)) as poisoned_dir:
+        fixture_parent = ROOT / "Reports" / "ci"
+        for directory in (
+            ROOT,
+            ROOT / "Reports",
+            fixture_parent,
+        ):
+            self.assertTrue(directory.is_dir())
+            self.assertFalse(directory.is_symlink())
+            self.assertEqual(directory, directory.resolve(strict=True))
+        parent_stat = fixture_parent.stat()
+        self.assertEqual(os.getuid(), parent_stat.st_uid)
+        self.assertEqual(0, parent_stat.st_mode & 0o022)
+        self.assertTrue(
+            os.access(
+                str(fixture_parent),
+                os.R_OK | os.W_OK | os.X_OK,
+            )
+        )
+        probe = "Reports/ci/r0b-repo-local-git-fixture/probe"
+        ignored = _run_trusted_git(
+            "check-ignore",
+            "--quiet",
+            "--no-index",
+            "--",
+            probe,
+        )
+        self.assertEqual(0, ignored.returncode)
+        tracked = _run_trusted_git(
+            "ls-files",
+            "--error-unmatch",
+            "--",
+            probe,
+        )
+        self.assertEqual(1, tracked.returncode)
+        with tempfile.TemporaryDirectory(
+            prefix="r0b-repo-local-git-",
+            dir=str(fixture_parent),
+        ) as poisoned_dir:
+            poisoned_path = Path(poisoned_dir)
+            self.assertFalse(poisoned_path.is_symlink())
+            self.assertEqual(poisoned_path, poisoned_path.resolve(strict=True))
+            self.assertEqual(os.getuid(), poisoned_path.stat().st_uid)
+            self.assertEqual(0o700, poisoned_path.stat().st_mode & 0o777)
+            self.assertEqual(fixture_parent, poisoned_path.parent)
             hostile = Path(poisoned_dir) / "git"
             hostile.write_text("#!/bin/sh\necho HOSTILE\n", encoding="utf-8")
             hostile.chmod(0o755)

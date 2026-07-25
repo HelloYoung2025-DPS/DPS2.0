@@ -232,6 +232,9 @@ ALLOWED_RUNTIME_ENVIRONMENT = (
     "DPS_TEST_PLATFORM_AUTHORITY_PKCS8_FILE",
     "DPS_PSQL",
 )
+PHASE0_PREREQUISITE_RUNTIME_ENVIRONMENT = (
+    "DPS_LEGACY_BASELINE_ANCHOR",
+)
 POSTGRES_CONNECTION_ENVIRONMENT = (
     "DPS_TEST_POSTGRES",
     "DPS_TEST_POSTGRES_ADMIN_URI",
@@ -763,19 +766,36 @@ def _candidate_git_environment() -> Dict[str, str]:
     }
 
 
+def _candidate_git_invocation(
+    root: Path, args: Sequence[str]
+) -> Tuple[Path, List[str]]:
+    try:
+        canonical_root = root.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise Phase0Error("locked Git root cannot be resolved: " + str(exc))
+    if not canonical_root.is_dir():
+        raise Phase0Error(
+            "locked Git root is not a directory: " + str(canonical_root)
+        )
+    return canonical_root, [
+        str(GIT_EXECUTABLE),
+        "-c",
+        "safe.directory=" + str(canonical_root),
+        "-c",
+        "core.hooksPath=/dev/null",
+        "-c",
+        "core.fsmonitor=false",
+        *args,
+    ]
+
+
 def _candidate_git(
     root: Path, args: Sequence[str], *, timeout_seconds: int = 30
 ) -> Any:
+    canonical_root, command = _candidate_git_invocation(root, args)
     return run_command(
-        [
-            str(GIT_EXECUTABLE),
-            "-c",
-            "core.hooksPath=/dev/null",
-            "-c",
-            "core.fsmonitor=false",
-            *args,
-        ],
-        root,
+        command,
+        canonical_root,
         timeout_seconds=timeout_seconds,
         env=_candidate_git_environment(),
     )
@@ -791,17 +811,13 @@ def _candidate_git_output(root: Path, args: Sequence[str]) -> str:
 
 
 def _candidate_git_blob(root: Path, revision_and_path: str) -> Optional[bytes]:
+    canonical_root, command = _candidate_git_invocation(
+        root,
+        ["show", revision_and_path],
+    )
     completed = subprocess.run(
-        [
-            str(GIT_EXECUTABLE),
-            "-c",
-            "core.hooksPath=/dev/null",
-            "-c",
-            "core.fsmonitor=false",
-            "show",
-            revision_and_path,
-        ],
-        cwd=str(root),
+        command,
+        cwd=str(canonical_root),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         check=False,
@@ -2097,6 +2113,17 @@ def _phase0_companion_evidence_path(
     return _safe_evidence_path(root, companion, allow_reserved_companion=True)
 
 
+def _phase0_prerequisite_runtime_environment(
+    ambient: Optional[Mapping[str, str]] = None,
+) -> Dict[str, str]:
+    source = os.environ if ambient is None else ambient
+    return {
+        key: source[key]
+        for key in PHASE0_PREREQUISITE_RUNTIME_ENVIRONMENT
+        if source.get(key)
+    }
+
+
 def _phase0_prerequisite(
     root: Path,
     candidate_evidence_path: Path,
@@ -2121,7 +2148,11 @@ def _phase0_prerequisite(
     ]
     if diagnostic:
         command.append("--diagnostic-workspace")
-    with _trusted_test_environment_scope({}) as environment:
+    phase0_environment = {}
+    legacy_anchor = runtime_environment.get("DPS_LEGACY_BASELINE_ANCHOR")
+    if legacy_anchor:
+        phase0_environment["DPS_LEGACY_BASELINE_ANCHOR"] = legacy_anchor
+    with _trusted_test_environment_scope(phase0_environment) as environment:
         result = run_command(
             command,
             root,
@@ -3002,7 +3033,7 @@ def _run_candidate_gate(
         head,
         str(start_workspace["digest"]),
         diagnostic_run,
-        runtime_environment,
+        _phase0_prerequisite_runtime_environment(),
         evidence_publication.run_id,
     )
     checks.append(phase0_check)

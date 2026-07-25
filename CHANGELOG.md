@@ -8,6 +8,14 @@
 
 - 为唯一的 R0-B 历史 base `8f63593d4f262ec1496b05300da75a71b86eaab4`、head `2ce0d14744ea8d25db2e963d4902cb0430b70cc4`、merge commit `8165fedbd44ecb8388c4dfce5e44e8753af21daf` 增加窄化 §4.5 step 1 再基线规则；仅在原 formal raw/publication 字节持久可读可校验、非 OpenAI 独立外审明确批准且 Owner 合入后记为 `REBASELINED`，不把 formal 改称 diagnostic，不改变原始 `39 PASS / 14 FAIL / 0 INFRA_ERROR`，也不外推其他批次或自动改变 T4/M1 裁决。
 
+### R0-B legacy baseline hosted gate
+
+#### Changed
+
+- Hosted Static CI 现在从受保护的 `DPS_LEGACY_BASELINE_ANCHOR_B64` secret 恢复固定 SHA-256 的仓外 legacy baseline anchor，并把 GitHub 生成的唯一 gate 脚本封装成 root-owned 只读输入，再以无 sudo 权限的专用执行身份运行精确 PR head。Phase 0 仅接受受保护 Manifest 现有的精确 `.venv/bin/python -I` 形状，将无参数 `test_*.py` 作为 isolated unittest 执行，并只向 `legacy-runtime-adapter.static` 转发该 trusted-executor ambient 输入；candidate gate 也只通过专用窄 allowlist 将同一 ambient anchor 传给 cumulative Phase 0 prerequisite。缺失、Manifest 自声明、仓内、可写或同身份控制的 anchor 均失败关闭。此接口只建立 hosted required-path 与本批 §4.5 取证的受支持执行链，不改变产品能力或既有 raw gate 状态。
+- 专用 Phase 0 身份在 checkout 内的写入面仅增加由 `Dps.slnx` 与 tracked `.csproj` 精确同集导出的、Git 忽略且初始不存在的逐项目 `bin/`、`obj/` 输出岛；每个输出岛独立为该身份所有且模式为 `0700`，不递归授权，也不放宽项目文件、项目目录或其他 checkout 路径。workflow 在启动 gate 前校验项目集合、canonical 路径、ACL/属主/模式、全仓可写目录精确集合及只读身份下的 clean Git 状态；任何漂移均失败关闭。
+- Candidate gate 的 locked Git 在继续禁用 system/global config、固定绝对可执行文件并关闭 hooks/fsmonitor 的前提下，只以 command scope 信任当前 canonical repository root；不存在 wildcard 或 ambient Git config 注入。两个需要临时写入的 R0-B 对抗 fixture 分别使用既有 Git-ignored evidence 目录和仓外私有 `0700` Git object database，真实 checkout、canonical `.git`、refs 与产品文件继续只读；该修正只恢复专用身份下的既有测试语义，不改变产品能力或其余 raw FAIL。
+
 ### R0-D factory module retirement
 
 #### Removed

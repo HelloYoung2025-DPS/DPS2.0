@@ -21,6 +21,8 @@ jobs:
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
 
       - name: Set up pinned Python
         uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
@@ -37,9 +39,16 @@ jobs:
         with:
           dotnet-version: "10.0.301"
 
+      - name: Create pinned repository virtual environment
+        run: |
+          set -euo pipefail
+          python -m venv --copies .venv
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+          .venv/bin/python -I -c 'import platform; assert platform.python_version() == "3.12.13"'
+
       - name: Install hash-locked Python gate dependencies
         run: >-
-          python -m pip install
+          .venv/bin/python -m pip install
           --disable-pip-version-check
           --require-hashes
           --requirement requirements-ci.txt
@@ -51,19 +60,588 @@ jobs:
           -p test_module_impact.py
           -v
 
+      - name: Materialize protected legacy baseline anchor
+        env:
+          DPS_LEGACY_BASELINE_ANCHOR_B64: ${{ secrets.DPS_LEGACY_BASELINE_ANCHOR_B64 }}
+          DPS_EXPECTED_HEAD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+          materialize_stage=0
+          materialize_step() {
+            materialize_stage="$1"
+            printf 'MATERIALIZE_STAGE=%03d\n' "$materialize_stage"
+          }
+          on_materialize_err() {
+            materialize_status=$?
+            trap - ERR
+            printf 'MATERIALIZE_FAIL stage=%03d rc=%d\n' \
+              "$materialize_stage" "$materialize_status" >&2
+            exit "$materialize_status"
+          }
+          trap on_materialize_err ERR
+          materialize_step 101
+          test -n "${DPS_LEGACY_BASELINE_ANCHOR_B64:-}"
+          materialize_step 102
+          anchor_staging="$(/usr/bin/mktemp "$RUNNER_TEMP/dps-legacy-anchor.XXXXXX")"
+          materialize_step 103
+          wrapper_staging="$(/usr/bin/mktemp "$RUNNER_TEMP/dps-phase0-shell.XXXXXX")"
+          materialize_step 104
+          trap '/usr/bin/rm -f "$anchor_staging" "$wrapper_staging"' EXIT
+          materialize_step 105
+          if ! printf '%s' "$DPS_LEGACY_BASELINE_ANCHOR_B64" | /usr/bin/base64 --decode > "$anchor_staging"; then
+            /usr/bin/false
+          fi
+          materialize_step 106
+          anchor_sha256="$(/usr/bin/sha256sum "$anchor_staging" | /usr/bin/awk '{print $1}')"
+          materialize_step 107
+          test "$anchor_sha256" = "1b2d69e8ca5bdbd5a790dfd55d42704d710104faf3888bdb206462f6449c69fb"
+          materialize_step 108
+          if /usr/bin/id -u dps-phase0 >/dev/null 2>&1; then
+            materialize_step 109
+            /usr/bin/false
+          fi
+          materialize_step 110
+          /usr/bin/sudo /usr/sbin/useradd --system --create-home --shell /usr/sbin/nologin dps-phase0
+          materialize_step 111
+          /usr/bin/sudo /usr/bin/install -d -o root -g root -m 0555 /opt/dps-protected
+          materialize_step 112
+          /usr/bin/sudo /usr/bin/install -o root -g root -m 0444 "$anchor_staging" /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json
+          materialize_step 113
+          /usr/bin/cat <<'DPS_PHASE0_WRAPPER' > "$wrapper_staging"
+          #!/bin/bash
+          set -euo pipefail
+          export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+          if [[ "$#" -ne 1 ]]; then
+            exit 64
+          fi
+          source_script="$1"
+          if [[ -L "$source_script" ]]; then
+            exit 65
+          fi
+          source_real="$(/usr/bin/realpath -e -- "$source_script")"
+          runner_temp_real="$(/usr/bin/realpath -e -- "${RUNNER_TEMP:?}")"
+          case "$source_real" in
+            "$runner_temp_real"/*) ;;
+            *) exit 66 ;;
+          esac
+          test -f "$source_real"
+          test "$(/usr/bin/stat -c '%u' "$source_real")" = "$(/usr/bin/id -u)"
+          source_mode="$(/usr/bin/stat -c '%a' "$source_real")"
+          if (( (8#$source_mode & 022) != 0 )); then
+            exit 67
+          fi
+          workspace_real="$(/usr/bin/realpath -e -- "${GITHUB_WORKSPACE:?}")"
+          test "$(/usr/bin/realpath -e -- "$PWD")" = "$workspace_real"
+          [[ "${DPS_EXPECTED_HEAD_COMMIT:?}" =~ ^[0-9a-f]{40}$ ]]
+          test "$(/usr/bin/git rev-parse HEAD^{commit})" = "$DPS_EXPECTED_HEAD_COMMIT"
+          [[ "${DPS_BASELINE_COMMIT:?}" =~ ^[0-9a-f]{40}$ ]]
+          anchor="/opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json"
+          test "${DPS_LEGACY_BASELINE_ANCHOR:?}" = "$anchor"
+          node_real=""
+          for node_candidate in \
+            /opt/hostedtoolcache/node/24.18.0/x64/bin/node \
+            /opt/hostedtoolcache/node/24.18.0/arm64/bin/node
+          do
+            if [[ -x "$node_candidate" ]]; then
+              node_real="$(/usr/bin/realpath -e -- "$node_candidate")"
+              break
+            fi
+          done
+          test -n "$node_real"
+          protected_script="/opt/dps-protected/github-phase0-step.sh"
+          test ! -e "$protected_script"
+          /usr/bin/sudo /usr/bin/install -o root -g root -m 0444 "$source_real" "$protected_script"
+          test "$(/usr/bin/stat -c '%U:%G:%a' "$protected_script")" = "root:root:444"
+          /usr/bin/cmp --silent "$source_real" "$protected_script"
+          dps_home="$(/usr/bin/getent passwd dps-phase0 | /usr/bin/cut -d: -f6)"
+          test -n "$dps_home"
+          status=0
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
+            HOME="$dps_home" \
+            USER=dps-phase0 \
+            LOGNAME=dps-phase0 \
+            PATH="$workspace_real/.venv/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+            PYTHONDONTWRITEBYTECODE=1 \
+            LANG=C \
+            LC_ALL=C \
+            DPS_BASELINE_COMMIT="$DPS_BASELINE_COMMIT" \
+            DPS_LEGACY_BASELINE_ANCHOR="$anchor" \
+            DPS_NODE="$node_real" \
+            GITHUB_ACTIONS="${GITHUB_ACTIONS:-true}" \
+            RUNNER_OS="${RUNNER_OS:-Linux}" \
+            RUNNER_ARCH="${RUNNER_ARCH:-X64}" \
+            ImageOS="${ImageOS:-}" \
+            ImageVersion="${ImageVersion:-}" \
+            /bin/bash --noprofile --norc -eo pipefail "$protected_script" || status=$?
+          /usr/bin/sudo /usr/bin/rm -f "$protected_script"
+          exit "$status"
+          DPS_PHASE0_WRAPPER
+          materialize_step 114
+          /usr/bin/sudo /usr/bin/install -o root -g root -m 0555 "$wrapper_staging" /opt/dps-protected/dps-phase0-shell
+          materialize_step 115
+          /usr/bin/rm -f "$anchor_staging" "$wrapper_staging"
+          materialize_step 116
+          trap - EXIT
+          materialize_step 117
+          test "$(/usr/bin/stat -c '%U:%G:%a' /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json)" = "root:root:444"
+          materialize_step 118
+          test "$(/usr/bin/stat -c '%U:%G:%a' /opt/dps-protected/dps-phase0-shell)" = "root:root:555"
+          materialize_step 119
+          /usr/bin/sudo --user=dps-phase0 /usr/bin/test -r /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json
+          materialize_step 120
+          /usr/bin/sudo --user=dps-phase0 /usr/bin/test ! -w /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json
+          materialize_step 121
+          /usr/bin/sudo --user=dps-phase0 /usr/bin/test ! -w /opt/dps-protected
+          materialize_step 122
+          if /usr/bin/sudo --user=dps-phase0 /usr/bin/sudo --non-interactive /usr/bin/true >/dev/null 2>&1; then
+            materialize_step 123
+            /usr/bin/false
+          fi
+          materialize_step 124
+          if /usr/bin/git config --local --get-regexp '^http\..*\.extraheader$' >/dev/null 2>&1; then
+            materialize_step 125
+            /usr/bin/false
+          fi
+          materialize_step 126
+          /usr/bin/test -x /usr/bin/setfacl
+          materialize_step 127
+          /usr/bin/test -x /usr/bin/getfacl
+          materialize_step 201
+          workspace_real="$(/usr/bin/realpath -e -- "$GITHUB_WORKSPACE")"
+          materialize_step 202
+          test "$workspace_real" = "$GITHUB_WORKSPACE"
+          materialize_step 203
+          case "$workspace_real" in
+            /home/runner/work/*/*) ;;
+            *)
+              materialize_step 204
+              /usr/bin/false
+              ;;
+          esac
+          workspace_relative="${workspace_real#/home/runner/work/}"
+          materialize_step 205
+          [[ "$workspace_relative" == */* ]]
+          materialize_step 206
+          [[ "${workspace_relative#*/}" != */* ]]
+          materialize_step 207
+          workspace_parent="$(/usr/bin/dirname -- "$workspace_real")"
+          materialize_step 208
+          test "$workspace_parent" = "/home/runner/work/${workspace_relative%%/*}"
+          materialize_step 209
+          [[ "${DPS_EXPECTED_HEAD_COMMIT:?}" =~ ^[0-9a-f]{40}$ ]]
+          materialize_step 210
+          checkout_head="$(/usr/bin/git -C "$workspace_real" rev-parse HEAD^{commit})"
+          materialize_step 211
+          test "$checkout_head" = "$DPS_EXPECTED_HEAD_COMMIT"
+          reports_dir="$workspace_real/Reports"
+          evidence_dir="$reports_dir/ci"
+          if [[ -e "$reports_dir" || -L "$reports_dir" ]]; then
+            materialize_step 213
+            test -d "$reports_dir"
+            materialize_step 214
+            test ! -L "$reports_dir"
+            materialize_step 215
+            test "$(/usr/bin/realpath -e -- "$reports_dir")" = "$reports_dir"
+            materialize_step 216
+            test "$(/usr/bin/stat -c '%U:%G:%a' "$reports_dir")" = "root:root:755"
+          else
+            materialize_step 217
+            /usr/bin/sudo /usr/bin/install -d -o root -g root -m 0755 "$reports_dir"
+          fi
+          materialize_step 218
+          test ! -e "$evidence_dir"
+          materialize_step 219
+          test ! -L "$evidence_dir"
+          materialize_step 220
+          runner_gid="$(/usr/bin/id -g)"
+          materialize_step 221
+          /usr/bin/sudo /usr/bin/install -d -o dps-phase0 -g "$runner_gid" -m 0750 "$evidence_dir"
+          materialize_step 222
+          evidence_real="$(/usr/bin/realpath -e -- "$evidence_dir")"
+          materialize_step 223
+          test "$evidence_real" = "$evidence_dir"
+          materialize_step 224
+          dps_uid="$(/usr/bin/id -u dps-phase0)"
+          materialize_step 301
+          project_list="$(/usr/bin/mktemp "$RUNNER_TEMP/dps-dotnet-projects.XXXXXX")"
+          allowed_writable_list="$(/usr/bin/mktemp "$RUNNER_TEMP/dps-writable-allowed.XXXXXX")"
+          observed_writable_list="$(/usr/bin/mktemp "$RUNNER_TEMP/dps-writable-observed.XXXXXX")"
+          trap '/usr/bin/rm -f "$project_list" "$allowed_writable_list" "$observed_writable_list"' EXIT
+          materialize_step 302
+          "$workspace_real/.venv/bin/python" -I - \
+            "$workspace_real" "$project_list" <<'PY'
+          import os
+          import pathlib
+          import re
+          import subprocess
+          import sys
+          import xml.etree.ElementTree as element_tree
+
+          root = pathlib.Path(sys.argv[1]).resolve(strict=True)
+          output = pathlib.Path(sys.argv[2])
+          output_stat = output.stat(follow_symlinks=False)
+          if output.is_symlink() or output_stat.st_uid != os.getuid():
+              raise SystemExit("unsafe project-list output")
+          if output_stat.st_mode & 0o077:
+              raise SystemExit("project-list output is not private")
+
+          tracked_raw = subprocess.run(
+              [
+                  "/usr/bin/git",
+                  "-C",
+                  str(root),
+                  "ls-files",
+                  "-z",
+                  "--",
+                  ":(glob)**/*.csproj",
+              ],
+              check=True,
+              stdout=subprocess.PIPE,
+          ).stdout
+          tracked_values = [
+              os.fsdecode(value)
+              for value in tracked_raw.split(b"\0")
+              if value
+          ]
+          if not tracked_values or len(tracked_values) != len(set(tracked_values)):
+              raise SystemExit("tracked project inventory is empty or duplicated")
+
+          solution = element_tree.parse(str(root / "Dps.slnx"))
+          solution_values = [
+              element.get("Path")
+              for element in solution.findall(".//Project")
+          ]
+          if (
+              any(not isinstance(value, str) for value in solution_values)
+              or len(solution_values) != len(set(solution_values))
+              or set(solution_values) != set(tracked_values)
+          ):
+              raise SystemExit(
+                  "Dps.slnx projects do not exactly match tracked csproj inventory"
+              )
+
+          project_parents = set()
+          for value in sorted(tracked_values):
+              raw_parts = value.split("/")
+              if (
+                  re.fullmatch(r"[A-Za-z0-9._/-]+\.csproj", value) is None
+                  or "\\" in value
+                  or any(part in ("", ".", "..") for part in raw_parts)
+              ):
+                  raise SystemExit("unsafe tracked project path")
+              relative = pathlib.PurePosixPath(value)
+              if relative.is_absolute() or ".." in relative.parts:
+                  raise SystemExit("unsafe tracked project path")
+              lexical = root.joinpath(*relative.parts)
+              resolved = lexical.resolve(strict=True)
+              if (
+                  resolved != lexical
+                  or not resolved.is_file()
+                  or resolved.is_symlink()
+                  or resolved.suffix.casefold() != ".csproj"
+              ):
+                  raise SystemExit("tracked project is missing, linked, or non-canonical")
+              parent = resolved.parent
+              if parent in project_parents:
+                  raise SystemExit("multiple projects share one output-island parent")
+              project_parents.add(parent)
+
+          descriptor = os.open(
+              output,
+              os.O_WRONLY | os.O_TRUNC | os.O_NOFOLLOW,
+          )
+          try:
+              for value in sorted(tracked_values):
+                  os.write(descriptor, os.fsencode(value) + b"\0")
+          finally:
+              os.close(descriptor)
+          PY
+          materialize_step 303
+          project_count=0
+          output_island_count=0
+          while IFS= read -r -d '' project_relative; do
+            project_count=$((project_count + 1))
+            project_file="$workspace_real/$project_relative"
+            project_dir="$(/usr/bin/dirname -- "$project_file")"
+            materialize_step $((1000 + project_count * 20))
+            test -f "$project_file"
+            test ! -L "$project_file"
+            test "$(/usr/bin/realpath -e -- "$project_file")" = "$project_file"
+            test "$(/usr/bin/realpath -e -- "$project_dir")" = "$project_dir"
+            for output_name in bin obj; do
+              output_path="$project_dir/$output_name"
+              output_island_count=$((output_island_count + 1))
+              materialize_step $((1001 + project_count * 20 + (output_island_count - 1) % 2))
+              /usr/bin/git -C "$workspace_real" check-ignore --quiet --no-index -- "$output_path/probe"
+              test ! -e "$output_path"
+              test ! -L "$output_path"
+              /usr/bin/sudo /usr/bin/install -d \
+                -o dps-phase0 -g "$runner_gid" -m 0700 "$output_path"
+              test "$(/usr/bin/realpath -e -- "$output_path")" = "$output_path"
+              test "$(/usr/bin/stat -c '%u:%g:%a' "$output_path")" = "${dps_uid}:${runner_gid}:700"
+              output_acl="$(/usr/bin/sudo /usr/bin/getfacl --absolute-names --numeric --omit-header -- "$output_path")"
+              if printf '%s\n' "$output_acl" | /usr/bin/grep -Eq "^(default:|user:[0-9]+:|group:[0-9]+:)"; then
+                /usr/bin/false
+              fi
+              printf '%s\0' "$output_path" >> "$allowed_writable_list"
+            done
+          done < "$project_list"
+          materialize_step 304
+          test "$project_count" -gt 0
+          test "$output_island_count" = "$((project_count * 2))"
+          printf '%s\0' "$evidence_real" >> "$allowed_writable_list"
+          acl_directories=(
+            /home
+            /home/runner
+            /home/runner/work
+            "$workspace_parent"
+            "$workspace_real"
+            "$reports_dir"
+          )
+          acl_index=0
+          for directory in "${acl_directories[@]}"; do
+            acl_stage_base=$((700 + acl_index * 20))
+            materialize_step $((acl_stage_base + 1))
+            test -d "$directory"
+            materialize_step $((acl_stage_base + 2))
+            test ! -L "$directory"
+            materialize_step $((acl_stage_base + 3))
+            test "$(/usr/bin/realpath -e -- "$directory")" = "$directory"
+            materialize_step $((acl_stage_base + 4))
+            acl_before="$(/usr/bin/sudo /usr/bin/getfacl --absolute-names --numeric --omit-header -- "$directory")"
+            materialize_step $((acl_stage_base + 5))
+            default_acl_before="$(
+              printf '%s\n' "$acl_before" | /usr/bin/awk '/^default:/'
+            )"
+            materialize_step $((acl_stage_base + 7))
+            /usr/bin/sudo /usr/bin/setfacl --modify 'u:dps-phase0:r-x' -- "$directory"
+            materialize_step $((acl_stage_base + 8))
+            acl_after="$(/usr/bin/sudo /usr/bin/getfacl --absolute-names --numeric --omit-header -- "$directory")"
+            materialize_step $((acl_stage_base + 9))
+            printf '%s\n' "$acl_after" | /usr/bin/grep -Fx "user:${dps_uid}:r-x" >/dev/null
+            materialize_step $((acl_stage_base + 10))
+            test "$(printf '%s\n' "$acl_after" | /usr/bin/grep -Fxc "user:${dps_uid}:r-x")" = "1"
+            materialize_step $((acl_stage_base + 11))
+            default_acl_after="$(
+              printf '%s\n' "$acl_after" | /usr/bin/awk '/^default:/'
+            )"
+            materialize_step $((acl_stage_base + 12))
+            test "$default_acl_after" = "$default_acl_before"
+            materialize_step $((acl_stage_base + 13))
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -r "$directory"
+            materialize_step $((acl_stage_base + 14))
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -x "$directory"
+            materialize_step $((acl_stage_base + 15))
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$directory"
+            acl_index=$((acl_index + 1))
+          done
+          materialize_step 305
+          while IFS= read -r -d '' project_relative; do
+            project_file="$workspace_real/$project_relative"
+            project_dir="$(/usr/bin/dirname -- "$project_file")"
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -r "$project_file"
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$project_file"
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$project_dir"
+            for output_name in bin obj; do
+              output_path="$project_dir/$output_name"
+              /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -r "$output_path"
+              /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -x "$output_path"
+              /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -w "$output_path"
+            done
+          done < "$project_list"
+          materialize_step 306
+          /usr/bin/sudo --non-interactive --user=dps-phase0 \
+            /usr/bin/find "$workspace_real" -xdev -type d -writable -print0 \
+            > "$observed_writable_list"
+          materialize_step 307
+          "$workspace_real/.venv/bin/python" -I - \
+            "$allowed_writable_list" "$observed_writable_list" <<'PY'
+          import os
+          import pathlib
+          import sys
+
+          def load(path):
+              values = pathlib.Path(path).read_bytes().split(b"\0")
+              decoded = [os.fsdecode(value) for value in values if value]
+              if len(decoded) != len(set(decoded)):
+                  raise SystemExit("duplicate writable-directory record")
+              return set(decoded)
+
+          allowed = load(sys.argv[1])
+          observed = load(sys.argv[2])
+          if observed != allowed:
+              unexpected = sorted(observed - allowed)
+              missing = sorted(allowed - observed)
+              raise SystemExit(
+                  "dedicated identity writable directory mismatch: "
+                  f"unexpected={unexpected}; missing={missing}"
+              )
+          PY
+          materialize_step 308
+          printf 'DPS_DOTNET_OUTPUT_ISLANDS projects=%d roots=%d\n' \
+            "$project_count" "$output_island_count"
+          /usr/bin/rm -f "$project_list" "$allowed_writable_list" "$observed_writable_list"
+          trap - EXIT
+          materialize_step 900
+          evidence_acl="$(/usr/bin/sudo /usr/bin/getfacl --absolute-names --numeric --omit-header -- "$evidence_real")"
+          materialize_step 901
+          if printf '%s\n' "$evidence_acl" | /usr/bin/grep -Eq "^(default:|user:${dps_uid}:)"; then
+            materialize_step 902
+            /usr/bin/false
+          fi
+          materialize_step 903
+          test "$(/usr/bin/stat -c '%u:%g:%a' "$evidence_real")" = "${dps_uid}:${runner_gid}:750"
+          materialize_step 904
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -r "$evidence_real"
+          materialize_step 905
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -x "$evidence_real"
+          materialize_step 906
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test -w "$evidence_real"
+          materialize_step 907
+          /usr/bin/test -r "$evidence_real"
+          materialize_step 908
+          /usr/bin/test -x "$evidence_real"
+          materialize_step 909
+          /usr/bin/test ! -w "$evidence_real"
+          materialize_step 910
+          /usr/bin/sudo /usr/bin/git config --system --add safe.directory "$GITHUB_WORKSPACE"
+          materialize_step 911
+          dps_home="$(/usr/bin/getent passwd dps-phase0 | /usr/bin/cut -d: -f6)"
+          materialize_step 912
+          test -n "$dps_home"
+          materialize_step 913
+          restricted_checkout_head="$(
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
+              HOME="$dps_home" \
+              PATH=/usr/bin:/bin \
+              /usr/bin/git -C "$workspace_real" rev-parse HEAD^{commit}
+          )"
+          materialize_step 914
+          test "$restricted_checkout_head" = "$checkout_head"
+          materialize_step 915
+          test "$restricted_checkout_head" = "$DPS_EXPECTED_HEAD_COMMIT"
+          materialize_step 9151
+          restricted_workspace_status="$(
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
+              HOME="$dps_home" \
+              PATH=/usr/bin:/bin \
+              /usr/bin/git -C "$workspace_real" status \
+                --porcelain=v1 --untracked-files=all
+          )"
+          materialize_step 9152
+          test -z "$restricted_workspace_status"
+          materialize_step 916
+          gate_source_sha256="$(/usr/bin/sha256sum "$workspace_real/Tools/ci/run_phase0_gate.py" | /usr/bin/awk '{print $1}')"
+          materialize_step 917
+          restricted_gate_source_sha256="$(
+            /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
+              PATH=/usr/bin:/bin \
+              /usr/bin/sha256sum "$workspace_real/Tools/ci/run_phase0_gate.py" |
+              /usr/bin/awk '{print $1}'
+          )"
+          materialize_step 918
+          test "$restricted_gate_source_sha256" = "$gate_source_sha256"
+          materialize_step 919
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
+            HOME="$dps_home" \
+            PATH=/usr/bin:/bin \
+            PYTHONDONTWRITEBYTECODE=1 \
+            "$workspace_real/.venv/bin/python" -I -c \
+            'import platform; assert platform.python_version() == "3.12.13"'
+          expected_chain=("${acl_directories[@]}" "$evidence_real")
+          materialize_step 921
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/env -i \
+            HOME="$dps_home" \
+            PATH=/usr/bin:/bin \
+            PYTHONDONTWRITEBYTECODE=1 \
+            "$workspace_real/.venv/bin/python" -I -c '
+          import os
+          import pathlib
+          import sys
+
+          target = pathlib.Path(sys.argv[1])
+          expected = sys.argv[2:]
+          flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+          descriptor = os.open(target.anchor, flags)
+          observed = []
+          current = pathlib.Path(target.anchor)
+          try:
+              for component in target.parts[1:]:
+                  child = os.open(component, flags, dir_fd=descriptor)
+                  os.close(descriptor)
+                  descriptor = child
+                  current = current / component
+                  observed.append(str(current))
+          finally:
+              os.close(descriptor)
+          if observed != expected:
+              raise SystemExit("unexpected evidence ancestor chain")
+          ' "$evidence_real" "${expected_chain[@]}"
+          materialize_step 922
+          if /usr/bin/sudo --user=dps-phase0 /usr/bin/sudo --non-interactive /usr/bin/true >/dev/null 2>&1; then
+            materialize_step 923
+            /usr/bin/false
+          fi
+          materialize_step 924
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$workspace_real"
+          materialize_step 925
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$workspace_real/.git"
+          materialize_step 926
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$workspace_real/.venv"
+          materialize_step 927
+          /usr/bin/sudo --non-interactive --user=dps-phase0 /usr/bin/test ! -w "$workspace_real/Tools/ci/run_phase0_gate.py"
+          materialize_step 928
+          trap - ERR
+
       - name: Run the unique Phase 0 gate
+        shell: /opt/dps-protected/dps-phase0-shell {0}
         env:
           DPS_BASELINE_COMMIT: ${{ github.event.pull_request.base.sha || github.event.before }}
+          DPS_EXPECTED_HEAD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          DPS_LEGACY_BASELINE_ANCHOR: /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json
         run: >-
           python Tools/ci/run_phase0_gate.py
-          --node "$(command -v node)"
+          --node "$DPS_NODE"
           --evidence Reports/ci/phase0-evidence/phase0-evidence.json
+
+      - name: Seal Phase 0 evidence for artifact upload
+        if: always()
+        run: |
+          set -euo pipefail
+          export PATH=/usr/bin:/bin:/usr/sbin:/sbin
+          workspace_real="$(/usr/bin/realpath -e -- "$GITHUB_WORKSPACE")"
+          case "$workspace_real" in
+            /home/runner/work/*/*) ;;
+            *) exit 1 ;;
+          esac
+          evidence_dir="$workspace_real/Reports/ci"
+          test "$(/usr/bin/realpath -e -- "$PWD")" = "$workspace_real"
+          test "$(/usr/bin/realpath -e -- "$evidence_dir")" = "$evidence_dir"
+          test "$(/usr/bin/realpath -e -- Reports/ci)" = "$evidence_dir"
+          sudo chown -R root:root Reports/ci
+          /usr/bin/sudo /usr/bin/find "$evidence_dir" -type d -exec /usr/bin/chmod 0555 {} +
+          /usr/bin/sudo /usr/bin/find "$evidence_dir" -type f -exec /usr/bin/chmod 0444 {} +
+          /usr/bin/test -r "$evidence_dir"
+          /usr/bin/test -x "$evidence_dir"
+          /usr/bin/test ! -w "$evidence_dir"
+          unreadable_path="$(
+            /usr/bin/find "$evidence_dir" \
+              \( -type d \( ! -readable -o ! -executable \) -o -type f ! -readable \) \
+              -print -quit
+          )"
+          test -z "$unreadable_path"
+          writable_path="$(
+            /usr/bin/find "$evidence_dir" \
+              \( -type d -o -type f \) -writable -print -quit
+          )"
+          test -z "$writable_path"
 
       - name: Upload raw Phase 0 evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: dps-phase0-evidence-${{ github.sha }}
+          name: dps-phase0-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             Reports/ci/phase0-evidence/
             Reports/ci/playwright-config.json

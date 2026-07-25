@@ -23,7 +23,7 @@ import stat
 import sys
 import tempfile
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
@@ -36,6 +36,7 @@ if str(CI_DIRECTORY) not in sys.path:
 from phase0 import (  # noqa: E402
     REQUIRED_DOTNET_SDK,
     REQUIRED_NODE_VERSION,
+    REQUIRED_PYTHON,
     VERIFICATION_LEVEL,
     CommandResult,
     Phase0Error,
@@ -64,6 +65,7 @@ from phase0 import (  # noqa: E402
 
 ALLOWED_MANIFEST_ENVIRONMENT = {"PYTHONPATH"}
 ALLOWED_TRUSTED_EXECUTOR_ENVIRONMENT = ALLOWED_MANIFEST_ENVIRONMENT | {
+    "DPS_LEGACY_BASELINE_ANCHOR",
     "DPS_PSQL",
     "DPS_TEST_POSTGRES",
     "DPS_TEST_POSTGRES_ADMIN_URI",
@@ -72,6 +74,10 @@ ALLOWED_TRUSTED_EXECUTOR_ENVIRONMENT = ALLOWED_MANIFEST_ENVIRONMENT | {
     "DPS_TEST_PLATFORM_AUTHORITY_PKCS8_FILE",
 }
 PYTHON_NAMES = {"python", "python3", "python3.12"}
+REPOSITORY_VENV_PYTHON = ".venv/bin/python"
+LEGACY_BASELINE_ANCHOR_ENV = "DPS_LEGACY_BASELINE_ANCHOR"
+LEGACY_BASELINE_MODULE_ID = "legacy-runtime-adapter"
+LEGACY_BASELINE_SUITE_ID = "legacy-runtime-adapter.static"
 FORBIDDEN_COMMAND_FRAGMENTS = ("\n", "\r", "\x00", "`", "$(`", "${", ";", "|", ">", "<")
 PUBLICATION_SCHEMA_VERSION = "dps.evidence-publication/v1"
 PUBLICATION_MARKER_SUFFIX = ".publication.json"
@@ -286,7 +292,7 @@ R0B_FROZEN_BASELINE_COMMIT = "8f63593d4f262ec1496b05300da75a71b86eaab4"
 
 
 def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
-    minimum_adversarial_tests = 156
+    minimum_adversarial_tests = 167
     required_inventory = {
         "test_missing_standard_module_layout_is_rejected",
         "test_placeholder_only_src_is_rejected",
@@ -298,6 +304,19 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         "test_shell_metacharacter_is_rejected",
         "test_unknown_environment_prefix_is_rejected",
         "test_manifest_cannot_declare_trusted_executor_postgres_environment",
+        "test_manifest_cannot_declare_legacy_baseline_anchor",
+        "test_repository_venv_direct_test_runs_isolated_unittest",
+        "test_repository_venv_requires_isolated_mode",
+        "test_unknown_repository_venv_interpreter_is_rejected",
+        "test_repository_venv_direct_test_rejects_extra_arguments",
+        "test_legacy_anchor_is_injected_only_for_exact_static_suite",
+        "test_missing_writable_and_repository_local_legacy_anchors_fail_closed",
+        "test_repository_workflow_builds_venv_and_external_anchor_boundary",
+        "test_repository_workflow_limits_dps_writes_to_exact_dotnet_output_islands",
+        "test_dotnet_output_islands_cover_exact_solution_project_set",
+        "test_candidate_gate_forwards_only_legacy_anchor_to_cumulative_phase0",
+        "test_candidate_git_uses_canonical_safe_directory_with_system_config_disabled",
+        "test_candidate_git_blob_uses_the_same_canonical_safe_directory",
         "test_path_traversal_is_rejected",
         "test_symlink_escape_is_rejected",
         "test_zero_unittests_fails_even_with_exit_zero",
@@ -395,6 +414,7 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         "test_unknown_commit_fails_closed",
         "test_a_baseline_that_does_not_descend_from_the_corpus_fails_closed",
         "test_a_baseline_older_than_the_corpus_fails_closed",
+        "test_a_repo_local_planted_git_on_path_is_ignored",
         "test_provenance_repointed_at_another_ancestor_fails_closed",
         "test_the_frozen_constant_is_what_the_corpus_declares",
         "test_every_new_trust_bearing_artifact_is_byte_bound",
@@ -1525,7 +1545,30 @@ def _parse_python_invocation(
 ) -> TrustedInvocation:
     python_prefix = [sys.executable, "-I"]
     values = list(segment)
-    if not values or values.pop(0) not in PYTHON_NAMES:
+    if not values:
+        raise Phase0Error("only the pinned Phase0 Python interpreter is allowed")
+    executable = values.pop(0)
+    repository_venv = executable == REPOSITORY_VENV_PYTHON
+    if repository_venv:
+        expected_executable = Path(
+            os.path.abspath(os.fspath(ROOT / REPOSITORY_VENV_PYTHON))
+        )
+        actual_executable = Path(os.path.abspath(sys.executable))
+        expected_prefix = Path(os.path.abspath(os.fspath(ROOT / ".venv")))
+        actual_prefix = Path(os.path.abspath(sys.prefix))
+        if (
+            actual_executable != expected_executable
+            or actual_prefix != expected_prefix
+            or sys.prefix == sys.base_prefix
+            or tuple(sys.version_info[:3]) != REQUIRED_PYTHON
+        ):
+            raise Phase0Error(
+                "repository .venv command requires the active pinned repository interpreter"
+            )
+        if values[:1] != ["-I"]:
+            raise Phase0Error("repository .venv Python command must declare isolated mode")
+        values.pop(0)
+    elif executable not in PYTHON_NAMES:
         raise Phase0Error("only the pinned Phase0 Python interpreter is allowed")
     if values[:3] == ["-m", "unittest", "discover"]:
         if len(values) != 7 or values[3] != "-s" or values[5] != "-p":
@@ -1576,18 +1619,41 @@ def _parse_python_invocation(
         raise Phase0Error(
             "json.tool checks syntax only and is not semantic contract test evidence"
         )
-    if test_type != "static" or not values:
-        raise Phase0Error("direct Python scripts are allowed only for static suites")
-    script_raw = values.pop(0)
+    if not values:
+        raise Phase0Error("direct Python suite target is missing")
+    direct_values = list(values)
+    script_raw = direct_values.pop(0)
     if script_raw.replace("\\", "/") == "Tools/ci/run_phase0_gate.py":
         raise Phase0Error("recursive Phase0 suite command is forbidden")
     script = _safe_existing_path(root, module_root, script_raw, require_file=True)
+    if (
+        repository_venv
+        and not direct_values
+        and script.parent == (module_root / "tests").resolve()
+        and re.fullmatch(r"test_[A-Za-z0-9_.\-]+\.py", script.name) is not None
+    ):
+        return TrustedInvocation(
+            [
+                *python_prefix,
+                "-m",
+                "unittest",
+                "discover",
+                "-s",
+                str(script.parent),
+                "-p",
+                script.name,
+            ],
+            "python-unittest",
+            1,
+        )
+    if test_type != "static":
+        raise Phase0Error("direct Python scripts are allowed only for static suites")
     if script.suffix.casefold() != ".py":
         raise Phase0Error("static Python suite target must be a .py file")
-    if values not in ([], ["--root", "."]):
+    if direct_values not in ([], ["--root", "."]):
         raise Phase0Error("static Python suite arguments are not allowlisted")
     return TrustedInvocation(
-        [sys.executable, str(script), *values], "static-json", 1
+        [*python_prefix, str(script), *direct_values], "static-json", 1
     )
 
 
@@ -1637,7 +1703,7 @@ def parse_manifest_suite_command(
             test_type,
             expected_test_category=expected_test_category,
         )
-    elif executable in PYTHON_NAMES:
+    elif executable in PYTHON_NAMES or executable == REPOSITORY_VENV_PYTHON:
         if len(segments) != 1:
             raise Phase0Error("Python suites cannot use compound shell commands")
         invocations = (
@@ -2014,6 +2080,81 @@ def _trusted_test_environment_scope(
             pass
 
 
+def _absolute_path_has_symlink_component(path: Path) -> bool:
+    current = Path(path.anchor)
+    for part in path.parts[1:]:
+        current = current / part
+        if current.is_symlink():
+            return True
+    return False
+
+
+def _validated_legacy_anchor_path(root: Path, raw: str) -> Path:
+    if not isinstance(raw, str) or not raw:
+        raise Phase0Error("trusted legacy baseline anchor is missing")
+    anchor = Path(raw)
+    if not anchor.is_absolute():
+        raise Phase0Error("trusted legacy baseline anchor path must be absolute")
+    if _absolute_path_has_symlink_component(anchor):
+        raise Phase0Error(
+            "trusted legacy baseline anchor path and parents may not be symlinks"
+        )
+    try:
+        resolved = anchor.resolve(strict=True)
+        anchor_stat = resolved.stat(follow_symlinks=False)
+        parent_stat = resolved.parent.stat(follow_symlinks=False)
+        repository_root = root.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise Phase0Error(
+            "trusted legacy baseline anchor is unavailable: " + str(exc)
+        )
+    if _within(resolved, repository_root):
+        raise Phase0Error(
+            "trusted legacy baseline anchor must be outside the repository"
+        )
+    if not stat.S_ISREG(anchor_stat.st_mode):
+        raise Phase0Error("trusted legacy baseline anchor must be a regular file")
+    if anchor_stat.st_mode & 0o222:
+        raise Phase0Error("trusted legacy baseline anchor must be read-only")
+    verifier_uid = os.geteuid() if hasattr(os, "geteuid") else None
+    if verifier_uid is None:
+        raise Phase0Error(
+            "trusted legacy baseline anchor ownership is unsupported"
+        )
+    if anchor_stat.st_uid == verifier_uid or parent_stat.st_uid == verifier_uid:
+        raise Phase0Error(
+            "trusted legacy baseline anchor must be owned by another identity"
+        )
+    if os.access(str(resolved.parent), os.W_OK):
+        raise Phase0Error(
+            "trusted legacy baseline anchor parent must not be writable"
+        )
+    return resolved
+
+
+def _trusted_suite_plan_with_ambient_environment(
+    root: Path,
+    plan: TrustedSuitePlan,
+    ambient: Optional[Mapping[str, str]] = None,
+) -> TrustedSuitePlan:
+    if (
+        plan.module_id != LEGACY_BASELINE_MODULE_ID
+        or plan.suite_id != LEGACY_BASELINE_SUITE_ID
+    ):
+        return plan
+    if LEGACY_BASELINE_ANCHOR_ENV in plan.environment:
+        raise Phase0Error(
+            "legacy baseline anchor may not be declared by a module manifest"
+        )
+    source = os.environ if ambient is None else ambient
+    anchor = _validated_legacy_anchor_path(
+        root, source.get(LEGACY_BASELINE_ANCHOR_ENV, "")
+    )
+    environment = dict(plan.environment)
+    environment[LEGACY_BASELINE_ANCHOR_ENV] = str(anchor)
+    return replace(plan, environment=environment)
+
+
 def run_locked_solution_build(root: Path, timeout_seconds: int = 600) -> Dict[str, Any]:
     started = time.monotonic()
     solution = root / "Dps.slnx"
@@ -2304,6 +2445,34 @@ def execute_manifest_suite(root: Path, plan: TrustedSuitePlan, timeout_seconds: 
         "effective_command": effective,
         "executed_tests": 0,
     }
+    python_invocations = [
+        invocation
+        for invocation in plan.invocations
+        if invocation.argv
+        and Path(os.path.abspath(os.fspath(invocation.argv[0])))
+        == Path(os.path.abspath(sys.executable))
+    ]
+    if python_invocations:
+        details["python_interpreter"] = {
+            "path": os.path.abspath(sys.executable),
+            "sha256": sha256_file(Path(sys.executable)),
+            "isolated": all("-I" in invocation.argv for invocation in python_invocations),
+        }
+    if LEGACY_BASELINE_ANCHOR_ENV in plan.environment:
+        anchor_path = Path(plan.environment[LEGACY_BASELINE_ANCHOR_ENV])
+        anchor_stat = anchor_path.stat(follow_symlinks=False)
+        parent_stat = anchor_path.parent.stat(follow_symlinks=False)
+        details["trusted_external_anchor"] = {
+            "environment_key": LEGACY_BASELINE_ANCHOR_ENV,
+            "path": str(anchor_path),
+            "sha256": sha256_file(anchor_path),
+            "size": anchor_path.stat().st_size,
+            "owner_uid": anchor_stat.st_uid,
+            "mode": stat.S_IMODE(anchor_stat.st_mode),
+            "parent_owner_uid": parent_stat.st_uid,
+            "parent_mode": stat.S_IMODE(parent_stat.st_mode),
+            "verifier_uid": os.geteuid() if hasattr(os, "geteuid") else None,
+        }
     status = "PASS"
     if failed_restore and _restore_failure_is_infrastructure(final_exit, output):
         status = "INFRA_ERROR"
@@ -2423,6 +2592,7 @@ def run_required_module_static_tests(root: Path, timeout_seconds: int = 300) -> 
             suite_id = str(suite.get("id", "invalid-suite"))
             try:
                 plan = parse_manifest_suite_command(root, module_root, module_id, suite)
+                plan = _trusted_suite_plan_with_ambient_environment(root, plan)
             except Phase0Error as exc:
                 checks.append(_module_test_failure(module_id, suite_id, str(exc)))
                 continue
