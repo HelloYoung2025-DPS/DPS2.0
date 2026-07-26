@@ -597,7 +597,7 @@ jobs:
       - name: Run the unique Phase 0 gate
         shell: /opt/dps-protected/dps-phase0-shell {0}
         env:
-          DPS_BASELINE_COMMIT: ${{ github.event.pull_request.base.sha || github.event.before }}
+          DPS_BASELINE_COMMIT: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before }}
           DPS_EXPECTED_HEAD_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
           DPS_LEGACY_BASELINE_ANCHOR: /opt/dps-protected/legacy-baseline-anchor.r0b-d330919.json
         run: >-
