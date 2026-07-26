@@ -213,7 +213,16 @@ R0-B/R0-C/R0-D 每一批都会改写候选门禁的信任根清单 `CANDIDATE_TR
 
 1. 合入前，在批次 PR head 上取 required 静态门证据：`.github/workflows/static-ci.yml` 的 required check 即证据来源，其原始证据由 CI 以 artifact 自动留档（`dps-phase0-evidence-<head sha>`，`if: always()` 上传，保留期以该工作流的 `retention-days` 配置为准；required check 结论随 PR 长期可查）。触碰信任根不增加任何额外的人工取证步骤；批次以「required check `PASS` + 外审 + 所有者合入」即告关闭，合入即终点，无后续取证动作。
 
-merge queue（或 §4.1 第 5 条的 required up-to-date 过渡等价物）对触碰信任根的批次按同一合入前程序取证。
+   **保留期届满后的证据状态（如实界定记法，不创设留档任务）**：artifact 过期后其原字节在平台上不再可取，required check 的结论与 run 记录仍长期可查。届满后审计对该批次的 artifact 引用一律记 `UNAVAILABLE`；若该批次证据已按项目边界另存仓外归档，可在同一条目上附归档位置与逐文件 SHA-256 摘要作为具名替代（仅当摘要可回读校验时）。**过期不得被记为通过**——`UNAVAILABLE` 同样是 fail-closed，不满足 T4/T13/T19「写 `PASS` 的充要条件」。本段只界定记法，不产生任何合入后才到期的义务、不依赖任何后续 PR。
+
+**merge queue 侧的取证状态（如实记录，2026-07-26 实测；两重独立缺陷）。** 经 merge queue 合入的批次，其**最终合并提交至今从未被任何门禁验证过**。实测两项：
+
+- **(1) 队列从未派发过 `merge_group` 事件。** `GET /repos/.../actions/runs?event=merge_group` 的 `total_count` 为 `0`；近 60 条 run 的事件分布只有 `pull_request`(44) 与 `push`(16)；`gh-readonly-queue/*` 临时分支无任何残留。而同日已有 5 个 PR（#17、#18、#19、#20、#24）经队列合入。直接原因是 `main` 未配置任何 required status check——队列没有需要等待的检查，直接完成合并，不创建合并组。该项归口为仓库设置层面的 required checks 启用工作，不属于任何施工批次的交付范围。
+- **(2) 即使事件被派发，门禁也会在启动前死掉。** `.github/workflows/static-ci.yml` 原先的 `DPS_BASELINE_COMMIT` 只从 `github.event.pull_request.base.sha` 与 `github.event.before` 解析，而 `merge_group` 事件两者皆无；包装脚本要求 40 位十六进制 base、否则拒绝启动，因此会在门禁开始之前退出。该项已由 PR #24 修复（增加 `github.event.merge_group.base_sha` 解析，并以守卫测试同时钉住该表达式与三个触发器）。
+
+两者相互独立：(2) 已修复，(1) 未完成前队列侧仍无最终提交证据。**仅当 (1) 也完成后**，merge queue（或 §4.1 第 5 条的 required up-to-date 过渡等价物）才对触碰信任根的批次按与上方第 1 条同一的合入前程序取证。此前经队列合入的批次，其正式证据仅存在于 PR head 上的 required check，最终合并提交无证据——此为历史事实，据实记录、不追溯改写、不因本节修订而改判。
+
+该缺口同时意味着 `Docs/Operations/RepositoryProtection_仓库保护.md:23`「外部 merge queue 派发工作流的 `merge_group` 事件；合并提交或所选合并策略在精确的最终提交上被测试」一项自写入以来从未满足；本节不豁免该条，只记录其状态。
 
 **废止记录（2026-07-25，面向未来生效；历史记录不改写）。** 本节原文规定两段式取证，其第 2 步要求：批次合入为提交 D 后，在 D 的后继提交（必要时空提交）上以 `--base D` 重跑候选门禁，取首个 clean 候选证据作为该批次的正式静态门结果。该步骤整体废止，理由：
 
@@ -223,9 +232,9 @@ merge queue（或 §4.1 第 5 条的 required up-to-date 过渡等价物）对�
 
 原第 1 步（合入前以 `--diagnostic-workspace` 取记录性验证）同日改定义为上方第 1 条的合入前 required 静态门取证，不再另设 diagnostic 仪式。历史批次按原条文留下（或未能留下）的取证记录是历史事实，不改写、不追溯重评；其遗留取证缺口的定性由 §4.6 (e) 处理，相关历史程序缺陷的定性由 PR-A 历史收口文书（`Docs/Operations/HistoricalClosure_历史收口_2026-07-26.md`）承载（见 §4.6 (b)）。
 
-**残余披露：信任根改动可以为自己签发 PASS（如实记录；本次修订既未制造它、也未修好它）。** required 静态门的载体 `.github/workflows/static-ci.yml` 以 `ref: ${{ github.event.pull_request.head.sha || github.sha }}` checkout 批次 PR head，并执行该 checkout 内的 `Tools/ci/run_phase0_gate.py`；而 `.github/workflows/static-ci.yml`、`Tools/ci/run_phase0_gate.py`、`Tools/ci/phase0.py`、`Tools/ci/run_candidate_gate.py` 及其测试本身都在 `CANDIDATE_TRUST_PATHS` 清单内（见 `Tools/ci/run_candidate_gate.py:150` 起）。因此触碰信任根的批次，其上方第 1 条所称正式证据是**由候选自身携带的校验器签发的**：一个削弱校验器的改动，可以让被削弱后的校验器为它自己出具 PASS。**该残余在本次废止之前同样存在**——原两段式的第 1 步（候选工作区 diagnostic）与第 2 步（在合入提交 D 的后继提交上重跑候选门禁，所跑代码正是 D 合入进来的候选代码）同样由候选自身执行，且第 2 步从无 CI 执行路径（见上「执行路径从未存在」）；故废止既没有制造该残余，也没有修好它，此处只作如实披露，不作已修好之声称。机制解法方向（本节只指方向，不实施、不承诺时限、不设完成判据）：以候选 diff 之外的不可变校验器验证信任根改动——base 锚定的受保护工作流，或独立签名的外部校验器——并把其结论绑定到精确 head、base 与 merge-group 提交。其归口是两项仓库配置工作——为 `main` 启用 required status checks，以及收紧施工凭证——两者都在仓库设置层面完成，不属于任何施工批次的交付范围；需要所有者拍板的事项统一走仓库中既有的那一个 Owner 决策 issue，不为此另开治理 PR。**本段只作披露：不代为登记、不创设待办或勾选项、不产生任何合入后才到期的义务或后续 PR 依赖**；在该机制建成前，触碰信任根批次的 required 静态门 PASS 一律按此残余理解其证明力，任何文书不得把它表述为独立于候选的验证。
+**残余披露：信任根改动可以为自己签发 PASS（如实记录；本次修订既未制造它、也未修好它）。** required 静态门的载体 `.github/workflows/static-ci.yml` 以 `ref: ${{ github.event.pull_request.head.sha || github.sha }}` checkout 批次 PR head，并执行该 checkout 内的 `Tools/ci/run_phase0_gate.py`；而 `.github/workflows/static-ci.yml`、`Tools/ci/run_phase0_gate.py`、`Tools/ci/phase0.py`、`Tools/ci/run_candidate_gate.py` 及其测试本身都在 `CANDIDATE_TRUST_PATHS` 清单内（见 `Tools/ci/run_candidate_gate.py:150` 起）。因此触碰信任根的批次，其上方第 1 条所称正式证据是**由候选自身携带的校验器签发的**：一个削弱校验器的改动，可以让被削弱后的校验器为它自己出具 PASS。**该残余在本次废止之前同样存在**——原两段式的第 1 步（候选工作区 diagnostic）与第 2 步（在合入提交 D 的后继提交上重跑候选门禁，所跑代码正是 D 合入进来的候选代码）同样由候选自身执行，且第 2 步从无 CI 执行路径（见上「执行路径从未存在」）；故废止既没有制造该残余，也没有修好它，此处只作如实披露，不作已修好之声称。**该残余与仓内既有规则正面冲突（记录，不豁免）**：`Docs/Operations/RepositoryProtection_仓库保护.md:21` 已明文要求「required 验证工作流由组织所有或从受保护默认分支加载。候选分支不得替换评判它自己的那个工作流」。上述残余正是该条要求未被启用的直接后果——实测截至 2026-07-26，`main` 未配置任何 required status check、`required_approving_review_count` 为 `0`、`merge_group` 事件的门禁运行数为 `0`，即该条自写入以来从未生效过。本节**不豁免、不改写、不宣称已满足该条**，也不据此降低任何门槛；它记录的是「规则已写、尚未启用」这一状态。机制解法方向（本节只指方向，不实施、不承诺时限、不设完成判据）：以候选 diff 之外的不可变校验器验证信任根改动——base 锚定的受保护工作流，或独立签名的外部校验器——并把其结论绑定到精确 head、base 与 merge-group 提交。其归口是两项仓库配置工作——为 `main` 启用 required status checks，以及收紧施工凭证——两者都在仓库设置层面完成，不属于任何施工批次的交付范围；需要所有者拍板的事项统一走仓库中既有的那一个 Owner 决策 issue，不为此另开治理 PR。**本段只作披露：不代为登记、不创设待办或勾选项、不产生任何合入后才到期的义务或后续 PR 依赖**；在该机制建成前，触碰信任根批次的 required 静态门 PASS 一律按此残余理解其证明力，任何文书不得把它表述为独立于候选的验证。
 
-> **附则状态（2026-07-25）**：随第 2 步废止与第 1 步改定义，以下附则失去审计对象（收口审计不再核验 §4.5 step 1 diagnostic 替代物），不再是待 Owner 批准的现行条款；原文保留为历史记录、字节不改。其涉及对象的处置随 PR #15 的历史裁决：该裁决已由 PR-A 历史收口文书（`Docs/Operations/HistoricalClosure_历史收口_2026-07-26.md`，经 Owner 平台可见批准后合入）追认为既成事实（见 §4.6 (b)），故本附则涉及对象仅存为历史记录。
+> **附则状态（2026-07-25）**：随第 2 步废止与第 1 步改定义，以下附则失去审计对象（收口审计不再核验 §4.5 step 1 diagnostic 替代物），不再是待 Owner 批准的现行条款；原文保留为历史记录、字节不改。其涉及对象的处置随 PR #15 的历史裁决：该裁决由 PR-A 历史收口文书（`Docs/Operations/HistoricalClosure_历史收口_2026-07-26.md`）追认（该文书的合入以 Owner 在 PR-A 上给出平台可见、绑定精确 head 的批准为前提，且须先于本节修订合入；见 §4.6 (b)），故本附则涉及对象仅存为历史记录。
 >
 > **R0-B 历史 step 1 一次性再基线附则。** 仅对 base `8f63593d4f262ec1496b05300da75a71b86eaab4`、head `2ce0d14744ea8d25db2e963d4902cb0430b70cc4`、merge commit D `8165fedbd44ecb8388c4dfce5e44e8753af21daf` 这一组历史对象，因同期 step 1 diagnostic raw 已不可恢复，允许将其合入前 formal raw/publication 原字节对作为替代锚点：raw 必须保持 493225 bytes、文件 SHA-256 `440e5b893a4a0badca7e9983004435995aab36150e4bcd8e9b9e65556612edd4`、record self-hash `df92f5ea20197d4add500d60c5f82d0dd7b9649e8f40a202a83966bd9f66fa3b`；publication 必须保持 384 bytes、文件 SHA-256 `e922024ae89f361fff8fdce4850bfb71f8f81d6471256cbae9e06592c9c2a9a6`、record self-hash `01e775cd0527a159dc7d60df368dff215aa035f2ea9044384ab26a4827a3f4ac`，且 payload hash/size 必须回指该 raw。该 formal evidence 仍须如实标记 `diagnostic_workspace=false`、`formal_evidence_eligible=true`、`overall_status=FAIL` 和 `39 PASS / 14 FAIL / 0 INFRA_ERROR`，不得改称历史 diagnostic；当前复现、孤立 publication marker 或普通风险接受均不能替代上述原字节对。
 >
@@ -240,9 +249,11 @@ merge queue（或 §4.1 第 5 条的 required up-to-date 过渡等价物）对�
 - ☐ 确认 §4.5 原第 2 步（合入后在后继提交上以 `--base D` 取 clean 候选证据）及其全部派生仪式（证据锚 PR、空提交锚、专职补证会话、收口审计对该步锚点的逐条核验）自 2026-07-25 起整体废止；废止面向未来，历史记录不改写。
 - **本项即 §4.5「生效条件」所指的那一项**：本项签署前，§4.5 的 2026-07-25 修订、本节除本项与前言签署机制以外的全部条目，及其全部下游指示（`CLAUDE.md` 信任根取证一条、施工提示词库三条硬规则与 `TR`/`T4`/`T13`/`T19`、`T1`/`T2`/`T3` 的取证注记、§10 末段）一律不生效，取证按 §4.5「生效条件」中逐字保留的原两段式条文（含串行硬顺序）执行；本项签署后，上述条文同时生效。本项与前言的签署机制不被自身暂停。本项不签署不产生任何义务，只是维持原条文。
 
-**(b) 三条历史程序缺陷的书面裁决——已由 PR-A 历史收口文书承载**
+**(b) 三条历史程序缺陷的书面裁决——由 PR-A 历史收口文书承载**
 
-三条历史程序缺陷（PR #15 外审 veto 被同账号标记 CLOSED 无独立复核、PR #15 无 Owner 授权记录被合入、PR #6 在 BLOCK 态被合入）的裁决由 `Docs/Operations/HistoricalClosure_历史收口_2026-07-26.md`（PR-A 历史收口文书）承载，已由 PR-A 经 Owner 平台可见批准后合入（三条均追认；追认≠认可当时做法，不回退任何一条），本文书不再重复裁决；细节与裁决理由以该文书为准。
+三条历史程序缺陷（PR #15 外审 veto 被同账号标记 CLOSED 无独立复核、PR #15 无 Owner 授权记录被合入、PR #6 在 BLOCK 态被合入）的裁决由 `Docs/Operations/HistoricalClosure_历史收口_2026-07-26.md`（PR-A 历史收口文书）承载（三条均追认；追认≠认可当时做法，不回退任何一条），本文书不再重复裁决；细节与裁决理由以该文书为准。
+
+**合入顺序与前提（本条不断言其已经发生）**：PR-A 须先于本文书所在的 PR-B 合入，且 PR-A 的合入以 Owner 在 PR-A 上给出平台可见、绑定精确 head 的批准为前提。顺序已机械化——PR-B 的 base 分支即 PR-A 分支，故 PR-A 未合入 main 前 PR-B 无法先行合入。若 PR-A 被打回，或其裁决内容偏离「三条均追认」，本项陈述即不成立，须在 PR-B 合入前校正。
 
 **(c) M1 冻结解除条件与 M2 放行声明**
 
