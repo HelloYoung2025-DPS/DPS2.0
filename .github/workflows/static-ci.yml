@@ -646,4 +646,4 @@ jobs:
             Reports/ci/phase0-evidence/
             Reports/ci/playwright-config.json
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 90
