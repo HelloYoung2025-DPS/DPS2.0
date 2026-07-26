@@ -2865,6 +2865,24 @@ jobs:
             "            Reports/ci/phase0-evidence/\n", workflow
         )
 
+    def test_repository_workflow_resolves_a_baseline_for_every_trigger(self):
+        # The workflow triggers on pull_request, merge_group and push, and
+        # :138 refuses to start unless DPS_BASELINE_COMMIT is a 40-hex sha.
+        # A merge_group event carries neither pull_request.base.sha nor
+        # event.before, so omitting merge_group.base_sha made queue runs die
+        # in the wrapper -- before the gate, with no evidence produced -- and
+        # the final merged commit was never verified at all.
+        workflow = (ROOT / ".github/workflows/static-ci.yml").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "DPS_BASELINE_COMMIT: ${{ github.event.pull_request.base.sha "
+            "|| github.event.merge_group.base_sha || github.event.before }}",
+            workflow,
+        )
+        for trigger in ("pull_request:", "merge_group:", "push:"):
+            self.assertIn("\n  " + trigger, workflow, trigger)
+
     def test_repository_workflow_builds_venv_and_external_anchor_boundary(self):
         workflow = (ROOT / ".github/workflows/static-ci.yml").read_text(
             encoding="utf-8"
