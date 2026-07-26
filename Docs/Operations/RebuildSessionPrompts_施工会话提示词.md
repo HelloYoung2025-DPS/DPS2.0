@@ -14,6 +14,7 @@
 
    **当前档位判定（事实，非估计）**：零部署、零真实设备；23 个 `Modules/*/module.yaml` 全部 `releaseEligible=false`；`AGENTS.md:106` 明写当前治理基线下最高只能声称 `REPOSITORY_STATIC_VERIFIED`；`Docs/RebuildPlan_重构计划书.md:6` 记 `当前正式证据等级: NONE`；main tip 的 Phase 0 required 为 overall `FAIL`。**故当前处于 F0–F2 档。**
 
+   **档位≠F 级交付（勿把升档读成达成声称）**：本表的 F0–F2 / F3–F5 / F6–F9 是**施工节奏档位**（决定工作单位、门禁与仪式强度），只是借用技术书 §13 F0–F9 的编号分段；**升档触发条件全部是治理/门禁事实，不含任何 F 级交付本身**（正典 F2 交付——Soul→MemoryEvent→Interest→GBrain 无副作用切片与其 Integration evidence——恰恰是 F3 档工作单位 T5–T8 的产物）。因此**升档不构成、也不得被引用为「已达成技术书 §13 对应 F 级」的声称**；各 F 级交付是否达成，只按技术书 §13 各自的验收判据另行判定。
    | 档位 | 工作单位 | 门禁 | 外审 | 收口审计 |
    |---|---|---|---|---|
    | **F0–F2** | **一处修复 = 一个 commit**，不必凑成批次、不必一批一会话 | lint 与 Phase 0 静态门。required 语义不变：只有 `PASS` 放行 | 会话收尾自动 review gate（外审机制 §二 第 1 行，每次 stop 强制），**并加合入前绑定精确 head/base 的 Codex 一票**（外审机制 §二「批次收尾」行与 §三-5；信任根/anchor/执行链改动用 `adversarial-review`；`FAIL`/`UNAVAILABLE` 即冻结不合入），**外加所有者平台可见、绑定该精确 head 的批准**——每个进入 main 的提交都须被这一票与该批准覆盖，任何档位不降 | 不作为逐批前置（见硬规则 1 的适用强度段） |
