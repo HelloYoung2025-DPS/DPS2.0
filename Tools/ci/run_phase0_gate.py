@@ -4,16 +4,85 @@
 Every required check is represented in one evidence bundle.  A required check
 passes only with the literal status ``PASS``; skip, partial, empty, timeout,
 missing evidence, and infrastructure errors all make this process exit nonzero.
+
+One narrow exception exists at the overall level: required FAILs whose failure
+fingerprints exactly match ``governance/baseline-red-ledger.json`` yield the
+overall status ``PASS_WITH_REGISTERED_BASELINE`` (exit 0, never the literal
+``PASS``, and never releasable: ``--require-literal-pass``, pinned into
+``scripts/release.sh``, re-tightens exit 0 to the literal ``PASS``).  Any
+deviation from the registered fingerprints -- an unregistered red, a changed,
+moved, shrunk, or grown fingerprint, a stale entry, ledger expansion or
+removal relative to ``--base``, or a missing authoritative baseline commit
+while the ledger is load-bearing -- fails closed.  A registered unittest
+failure is bound to a normalized digest of its traceback, so the same test
+failing for a new reason is a new red, and a run that introduces ledger
+entries not already present at ``--base`` is treated as expansion and can
+never clear itself.
+
+Known boundaries, stated so this is not mistaken for more than it is:
+
+* Fingerprint protection only applies to runs that actually execute this gate
+  (the CI path).  If ``run_phase0_gate.py`` itself is edited with hostile
+  intent, today's machine checks do not catch semantic changes:
+  ``validate_ci_integrity`` pins the workflow shape and the reachable-call
+  inventory of ``main``, and the candidate trust anchor pins bytes, but a
+  semantic edit that preserves those shapes passes both.  Protection of this
+  file's semantics rests on trust-root review discipline, not on a machine
+  guarantee.
+* Registered fingerprints can only legitimately change through an
+  Owner-merged edit of ``governance/baseline-red-ledger.json``.  This gate
+  refuses expansion relative to ``--base`` but cannot itself verify who
+  merged the baseline it compares against.
+* ``observed_commit`` on a ledger entry is a provenance annotation for human
+  review.  It is syntax-checked only; this gate never resolves it and never
+  corroborates an entry against evidence taken at that commit.  What the gate
+  does guarantee is that entries are load-bearing only once they already exist
+  at ``--base``, so the annotation is never the thing standing between a
+  candidate and exit 0.
+* Failure-cause digests apply the seven rewrites enumerated in
+  :func:`_unittest_reason_digest` (eighth-round R8 correction: the earlier
+  "exactly three" arithmetic undercounted what the code does): (1) every
+  line loses its trailing whitespace; (2) inside a traceback preamble a
+  frame line loses its line number and the unbounded run of lines indented
+  deeper than the frame -- the echoed source line, the 3.11+ caret line,
+  and anything else that deep -- is swallowed; (3) a preamble frame path
+  has its backslashes rewritten to forward slashes; (4) this checkout's own
+  absolute root is stripped from every line, in both spellings (``/tmp/...``
+  and its ``/private/tmp/...`` alias); (5) the item order of an inline
+  brace group is sorted only when every item is a string literal (only
+  str/bytes hashing is randomized); (6) blank-line runs collapse to a
+  single blank and leading and trailing blank lines are dropped; (7) the
+  item run under a unittest set-comparison header is sorted whatever the
+  items look like -- a distinct rule from (5), with no string-literal
+  restriction.  Anything those seven rewrites do not cover is hashed
+  as-is.  In particular no timestamp is ever erased -- not in an assertion
+  message and not in a line-leading logger position; no temporary path is
+  ever erased -- not the mkdtemp segment and not the tail after it; and no
+  hex address is ever erased -- not a bare literal and not a ``<... at
+  0x...>`` repr tail.  The sixth-round review measured all three of those
+  rules at zero hits on the real Tests/ci red log while each carried a
+  release-shaped collision, so they were deleted rather than narrowed.
+  Content that is unstable but not covered here simply MISMATCHes, which
+  blocks; normalization is never widened to buy quiet.
+* Introducing a populated ledger fails its own drift check
+  (``LEDGER_INTRODUCED``) and merges red.  That is the shipping form, by
+  design: the run that registers a red can never clear itself, and the
+  three-state policy takes effect from the next commit.  It is not staged as
+  "empty file now, entries later" -- that would be a post-merge obligation,
+  and this project does not create those.
 """
 
 from __future__ import annotations
 
 import argparse
+import atexit
 import contextlib
 import datetime as dt
 import errno
+import fnmatch
 import functools
 import hashlib
+import importlib.machinery
 import json
 import os
 import re
@@ -142,6 +211,15 @@ def parse_arguments(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
             "REPOSITORY_STATIC_VERIFIED evidence"
         ),
     )
+    parser.add_argument(
+        "--require-literal-pass",
+        action="store_true",
+        help=(
+            "Exit 0 only for the literal overall status PASS; registered "
+            "baseline reds (PASS_WITH_REGISTERED_BASELINE) exit nonzero. "
+            "Pinned into scripts/release.sh so a registered red never releases."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -155,7 +233,23 @@ def _default_phase0_evidence_path(run_id: str) -> Path:
     return DEFAULT_PHASE0_RUNS_ROOT / run_id / "phase0-evidence.json"
 
 
-def resolve_baseline(explicit: Optional[str]) -> str:
+def resolve_baseline(explicit: Optional[str]) -> tuple[str, bool]:
+    """Resolve the baseline commit and whether it is authoritative.
+
+    Only an explicit ``--base`` or the DPS_BASELINE_COMMIT / GITHUB_BASE_SHA
+    environment naming a commit other than HEAD is authoritative.  The HEAD
+    fallback (also reached through an empty or all-zero candidate) keeps
+    legacy consumers such as the instruction receipt working, and an explicit
+    base that resolves to the current HEAD commit (``--base HEAD``, or the
+    HEAD sha spelled out) is the same self-comparison in disguise, so both
+    are never an authority for the baseline red ledger: callers must treat a
+    non-authoritative baseline as BASELINE_COMMIT_UNAVAILABLE for drift.
+    ``scripts/release.sh`` intentionally self-compares with
+    ``--base "$head_commit"``; it stays safe through
+    ``--require-literal-pass``, which releases only the literal PASS.
+    """
+
+    head = git_output(ROOT, ["rev-parse", "HEAD"])
     candidates = (
         explicit,
         os.environ.get("DPS_BASELINE_COMMIT"),
@@ -163,8 +257,9 @@ def resolve_baseline(explicit: Optional[str]) -> str:
     )
     for candidate in candidates:
         if candidate and candidate.strip("0"):
-            return git_output(ROOT, ["rev-parse", candidate + "^{commit}"])
-    return git_output(ROOT, ["rev-parse", "HEAD"])
+            resolved = git_output(ROOT, ["rev-parse", candidate + "^{commit}"])
+            return resolved, resolved != head
+    return head, False
 
 
 def workspace_cleanliness_check(root: Path, diagnostic: bool) -> Dict[str, Any]:
@@ -241,6 +336,1350 @@ def evidence_classification(
     return VERIFICATION_LEVEL, level
 
 
+# --- Baseline red ledger (RebuildPlan §4.1 clause 6, first item) -------------
+#
+# The ledger registers the exact failure fingerprint of every pre-existing
+# required red on the merged baseline.  A run whose only required failures
+# match the registered fingerprints byte-for-byte is reported as
+# PASS_WITH_REGISTERED_BASELINE (exit 0, never the literal "PASS"); every
+# other deviation -- an unregistered red, a changed, moved, shrunk, or grown
+# fingerprint, a stale entry whose check has partially or fully turned green,
+# a ledger that expanded or was removed relative to the --base commit, or a
+# run without an authoritative --base commit while the ledger is load-bearing
+# -- fails closed.  The only legal terminal state is an entries list shrunk to
+# empty with the ledger file still present.
+
+BASELINE_RED_LEDGER_RELATIVE_PATH = "governance/baseline-red-ledger.json"
+# v2 (CF2-P0-2) binds every registered unittest failure to a normalized
+# failure-cause digest.  The bump is deliberate and breaking: a v1 document is
+# refused outright rather than read as a compatible ledger, because a v1 MATCH
+# was decided without ever looking at why a test failed.
+BASELINE_RED_LEDGER_SCHEMA_VERSION = "dps.baseline-red-ledger/v2"
+BASELINE_RED_DRIFT_CHECK_ID = "baseline-red-ledger-drift"
+OVERALL_PASS_WITH_REGISTERED_BASELINE = "PASS_WITH_REGISTERED_BASELINE"
+PASSING_OVERALL_STATUSES = ("PASS", OVERALL_PASS_WITH_REGISTERED_BASELINE)
+BASELINE_RED_FINGERPRINT_KINDS = ("unittest", "dotnet", "error-set")
+
+_UNITTEST_SEPARATOR_LINE = "=" * 70
+_UNITTEST_RULE_LINE = "-" * 70
+_UNITTEST_DETAIL_HEADER = re.compile(r"^(?:FAIL|ERROR): (\S+) \(([^()\s]+)\)(.*)$")
+_UNITTEST_FRAME_LINE = re.compile(
+    r'^(?P<indent>\s*)File "(?P<path>[^"]*)", line [0-9]+(?P<rest>.*)$'
+)
+_TRACEBACK_HEADER_LINE = "Traceback (most recent call last):"
+# R6-1/R6-2/R6-3: the timestamp, temporary-path and repr-address rules were
+# deleted, not narrowed.  Each was measured at zero rewritten lines on the real
+# Tests/ci red log (707 lines, 41 rewritten by the ROOT strip and 41 frame
+# lines), so none of them bought any measurable stability -- while each one
+# admitted a collision that ended in exit 0: a moved anchor-expiry stamp
+# ("2026-01-01T00:00:00Z exceeds the permitted window" vs
+# "1970-01-01T00:00:00Z ..."), a swapped first temporary segment
+# ("/tmp/dps-sandbox" vs "/tmp/etc-shadow-link"), and an unanchored hex rewrite
+# ("mapped at 0xDEADBEEF>" vs "mapped at 0x00000000>").  An un-normalized
+# wall-clock stamp can only produce a MISMATCH, which is the safe direction.
+_UNITTEST_RAN_LINE = re.compile(r"^Ran ([0-9]+) tests? in \S+$")
+_UNITTEST_FAILED_SUMMARY = re.compile(r"^FAILED \(([^()]*)\)$")
+_UNITTEST_SUMMARY_TOKEN = re.compile(r"^(failures|errors)=([0-9]+)$")
+_DOTNET_FILE_ERROR_LINE = re.compile(
+    r"^(.+?)\((\d+),(\d+)\):\s*error\s+([A-Za-z]+\d+)\s*:"
+)
+_DOTNET_BARE_ERROR_LINE = re.compile(r"(?:^|\s)error\s+([A-Za-z]+\d+)\s*:")
+_DOTNET_FAILED_TEST_LINE = re.compile(r"^failed\s+(\S+\.\S+)(?:\s|$)")
+_DOTNET_TEST_COUNT_LINE = re.compile(
+    r"^\s*(total|failed|succeeded|skipped):\s*([0-9]+)\s*$"
+)
+_DOTNET_BUILD_FAILED_LINE = re.compile(
+    r"^\s*(?:Build failed with exit code\b|Build FAILED\.)"
+)
+
+
+def _unittest_failure_item(method: str, qualified: str, suffix: str = "") -> str:
+    """Full module-qualified failure identity, never a truncated suffix.
+
+    ``suffix`` is the whitespace-normalized remainder of the detail header
+    after the qualified name -- the subTest parameter/message portion such as
+    ``(i=1)`` or ``[boom] (a=1, b=2, c=3)``.  It stays part of the identity so
+    each failed subTest counts once, keeping the deduplicated header count
+    equal to the FAILED summary instead of collapsing every subTest of one
+    method into a single item (which made any subTest failure UNPARSEABLE).
+    """
+
+    if qualified.endswith("." + method) or qualified == method:
+        item = qualified
+    else:
+        item = qualified + "." + method
+    normalized_suffix = " ".join(suffix.split())
+    if normalized_suffix:
+        item = item + " " + normalized_suffix
+    return item
+
+
+def _checkout_prefixes() -> Sequence[str]:
+    """This checkout's own root, in every spelling a log can carry it.
+
+    ``ROOT`` is ``Path(...).resolve()``d, so on macOS a checkout under
+    ``/tmp/x`` is known here as ``/private/tmp/x`` while a subprocess that
+    never resolved the path prints ``/tmp/x``.  Both name the same directory,
+    so both are stripped.  This is a literal, fully determined prefix -- not a
+    wildcard segment -- so it can only fold two spellings of one checkout onto
+    the same repository-relative path; it can never fold two different
+    directories together.
+    """
+
+    root = str(ROOT).rstrip("/")
+    prefixes = {root}
+    if root.startswith("/private/"):
+        prefixes.add(root[len("/private") :])
+    else:
+        prefixes.add("/private" + root)
+    return sorted(prefixes, key=len, reverse=True)
+
+
+def _scrub_unstable_reason_text(text: str) -> str:
+    """Erase the checkout prefix.  Nothing else.
+
+    R6-1..3 (sixth-round review): the temporary-path, ``<... at 0x...>`` repr
+    address and line-leading wall-clock timestamp rules were **deleted**.  All
+    three rewrote zero lines of the real Tests/ci red log, so they bought no
+    measurable stability, while each one merged a hostile observation onto a
+    registered one and released it at exit 0.  What is left is the only rule
+    that actually fires on real logs (41 of 707 lines): the checkout prefix,
+    which is pure location noise -- the same repository content is reached
+    through a different absolute path on every runner.
+
+    Nothing else is touched here.  A wall-clock timestamp, a temporary path
+    and a hex address now all reach the digest verbatim, so a run whose
+    environment moves them MISMATCHes.  That is the fail-closed direction and
+    is deliberately preferred over the collisions the rules admitted.
+    """
+
+    for prefix in _checkout_prefixes():
+        text = text.replace(prefix + "/", "")
+    return text
+
+
+_OPEN_TO_CLOSE = {"{": "}", "[": "]", "(": ")"}
+# Only str/bytes hashing is randomized per process, so the only brace group
+# whose order can move between runs is one whose items are string literals.
+# Requiring that shape keeps prose such as "{root, intermediate, leaf}" -- where
+# the order may well be the point -- out of the sorting rule entirely.
+_STRING_LITERAL_ITEM = re.compile(r"^[bBrRuUfF]{0,2}[\"']")
+
+
+def _scan_quoted(text: str, start: int) -> tuple:
+    """Consume one quoted run verbatim; return (text, index after it)."""
+
+    quote = text[start]
+    index = start + 1
+    while index < len(text):
+        character = text[index]
+        if character == "\\":
+            index += 2
+            continue
+        if character == quote:
+            return text[start : index + 1], index + 1
+        index += 1
+    return text[start:], len(text)
+
+
+def _scan_bracket_group(text: str, start: int) -> tuple:
+    """Rewrite one bracketed group, sorting it only if it is a set repr.
+
+    A ``{...}`` group whose top level holds at least two comma separated
+    string literals and no ``key: value`` pair is a set/frozenset rendering of
+    strings: its order is python's randomized string hashing and carries no
+    information, so the items are sorted.  Everything else -- dicts (insertion
+    ordered, never hash randomized), lists, tuples, unbalanced brackets, and
+    any brace group that is not a run of string literals -- is re-emitted
+    exactly as it came in, with nested groups still normalized, so genuine
+    sequence order stays load bearing.  Sorting is a permutation of the items,
+    never a merge: change, add or drop one item and the rendering changes with
+    it (U1 / C5b).
+    """
+
+    opener = text[start]
+    closer = _OPEN_TO_CLOSE[opener]
+    index = start + 1
+    items: List[str] = []
+    current: List[str] = []
+    saw_colon = False
+    while index < len(text):
+        character = text[index]
+        if character == closer:
+            items.append("".join(current))
+            index += 1
+            verbatim = opener + ",".join(items) + closer
+            if (
+                opener == "{"
+                and not saw_colon
+                and len(items) >= 2
+                and all(
+                    _STRING_LITERAL_ITEM.match(item.strip()) for item in items
+                )
+            ):
+                return (
+                    "{" + ", ".join(sorted(item.strip() for item in items)) + "}",
+                    index,
+                )
+            return verbatim, index
+        if character in _OPEN_TO_CLOSE:
+            rendered, index = _scan_bracket_group(text, index)
+            current.append(rendered)
+            continue
+        if character in "\"'":
+            rendered, index = _scan_quoted(text, index)
+            current.append(rendered)
+            continue
+        if character == ",":
+            items.append("".join(current))
+            current = []
+            index += 1
+            continue
+        if character == ":":
+            saw_colon = True
+        current.append(character)
+        index += 1
+    return text[start:], len(text)
+
+
+def _sort_inline_set_literals(line: str) -> str:
+    """Normalize the item order of every inline set repr on one line."""
+
+    rendered: List[str] = []
+    index = 0
+    while index < len(line):
+        character = line[index]
+        if character in _OPEN_TO_CLOSE:
+            chunk, index = _scan_bracket_group(line, index)
+            rendered.append(chunk)
+            continue
+        if character in "\"'":
+            chunk, index = _scan_quoted(line, index)
+            rendered.append(chunk)
+            continue
+        rendered.append(character)
+        index += 1
+    return "".join(rendered)
+
+
+# The exact headers unittest emits before a run of items that describe an
+# unordered collection (unittest.case.assertSetEqual / assertCountEqual).
+_UNITTEST_UNORDERED_BLOCK_MARKERS = (
+    "Items in the first set but not the second:",
+    "Items in the second set but not the first:",
+    "Element counts were not equal:",
+)
+
+
+def _is_unordered_block_marker(line: str) -> bool:
+    return any(
+        line.endswith(marker) for marker in _UNITTEST_UNORDERED_BLOCK_MARKERS
+    )
+
+
+def _sort_unordered_report_blocks(lines: Sequence[str]) -> List[str]:
+    """Sort the item runs unittest emits for set comparisons.
+
+    ``assertSetEqual`` and ``assertCountEqual`` render their differences in
+    Python set iteration order, which differs between processes because string
+    hashing is randomized -- and the suite runs under ``-I``, which
+    deliberately suppresses PYTHONHASHSEED, so the child cannot be pinned to a
+    fixed seed.  Those items describe an unordered collection, so sorting the
+    run removes the randomness without removing any information: change which
+    items are in the set and the sorted run changes with it.  Only these three
+    unittest-authored headers trigger it; no other line ordering is touched.
+    """
+
+    result: List[str] = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        result.append(line)
+        index += 1
+        if not _is_unordered_block_marker(line):
+            continue
+        run_start = index
+        while index < len(lines):
+            candidate = lines[index]
+            if not candidate.strip() or _is_unordered_block_marker(candidate):
+                break
+            index += 1
+        result.extend(sorted(lines[run_start:index]))
+    return result
+
+
+def _unittest_reason_digest(body: Sequence[str]) -> str:
+    """Deterministic digest of one detail block's normalized failure cause.
+
+    Frame rewriting is scoped to the traceback preamble: the region that opens
+    with ``Traceback (most recent call last):`` and closes at the first
+    non-blank line indented no deeper than that header -- the exception line.
+    Inside it a frame keeps its repository-relative path and its function but
+    loses the line number, the echoed source line and the 3.11+ caret anchors,
+    which move whenever the file is edited above the failure site.
+
+    CF5-4: outside the preamble nothing is swallowed.  Aggregated sub-failure
+    reports embed ``File "x.py", line N, in f`` shaped lines inside the
+    exception *message*; the old unconditional rule dropped every indented
+    line beneath them, so ``reason: reciprocal edge missing for module alpha``
+    and ``reason: TRUST ROOT SIGNATURE FORGED`` hashed identically.
+
+    CF5-5: the frame path is no longer collapsed to its base name.  The ROOT
+    prefix strip in :func:`_scrub_unstable_reason_text` already removes
+    checkout-location noise, so dropping the directory bought no stability and
+    only made ``Modules/alpha/helper.py`` and ``Modules/omega/helper.py``
+    indistinguishable.
+
+    R8 (eighth-round review): this function performs exactly seven
+    rewrites, enumerated here so the prose can be held against the code.
+    (1) Every line is rstripped.  (2) A frame line inside the traceback
+    preamble loses its line number, and the unbounded run of lines indented
+    deeper than that frame -- the echoed source line, the 3.11+ caret line,
+    and any other line that deep -- is swallowed until a blank line or a
+    line at the frame's indent or shallower.  (3) The frame path's
+    backslashes become forward slashes.  (4) The checkout prefix, in both
+    spellings (:func:`_checkout_prefixes`), is stripped from every line.
+    (5) :func:`_sort_inline_set_literals` sorts an inline brace group only
+    when every item is a string literal.  (6) Blank-line runs collapse to a
+    single blank, and leading and trailing blank lines are dropped.
+    (7) :func:`_sort_unordered_report_blocks` sorts the line run under a
+    unittest set-comparison header with no string-literal restriction -- a
+    separate rule from (5), not a variant of it.  Anything a rewrite does
+    not cover is hashed as-is: a different exception class or a different
+    message body always produces a different digest.
+    """
+
+    normalized: List[str] = []
+    index = 0
+    preamble_indent: Optional[int] = None
+    while index < len(body):
+        raw = body[index].rstrip()
+        if raw.strip() == _TRACEBACK_HEADER_LINE:
+            preamble_indent = len(raw) - len(raw.lstrip())
+            normalized.append(raw)
+            index += 1
+            continue
+        if preamble_indent is not None and (
+            not raw.strip() or len(raw) - len(raw.lstrip()) <= preamble_indent
+        ):
+            # The exception line (or a blank) closes the frame region.  From
+            # here on the text is the exception message and is kept verbatim,
+            # frame shaped or not, until another traceback header opens.
+            preamble_indent = None
+        frame = (
+            _UNITTEST_FRAME_LINE.match(raw) if preamble_indent is not None else None
+        )
+        if frame is None:
+            normalized.append(raw)
+            index += 1
+            continue
+        indent = len(frame.group("indent"))
+        normalized.append(
+            '{0}File "{1}", line <n>{2}'.format(
+                frame.group("indent"),
+                frame.group("path").replace("\\", "/"),
+                frame.group("rest"),
+            )
+        )
+        index += 1
+        while index < len(body):
+            following = body[index].rstrip()
+            if not following.strip():
+                break
+            if len(following) - len(following.lstrip()) <= indent:
+                break
+            index += 1
+    scrubbed = _scrub_unstable_reason_text("\n".join(normalized)).split("\n")
+    collapsed: List[str] = []
+    for line in scrubbed:
+        stripped = _sort_inline_set_literals(line.rstrip())
+        if not stripped and (not collapsed or not collapsed[-1]):
+            continue
+        collapsed.append(stripped)
+    while collapsed and not collapsed[-1]:
+        collapsed.pop()
+    return sha256_text(stable_json(_sort_unordered_report_blocks(collapsed)))
+
+
+def unittest_failure_fingerprint(
+    log: str, required_inventory: Optional[Sequence[str]] = None
+) -> Dict[str, Any]:
+    """Fingerprint a python-unittest FAIL log from its canonical tail only.
+
+    The parse domain is the unittest tail: exactly one ``Ran N tests`` line,
+    exactly one ``FAILED (failures=X, errors=Y)`` summary as the last
+    non-empty line, and detail headers that are counted only when they
+    directly follow a 70-character ``=`` separator line.  Free-form prints in
+    the progress region are never counted, and the deduplicated header count
+    must equal X+Y; any deviation yields ``parse_error`` (never a match).
+    ``executed`` (from the Ran line) and ``missing_inventory`` (required
+    inventory names absent from the log) are part of the fingerprint, so
+    deleting a carrier test file changes the fingerprint even while the check
+    is already red.  ``failure_reasons`` binds each failed identity to a
+    normalized digest of its detail block (CF2-P0-2), so a registered test that
+    starts failing for a new reason is a new failure, not a registered one.
+    """
+
+    missing = (
+        sorted(name for name in set(required_inventory) if name not in log)
+        if required_inventory is not None
+        else []
+    )
+    fingerprint: Dict[str, Any] = {
+        "kind": "unittest",
+        "failed_tests": [],
+        "failure_reasons": {},
+        "count": 0,
+        "executed": 0,
+        "missing_inventory": missing,
+    }
+
+    def failed(reason: str) -> Dict[str, Any]:
+        fingerprint["parse_error"] = reason
+        return fingerprint
+
+    lines = log.splitlines()
+    ran_indexes = [
+        index for index, line in enumerate(lines) if _UNITTEST_RAN_LINE.match(line)
+    ]
+    if len(ran_indexes) != 1:
+        return failed(
+            "expected exactly one canonical 'Ran N tests' line, found {0}".format(
+                len(ran_indexes)
+            )
+        )
+    ran_index = ran_indexes[0]
+    fingerprint["executed"] = int(
+        _UNITTEST_RAN_LINE.match(lines[ran_index]).group(1)
+    )
+    tail_lines = [line for line in lines[ran_index + 1 :] if line.strip()]
+    if len(tail_lines) != 1:
+        return failed(
+            "expected exactly the FAILED summary after the Ran line, found "
+            + repr(tail_lines)
+        )
+    summary_match = _UNITTEST_FAILED_SUMMARY.match(tail_lines[0])
+    if summary_match is None:
+        return failed(
+            "log does not end with a canonical FAILED summary: "
+            + repr(tail_lines[0])
+        )
+    summary_total = 0
+    for token in summary_match.group(1).split(", "):
+        token_match = _UNITTEST_SUMMARY_TOKEN.match(token)
+        if token_match is None:
+            return failed("unsupported FAILED summary token: " + repr(token))
+        summary_total += int(token_match.group(2))
+    separator_indexes = [
+        index for index in range(ran_index) if lines[index] == _UNITTEST_SEPARATOR_LINE
+    ]
+    items: Dict[str, str] = {}
+    for position, index in enumerate(separator_indexes):
+        header = (
+            _UNITTEST_DETAIL_HEADER.match(lines[index + 1])
+            if index + 1 < ran_index
+            else None
+        )
+        if header is None:
+            # A separator that opens no detail block would silently truncate
+            # the preceding block's body, so a cause could be split off and
+            # dropped from its digest.  Inside the parse domain every 70-'='
+            # line must open a block; anything else is unparseable, never a
+            # match.
+            #
+            # U2: one decorative 70-'=' banner voids every registered entry of
+            # the check, so the error has to name the culprit.  The two lines
+            # on each side of the offending separator are quoted verbatim --
+            # that window contains the printing test's own output.
+            return failed(
+                "separator line at offset {0} does not open a detail block; "
+                "context lines {1}-{2}: {3!r}".format(
+                    index,
+                    max(0, index - 2),
+                    min(len(lines) - 1, index + 2),
+                    lines[max(0, index - 2) : index + 3],
+                )
+            )
+        item = _unittest_failure_item(
+            header.group(1), header.group(2), header.group(3)
+        )
+        rule_index = index + 2
+        if rule_index >= ran_index or lines[rule_index] != _UNITTEST_RULE_LINE:
+            return failed(
+                "detail block for {0!r} is not followed by the canonical "
+                "70-dash rule line".format(item)
+            )
+        end = (
+            separator_indexes[position + 1]
+            if position + 1 < len(separator_indexes)
+            else ran_index
+        )
+        body = list(lines[rule_index + 1 : end])
+        while body and not body[-1].strip():
+            body.pop()
+        if body and body[-1] == _UNITTEST_RULE_LINE:
+            body.pop()
+            while body and not body[-1].strip():
+                body.pop()
+        if not body:
+            return failed("detail block for {0!r} has an empty body".format(item))
+        digest = _unittest_reason_digest(body)
+        if items.setdefault(item, digest) != digest:
+            return failed(
+                "detail blocks for {0!r} disagree on the failure cause".format(item)
+            )
+    if len(items) != summary_total:
+        return failed(
+            "deduplicated detail headers ({0}) do not equal the FAILED summary "
+            "failures+errors ({1})".format(len(items), summary_total)
+        )
+    fingerprint["failed_tests"] = sorted(items)
+    fingerprint["failure_reasons"] = {name: items[name] for name in sorted(items)}
+    fingerprint["count"] = len(items)
+    return fingerprint
+
+
+def dotnet_failure_fingerprint(
+    log: str, root_prefixes: Optional[Sequence[str]] = None
+) -> Dict[str, Any]:
+    """Fingerprint a dotnet check by exact diagnostic instances plus counts.
+
+    Compiler and analyzer diagnostics are collected as unique repository
+    relative ``(file, line, column, code)`` instances (MSBuild reprints of the
+    same diagnostic deduplicate), then hashed as a sorted table; moving a
+    diagnostic to another line or file therefore always changes the
+    fingerprint.  Test-run checks additionally pin the exact
+    total/failed/succeeded/skipped summary counts, and compile checks pin the
+    build-failed marker, so shrinking green coverage or losing the failure
+    marker also changes the fingerprint.
+    """
+
+    prefixes = [
+        str(value).rstrip("/") + "/"
+        for value in (root_prefixes if root_prefixes is not None else [str(ROOT)])
+    ]
+
+    def relative(path: str) -> str:
+        for prefix in prefixes:
+            if path.startswith(prefix):
+                return path[len(prefix) :]
+        return path
+
+    def normalized(text: str) -> str:
+        for prefix in prefixes:
+            text = text.replace(prefix, "")
+        return text
+
+    file_instances: set = set()
+    bare_instances: set = set()
+    failed_tests: set = set()
+    count_values: Dict[str, List[int]] = {
+        "total": [],
+        "failed": [],
+        "succeeded": [],
+        "skipped": [],
+    }
+    build_failed = False
+    for raw_line in log.splitlines():
+        line = raw_line.strip()
+        if _DOTNET_BUILD_FAILED_LINE.match(line):
+            build_failed = True
+            continue
+        count_match = _DOTNET_TEST_COUNT_LINE.match(raw_line)
+        if count_match is not None:
+            count_values[count_match.group(1)].append(int(count_match.group(2)))
+            continue
+        file_match = _DOTNET_FILE_ERROR_LINE.match(line)
+        if file_match is not None:
+            file_instances.add(
+                (
+                    relative(file_match.group(1)),
+                    int(file_match.group(2)),
+                    int(file_match.group(3)),
+                    file_match.group(4),
+                )
+            )
+            continue
+        failed_match = _DOTNET_FAILED_TEST_LINE.match(line)
+        if failed_match is not None:
+            failed_tests.add(failed_match.group(1))
+            continue
+        bare_match = _DOTNET_BARE_ERROR_LINE.search(line)
+        if bare_match is not None:
+            bare_instances.add((bare_match.group(1), normalized(line)))
+    error_codes: Dict[str, int] = {}
+    for instance in file_instances:
+        error_codes[instance[3]] = error_codes.get(instance[3], 0) + 1
+    for code, _line in bare_instances:
+        error_codes[code] = error_codes.get(code, 0) + 1
+    instance_table = {
+        "file_instances": sorted(list(item) for item in file_instances),
+        "bare_instances": sorted(list(item) for item in bare_instances),
+    }
+    fingerprint: Dict[str, Any] = {
+        "kind": "dotnet",
+        "error_instances_sha256": sha256_text(stable_json(instance_table)),
+        "error_codes": {code: error_codes[code] for code in sorted(error_codes)},
+        "files": sorted({instance[0] for instance in file_instances}),
+        "failed_tests": sorted(failed_tests),
+        "test_counts": None,
+        "build_failed": build_failed,
+        "count": sum(error_codes.values()) + len(failed_tests),
+    }
+    observed_counts = {key for key, values in count_values.items() if values}
+    if observed_counts:
+        if observed_counts != set(count_values) or any(
+            len(values) != 1 for values in count_values.values()
+        ):
+            fingerprint["parse_error"] = (
+                "ambiguous or partial dotnet test summary counts: "
+                + repr({key: values for key, values in count_values.items()})
+            )
+            return fingerprint
+        fingerprint["test_counts"] = {
+            key: values[0] for key, values in count_values.items()
+        }
+    return fingerprint
+
+
+def error_set_fingerprint(log: str) -> Dict[str, Any]:
+    """Fingerprint of an in-process check: sha256 of the sorted error set."""
+
+    lines = log.splitlines()
+    if lines and lines[0].startswith("ERROR: "):
+        lines[0] = lines[0][len("ERROR: ") :]
+    errors = sorted({line.strip() for line in lines if line.strip()})
+    return {
+        "kind": "error-set",
+        "errors_sha256": sha256_text(stable_json(errors)),
+        "count": len(errors),
+    }
+
+
+def compute_failure_fingerprint(
+    kind: str,
+    log: str,
+    required_inventory: Optional[Sequence[str]] = None,
+    root_prefixes: Optional[Sequence[str]] = None,
+) -> Dict[str, Any]:
+    if kind == "unittest":
+        return unittest_failure_fingerprint(log, required_inventory)
+    if kind == "dotnet":
+        return dotnet_failure_fingerprint(log, root_prefixes)
+    if kind == "error-set":
+        return error_set_fingerprint(log)
+    raise Phase0Error("unknown baseline red fingerprint kind: " + str(kind))
+
+
+def fingerprint_relation(
+    observed: Mapping[str, Any], registered: Mapping[str, Any]
+) -> str:
+    """Return MATCH, SHRUNK, or GREW for observed relative to registered.
+
+    Only the unittest failed-test set can be recognised as SHRUNK, and only
+    while its executed count, missing-inventory list and the failure-cause
+    digest of every surviving failure are unchanged.  Every dotnet and
+    error-set deviation -- including a genuine partial fix, a line number drift
+    after editing a file with registered errors, or a changed test count -- is
+    GREW: reseeding those fingerprints is an Owner-merged ledger change by
+    design, never an automatic pass.
+    """
+
+    if "parse_error" in observed or "parse_error" in registered:
+        return "GREW"
+    if observed.get("kind") != registered.get("kind"):
+        return "GREW"
+    kind = registered.get("kind")
+    if kind == "unittest":
+        if observed.get("executed") != registered.get("executed"):
+            return "GREW"
+        if list(observed.get("missing_inventory") or []) != list(
+            registered.get("missing_inventory") or []
+        ):
+            return "GREW"
+        observed_reasons = observed.get("failure_reasons")
+        registered_reasons = registered.get("failure_reasons")
+        if not isinstance(observed_reasons, Mapping) or not isinstance(
+            registered_reasons, Mapping
+        ):
+            # CF2-P0-2: a cause-blind fingerprint predates the cause-bound
+            # schema and can never be recognised, on either side.
+            return "GREW"
+        observed_tests = set(observed.get("failed_tests") or [])
+        registered_tests = set(registered.get("failed_tests") or [])
+        if not observed_tests <= registered_tests:
+            return "GREW"
+        for name in observed_tests:
+            # A surviving failure that changed cause is a new failure wearing
+            # the registered test's name; ``.get`` on a missing side is None
+            # and therefore also GREW.
+            if observed_reasons.get(name) != registered_reasons.get(name):
+                return "GREW"
+        if observed_tests == registered_tests:
+            return "MATCH"
+        return "SHRUNK"
+    if kind in ("dotnet", "error-set"):
+        return "MATCH" if dict(observed) == dict(registered) else "GREW"
+    return "GREW"
+
+
+def _sorted_unique_string_list_errors(value: Any, label: str) -> List[str]:
+    if not isinstance(value, list) or any(
+        not isinstance(item, str) or not item for item in value
+    ):
+        return [label + " must be a list of non-empty strings"]
+    if value != sorted(set(value)):
+        return [label + " must be sorted and free of duplicates"]
+    return []
+
+
+def _non_negative_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _fingerprint_errors(fingerprint: Any) -> List[str]:
+    if not isinstance(fingerprint, Mapping):
+        return ["failure_fingerprint must be an object"]
+    if "parse_error" in fingerprint:
+        return ["a fingerprint with parse_error may never be registered"]
+    kind = fingerprint.get("kind")
+    errors: List[str] = []
+    if kind == "unittest":
+        if set(fingerprint) != {
+            "kind",
+            "failed_tests",
+            "failure_reasons",
+            "count",
+            "executed",
+            "missing_inventory",
+        }:
+            # A pre-CF2-P0-2 entry has no failure_reasons and lands here: the
+            # cause-blind schema fails closed, it is never accepted as
+            # "compatible".
+            return [
+                "unittest fingerprint must have exactly kind/failed_tests/"
+                "failure_reasons/count/executed/missing_inventory"
+            ]
+        errors.extend(
+            _sorted_unique_string_list_errors(
+                fingerprint.get("failed_tests"), "failed_tests"
+            )
+        )
+        errors.extend(
+            _sorted_unique_string_list_errors(
+                fingerprint.get("missing_inventory"), "missing_inventory"
+            )
+        )
+        reasons = fingerprint.get("failure_reasons")
+        if not isinstance(reasons, Mapping) or any(
+            not isinstance(name, str)
+            or not isinstance(digest, str)
+            or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+            for name, digest in reasons.items()
+        ):
+            errors.append(
+                "failure_reasons must map failed test names to lowercase "
+                "sha256 hex digests"
+            )
+        if errors:
+            return errors
+        if sorted(reasons) != fingerprint["failed_tests"]:
+            errors.append(
+                "failure_reasons must cover exactly the failed_tests names"
+            )
+        if not fingerprint["failed_tests"]:
+            errors.append("failed_tests must not be empty")
+        if fingerprint.get("count") != len(fingerprint["failed_tests"]):
+            errors.append("count must equal the number of failed_tests")
+        executed = fingerprint.get("executed")
+        # Not bounded below by len(failed_tests): one executed test can fail
+        # several subTests, each a distinct failure identity.
+        if not _non_negative_int(executed) or executed < 1:
+            errors.append("executed must be a positive integer")
+        return errors
+    if kind == "dotnet":
+        if set(fingerprint) != {
+            "kind",
+            "error_instances_sha256",
+            "error_codes",
+            "files",
+            "failed_tests",
+            "test_counts",
+            "build_failed",
+            "count",
+        }:
+            return [
+                "dotnet fingerprint must have exactly kind/error_instances_sha256/"
+                "error_codes/files/failed_tests/test_counts/build_failed/count"
+            ]
+        digest = fingerprint.get("error_instances_sha256")
+        if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            errors.append(
+                "error_instances_sha256 must be a lowercase sha256 hex digest"
+            )
+        error_codes = fingerprint.get("error_codes")
+        if not isinstance(error_codes, Mapping) or any(
+            not isinstance(code, str)
+            or not code
+            or not isinstance(value, int)
+            or isinstance(value, bool)
+            or value < 1
+            for code, value in error_codes.items()
+        ):
+            errors.append("error_codes must map non-empty codes to positive integers")
+        errors.extend(
+            _sorted_unique_string_list_errors(fingerprint.get("files"), "files")
+        )
+        errors.extend(
+            _sorted_unique_string_list_errors(
+                fingerprint.get("failed_tests"), "failed_tests"
+            )
+        )
+        if not isinstance(fingerprint.get("build_failed"), bool):
+            errors.append("build_failed must be a boolean")
+        test_counts = fingerprint.get("test_counts")
+        if test_counts is not None:
+            if (
+                not isinstance(test_counts, Mapping)
+                or set(test_counts) != {"total", "failed", "succeeded", "skipped"}
+                or not all(_non_negative_int(value) for value in test_counts.values())
+            ):
+                errors.append(
+                    "test_counts must be null or exactly "
+                    "total/failed/succeeded/skipped non-negative integers"
+                )
+        if errors:
+            return errors
+        if test_counts is None:
+            if fingerprint["failed_tests"]:
+                errors.append("failed_tests require the pinned test_counts summary")
+        else:
+            if test_counts["total"] != (
+                test_counts["failed"]
+                + test_counts["succeeded"]
+                + test_counts["skipped"]
+            ):
+                errors.append("test_counts total must equal failed+succeeded+skipped")
+            if test_counts["failed"] != len(fingerprint["failed_tests"]):
+                errors.append(
+                    "test_counts failed must equal the failed_tests length"
+                )
+        total = sum(error_codes.values()) + len(fingerprint["failed_tests"])
+        if total < 1:
+            errors.append("dotnet fingerprint must register at least one failure item")
+        if fingerprint.get("count") != total:
+            errors.append("count must equal error instances plus failed tests")
+        return errors
+    if kind == "error-set":
+        if set(fingerprint) != {"kind", "errors_sha256", "count"}:
+            return ["error-set fingerprint must have exactly kind/errors_sha256/count"]
+        digest = fingerprint.get("errors_sha256")
+        if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            errors.append("errors_sha256 must be a lowercase sha256 hex digest")
+        count = fingerprint.get("count")
+        if not isinstance(count, int) or isinstance(count, bool) or count < 1:
+            errors.append("count must be a positive integer")
+        return errors
+    return ["fingerprint kind must be one of: " + ", ".join(BASELINE_RED_FINGERPRINT_KINDS)]
+
+
+def parse_baseline_red_ledger(text: str, source_label: str) -> List[Dict[str, Any]]:
+    """Parse and strictly validate one ledger document; fail closed on errors."""
+
+    try:
+        payload = json.loads(text)
+    except Exception as exc:
+        raise Phase0Error(
+            "{0}: ledger is not valid JSON: {1}".format(source_label, exc)
+        )
+    if not isinstance(payload, dict):
+        raise Phase0Error(source_label + ": ledger must be a JSON object")
+    errors: List[str] = []
+    if set(payload) - {"notes"} != {"schema_version", "entries"}:
+        errors.append(
+            "ledger must have exactly schema_version and entries plus optional notes"
+        )
+    if "notes" in payload and (
+        not isinstance(payload["notes"], list)
+        or any(
+            not isinstance(item, str) or not item.strip()
+            for item in payload["notes"]
+        )
+    ):
+        errors.append("notes must be a list of non-empty strings")
+    if payload.get("schema_version") != BASELINE_RED_LEDGER_SCHEMA_VERSION:
+        errors.append(
+            "schema_version must be " + BASELINE_RED_LEDGER_SCHEMA_VERSION
+        )
+    entries = payload.get("entries")
+    if not isinstance(entries, list):
+        errors.append("entries must be a list")
+        entries = []
+    seen_ids: set = set()
+    expected_keys = {
+        "check_id",
+        "registered_batch",
+        "root_cause",
+        "observed_commit",
+        "failure_fingerprint",
+    }
+    for index, entry in enumerate(entries):
+        label = "entries[{0}]".format(index)
+        if not isinstance(entry, Mapping):
+            errors.append(label + " must be an object")
+            continue
+        if set(entry) != expected_keys:
+            errors.append(
+                label
+                + " must have exactly check_id/registered_batch/root_cause/"
+                + "observed_commit/failure_fingerprint"
+            )
+            continue
+        check_id = entry.get("check_id")
+        if not isinstance(check_id, str) or not check_id:
+            errors.append(label + " check_id must be a non-empty string")
+            continue
+        if check_id == BASELINE_RED_DRIFT_CHECK_ID:
+            errors.append(
+                label + " may not register the ledger drift check itself"
+            )
+        if check_id in seen_ids:
+            errors.append("duplicate ledger entry for check " + check_id)
+        seen_ids.add(check_id)
+        if not isinstance(entry.get("registered_batch"), str) or not entry[
+            "registered_batch"
+        ]:
+            errors.append(label + " registered_batch must be a non-empty string")
+        if not isinstance(entry.get("root_cause"), str) or not entry["root_cause"]:
+            errors.append(label + " root_cause must be a non-empty string")
+        observed_commit = entry.get("observed_commit")
+        if (
+            not isinstance(observed_commit, str)
+            or re.fullmatch(r"[0-9a-f]{40}", observed_commit) is None
+        ):
+            errors.append(label + " observed_commit must be a 40-hex commit")
+        errors.extend(
+            label + " " + message
+            for message in _fingerprint_errors(entry.get("failure_fingerprint"))
+        )
+    if errors:
+        raise Phase0Error(source_label + ": " + "; ".join(errors))
+    return [dict(entry) for entry in entries]
+
+
+def _evaluate_ledger_drift(state: Dict[str, Any]) -> None:
+    if state["errors"]:
+        state["drift_status"] = "LEDGER_INVALID"
+        state["drift_errors"] = list(state["errors"])
+        return
+    if state["baseline_commit"] is None:
+        state["drift_status"] = "BASELINE_COMMIT_UNAVAILABLE"
+        entries = state["entries"] if isinstance(state["entries"], list) else None
+        if state["present"] and entries is not None and not entries:
+            # An inert ledger (present, zero entries) excuses nothing, so an
+            # unverifiable drift has nothing to hide; all-green still passes.
+            return
+        state["drift_errors"] = [
+            "no authoritative baseline commit (--base, DPS_BASELINE_COMMIT, or "
+            "GITHUB_BASE_SHA): ledger drift is UNKNOWN and the ledger is "
+            "load-bearing, so this run fails closed"
+        ]
+        return
+    if not state["present"] and state["baseline_present"] is not True:
+        state["drift_status"] = "LEDGER_ABSENT"
+        return
+    if not state["present"]:
+        state["drift_status"] = "LEDGER_REMOVED"
+        state["drift_errors"] = [
+            "removal: {0} exists at the baseline commit but not in the working "
+            "tree; deleting the ledger resets the shrink-only ratchet and is "
+            "never a legal transition -- the only legal terminal state is an "
+            "empty entries list with the file still present".format(
+                BASELINE_RED_LEDGER_RELATIVE_PATH
+            )
+        ]
+        return
+    if state["baseline_present"] is not True:
+        # CF2-P0-1: bootstrap is expansion.  With no ledger at the
+        # authoritative base commit every entry is self-reported by this
+        # candidate and anchored to nothing the gate can read independently --
+        # ``observed_commit`` is syntax-checked, never resolved or corroborated
+        # -- so accepting them here let the introducing PR register the reds
+        # its own diff created and then match them against its own current
+        # failures for exit 0.  The introducing run therefore never earns
+        # PASS_WITH_REGISTERED_BASELINE; entries only become load-bearing from
+        # the first commit whose base already carries them, i.e. after an
+        # Owner merge, exactly like every other expansion.
+        #
+        # This is the designed shipping form, not a defect and not a staging
+        # instruction: the change that introduces a populated ledger fails its
+        # own drift check and merges red, and the three-state policy starts
+        # deciding from the next commit.  It is deliberately NOT split into
+        # "add an empty file now, register in a follow-up PR" -- that would be
+        # a post-merge obligation, which this project does not create.
+        state["drift_status"] = "LEDGER_INTRODUCED"
+        entries = state["entries"] if isinstance(state["entries"], list) else None
+        if entries is not None and not entries:
+            # An inert ledger (introduced with zero entries) excuses nothing,
+            # so the shrink-only ratchet may legally start from empty.
+            return
+        state["drift_errors"] = [
+            "bootstrap: {0} does not exist at the authoritative baseline commit "
+            "{1}, so all {2} of its entries are this candidate's own unverified "
+            "claim; the run that introduces registered baseline reds can never "
+            "clear itself.  This run therefore fails by design.  The entries "
+            "become load-bearing once the Owner has merged them, from the first "
+            "commit whose base already carries the ledger; no follow-up change "
+            "is owed.".format(
+                BASELINE_RED_LEDGER_RELATIVE_PATH,
+                state["baseline_commit"],
+                len(entries) if entries is not None else "unparsed",
+            )
+        ]
+        return
+    current_by_id = {entry["check_id"]: entry for entry in state["entries"]}
+    baseline_by_id = {entry["check_id"]: entry for entry in state["baseline_entries"]}
+    drift_errors: List[str] = []
+    shrunk = bool(set(baseline_by_id) - set(current_by_id))
+    for check_id, entry in current_by_id.items():
+        baseline_entry = baseline_by_id.get(check_id)
+        if baseline_entry is None:
+            drift_errors.append(
+                "expansion: new ledger entry for check " + check_id
+            )
+            continue
+        relation = fingerprint_relation(
+            entry["failure_fingerprint"], baseline_entry["failure_fingerprint"]
+        )
+        if relation == "GREW":
+            drift_errors.append(
+                "expansion: fingerprint for check {0} grew or changed relative "
+                "to the baseline ledger".format(check_id)
+            )
+        elif relation == "SHRUNK":
+            shrunk = True
+    if drift_errors:
+        state["drift_status"] = "LEDGER_EXPANDED"
+        state["drift_errors"] = drift_errors
+    elif shrunk:
+        state["drift_status"] = "LEDGER_SHRUNK"
+    else:
+        state["drift_status"] = "LEDGER_UNCHANGED"
+
+
+def load_baseline_red_ledger_state(
+    root: Path, baseline: Optional[str]
+) -> Dict[str, Any]:
+    """Read the working tree ledger and its blob at the baseline commit.
+
+    ``baseline`` must be an authoritative commit (--base, DPS_BASELINE_COMMIT,
+    or GITHUB_BASE_SHA).  ``None`` -- including the resolve_baseline HEAD
+    fallback, which would make every drift comparison a vacuous
+    self-comparison -- is recorded as BASELINE_COMMIT_UNAVAILABLE and fails
+    closed whenever the ledger is load-bearing.
+    """
+
+    state: Dict[str, Any] = {
+        "ledger_path": BASELINE_RED_LEDGER_RELATIVE_PATH,
+        "present": False,
+        "ledger_sha256": None,
+        "entries": None,
+        "errors": [],
+        "baseline_commit": baseline,
+        "baseline_present": None,
+        "baseline_ledger_sha256": None,
+        "baseline_entries": None,
+        "drift_status": None,
+        "drift_errors": [],
+    }
+    path = root / BASELINE_RED_LEDGER_RELATIVE_PATH
+    if path.is_file():
+        state["present"] = True
+        try:
+            text = path.read_text(encoding="utf-8-sig")
+        except OSError as exc:
+            state["errors"].append(
+                "cannot read {0}: {1}".format(BASELINE_RED_LEDGER_RELATIVE_PATH, exc)
+            )
+        else:
+            state["ledger_sha256"] = sha256_text(text)
+            try:
+                state["entries"] = parse_baseline_red_ledger(
+                    text, "working tree ledger"
+                )
+            except Phase0Error as exc:
+                state["errors"].append(str(exc))
+    if baseline is not None:
+        blob_reference = baseline + ":" + BASELINE_RED_LEDGER_RELATIVE_PATH
+        # ``git cat-file -e <commit>:<path>`` fails identically when the path is
+        # absent and when the commit itself is unreadable (a shallow fetch, a
+        # pruned object).  Only the first is "no ledger at the baseline"; the
+        # second is a missing baseline authority and must be an error, never a
+        # bootstrap classification the run could be measured against.
+        commit_probe = run_command(
+            ["git", "cat-file", "-e", baseline + "^{commit}"],
+            root,
+            timeout_seconds=30,
+        )
+        probe = run_command(
+            ["git", "cat-file", "-e", blob_reference], root, timeout_seconds=30
+        )
+        if commit_probe.exit_code != 0:
+            state["errors"].append(
+                "baseline commit {0} is not readable in this checkout: the "
+                "ledger cannot be compared against it".format(baseline)
+            )
+        elif probe.exit_code != 0:
+            state["baseline_present"] = False
+        else:
+            state["baseline_present"] = True
+            blob = run_command(
+                ["git", "cat-file", "blob", blob_reference], root, timeout_seconds=30
+            )
+            if blob.exit_code != 0:
+                state["errors"].append(
+                    "cannot read baseline ledger blob {0}: exit code {1}".format(
+                        blob_reference, blob.exit_code
+                    )
+                )
+            else:
+                state["baseline_ledger_sha256"] = sha256_text(blob.output)
+                try:
+                    state["baseline_entries"] = parse_baseline_red_ledger(
+                        blob.output, "baseline ledger"
+                    )
+                except Phase0Error as exc:
+                    state["errors"].append(str(exc))
+    _evaluate_ledger_drift(state)
+    return state
+
+
+def baseline_red_ledger_drift_check(state: Mapping[str, Any]) -> Dict[str, Any]:
+    details = {
+        "ledger_path": state["ledger_path"],
+        "ledger_present": state["present"],
+        "ledger_sha256": state["ledger_sha256"],
+        "entry_count": len(state["entries"]) if isinstance(state["entries"], list) else 0,
+        "baseline_commit": state["baseline_commit"],
+        "baseline_ledger_present": state["baseline_present"],
+        "baseline_ledger_sha256": state["baseline_ledger_sha256"],
+        "drift_status": state["drift_status"],
+    }
+    if state["drift_errors"]:
+        log = "\n".join(
+            ["ERROR: baseline red ledger failed the shrink-only drift rule:"]
+            + [" - " + message for message in state["drift_errors"]]
+            + [
+                "ledger expansion, removal, or an unverifiable baseline requires "
+                "an Owner-merged change; this gate only accepts shrinking or "
+                "unchanged ledgers against an authoritative --base"
+            ]
+        )
+        return new_check(
+            BASELINE_RED_DRIFT_CHECK_ID, True, "FAIL", None, 1, 0, log, details
+        )
+    return new_check(
+        BASELINE_RED_DRIFT_CHECK_ID,
+        True,
+        "PASS",
+        None,
+        0,
+        0,
+        "baseline red ledger drift status: " + str(state["drift_status"]),
+        details,
+    )
+
+
+def evaluate_baseline_red_policy(
+    checks: Sequence[Mapping[str, Any]], state: Mapping[str, Any]
+) -> Dict[str, Any]:
+    """Classify the run against the ledger; only exact matches may pass.
+
+    Returns the ``baseline_red`` evidence block.  ``result`` is
+    ``LEDGER_INACTIVE`` (no entries and nothing blocking: the ledger never
+    rewrites the verdict), ``REGISTERED_BASELINE_ONLY`` (every ledger entry is
+    exactly matched and no other required check is non-PASS), or
+    ``BLOCKED``."""
+
+    entries = state["entries"] if isinstance(state["entries"], list) else []
+    checks_by_id: Dict[str, Mapping[str, Any]] = {
+        str(check.get("id")): check for check in checks
+    }
+    required_failures = sorted(
+        str(check.get("id"))
+        for check in checks
+        if check.get("required") is True and check.get("status") == "FAIL"
+    )
+    required_non_fail_non_pass = sorted(
+        str(check.get("id"))
+        for check in checks
+        if check.get("required") is True
+        and check.get("status") not in ("PASS", "FAIL")
+    )
+    registered_ids = {entry["check_id"] for entry in entries}
+    unregistered = [
+        check_id for check_id in required_failures if check_id not in registered_ids
+    ]
+    block_reasons: List[str] = []
+    entry_results: List[Dict[str, Any]] = []
+    if state["errors"]:
+        block_reasons.append(
+            "ledger unreadable or invalid: " + "; ".join(state["errors"])
+        )
+    if state["drift_errors"]:
+        block_reasons.append(
+            "ledger drift check failed; see " + BASELINE_RED_DRIFT_CHECK_ID
+        )
+    for entry in entries:
+        check_id = entry["check_id"]
+        registered_fingerprint = entry["failure_fingerprint"]
+        check = checks_by_id.get(check_id)
+        observed_fingerprint: Optional[Dict[str, Any]] = None
+        if check is None:
+            verdict = "STALE_MISSING_CHECK"
+        elif check.get("required") is not True:
+            verdict = "STALE_NOT_REQUIRED"
+        elif check.get("status") == "PASS":
+            verdict = "STALE_GREEN"
+        elif check.get("status") != "FAIL":
+            verdict = "UNMATCHABLE_STATUS_" + str(check.get("status"))
+        elif (
+            (check.get("details") or {}).get("reason")
+            == TEST_FILE_SET_MISMATCH_REASON
+        ):
+            # Parent-process file-set self-check failed: the suite never ran
+            # and its log is not a unittest stream.  Refuse fingerprint
+            # matching outright; details are parent-authored, so a child
+            # process can never clear (or set) this reason.
+            verdict = TEST_FILE_SET_MISMATCH_REASON
+        else:
+            details = check.get("details") or {}
+            observed_fingerprint = compute_failure_fingerprint(
+                str(registered_fingerprint.get("kind")),
+                str(check.get("log") or ""),
+                required_inventory=details.get("required_inventory"),
+            )
+            if observed_fingerprint.get("parse_error"):
+                verdict = "UNPARSEABLE_FAILURE"
+            elif observed_fingerprint.get("count", 0) == 0:
+                verdict = "UNPARSEABLE_FAILURE"
+            else:
+                relation = fingerprint_relation(
+                    observed_fingerprint, registered_fingerprint
+                )
+                verdict = {
+                    "MATCH": "MATCHED",
+                    "SHRUNK": "STALE_PARTIALLY_GREEN",
+                }.get(relation, "MISMATCH")
+        entry_results.append(
+            {
+                "check_id": check_id,
+                "registered_batch": entry.get("registered_batch"),
+                "verdict": verdict,
+                "registered_fingerprint": registered_fingerprint,
+                "observed_fingerprint": observed_fingerprint,
+            }
+        )
+        if verdict == "MATCHED":
+            continue
+        if verdict in (
+            "STALE_GREEN",
+            "STALE_PARTIALLY_GREEN",
+            "STALE_MISSING_CHECK",
+            "STALE_NOT_REQUIRED",
+        ):
+            block_reasons.append(
+                "ledger entry {0} is stale ({1}); shrink {2} in the same PR".format(
+                    check_id, verdict, BASELINE_RED_LEDGER_RELATIVE_PATH
+                )
+            )
+        elif verdict == "MISMATCH":
+            block_reasons.append(
+                "check {0} failure set does not match its registered fingerprint; "
+                "treated as an unregistered red".format(check_id)
+            )
+        else:
+            block_reasons.append(
+                "ledger entry {0} cannot be matched: {1}".format(check_id, verdict)
+            )
+    for check_id in unregistered:
+        block_reasons.append(
+            "required check {0} FAIL is not registered in {1}".format(
+                check_id, BASELINE_RED_LEDGER_RELATIVE_PATH
+            )
+        )
+    for check_id in required_non_fail_non_pass:
+        block_reasons.append(
+            "required check {0} has status {1}; only a literal FAIL can match "
+            "a registered baseline red".format(
+                check_id, checks_by_id[check_id].get("status")
+            )
+        )
+    if block_reasons:
+        result = "BLOCKED"
+    elif not entries:
+        result = "LEDGER_INACTIVE"
+    else:
+        result = "REGISTERED_BASELINE_ONLY"
+    notes: List[str] = []
+    if result == "REGISTERED_BASELINE_ONLY":
+        notes.append(
+            "overall_status {0}: {1} registered baseline red(s) remain".format(
+                OVERALL_PASS_WITH_REGISTERED_BASELINE, len(entries)
+            )
+        )
+        for entry in entries:
+            notes.append(
+                "registered baseline red: {0} (batch {1}, {2} failure item(s))".format(
+                    entry["check_id"],
+                    entry.get("registered_batch"),
+                    entry["failure_fingerprint"].get("count"),
+                )
+            )
+    elif result == "BLOCKED":
+        notes.extend(block_reasons)
+    return {
+        "ledger_path": state["ledger_path"],
+        "ledger_present": state["present"],
+        "ledger_sha256": state["ledger_sha256"],
+        "baseline_commit": state["baseline_commit"],
+        "baseline_ledger_present": state["baseline_present"],
+        "baseline_ledger_sha256": state["baseline_ledger_sha256"],
+        "drift_status": state["drift_status"],
+        "drift_errors": list(state["drift_errors"]),
+        "ledger_errors": list(state["errors"]),
+        "entries": entry_results,
+        "required_failures": required_failures,
+        "required_non_fail_non_pass": required_non_fail_non_pass,
+        "unregistered_required_failures": unregistered,
+        "result": result,
+        "block_reasons": block_reasons,
+        "notes": notes,
+    }
+
+
+def apply_baseline_red_policy(overall_status: str, baseline_red: Mapping[str, Any]) -> str:
+    """Fold the ledger verdict into the overall status, fail closed."""
+
+    result = baseline_red.get("result")
+    if result == "REGISTERED_BASELINE_ONLY" and overall_status == "FAIL":
+        return OVERALL_PASS_WITH_REGISTERED_BASELINE
+    if result == "BLOCKED":
+        return "FAIL"
+    return overall_status
+
+
+def gate_exit_code(overall_status: str, require_literal_pass: bool) -> int:
+    """Exit policy: release paths demand the literal PASS, nothing weaker."""
+
+    if require_literal_pass:
+        return 0 if overall_status == "PASS" else 1
+    return 0 if overall_status in PASSING_OVERALL_STATUSES else 1
+
+
+# -----------------------------------------------------------------------------
+
+
 def in_process_check(check_id: str, operation: Any) -> Dict[str, Any]:
     started = time.monotonic()
     try:
@@ -291,9 +1730,15 @@ def in_process_check(check_id: str, operation: Any) -> Dict[str, Any]:
 R0B_FROZEN_BASELINE_COMMIT = "8f63593d4f262ec1496b05300da75a71b86eaab4"
 
 
-def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
-    minimum_adversarial_tests = 167
-    required_inventory = {
+# MF5: the executed-test floor is the pre-ledger floor of 167 plus the 107
+# tests of the baseline red ledger guard suite; both constants are module
+# level so the guard suite can pin itself against them.  It is a floor, not a
+# census: the real Tests/ci discovery on main runs well above it.  The 107 is
+# the measured method count of Tests/ci/test_baseline_red_ledger.py, pinned by
+# test_guard_suite_methods_are_pinned_into_the_gate_inventory.
+PHASE0_MINIMUM_ADVERSARIAL_TESTS = 274
+PHASE0_REQUIRED_UNITTEST_INVENTORY = frozenset(
+    {
         "test_missing_standard_module_layout_is_rejected",
         "test_placeholder_only_src_is_rejected",
         "test_standard_layout_symlink_is_rejected",
@@ -510,10 +1955,337 @@ def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
         # owner-signed native-stop-trust receipt fixture (signer provisioned
         # 2026-07-21) -- pinned so an emptied body cannot read as green.
         "test_main_happy_path_with_owner_signed_receipt_passes",
+        # MF5: the baseline red ledger guard suite
+        # (Tests/ci/test_baseline_red_ledger.py) protects the ledger gate
+        # itself.  Naming every guard test here means deleting or renaming
+        # any of them fails this gate instead of silently un-guarding the
+        # ledger.
+        "test_added_ci_test_file_is_intercepted_before_the_subprocess",
+        "test_address_and_timestamp_drift_is_a_new_cause",
+        "test_all_green_with_emptied_ledger_stays_pass",
+        "test_all_green_with_no_ledger_stays_pass",
+        "test_bootstrap_and_expansion_share_one_rule",
+        "test_bootstrap_ledger_blocks_even_when_every_entry_matches",
+        "test_bootstrap_ledger_cannot_buy_its_own_exit_zero",
+        "test_cause_blind_fingerprint_can_never_be_a_match",
+        "test_cause_blind_v1_document_fails_closed",
+        "test_checkout_prefix_alias_is_the_only_path_rule_left",
+        "test_ci_test_file_pin_equals_the_candidate_trust_path_set",
+        "test_ci_test_file_set_pin_matches_the_working_tree",
+        "test_committed_repository_ledger_pins_the_reseeded_fingerprints",
+        "test_committed_repository_ledger_stays_strictly_valid",
+        "test_count_mismatch_is_rejected",
+        "test_detail_block_without_a_rule_line_is_a_parse_error",
+        "test_dotnet_ambiguous_test_summary_is_a_parse_error",
+        "test_dotnet_count_shape_invariants_are_rejected",
+        "test_dotnet_cross_file_migration_changes_the_fingerprint",
+        "test_dotnet_fingerprint_dedupes_repeated_diagnostics",
+        "test_dotnet_fingerprint_pins_test_counts_and_build_marker",
+        "test_dotnet_fingerprint_strips_the_given_root_prefix",
+        "test_dotnet_line_number_drift_changes_the_fingerprint",
+        "test_dotnet_partial_fix_is_a_mismatch_requiring_owner_reseed",
+        "test_dotnet_relations_are_exact_match_or_growth_only",
+        "test_dotnet_test_count_shrink_is_a_mismatch",
+        "test_dropping_the_literal_pass_flag_breaks_the_release_allowlist",
+        "test_duplicate_check_id_is_rejected",
+        "test_duplicate_ran_summaries_are_a_parse_error",
+        "test_empty_detail_block_body_is_a_parse_error",
+        "test_entry_removal_is_a_shrink_and_matching_still_passes",
+        "test_error_set_fingerprint_is_order_independent",
+        "test_error_set_hash_swap_is_expansion",
+        "test_every_hex_address_stays_in_the_digest",
+        "test_every_temporary_path_segment_stays_in_the_digest",
+        "test_exact_fingerprint_match_passes_with_registered_baseline",
+        "test_executed_count_shrink_is_a_mismatch",
+        "test_expansion_blocks_even_when_observed_failures_match",
+        "test_explicit_base_equal_to_head_is_not_authoritative",
+        "test_extra_failure_inside_fingerprint_fails_as_mismatch",
+        "test_failure_cause_digest_normalizes_only_unstable_noise",
+        "test_failure_reason_digests_must_be_sha256_hex",
+        "test_failure_reasons_must_cover_exactly_the_failed_tests",
+        "test_file_set_mismatch_never_enters_fingerprint_matching",
+        "test_fingerprint_item_removal_is_a_shrink",
+        "test_forged_detail_block_breaks_the_summary_cross_check",
+        "test_frame_directory_stays_in_the_digest",
+        "test_frame_shaped_line_in_a_message_never_swallows_its_detail",
+        "test_fully_green_check_with_ledger_entry_is_stale_and_fails",
+        "test_gate_exit_requires_literal_pass_when_flagged",
+        "test_grown_fingerprint_is_expansion",
+        "test_guard_suite_methods_are_pinned_into_the_gate_inventory",
+        "test_infra_error_on_registered_check_fails",
+        "test_inline_set_repr_order_does_not_change_the_digest",
+        "test_introducing_an_empty_ledger_is_allowed",
+        "test_kind_change_is_growth",
+        "test_ledger_and_guard_suite_are_candidate_trust_paths",
+        "test_malformed_ledger_blocks_even_an_all_green_run",
+        "test_missing_baseline_commit_with_absent_ledger_fails",
+        "test_missing_baseline_commit_with_inert_ledger_stays_green",
+        "test_missing_baseline_commit_with_load_bearing_ledger_fails",
+        "test_missing_failed_summary_is_a_parse_error",
+        "test_missing_inventory_after_deleting_a_carrier_file_is_a_mismatch",
+        "test_module_docstring_states_the_machine_protection_boundaries",
+        "test_nested_discovery_surface_under_tests_ci_is_intercepted",
+        "test_new_entry_is_expansion_and_fails_the_drift_check",
+        "test_new_failure_reason_on_a_registered_test_is_a_mismatch",
+        "test_normalization_prose_matches_the_surviving_rules",
+        "test_optional_top_level_notes_are_validated",
+        "test_ordered_lines_outside_a_set_block_keep_their_order",
+        "test_overall_status_literal_is_never_pass",
+        "test_parse_error_fingerprint_is_rejected",
+        "test_partially_green_check_is_stale_and_fails_with_shrink_hint",
+        "test_print_forged_failure_lines_outside_detail_blocks_are_ignored",
+        "test_registering_the_drift_check_itself_is_rejected",
+        "test_release_script_pins_the_literal_pass_flag",
+        "test_removing_the_ledger_file_fails_the_drift_check",
+        "test_resolve_baseline_marks_the_head_fallback_non_authoritative",
+        "test_same_class_name_in_another_module_is_a_mismatch",
+        "test_same_identity_with_conflicting_causes_is_a_parse_error",
+        "test_same_test_failing_for_a_new_reason_is_growth",
+        "test_set_difference_item_order_does_not_change_the_digest",
+        "test_shrink_with_a_new_reason_on_the_survivor_is_growth",
+        "test_sourceless_bytecode_under_tests_ci_is_refused",
+        "test_stray_banner_parse_error_quotes_the_offending_lines",
+        "test_stray_separator_cannot_truncate_a_cause",
+        "test_subtest_failures_keep_distinct_identities",
+        "test_suite_child_never_reads_an_in_repository_pycache",
+        "test_symlinked_test_file_is_refused_whatever_its_name",
+        "test_temporary_root_child_without_a_tail_stays_in_the_digest",
+        "test_timestamps_stay_in_the_digest_wherever_they_appear",
+        "test_unchanged_failure_reason_still_matches_through_the_pipeline",
+        "test_unittest_entry_without_failure_reasons_is_rejected",
+        "test_unittest_fingerprint_binds_the_failure_cause",
+        "test_unittest_fingerprint_handles_setupclass_errors",
+        "test_unittest_fingerprint_keeps_full_module_qualified_names",
+        "test_unittest_fingerprint_records_executed_and_missing_inventory",
+        "test_unittest_relation_shrinks_only_with_stable_executed_and_inventory",
+        "test_unknown_fingerprint_kind_fails_closed",
+        "test_unparseable_failure_log_fails_closed",
+        "test_unpinned_importable_top_level_file_is_refused",
+        "test_unreadable_baseline_commit_is_never_read_as_a_bootstrap",
+        "test_unregistered_red_fails",
+        "test_unsorted_failed_tests_are_rejected",
+        "test_valid_ledger_round_trips",
+        "test_workflow_baseline_expression_covers_merge_group",
+        "test_wrong_schema_version_is_rejected",
     }
+)
+
+
+# The exact Tests/ci carrier file set, pinned inside the gate itself.  Every
+# unittest fingerprint input (failed tests, executed count, missing inventory,
+# the summary cross-check) is read from the merged stdout/stderr stream of the
+# discovered test processes' own interpreter, so a hostile test file added to
+# or edited into Tests/ci can rewrite that stream and wash a new red into a
+# byte-exact registered fingerprint.  The parent gate process therefore
+# enumerates Tests/ci with its own os.listdir/os.walk -- an input the child
+# cannot influence -- and refuses to run (FAIL, reason TEST_FILE_SET_MISMATCH,
+# never entering fingerprint matching) unless the discovered surface is
+# exactly this pinned set: no extra or missing top-level test_*.py, and no
+# __init__.py or nested test_*.py anywhere under Tests/ci that discovery
+# could import.  This constant must stay identical to the Tests/ci test
+# entries of run_candidate_gate.CANDIDATE_TRUST_PATHS (guarded by
+# test_ci_test_file_pin_equals_the_candidate_trust_path_set), so changing any
+# Tests/ci test file is a candidate trust-root change requiring Owner merge.
+PHASE0_CI_TEST_DIRECTORY = ("Tests", "ci")
+PHASE0_CI_TEST_FILE_PATTERN = "test_*.py"
+PHASE0_PINNED_CI_TEST_FILES = (
+    "test_baseline_red_ledger.py",
+    "test_candidate_bom_validator.py",
+    "test_candidate_bom_validator_e2e.py",
+    "test_candidate_gate.py",
+    "test_candidate_policy.py",
+    "test_f2_contract_schemas.py",
+    "test_legacy_sessionrunner_strangler.py",
+    "test_manifest_schema_subset_evaluator.py",
+    "test_module_impact.py",
+    "test_phase0_gate.py",
+    "test_r0b_receipt_migration_dual_run.py",
+    "test_release_bom_field_set_dual_pin.py",
+    "test_release_bom_signer_contract.py",
+)
+TEST_FILE_SET_MISMATCH_REASON = "TEST_FILE_SET_MISMATCH"
+
+# Tests/ci is sys.path[0] for the whole discovery run, so its import surface
+# is every file the import machinery is willing to load -- not just the
+# test_*.py names discovery globs.  An unpinned Tests/ci/json.py shadows the
+# stdlib module a pinned test imports; an unpinned Tests/ci/json.pyc does the
+# same through SourcelessFileLoader.  Inert data (.json/.md/.txt) is left
+# alone: no import hook loads it.
+PHASE0_CI_BYTECODE_SUFFIXES = frozenset({".pyc", ".pyo"})
+PHASE0_CI_IMPORTABLE_SUFFIXES = frozenset(
+    {suffix.casefold() for suffix in importlib.machinery.all_suffixes()}
+    | PHASE0_CI_BYTECODE_SUFFIXES
+    # .pth is only consumed inside site directories and a .zip only once it
+    # is on sys.path, but both are import-machinery inputs and Tests/ci has
+    # no legitimate use for either, so they are refused rather than argued
+    # about.
+    | {".pth", ".zip"}
+)
+PHASE0_BYTECODE_CACHE_DIRECTORY = "__pycache__"
+
+
+def _ci_test_file_set_errors(root: Path) -> List[str]:
+    """Parent-process check that Tests/ci is exactly the pinned surface.
+
+    Never reads or trusts child-process output.  Returns human-readable
+    errors; any non-empty result must fail the unittest check closed with
+    reason TEST_FILE_SET_MISMATCH before the suite subprocess is started.
+    """
+
+    directory = root.joinpath(*PHASE0_CI_TEST_DIRECTORY)
+    errors: List[str] = []
+    try:
+        names = sorted(os.listdir(directory))
+    except OSError as exc:
+        return ["cannot enumerate " + "/".join(PHASE0_CI_TEST_DIRECTORY) + ": " + str(exc)]
+    expected = sorted(PHASE0_PINNED_CI_TEST_FILES)
+    observed: List[str] = []
+    for name in names:
+        entry = directory / name
+        # Symlinks never enter the observed set: a symlink is a name that
+        # does not describe its own bytes.  They are reported by the walk
+        # below (which sees every depth uniformly), so this loop only has to
+        # keep them out of the pinned comparison -- a pinned name backed by a
+        # symlink must still read as missing.
+        if entry.is_symlink() or not entry.is_file():
+            continue
+        suffix = Path(name).suffix.casefold()
+        if fnmatch.fnmatch(name, PHASE0_CI_TEST_FILE_PATTERN):
+            observed.append(name)
+        elif (
+            suffix in PHASE0_CI_IMPORTABLE_SUFFIXES
+            # Bytecode gets the more specific "sourceless bytecode" message
+            # from the walk below; do not report it twice.
+            and suffix not in PHASE0_CI_BYTECODE_SUFFIXES
+        ):
+            errors.append("unpinned discovery surface: importable file " + name)
+    for name in sorted(set(observed) - set(expected)):
+        errors.append("unpinned test file present: " + name)
+    for name in sorted(set(expected) - set(observed)):
+        errors.append("pinned test file missing (or not a regular file): " + name)
+    # unittest discovery imports package __init__.py files and recurses into
+    # packages, so any __init__.py or nested test_*.py under Tests/ci is an
+    # unpinned import surface even though the top-level file set matches.
+    # Symlinked directories are refused outright: discovery follows them while
+    # this walk (followlinks=False) cannot see what they contain.
+    for current, directories, filenames in os.walk(directory):
+        current_path = Path(current)
+        for name in sorted(directories):
+            if (current_path / name).is_symlink():
+                errors.append(
+                    "unpinned discovery surface: symlinked directory "
+                    + (current_path / name).relative_to(directory).as_posix()
+                )
+        for filename in sorted(filenames):
+            path = current_path / filename
+            relative = path.relative_to(directory).as_posix()
+            # Any symlink at any depth is refused whatever it is named.  The
+            # earlier "is_file() and not is_symlink()" enumeration silently
+            # dropped symlinks instead, so a symlink carrying an unpinned
+            # name was neither an extra top-level file nor a nested surface
+            # while discovery still imported it (the pinned-name side of the
+            # same condition did fail closed, which is what hid the hole).
+            # run_candidate_gate._test_tree_sha256 already refuses symlinked
+            # entries outright; this is the same rule.
+            if path.is_symlink():
+                errors.append("unpinned discovery surface: symlinked file " + relative)
+                continue
+            if (
+                Path(filename).suffix.casefold() in PHASE0_CI_BYTECODE_SUFFIXES
+                and current_path.name != PHASE0_BYTECODE_CACHE_DIRECTORY
+            ):
+                # Bytecode outside __pycache__ is a SourcelessFileLoader
+                # surface that sys.pycache_prefix does not govern.  Bytecode
+                # inside __pycache__ is deliberately NOT refused here -- see
+                # _suite_bytecode_cache_prefix for why enumeration cannot be
+                # the closure for it.
+                errors.append(
+                    "unpinned discovery surface: sourceless bytecode " + relative
+                )
+                continue
+            nested = filename == "__init__.py" or (
+                current_path != directory
+                and fnmatch.fnmatch(filename, PHASE0_CI_TEST_FILE_PATTERN)
+            )
+            if nested:
+                errors.append("unpinned discovery surface: " + relative)
+    return sorted(errors)
+
+
+def _suite_bytecode_cache_prefix() -> str:
+    """A fresh empty bytecode cache directory for the suite child.
+
+    A PEP 552 unchecked-hash .pyc carries no verifiable link to its source:
+    Tests/ci/__pycache__/test_x.cpython-312.pyc replaces the entire import of
+    test_x.py while test_x.py stays byte-identical, so a parent that pins
+    NAMES pins nothing about the BYTES that run.  Refusing __pycache__ by
+    enumeration cannot be the answer -- static-ci.yml runs a discover over
+    Tests/ci before this gate, so the gate would fail on its own workflow's
+    honest cache.  Instead the parent redirects sys.pycache_prefix to a fresh
+    empty directory outside the repository, which makes every in-repository
+    __pycache__ unreachable for both reading and writing.  -B is not a
+    substitute: it only stops writes.  The directory is left in place for the
+    lifetime of the process so the running gate can be audited, and removed
+    at interpreter exit.
+    """
+
+    prefix = tempfile.mkdtemp(prefix="phase0-suite-pycache-")
+    atexit.register(shutil.rmtree, prefix, ignore_errors=True)
+    return prefix
+
+
+def run_phase0_unittests(baseline: Optional[str]) -> Dict[str, Any]:
+    minimum_adversarial_tests = PHASE0_MINIMUM_ADVERSARIAL_TESTS
+    required_inventory = PHASE0_REQUIRED_UNITTEST_INVENTORY
+    started = time.monotonic()
+    file_set_errors = _ci_test_file_set_errors(ROOT)
+    if file_set_errors:
+        return new_check(
+            "phase0-adversarial-unit-tests",
+            True,
+            "FAIL",
+            ["internal:parent-process-tests-ci-file-set-enumeration"],
+            1,
+            int((time.monotonic() - started) * 1000),
+            "ERROR: "
+            + TEST_FILE_SET_MISMATCH_REASON
+            + ": Tests/ci is not the pinned carrier file set; the unittest "
+            + "suite was not started and fingerprint matching is refused:\n"
+            + "\n".join(" - " + message for message in file_set_errors),
+            {
+                "reason": TEST_FILE_SET_MISMATCH_REASON,
+                "expected_test_files": sorted(PHASE0_PINNED_CI_TEST_FILES),
+                "file_set_errors": file_set_errors,
+            },
+        )
+    try:
+        cache_prefix = _suite_bytecode_cache_prefix()
+    except OSError as exc:
+        # No isolated bytecode cache means the child could load an
+        # in-repository __pycache__, so there is no run worth making.
+        return new_check(
+            "phase0-adversarial-unit-tests",
+            True,
+            "FAIL",
+            ["internal:parent-process-tests-ci-file-set-enumeration"],
+            1,
+            int((time.monotonic() - started) * 1000),
+            "ERROR: "
+            + TEST_FILE_SET_MISMATCH_REASON
+            + ": cannot allocate an isolated bytecode cache for the suite "
+            + "child; the unittest suite was not started: "
+            + str(exc),
+            {
+                "reason": TEST_FILE_SET_MISMATCH_REASON,
+                "expected_test_files": sorted(PHASE0_PINNED_CI_TEST_FILES),
+                "file_set_errors": ["cannot isolate the suite bytecode cache: " + str(exc)],
+            },
+        )
     command = [
         sys.executable,
         "-I",
+        "-X",
+        "pycache_prefix=" + cache_prefix,
         "-m",
         "unittest",
         "discover",
@@ -2733,6 +4505,7 @@ def _run_phase0_gate(
     gate_started_at = dt.datetime.now(dt.timezone.utc).isoformat()
     checks: List[Dict[str, Any]] = []
     baseline: Optional[str] = None
+    baseline_authoritative = False
     receipt: Dict[str, Any] = {}
     environment: Dict[str, Any] = {}
     workspace_check = workspace_cleanliness_check(
@@ -2744,7 +4517,7 @@ def _run_phase0_gate(
     )
 
     try:
-        baseline = resolve_baseline(arguments.base)
+        baseline, baseline_authoritative = resolve_baseline(arguments.base)
     except Phase0Error as exc:
         checks.append(
             new_check(
@@ -2884,6 +4657,11 @@ def _run_phase0_gate(
             )
         )
 
+    baseline_red_state = load_baseline_red_ledger_state(
+        ROOT, baseline if baseline_authoritative else None
+    )
+    checks.append(baseline_red_ledger_drift_check(baseline_red_state))
+
     try:
         head_commit = git_output(ROOT, ["rev-parse", "HEAD"])
     except Phase0Error:
@@ -2946,6 +4724,8 @@ def _run_phase0_gate(
         )
 
     overall_status, summary = evaluate_checks(checks)
+    baseline_red = evaluate_baseline_red_policy(checks, baseline_red_state)
+    overall_status = apply_baseline_red_policy(overall_status, baseline_red)
     finished_at = dt.datetime.now(dt.timezone.utc).isoformat()
     test_evidence = (
         build_test_evidence_records(
@@ -2985,6 +4765,7 @@ def _run_phase0_gate(
         "checks": checks,
         "test_evidence": test_evidence,
         "summary": summary,
+        "baseline_red": baseline_red,
         "limitations": [
             "No Windows, ZennoDroid, ADB, GBrain, or real-device verification is claimed.",
             "Hosted CI cannot issue WINDOWS_VERIFIED or DEVICE_VERIFIED evidence.",
@@ -3098,7 +4879,19 @@ def _run_phase0_gate(
     print("COMMITTED marker: " + str(evidence_publication.marker_path))
     for check in checks:
         print("[{0}] {1}".format(check["status"], check["id"]))
-    return 0 if overall_status == "PASS" else 1
+    for note in baseline_red.get("notes", ()):
+        print("NOTE: " + note, file=sys.stderr)
+    if (
+        arguments.require_literal_pass
+        and overall_status == OVERALL_PASS_WITH_REGISTERED_BASELINE
+    ):
+        print(
+            "ERROR: --require-literal-pass rejects "
+            + OVERALL_PASS_WITH_REGISTERED_BASELINE
+            + "; registered baseline reds are never releasable",
+            file=sys.stderr,
+        )
+    return gate_exit_code(overall_status, bool(arguments.require_literal_pass))
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

@@ -1,0 +1,167 @@
+{
+  "entries": [
+    {
+      "check_id": "manifest:evidence-service:evidence-service.unit",
+      "failure_fingerprint": {
+        "build_failed": true,
+        "count": 6,
+        "error_codes": {
+          "CS1503": 5,
+          "CS1729": 1
+        },
+        "error_instances_sha256": "e0d2b4ebd8af36e28bdbeda0199b498d5710f9e5a7fa6a4cac61577691696e41",
+        "failed_tests": [],
+        "files": [
+          "Modules/evidence-service/tests/EvidenceVerticalSlicePostgresIntegrationTests.cs"
+        ],
+        "kind": "dotnet",
+        "test_counts": null
+      },
+      "observed_commit": "65c2f5fed6392e08868aec25911ab5c74ea12ab5",
+      "registered_batch": "M2",
+      "root_cause": "GBrainProjection v1/v2 contract split breaks the test compile with CS1503/CS1729 (PR#1 B6)"
+    },
+    {
+      "check_id": "manifest:memory-event-ledger:memory-event-ledger.unit",
+      "failure_fingerprint": {
+        "build_failed": true,
+        "count": 17,
+        "error_codes": {
+          "xUnit1051": 17
+        },
+        "error_instances_sha256": "653b94142966c3349cf01ea60ece58114f942ed0fa4ecc389475562383a702dd",
+        "failed_tests": [],
+        "files": [
+          "Modules/memory-event-ledger/tests/MemoryEventV2TrustTests.cs"
+        ],
+        "kind": "dotnet",
+        "test_counts": null
+      },
+      "observed_commit": "65c2f5fed6392e08868aec25911ab5c74ea12ab5",
+      "registered_batch": "M2",
+      "root_cause": "xUnit1051 analyzer errors under TreatWarningsAsErrors (PR#1 B8)"
+    },
+    {
+      "check_id": "manifest:operation-compiler:operation-compiler.unit",
+      "failure_fingerprint": {
+        "build_failed": true,
+        "count": 11,
+        "error_codes": {
+          "xUnit1031": 1,
+          "xUnit1051": 10
+        },
+        "error_instances_sha256": "3b60dd5ef5483918b37f7064f9c625f420fe4a7be5c72fcd26c7837e26f98a7c",
+        "failed_tests": [],
+        "files": [
+          "Modules/operation-compiler/tests/Dps.OperationCompiler.Tests/AllowlistedOperationCompilerTests.cs",
+          "Modules/operation-compiler/tests/Dps.OperationCompiler.Tests/OperationCompilerIntegrationTests.cs"
+        ],
+        "kind": "dotnet",
+        "test_counts": null
+      },
+      "observed_commit": "65c2f5fed6392e08868aec25911ab5c74ea12ab5",
+      "registered_batch": "M3",
+      "root_cause": "xUnit1051/xUnit1031 analyzer errors under TreatWarningsAsErrors (PR#1 B9)"
+    },
+    {
+      "check_id": "manifest:soul-memory-adapter:soul-memory-adapter.unit",
+      "failure_fingerprint": {
+        "build_failed": true,
+        "count": 47,
+        "error_codes": {
+          "CS1503": 4,
+          "CS1729": 1,
+          "xUnit1051": 42
+        },
+        "error_instances_sha256": "993397e6b0a17586f863f7fa951bd640f6314fddc613e94f3f13e6f57f510a98",
+        "failed_tests": [],
+        "files": [
+          "Modules/soul-memory-adapter/tests/Dps.SoulMemoryAdapter.Tests/GBrainCompanyLoopbackIntegrationTests.cs",
+          "Modules/soul-memory-adapter/tests/Dps.SoulMemoryAdapter.Tests/SoulMemoryAdapterPostgresIntegrationTests.cs"
+        ],
+        "kind": "dotnet",
+        "test_counts": null
+      },
+      "observed_commit": "65c2f5fed6392e08868aec25911ab5c74ea12ab5",
+      "registered_batch": "M2",
+      "root_cause": "GBrainProjection v1/v2 compile errors plus xUnit1051 analyzer errors (PR#1 B8)"
+    },
+    {
+      "check_id": "manifest:windows-edge-supervisor:windows-edge-supervisor.unit",
+      "failure_fingerprint": {
+        "build_failed": false,
+        "count": 3,
+        "error_codes": {},
+        "error_instances_sha256": "566bd3d5b553040bdd3f65c9a7b4d4c856df0dc8a8b47b706464e999c06040f4",
+        "failed_tests": [
+          "Dps.WindowsEdgeSupervisor.Tests.SupervisorTests.Append_only_evidence_log_reopens_exact_chain_and_rejects_tampering",
+          "Dps.WindowsEdgeSupervisor.Tests.SupervisorTests.Cutover_requires_drain_and_exact_rollback",
+          "Dps.WindowsEdgeSupervisor.Tests.SupervisorTests.Unavailable_launch_abi_blocks_before_worker_process_or_runtime_channel"
+        ],
+        "files": [],
+        "kind": "dotnet",
+        "test_counts": {
+          "failed": 3,
+          "skipped": 0,
+          "succeeded": 9,
+          "total": 12
+        }
+      },
+      "observed_commit": "65c2f5fed6392e08868aec25911ab5c74ea12ab5",
+      "registered_batch": "M3",
+      "root_cause": "3 tests fail on the Linux runner: SecurePathProof revalidation throws InvalidOperationException (PR#1 B11; passes on local macOS)"
+    },
+    {
+      "check_id": "module-governance",
+      "failure_fingerprint": {
+        "count": 34,
+        "errors_sha256": "a479f7cce014dd07d03c79b526c9a12ddc3bd305c721b4de8dc1931b3bcd6a2b",
+        "kind": "error-set"
+      },
+      "observed_commit": "65c2f5fed6392e08868aec25911ab5c74ea12ab5",
+      "registered_batch": "R0-B",
+      "root_cause": "Manifest communication graph lacks reciprocal edges and runnable runtime contract paths (PR#1 B1)"
+    },
+    {
+      "check_id": "solution-locked-restore-build",
+      "failure_fingerprint": {
+        "build_failed": true,
+        "count": 84,
+        "error_codes": {
+          "CS1503": 9,
+          "CS1729": 2,
+          "CS8632": 3,
+          "xUnit1031": 1,
+          "xUnit1051": 69
+        },
+        "error_instances_sha256": "2ee8ef737cd0cf7afa297f71f7d28acc2ed78e34c99bb56c0b4347ec283cbc7b",
+        "failed_tests": [],
+        "files": [
+          "Modules/evidence-service/tests/EvidenceVerticalSlicePostgresIntegrationTests.cs",
+          "Modules/memory-event-ledger/tests/MemoryEventV2TrustTests.cs",
+          "Modules/operation-compiler/tests/Dps.OperationCompiler.Tests/AllowlistedOperationCompilerTests.cs",
+          "Modules/operation-compiler/tests/Dps.OperationCompiler.Tests/OperationCompilerIntegrationTests.cs",
+          "Modules/soul-memory-adapter/tests/Dps.SoulMemoryAdapter.Tests/GBrainCompanyLoopbackIntegrationTests.cs",
+          "Modules/soul-memory-adapter/tests/Dps.SoulMemoryAdapter.Tests/SoulMemoryAdapterPostgresIntegrationTests.cs",
+          "Modules/zenno-bridge/tests/BridgeContractTests.cs"
+        ],
+        "kind": "dotnet",
+        "test_counts": null
+      },
+      "observed_commit": "65c2f5fed6392e08868aec25911ab5c74ea12ab5",
+      "registered_batch": "R0-C/R0-D",
+      "root_cause": "Full-solution build aggregates the per-module test compile errors CS1503/CS1729/CS8632/xUnit1031/xUnit1051 (PR#1 B3)"
+    }
+  ],
+  "notes": [
+    "STALE, DO NOT TRUST THESE ENTRIES AS A CURRENT RED SET.  Every entry below was reseeded from archived CI evidence at main 65c2f5fe.  Main has since advanced -- 1d202a58 (PR #18/#19/#20), which cleared part of that red set, then 9c14f868 (PR #24) -- and no CI artifact has been taken at the new main yet.  Entries must be regenerated wholesale from a new-main CI run before this ledger can excuse anything; until then any entry that no longer matches reality is STALE_GREEN / STALE_PARTIALLY_GREEN / MISMATCH and BLOCKS the gate, which is the intended fail-closed behaviour, not a defect to be worked around.",
+    "The phase0-adversarial-unit-tests entry was removed rather than migrated to schema v2.  v2 requires a failure_reasons digest per failed test, derived from that test's actual traceback; no such traceback exists for the new main, and fabricating digests would be exactly the self-reported evidence the schema exists to refuse.  The check is therefore an unregistered red and BLOCKS until it is re-registered from a real new-main run.",
+    "Fingerprints are exact by design (adversarial review MF1-MF4 and second-round CF2-P0-2): a dotnet fingerprint hashes the deduplicated (file, line, column, code) instance table, so editing a file that contains registered errors shifts line numbers and MISMATCHes; a unittest fingerprint pins the executed count and binds every failed test to a normalized digest of its traceback, so adding or deleting Tests/ci tests, or the same test failing for a new reason, also MISMATCHes.  All of it is an intentional fail-closed cost: the reseeded entry must be updated in the same PR and merged by the Owner (drift reports LEDGER_EXPANDED for any fingerprint change).",
+    "Entries are load-bearing only from the first commit whose --base already carries them (CF2-P0-1).  A run that introduces entries not present at the baseline commit reports drift LEDGER_INTRODUCED with a bootstrap error and fails, exactly like expansion, so the PR that registers a red can never clear itself with it.  SHIPPING FORM, decided by the Owner and not a defect: this file arrives populated and its own drift check therefore FAILs, so the change that adds it merges red -- main is red already and every merge today happens under red.  The three states (PASS / PASS_WITH_REGISTERED_BASELINE / FAIL) start deciding from the next commit, whose base carries these entries.  This is explicitly NOT staged as 'introduce an empty entries list now and register in a second PR': that would be a post-merge obligation, which this project is abolishing.  No follow-up change is owed by the batch that lands this file.",
+    "The only legal terminal state is entries shrunk to empty with this file still present; deleting the file fails the drift check.",
+    "WHAT A unittest MATCH MEANS (eighth-round R8 correction: the earlier 'exactly three things are erased' arithmetic undercounted what the code does; these are the seven rewrites _unittest_reason_digest actually performs, and nothing beyond them).  (1) Every line loses its trailing whitespace.  (2) Inside a traceback preamble a frame line loses its line number, and the unbounded run of lines indented deeper than the frame -- the echoed source line, the 3.11+ caret line, and anything else that deep -- is swallowed; never a frame-shaped line inside an exception message, and never the frame's directory.  (3) A preamble frame path has its backslashes rewritten to forward slashes.  (4) This checkout's own absolute root is stripped from every line, in both spellings of it -- macOS resolves /tmp/x to /private/tmp/x while a subprocess that never resolved the path prints /tmp/x; a literal prefix can only fold two spellings of one checkout onto the same repository-relative path, never two different directories together.  (5) The item order of an inline brace group is sorted only when every item is a string literal -- only str/bytes hashing is randomized, membership stays fully load-bearing, and a brace group that is not a run of string literals is left alone.  (6) Runs of blank lines collapse to a single blank, and leading and trailing blank lines are dropped.  (7) The run of lines under one of the three unittest set-comparison headers is sorted whatever the items look like -- integers and paths included; a distinct rule from (5), with no string-literal restriction.  Anything those seven rewrites do not cover is hashed as-is.",
+    "WHAT IS NO LONGER NORMALIZED, AND WHY (sixth-round R6-1..3).  Three fifth-round rules were DELETED, not narrowed: wall-clock timestamps, temporary paths, and hex addresses.  Measured on the real 707-line Tests/ci red log they rewrote 0, 0 and 0 lines, while the two surviving rules rewrote 41 lines each -- so they bought no measurable stability, and each still admitted a collision that reached exit 0: a registered '2026-01-01T00:00:00Z exceeds the permitted window' was matched by an observed '1970-01-01T00:00:00Z exceeds the permitted window'; '/tmp/dps-sandbox' by '/tmp/etc-shadow-link' and '/var/folders/trusted' by '/var/folders/attacker'; 'mapped at 0xDEADBEEF>' by 'mapped at 0x00000000>'.  Consequence, stated plainly and not hedged: a timestamp, a temporary path or a memory address anywhere in a traceback -- including inside an assertion message and including a line-leading logger stamp -- is now part of the digest, so a rerun whose environment moves one of them MISMATCHes and the gate goes red.  That cost is accepted deliberately: an under-normalized digest can only produce a red, an over-normalized one releases a forged green.  Measured after the deletion, two independent real red runs produced identical fingerprints -- zero digest differences, fingerprint_relation MATCH in both directions.  That zero-false-red measurement is scoped, not universal: both runs used the same interpreter build on the same runner image.  Frames outside the checkout root -- the stdlib, site-packages -- keep their full absolute paths in the digest, so a Python patch upgrade that moves the stdlib directory will MISMATCH an already-registered unittest red; fail-closed, that can only block a run, never release one.  Today the ledger carries zero unittest entries, so no registered red is exposed to that bite.",
+    "KNOWN, NOT FIXED HERE (U3): schema_version is a hard break.  A v1 document at --base is refused as LEDGER_INVALID rather than read as a compatible ledger, because a v1 MATCH was decided without ever looking at why a test failed.  If a v1 ledger is ever merged, the migration path is a single Owner-merged commit that rewrites every entry to v2 with failure_reasons digests taken from a real CI run -- there is no in-gate upgrade and none is wanted.  This batch's base (main 9c14f868) carries no ledger at all, so nothing is blocked on it today."
+  ],
+  "schema_version": "dps.baseline-red-ledger/v2"
+}
