@@ -76,7 +76,7 @@
       "suiteId": "executor-gateway.contract",
       "testTarget": "Modules/executor-gateway/tests/Dps.ExecutorGateway.Tests/Dps.ExecutorGateway.Tests.csproj",
       "testCategory": "Contract",
-      "minimumExecutedTests": 12
+      "minimumExecutedTests": 15
     },
     {
       "moduleId": "gbrain-projector",
@@ -97,7 +97,7 @@
       "suiteId": "memory-event-ledger.contract",
       "testTarget": "Modules/memory-event-ledger/tests/Dps.MemoryEventLedger.Tests.csproj",
       "testCategory": "Contract",
-      "minimumExecutedTests": 4
+      "minimumExecutedTests": 13
     },
     {
       "moduleId": "operation-compiler",
@@ -188,7 +188,7 @@
       "suiteId": "windows-edge-supervisor.contract",
       "testTarget": "Modules/windows-edge-supervisor/tests/Dps.WindowsEdgeSupervisor.Tests.csproj",
       "testCategory": "Contract",
-      "minimumExecutedTests": 12
+      "minimumExecutedTests": 13
     },
     {
       "moduleId": "windows-edge-supervisor",
