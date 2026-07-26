@@ -87,7 +87,7 @@ For non-trivial changes:
 6. State any Windows, ZennoDroid, ADB, or real-device verification still pending.
 7. Update durable documentation and `CHANGELOG.md` when behavior or architecture changes.
 
-Do not store task plans or gate state in the repository. Use the task or pull-request description for temporary planning.
+Do not store task plans or gate state in the repository. Record audit and governance verdicts in repository issues; use the task, issue, or pull-request description for temporary planning. Do not open zero-diff or marker pull requests solely to carry a verdict.
 
 ## Evidence truth
 
