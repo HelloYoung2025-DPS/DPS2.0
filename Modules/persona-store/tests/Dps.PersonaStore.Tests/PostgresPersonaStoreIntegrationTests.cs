@@ -640,6 +640,9 @@ public sealed class PostgresPersonaStoreIntegrationTests
         public static Task<PersonaDatabase> CreateRuntimeOwnedEmptySchemaAsync() =>
             CreateCoreAsync(initialize: false, createRuntimeOwnedEmptySchema: true);
 
+        private static string QuoteLiteral(string value) =>
+            '\'' + value.Replace("'", "''", StringComparison.Ordinal) + '\'';
+
         private static async Task<PersonaDatabase> CreateCoreAsync(bool initialize, bool createRuntimeOwnedEmptySchema)
         {
             var adminConnectionString = RequireConnectionString();
@@ -665,8 +668,7 @@ public sealed class PostgresPersonaStoreIntegrationTests
                     if (exact != 180004) throw new InvalidOperationException($"Persona Store Integration requires exact PostgreSQL 18.4; server_version_num was {exact}.");
                 }
                 var quotedRole = new NpgsqlCommandBuilder().QuoteIdentifier(runtimeRole);
-                await using var role = new NpgsqlCommand($"CREATE ROLE {quotedRole} LOGIN PASSWORD @password NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT", admin);
-                role.Parameters.AddWithValue("password", runtimePassword);
+                await using var role = new NpgsqlCommand($"CREATE ROLE {quotedRole} LOGIN PASSWORD {QuoteLiteral(runtimePassword)} NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT", admin);
                 await role.ExecuteNonQueryAsync(TestCancellation);
                 if (createRuntimeOwnedEmptySchema)
                 {

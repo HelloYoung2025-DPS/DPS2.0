@@ -975,11 +975,11 @@ BEGIN
     END IF;
 
     IF target_result_document ->> 'live_primary_payload_state' IS DISTINCT FROM
-       CASE current_status_value
+       (CASE current_status_value
            WHEN 'active' THEN 'retained'
            WHEN 'deleted' THEN 'live-primary-logically-deleted'
            ELSE NULL
-       END THEN
+       END) THEN
         RAISE EXCEPTION 'Persona history export payload state does not match current truth';
     END IF;
 

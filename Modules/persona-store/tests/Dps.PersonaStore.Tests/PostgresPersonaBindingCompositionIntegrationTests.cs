@@ -129,9 +129,8 @@ public sealed class PostgresPersonaBindingCompositionIntegrationTests
                 }
                 var quotedRole = new NpgsqlCommandBuilder().QuoteIdentifier(runtimeRole);
                 await using var role = new NpgsqlCommand(
-                    $"CREATE ROLE {quotedRole} LOGIN PASSWORD @password NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT",
+                    $"CREATE ROLE {quotedRole} LOGIN PASSWORD {QuoteLiteral(runtimePassword)} NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT",
                     admin);
-                role.Parameters.AddWithValue("password", runtimePassword);
                 await role.ExecuteNonQueryAsync(TestCancellation);
             }
 
@@ -194,6 +193,9 @@ public sealed class PostgresPersonaBindingCompositionIntegrationTests
             return (PostgresBindingRegistry)(factory.Invoke(null, [options, device, account, null])
                 ?? throw new InvalidOperationException("Binding test composition returned no registry."));
         }
+
+        private static string QuoteLiteral(string value) =>
+            '\'' + value.Replace("'", "''", StringComparison.Ordinal) + '\'';
 
         private static string RequireConnectionString()
         {
