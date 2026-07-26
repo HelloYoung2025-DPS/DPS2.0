@@ -19,7 +19,8 @@
 | [Operations/RepositoryProtection_仓库保护.md](Operations/RepositoryProtection_仓库保护.md) | 治理路径, 两人审批, 受保护工作流和外部发布信任根要求 | 仓库与发布管理员 |
 | [Operations/GBrainCompany_LocalNonProduction_本地非生产.md](Operations/GBrainCompany_LocalNonProduction_本地非生产.md) | GBrain Company 的本机 PostgreSQL, Voyage, Source/OAuth 和证据边界 | 运维与测试管理员 |
 | [Operations/ExternalReview_外审机制.md](Operations/ExternalReview_外审机制.md) | 重构批次/会话/里程碑三级 Codex 外审程序与意见处置纪律（DeepSeek/GLM 属 §9.1 运行时安全网，不参与开发期投票） | 所有贡献者与批准者 |
-| [Operations/RebuildSessionPrompts_施工会话提示词.md](Operations/RebuildSessionPrompts_施工会话提示词.md) | 重构全程零填空施工会话模板（T0 补证 + T1-T19 + 兜底），按文件内「执行顺序（依赖 DAG）」挑对应 T# 整块粘贴 | 施工发起人 |
+| [Operations/RebuildSessionPrompts_施工会话提示词.md](Operations/RebuildSessionPrompts_施工会话提示词.md) | 重构全程零填空施工会话模板（TR 单处修复 + T1-T19 批次 + 兜底），按文件内「执行顺序（依赖 DAG）」挑对应 T# 整块粘贴 | 施工发起人 |
+| [Operations/HistoricalClosure_历史收口_2026-07-26.md](Operations/HistoricalClosure_历史收口_2026-07-26.md) | B-1/B-2/B-3 三条历史程序缺陷的 Owner 追认文书（追认≠认可当时做法，均不回退）；只定性历史，不创设义务 | 审计人员与批准者 |
 | [Platforms/GBrainCompany_Compatibility.md](Platforms/GBrainCompany_Compatibility.md) | 本机 GBrain 0.42.42.0 Source 隔离、32 字符 Source ID、软删除与 OAuth 能力探测；仅限诊断事实 | 架构、运维与适配器开发人员 |
 | [Platforms/ExternalVerification_F6-F9_外部验收.md](Platforms/ExternalVerification_F6-F9_外部验收.md) | Windows, GBrain, 真机, 灰度和规模证据输入边界 | 测试与发布管理员 |
 
