@@ -467,26 +467,26 @@ public sealed class AllowlistedOperationCompilerTests
 
     [Fact]
     [Trait("Category", "Contract")]
-    public void CompilationRequiresExactActiveAuthoritativeApprovalSnapshot()
+    public async Task CompilationRequiresExactActiveAuthoritativeApprovalSnapshot()
     {
         var approval = Approval("observe");
         var digest = ApprovalSnapshotV1Canonical.ComputeSha256(approval);
         var request = Request(approval, digest);
         var reader = new FixedAuthoritativeApprovalReader(new AuthoritativeApprovalSnapshotV1(approval, digest, AuthoritativeApprovalSnapshotV1.Active));
         var compiler = new AllowlistedOperationCompiler(reader);
-        var operation = compiler.CompileAsync(request).GetAwaiter().GetResult();
+        var operation = await compiler.CompileAsync(request, TestContext.Current.CancellationToken);
         Assert.Equal(request, reader.LastRequest);
         Assert.Equal(digest, operation.ApprovalSha256);
 
         var inactive = new AllowlistedOperationCompiler(new FixedAuthoritativeApprovalReader(new AuthoritativeApprovalSnapshotV1(approval, digest, "REVOKED")));
-        Assert.Throws<UnauthorizedAccessException>(() => inactive.CompileAsync(request).GetAwaiter().GetResult());
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => inactive.CompileAsync(request, TestContext.Current.CancellationToken));
 
         var mismatchedDigest = new AllowlistedOperationCompiler(new FixedAuthoritativeApprovalReader(new AuthoritativeApprovalSnapshotV1(approval, new string('0', 64), AuthoritativeApprovalSnapshotV1.Active)));
-        Assert.Throws<UnauthorizedAccessException>(() => mismatchedDigest.CompileAsync(request).GetAwaiter().GetResult());
-        Assert.Throws<UnauthorizedAccessException>(() => compiler.CompileAsync(request with { DeviceBindingId = "db_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }).GetAwaiter().GetResult());
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => mismatchedDigest.CompileAsync(request, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => compiler.CompileAsync(request with { DeviceBindingId = "db_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }, TestContext.Current.CancellationToken));
 
-        Assert.Throws<ArgumentException>(() => compiler.CompileAsync(request with { TraceId = request.TraceId + "\n" }).GetAwaiter().GetResult());
-        Assert.Throws<ArgumentException>(() => compiler.CompileAsync(request with { IdempotencyKey = request.IdempotencyKey + "\n" }).GetAwaiter().GetResult());
+        await Assert.ThrowsAsync<ArgumentException>(() => compiler.CompileAsync(request with { TraceId = request.TraceId + "\n" }, TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentException>(() => compiler.CompileAsync(request with { IdempotencyKey = request.IdempotencyKey + "\n" }, TestContext.Current.CancellationToken));
 
         Assert.Null(typeof(AllowlistedOperationCompiler).GetConstructor(Type.EmptyTypes));
         Assert.DoesNotContain(typeof(AllowlistedOperationCompiler).GetMethods(), method =>
