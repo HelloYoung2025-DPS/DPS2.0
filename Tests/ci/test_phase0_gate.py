@@ -2809,6 +2809,7 @@ if [[ "$bom_commit" != "$head_commit" ]]; then
   exit 1
 fi
 phase0_arguments=(--base "$head_commit")
+phase0_arguments+=(--require-literal-pass)
 if [[ -n "$phase0_evidence" ]]; then
   phase0_arguments+=(--evidence "$phase0_evidence")
 fi

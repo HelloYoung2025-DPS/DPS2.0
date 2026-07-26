@@ -4253,6 +4253,11 @@ def _release_validation_allowlist_errors(release_text: str) -> List[str]:
         'phase0_evidence=""',
         'phase0_evidence="${2:-}"',
         'phase0_arguments=(--base "$head_commit")',
+        # MF9: release validation demands the literal overall status PASS.  A
+        # registered baseline red (PASS_WITH_REGISTERED_BASELINE, exit 0
+        # elsewhere) must hard-stop the release path, so the flag itself is a
+        # pinned control line: dropping it is an allowlist error.
+        "phase0_arguments+=(--require-literal-pass)",
         'if [[ -n "$phase0_evidence" ]]; then',
         'phase0_arguments+=(--evidence "$phase0_evidence")',
         '"$python_executable" Tools/ci/run_phase0_gate.py "${phase0_arguments[@]}"',
@@ -4309,6 +4314,7 @@ def _release_validation_allowlist_errors(release_text: str) -> List[str]:
         ')"',
         'if [[ "$bom_commit" != "$head_commit" ]]; then',
         'phase0_arguments=(--base "$head_commit")',
+        "phase0_arguments+=(--require-literal-pass)",
         'if [[ -n "$phase0_evidence" ]]; then',
         'phase0_arguments+=(--evidence "$phase0_evidence")',
     }

@@ -1,0 +1,185 @@
+{
+  "entries": [
+    {
+      "check_id": "manifest:evidence-service:evidence-service.unit",
+      "failure_fingerprint": {
+        "build_failed": true,
+        "count": 6,
+        "error_codes": {
+          "CS1503": 5,
+          "CS1729": 1
+        },
+        "error_instances_sha256": "e0d2b4ebd8af36e28bdbeda0199b498d5710f9e5a7fa6a4cac61577691696e41",
+        "failed_tests": [],
+        "files": [
+          "Modules/evidence-service/tests/EvidenceVerticalSlicePostgresIntegrationTests.cs"
+        ],
+        "kind": "dotnet",
+        "test_counts": null
+      },
+      "observed_commit": "65c2f5fed6392e08868aec25911ab5c74ea12ab5",
+      "registered_batch": "M2",
+      "root_cause": "GBrainProjection v1/v2 contract split breaks the test compile with CS1503/CS1729 (PR#1 B6)"
+    },
+    {
+      "check_id": "manifest:memory-event-ledger:memory-event-ledger.unit",
+      "failure_fingerprint": {
+        "build_failed": true,
+        "count": 17,
+        "error_codes": {
+          "xUnit1051": 17
+        },
+        "error_instances_sha256": "653b94142966c3349cf01ea60ece58114f942ed0fa4ecc389475562383a702dd",
+        "failed_tests": [],
+        "files": [
+          "Modules/memory-event-ledger/tests/MemoryEventV2TrustTests.cs"
+        ],
+        "kind": "dotnet",
+        "test_counts": null
+      },
+      "observed_commit": "65c2f5fed6392e08868aec25911ab5c74ea12ab5",
+      "registered_batch": "M2",
+      "root_cause": "xUnit1051 analyzer errors under TreatWarningsAsErrors (PR#1 B8)"
+    },
+    {
+      "check_id": "manifest:operation-compiler:operation-compiler.unit",
+      "failure_fingerprint": {
+        "build_failed": true,
+        "count": 11,
+        "error_codes": {
+          "xUnit1031": 1,
+          "xUnit1051": 10
+        },
+        "error_instances_sha256": "3b60dd5ef5483918b37f7064f9c625f420fe4a7be5c72fcd26c7837e26f98a7c",
+        "failed_tests": [],
+        "files": [
+          "Modules/operation-compiler/tests/Dps.OperationCompiler.Tests/AllowlistedOperationCompilerTests.cs",
+          "Modules/operation-compiler/tests/Dps.OperationCompiler.Tests/OperationCompilerIntegrationTests.cs"
+        ],
+        "kind": "dotnet",
+        "test_counts": null
+      },
+      "observed_commit": "65c2f5fed6392e08868aec25911ab5c74ea12ab5",
+      "registered_batch": "M3",
+      "root_cause": "xUnit1051/xUnit1031 analyzer errors under TreatWarningsAsErrors (PR#1 B9)"
+    },
+    {
+      "check_id": "manifest:soul-memory-adapter:soul-memory-adapter.unit",
+      "failure_fingerprint": {
+        "build_failed": true,
+        "count": 47,
+        "error_codes": {
+          "CS1503": 4,
+          "CS1729": 1,
+          "xUnit1051": 42
+        },
+        "error_instances_sha256": "993397e6b0a17586f863f7fa951bd640f6314fddc613e94f3f13e6f57f510a98",
+        "failed_tests": [],
+        "files": [
+          "Modules/soul-memory-adapter/tests/Dps.SoulMemoryAdapter.Tests/GBrainCompanyLoopbackIntegrationTests.cs",
+          "Modules/soul-memory-adapter/tests/Dps.SoulMemoryAdapter.Tests/SoulMemoryAdapterPostgresIntegrationTests.cs"
+        ],
+        "kind": "dotnet",
+        "test_counts": null
+      },
+      "observed_commit": "65c2f5fed6392e08868aec25911ab5c74ea12ab5",
+      "registered_batch": "M2",
+      "root_cause": "GBrainProjection v1/v2 compile errors plus xUnit1051 analyzer errors (PR#1 B8)"
+    },
+    {
+      "check_id": "manifest:windows-edge-supervisor:windows-edge-supervisor.unit",
+      "failure_fingerprint": {
+        "build_failed": false,
+        "count": 3,
+        "error_codes": {},
+        "error_instances_sha256": "566bd3d5b553040bdd3f65c9a7b4d4c856df0dc8a8b47b706464e999c06040f4",
+        "failed_tests": [
+          "Dps.WindowsEdgeSupervisor.Tests.SupervisorTests.Append_only_evidence_log_reopens_exact_chain_and_rejects_tampering",
+          "Dps.WindowsEdgeSupervisor.Tests.SupervisorTests.Cutover_requires_drain_and_exact_rollback",
+          "Dps.WindowsEdgeSupervisor.Tests.SupervisorTests.Unavailable_launch_abi_blocks_before_worker_process_or_runtime_channel"
+        ],
+        "files": [],
+        "kind": "dotnet",
+        "test_counts": {
+          "failed": 3,
+          "skipped": 0,
+          "succeeded": 9,
+          "total": 12
+        }
+      },
+      "observed_commit": "65c2f5fed6392e08868aec25911ab5c74ea12ab5",
+      "registered_batch": "M3",
+      "root_cause": "3 tests fail on the Linux runner: SecurePathProof revalidation throws InvalidOperationException (PR#1 B11; passes on local macOS)"
+    },
+    {
+      "check_id": "module-governance",
+      "failure_fingerprint": {
+        "count": 34,
+        "errors_sha256": "a479f7cce014dd07d03c79b526c9a12ddc3bd305c721b4de8dc1931b3bcd6a2b",
+        "kind": "error-set"
+      },
+      "observed_commit": "65c2f5fed6392e08868aec25911ab5c74ea12ab5",
+      "registered_batch": "R0-B",
+      "root_cause": "Manifest communication graph lacks reciprocal edges and runnable runtime contract paths (PR#1 B1)"
+    },
+    {
+      "check_id": "phase0-adversarial-unit-tests",
+      "failure_fingerprint": {
+        "count": 9,
+        "executed": 430,
+        "failed_tests": [
+          "test_candidate_bom_validator.CandidateBomValidatorTests.test_shared_release_binding_compat_corpus_passes_real_validator",
+          "test_candidate_gate.CandidateGateHardeningTests.test_locked_third_party_imports_originate_in_repository_venv",
+          "test_candidate_gate.CandidateGateHardeningTests.test_policy_floor_is_injected_into_every_effective_plan",
+          "test_candidate_policy.CandidateTestPolicyTests.test_policy_evidence_matches_and_explicit_floors_never_weaken_manifests",
+          "test_legacy_sessionrunner_strangler.SessionRunnerStranglerBaselineTests.test_current_baseline_passes_without_runtime_claim",
+          "test_legacy_sessionrunner_strangler.SessionRunnerStranglerBaselineTests.test_duplicate_declaration_fails_even_if_source_hash_is_rebound",
+          "test_legacy_sessionrunner_strangler.SessionRunnerStranglerBaselineTests.test_schema_weakening_fails_closed",
+          "test_legacy_sessionrunner_strangler.SessionRunnerStranglerBaselineTests.test_signature_hash_tamper_fails_closed",
+          "test_legacy_sessionrunner_strangler.SessionRunnerStranglerBaselineTests.test_synthetic_trace_cannot_be_relabelled_as_runtime_evidence"
+        ],
+        "kind": "unittest",
+        "missing_inventory": []
+      },
+      "observed_commit": "65c2f5fed6392e08868aec25911ab5c74ea12ab5",
+      "registered_batch": "R0-B",
+      "root_cause": "4 candidate policy/venv assertions fail plus 5 legacy anchor trust-prerequisite failures (PR#1 B2 plus A2 environment prerequisite); executed pins the post-batch discovery count (main-tip 355 plus the 75 ledger guard tests)"
+    },
+    {
+      "check_id": "solution-locked-restore-build",
+      "failure_fingerprint": {
+        "build_failed": true,
+        "count": 84,
+        "error_codes": {
+          "CS1503": 9,
+          "CS1729": 2,
+          "CS8632": 3,
+          "xUnit1031": 1,
+          "xUnit1051": 69
+        },
+        "error_instances_sha256": "2ee8ef737cd0cf7afa297f71f7d28acc2ed78e34c99bb56c0b4347ec283cbc7b",
+        "failed_tests": [],
+        "files": [
+          "Modules/evidence-service/tests/EvidenceVerticalSlicePostgresIntegrationTests.cs",
+          "Modules/memory-event-ledger/tests/MemoryEventV2TrustTests.cs",
+          "Modules/operation-compiler/tests/Dps.OperationCompiler.Tests/AllowlistedOperationCompilerTests.cs",
+          "Modules/operation-compiler/tests/Dps.OperationCompiler.Tests/OperationCompilerIntegrationTests.cs",
+          "Modules/soul-memory-adapter/tests/Dps.SoulMemoryAdapter.Tests/GBrainCompanyLoopbackIntegrationTests.cs",
+          "Modules/soul-memory-adapter/tests/Dps.SoulMemoryAdapter.Tests/SoulMemoryAdapterPostgresIntegrationTests.cs",
+          "Modules/zenno-bridge/tests/BridgeContractTests.cs"
+        ],
+        "kind": "dotnet",
+        "test_counts": null
+      },
+      "observed_commit": "65c2f5fed6392e08868aec25911ab5c74ea12ab5",
+      "registered_batch": "R0-C/R0-D",
+      "root_cause": "Full-solution build aggregates the per-module test compile errors CS1503/CS1729/CS8632/xUnit1031/xUnit1051 (PR#1 B3)"
+    }
+  ],
+  "notes": [
+    "Fingerprints are exact by design (adversarial review MF1-MF4): a dotnet fingerprint hashes the deduplicated (file, line, column, code) instance table, so editing a file that contains registered errors shifts line numbers and MISMATCHes; a unittest fingerprint pins the executed count, so adding or deleting Tests/ci tests while the check stays red also MISMATCHes.  Both are intentional fail-closed costs: the reseeded entry must be updated in the same PR and merged by the Owner (drift reports LEDGER_EXPANDED for any fingerprint change).",
+    "unittest executed=430 is the post-batch discovery count: the archived main-tip run executed 355 tests and this batch adds the 75 guard tests of Tests/ci/test_baseline_red_ledger.py.",
+    "The only legal terminal state is entries shrunk to empty with this file still present; deleting the file fails the drift check."
+  ],
+  "schema_version": "dps.baseline-red-ledger/v1"
+}

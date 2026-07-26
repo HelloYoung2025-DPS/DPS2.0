@@ -183,12 +183,21 @@ CANDIDATE_TRUST_PATHS = (
     "governance/verification/release-bom.signature.v1.corpus.json",
     "governance/verification/f9-scale-input.v1.schema.json",
     "governance/verification/f9-scale-input.v2.schema.json",
+    "governance/baseline-red-ledger.json",
     "Modules/control-plane-host/tests/Dps.ControlPlaneHost.Tests/ActiveReleaseBindingAuthorityTests.cs",
     "Modules/control-plane-host/tests/Dps.ControlPlaneHost.Tests/Dps.ControlPlaneHost.Tests.csproj",
+    "Tests/ci/test_baseline_red_ledger.py",
     "Tests/ci/test_candidate_bom_validator.py",
     "Tests/ci/test_candidate_bom_validator_e2e.py",
     "Tests/ci/test_candidate_gate.py",
     "Tests/ci/test_candidate_policy.py",
+    # Every Tests/ci test_*.py is a candidate trust path by design: the file
+    # set is the phase0 unittest fingerprint's import surface, pinned inside
+    # run_phase0_gate.PHASE0_PINNED_CI_TEST_FILES, so editing ANY of these
+    # files (not just the gate suites) is a trust-root change that requires
+    # an Owner-merged batch.
+    "Tests/ci/test_f2_contract_schemas.py",
+    "Tests/ci/test_legacy_sessionrunner_strangler.py",
     "Tests/ci/test_manifest_schema_subset_evaluator.py",
     "Tests/ci/test_module_impact.py",
     "Tests/ci/test_r0b_receipt_migration_dual_run.py",
