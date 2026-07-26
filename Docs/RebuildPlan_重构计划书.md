@@ -228,7 +228,7 @@ R0-B/R0-C/R0-D 每一批都会改写候选门禁的信任根清单 `CANDIDATE_TR
 
 - **恒真式**：在 D 的后继提交 E 上以 `--base D` 比对信任根，只要 E 未改动信任根，全部信任根必然与 D 逐字节一致。对全部 5 个历史锚点的实测证实了这一点：4 个锚点的 D/E tree 逐字节相同，第 5 个仅相差一份不在信任根清单内的文档。该读法下信任根比对必然全同，产出零信息量，不构成证据。
 - **仪式成本**：该义务的直接产物是 5 个零 diff 空转 PR（#7、#9、#11、#12、#16，占全部 14 个已合入 PR 的三分之一强）与「证据锚 PR / 空提交锚」仪式本身。
-- **执行路径从未存在**：候选门禁 `Tools/ci/run_candidate_gate.py` 没有任何 CI 执行路径——`.github/workflows/` 下仅有 `static-ci.yml`，其 :604 只运行 `run_phase0_gate.py`；main 分支保护当前未配置 required_status_checks。第 2 步所要求的重跑从未在 CI 中存在过；真正有信息量的比对（候选 HEAD 相对受信基线的 diff 与 required 静态门本身）全部发生在合入前。
+- **执行路径从未存在**：候选门禁 `Tools/ci/run_candidate_gate.py` 没有任何 CI 执行路径——`.github/workflows/` 下仅有 `static-ci.yml`，其 :604 只运行 `run_phase0_gate.py`；main 分支保护当前未配置 required_status_checks。第 2 步所要求的重跑从未在 CI 中存在过；真正有信息量的比对（候选 HEAD 相对受信基线的 diff 与 required 静态门本身）全部发生在合入前。**如实补记（废止不只丢弃恒真式）**：按原设计，第 2 步在后继提交 E 上重跑候选门禁，除信任根比对外还会在 tree(E)≡tree(D) 的**最终合并树**上执行已注册 required 套件——该能力随第 2 步一并废止。它从未在 CI 中执行过、历史上也从未产出过 clean 证据，但最终合并树的验证缺口不因废止而消失：该缺口已在上方「merge queue 侧的取证状态」段如实记录，其闭合路径是 required checks + `merge_group`（仓库设置层面、Owner 专属），不是恢复第 2 步。
 
 原第 1 步（合入前以 `--diagnostic-workspace` 取记录性验证）同日改定义为上方第 1 条的合入前 required 静态门取证，不再另设 diagnostic 仪式。历史批次按原条文留下（或未能留下）的取证记录是历史事实，不改写、不追溯重评；其遗留取证缺口的定性由 §4.6 (e) 处理，相关历史程序缺陷的定性由 PR-A 历史收口文书（`Docs/Operations/HistoricalClosure_历史收口_2026-07-26.md`）承载（见 §4.6 (b)）。
 
