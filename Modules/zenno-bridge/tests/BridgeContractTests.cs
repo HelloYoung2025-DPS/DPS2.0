@@ -119,9 +119,9 @@ public sealed class BridgeContractTests
     }
 
     private static BridgeExchange ValidPollWith(
-        string? occurredAt = null,
-        string? authNonce = null,
-        string? commandId = null)
+        string occurredAt = null,
+        string authNonce = null,
+        string commandId = null)
     {
         var poll = ValidPoll();
         poll.OccurredAt = occurredAt ?? poll.OccurredAt;

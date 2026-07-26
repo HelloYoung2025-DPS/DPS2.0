@@ -1235,7 +1235,7 @@ public sealed class PostgresPersonaStore : IPersonaStore
                        relation.relname::text AS object_name,
                        attribute.attnum::text || ':' || attribute.attname AS member_name,
                        pg_catalog.format_type(attribute.atttypid, attribute.atttypmod) || '|' ||
-                       attribute.attnotnull::text || '|' || attribute.attidentity || '|' || attribute.attgenerated || '|' ||
+                       attribute.attnotnull::text || '|' || attribute.attidentity::text || '|' || attribute.attgenerated::text || '|' ||
                        COALESCE(pg_catalog.pg_get_expr(default_value.adbin, default_value.adrelid), '') || '|' ||
                        COALESCE((SELECT string_agg(item::text, '|' ORDER BY (item::text) COLLATE "C")
                                  FROM unnest(COALESCE(attribute.attacl, ARRAY[]::pg_catalog.aclitem[])) item), '') AS definition
