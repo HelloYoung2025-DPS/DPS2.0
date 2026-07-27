@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-07-27: As of this batch `GBrainProjectionRenderer`'s constructor is public and `GBrainSourceBindingAuthority.CreateInMemory` exists, so a consumer fixture can render through the real producer — real allocation, real collision retry, real capability check — without a PostgreSQL runtime. `ISourceBindingStore` and `InMemorySourceBindingStore` stay internal, so no caller gains read or tamper access to an allocated binding. `CreateInMemory` is volatile and is not a production authority.
 - Tightened `gbrain.source.binding/v1` and `gbrain.projection/v2` to exact schema versions, bounded candidate computation to nonce `0..1023`, and made both the DTO and Source authority recompute the fixed `soul_id + nonce` derivation before trusting a binding.
 - Removed injectable Source generation from the production authority/store path; collision tests now preoccupy real fixed-algorithm candidates without minting false bindings.
 - Split PostgreSQL migration and runtime credentials. The migrator now rejects shared/impersonated/elevated runtime identities, weak precreated schemas, catalog drift, mixed owners, unexpected constraints/indexes/triggers, and non-exact ACL before adoption; runtime initialization performs attestation but no DDL.

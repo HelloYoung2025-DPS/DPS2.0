@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using Dps.EvidenceService.Contracts;
+using Dps.GBrainProjector;
 using Dps.GBrainProjector.Contracts;
 using Dps.InterestReducer;
 using Dps.InterestReducer.Contracts;
@@ -133,8 +134,14 @@ public sealed class EvidenceVerticalSlicePostgresIntegrationTests
                 InterestSnapshotCanonicalizer.ComputeSha256(snapshotA),
                 InterestSnapshotCanonicalizer.ComputeSha256(replayedSnapshotA));
 
-            var projectionA = RenderProjectionFixture(persistedA, snapshotA);
-            var replayedProjectionA = RenderProjectionFixture(replayedA, replayedSnapshotA);
+            var projectionA = await RenderProjectionFixtureAsync(
+                persistedA,
+                snapshotA,
+                cancellationToken: cancellationToken);
+            var replayedProjectionA = await RenderProjectionFixtureAsync(
+                replayedA,
+                replayedSnapshotA,
+                cancellationToken: cancellationToken);
             Assert.Equal(projectionA.ProjectionChecksum, replayedProjectionA.ProjectionChecksum);
             Assert.Equal(
                 GBrainSourceIdCandidates.Compute(soulA.SoulId, FixtureNonce),
@@ -219,6 +226,106 @@ public sealed class EvidenceVerticalSlicePostgresIntegrationTests
         }
     }
 
+    /// <summary>
+    /// Executes the producer-backed projection fixture without the PostgreSQL ledger, so
+    /// the Source-binding allocation and collision-retry behaviour the composer depends
+    /// on is actually run and asserted rather than only reached from the ledger-gated
+    /// integration test.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "Contract")]
+    public async Task Producer_backed_projection_fixture_allocates_and_retries_source_binding_nonces()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var soul = FixtureSoul();
+        var baseTime = new DateTimeOffset(2026, 7, 14, 2, 0, 0, TimeSpan.Zero);
+        var memoryEvent = new MemoryEventV1(
+            MemoryEventV1.CurrentSchemaVersion,
+            MemoryEventV1.CurrentContractId,
+            MemoryEventV1.CurrentProducerModule,
+            Guid.Parse("00000000-0000-0000-0000-0000000000f2"),
+            soul.SoulId,
+            soul.DeviceBindingId,
+            soul.PlatformAccountId,
+            soul.TraceId,
+            FixtureIdempotency("event-f2-producer"),
+            baseTime,
+            "personal",
+            MemoryEventV1.ObservedContentEventType,
+            new MemoryObservationV1(new string('c', 64), true, [new InterestSignalV1("reading", 0.9m)]));
+        var snapshot = new DeterministicInterestReducer().Reduce(
+            new InterestReductionRequest(
+                soul.SoulId,
+                soul.DeviceBindingId,
+                soul.PlatformAccountId,
+                soul.TraceId,
+                FixtureIdempotency("reduce-f2-producer"),
+                baseTime.AddDays(1),
+                [memoryEvent]),
+            new InterestReducerOptions(86_400m));
+
+        var atNonceZero = await RenderProjectionFixtureAsync(
+            [memoryEvent],
+            snapshot,
+            cancellationToken: cancellationToken);
+        // Pre-occupying the Soul's nonce-0 candidate forces the authority down the
+        // collision-retry branch, which the hand-built projection could not reach.
+        var afterCollision = await RenderProjectionFixtureAsync(
+            [memoryEvent],
+            snapshot,
+            [GBrainSourceIdCandidates.Compute(soul.SoulId, FixtureNonce)],
+            cancellationToken);
+
+        Assert.Equal(FixtureNonce, atNonceZero.SourceBindingNonce);
+        Assert.Equal(GBrainSourceIdCandidates.Compute(soul.SoulId, FixtureNonce), atNonceZero.SourceId);
+        Assert.Equal(FixtureNonce + 1, afterCollision.SourceBindingNonce);
+        Assert.Equal(GBrainSourceIdCandidates.Compute(soul.SoulId, FixtureNonce + 1), afterCollision.SourceId);
+        Assert.NotEqual(atNonceZero.SourceId, afterCollision.SourceId);
+        Assert.NotEqual(atNonceZero.ProjectionChecksum, afterCollision.ProjectionChecksum);
+
+        // A replay of identical inputs through a fresh authority is byte-identical.
+        var replayed = await RenderProjectionFixtureAsync(
+            [memoryEvent],
+            snapshot,
+            cancellationToken: cancellationToken);
+        Assert.Equal(
+            GBrainProjectionV2Canonicalizer.Serialize(atNonceZero),
+            GBrainProjectionV2Canonicalizer.Serialize(replayed));
+
+        // The composer accepts a genuinely allocated non-zero-nonce Source, which is the
+        // consumer-side point of the v2 migration.
+        var composed = VerticalSliceEvidenceComposer.Compose(
+            soul,
+            [memoryEvent],
+            snapshot,
+            afterCollision,
+            CreateEvidenceMetadata(
+                Guid.Parse("00000000-0000-0000-0000-0000000000e1"),
+                baseTime.AddMinutes(2)) with
+            {
+                TestId = "evidence-service.contract-producer-backed",
+                TestType = "contract",
+                VerificationLevel = "CONTRACT_VERIFIED",
+                EvidenceIdempotencyKey = FixtureIdempotency("evidence-f2-producer")
+            });
+        Assert.True(TestEvidenceReleaseEvaluator.SatisfiesRequiredGate(composed.Receipt));
+    }
+
+    private static string FixtureIdempotency(string discriminator) =>
+        "idem_" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(discriminator)));
+
+    private static Dps.SoulRegistry.Contracts.SoulResolved FixtureSoul() =>
+        new(
+            "soul_" + new string('a', 64),
+            "db_" + new string('1', 32),
+            "pa_" + new string('2', 32),
+            "trace_" + new string('3', 32),
+            "idem_" + new string('4', 64),
+            new DateTimeOffset(2026, 7, 14, 1, 59, 0, TimeSpan.Zero),
+            "email",
+            new string('c', 64),
+            "f2-key-v1");
+
     private static async Task<Dps.SoulRegistry.Contracts.SoulResolved> RegisterAndResolveAsync(
         PostgresSoulRegistry registry,
         string rawAlias,
@@ -259,105 +366,33 @@ public sealed class EvidenceVerticalSlicePostgresIntegrationTests
     }
 
     /// <summary>
-    /// Deterministic v2 projection fixture built from public contract APIs; the
-    /// producer's renderer now requires its own least-privilege PostgreSQL runtime.
-    /// The final projection.Validate() recomputes the source-binding and checksum
-    /// chain, which is the fixture's correctness proof.
+    /// Producer-backed v2 projection fixture: the Source binding is really allocated by
+    /// <see cref="GBrainSourceBindingAuthority"/> (including collision retry) and the
+    /// projection is really rendered by <see cref="GBrainProjectionRenderer"/>. Both are
+    /// pure in-process work, so the fixture needs no PostgreSQL: only the durable
+    /// PostgreSQL store behind <c>GBrainProjectorPostgresRuntime</c> demands the
+    /// least-privilege role pair. A fresh authority per call over a fixed clock keeps a
+    /// replay of identical inputs byte-identical.
     /// </summary>
-    private static GBrainProjectionV2 RenderProjectionFixture(
+    /// <param name="reservedSourceIds">
+    /// Source candidates to pre-occupy, so a caller can force the allocator off nonce 0.
+    /// </param>
+    private static async Task<GBrainProjectionV2> RenderProjectionFixtureAsync(
         IReadOnlyList<MemoryEventV1> memoryEvents,
-        InterestSnapshotV1 snapshot)
+        InterestSnapshotV1 snapshot,
+        IReadOnlyCollection<string>? reservedSourceIds = null,
+        CancellationToken cancellationToken = default)
     {
-        snapshot.Validate();
-        var binding = GBrainSourceBindingV1.Create(
-            snapshot.SoulId,
-            GBrainSourceIdCandidates.Compute(snapshot.SoulId, FixtureNonce),
-            FixtureNonce,
-            FixtureBindingTime);
-        var uniqueEvents = new Dictionary<Guid, (MemoryEventV1 Event, string Hash)>();
-        foreach (var memoryEvent in memoryEvents)
-        {
-            memoryEvent.Validate();
-            var hash = MemoryEventCanonicalizer.ComputeSha256(memoryEvent);
-            if (uniqueEvents.TryGetValue(memoryEvent.EventId, out var existing))
-            {
-                Assert.Equal(existing.Hash, hash);
-                continue;
-            }
+        var authority = GBrainSourceBindingAuthority.CreateInMemory(
+            new FixtureTimeProvider(FixtureBindingTime),
+            reservedSourceIds);
+        var binding = await authority.ResolveAsync(snapshot.SoulId, cancellationToken);
+        return new GBrainProjectionRenderer(authority).Render(binding, memoryEvents, snapshot);
+    }
 
-            uniqueEvents.Add(memoryEvent.EventId, (memoryEvent, hash));
-        }
-
-        Assert.Equal(snapshot.SourceEventCount, uniqueEvents.Count);
-        var projectedEvents = uniqueEvents.Values
-            .Select(static item => new ProjectionEventV1(
-                item.Event.EventId,
-                item.Hash,
-                item.Event.Observation.ContentDigest.ToLowerInvariant(),
-                item.Event.OccurredAt))
-            .OrderBy(static item => item.OccurredAt)
-            .ThenBy(static item => item.EventId)
-            .ToArray();
-        var projectedInterests = snapshot.Interests
-            .Select(static item => new ProjectionInterestV1(
-                item.Topic,
-                item.OriginalConfidence,
-                item.DecayedConfidence,
-                item.HalfLifeSeconds,
-                item.AlgorithmVersion,
-                item.Evidence.Select(static evidence => new ProjectionInterestEvidenceV1(
-                        evidence.EventId,
-                        evidence.EventHash.ToLowerInvariant(),
-                        evidence.OccurredAt,
-                        evidence.OriginalConfidence,
-                        evidence.DecayedConfidence))
-                    .OrderBy(static evidence => evidence.OccurredAt)
-                    .ThenBy(static evidence => evidence.EventId)
-                    .ToArray()))
-            .OrderBy(static item => item.Topic, StringComparer.Ordinal)
-            .ToArray();
-        var revision = Convert.ToHexStringLower(SHA256.HashData(
-            Encoding.UTF8.GetBytes(string.Join(
-                '\n',
-                binding.BindingRevision,
-                binding.BindingChecksum,
-                snapshot.SoulId,
-                snapshot.DeviceBindingId,
-                snapshot.PlatformAccountId,
-                InterestSnapshotCanonicalizer.ComputeSha256(snapshot),
-                string.Join(
-                    ',',
-                    projectedEvents.Select(static item => item.EventId + ":" + item.EventHash))))));
-        var withoutChecksum = new GBrainProjectionV2(
-            GBrainProjectionV2.CurrentSchemaVersion,
-            GBrainProjectionV2.CurrentContractId,
-            GBrainProjectionV2.CurrentProducerModule,
-            snapshot.SoulId,
-            snapshot.DeviceBindingId,
-            snapshot.PlatformAccountId,
-            snapshot.TraceId,
-            snapshot.IdempotencyKey,
-            snapshot.AsOf,
-            snapshot.PrivacyClass,
-            binding.SourceId,
-            binding.Algorithm,
-            binding.Nonce,
-            binding.SoulHash,
-            binding.AllocatedAt,
-            binding.BindingRevision,
-            binding.BindingChecksum,
-            revision,
-            new string('0', 64),
-            GBrainProjectionV2.RenderedNotWrittenStatus,
-            projectedEvents.Length,
-            projectedEvents,
-            projectedInterests);
-        var projection = withoutChecksum with
-        {
-            ProjectionChecksum = GBrainProjectionV2Canonicalizer.ComputeSha256(withoutChecksum)
-        };
-        projection.Validate();
-        return projection;
+    private sealed class FixtureTimeProvider(DateTimeOffset value) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => value;
     }
 
     private static MemoryEventV1 CreateMemoryEvent(

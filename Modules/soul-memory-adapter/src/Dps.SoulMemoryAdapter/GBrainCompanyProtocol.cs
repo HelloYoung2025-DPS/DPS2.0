@@ -334,15 +334,23 @@ public sealed record GBrainProjectionDeleteIntent(
     string ExpectedProjectionChecksum,
     long SourceBindingNonce)
 {
-    // 1.1 (additive minor): the intent now carries the source-binding nonce witness so
-    // its (soul, source, nonce) triple is locally provable; RequireMajor(…, 1) keeps
-    // major-1 compatibility.
-    public const string CurrentSchemaVersion = "1.1";
-    public const string CurrentContractId = "gbrain.projection.delete-intent/v1";
+    // v2 (breaking): the required SourceBindingNonce witness makes the (soul, source,
+    // nonce) triple locally provable, but it also makes every major-1 record invalid —
+    // a v1 record has no nonce field, deserializes to nonce 0, and carries the v1
+    // truncated source derivation, so the witness recomputation can never match.
+    // Major-1 input is therefore quarantined by RequireMajor before any witness check:
+    // a named contract-major refusal, not a source-mismatch misdiagnosis. There is no
+    // migration or dual-accept path on purpose, because there is nothing to migrate —
+    // all 23 module.yaml manifests in this repository declare releaseEligible=false,
+    // and a delete intent is only ever persisted after conversion to the journaled
+    // mutation tuple, whose IGBrainProjectionMutationJournal port has no implementation
+    // outside the test assembly. No major-1 record was ever written anywhere.
+    public const string CurrentSchemaVersion = "2.0";
+    public const string CurrentContractId = "gbrain.projection.delete-intent/v2";
 
     public void Validate()
     {
-        SoulMemoryContractValidation.RequireMajor(SchemaVersion, 1);
+        SoulMemoryContractValidation.RequireMajor(SchemaVersion, 2);
         SoulMemoryContractValidation.RequireExact(ContractId, CurrentContractId, nameof(ContractId));
         new GBrainSoulScope(SourceId, SoulId, DeviceBindingId, PlatformAccountId, SourceBindingNonce)
             .Validate();
@@ -389,6 +397,8 @@ public sealed record GBrainProjectionRebuildIntent(
     string IdempotencyKey,
     DateTimeOffset OccurredAt)
 {
+    // Deliberately still major 1: this envelope carries no Source, Soul, or nonce, so
+    // the v2 source-binding witness did not change its shape or its accept set.
     public const string CurrentSchemaVersion = "1.0";
     public const string CurrentContractId = "gbrain.projection.rebuild-intent/v1";
 
@@ -422,11 +432,18 @@ public sealed record GBrainProjectionMutationIntent(
     string ExpectedProjectionChecksum,
     long SourceBindingNonce)
 {
-    // 1.1 (additive minor): the journaled tuple now pins the source-binding nonce
-    // witness alongside the Source identifier; RequireMajor(…, 1) keeps major-1
-    // compatibility.
-    public const string CurrentSchemaVersion = "1.1";
-    public const string CurrentContractId = "gbrain.projection.mutation-intent/v1";
+    // v2 (breaking): the journaled tuple now pins the source-binding nonce witness
+    // alongside the Source identifier. Because this record is durable, the break is
+    // stated rather than hidden: a stored major-1 tuple has no nonce column, replays as
+    // nonce 0 against a v1 truncated source identifier, and can never satisfy the
+    // witness recomputation. Replay of such a record fails closed at RequireMajor, so
+    // the journal refuses it at the door instead of reserving or reconciling it. No
+    // migration path is offered because there is nothing to migrate: all 23 module.yaml
+    // manifests in this repository declare releaseEligible=false, and
+    // IGBrainProjectionMutationJournal — the only durable home for this tuple — has no
+    // implementation outside the test assembly, so no major-1 tuple was ever persisted.
+    public const string CurrentSchemaVersion = "2.0";
+    public const string CurrentContractId = "gbrain.projection.mutation-intent/v2";
 
     public static GBrainProjectionMutationIntent FromProjection(GBrainProjectionV2 projection)
     {
@@ -474,7 +491,7 @@ public sealed record GBrainProjectionMutationIntent(
 
     public void Validate()
     {
-        SoulMemoryContractValidation.RequireMajor(SchemaVersion, 1);
+        SoulMemoryContractValidation.RequireMajor(SchemaVersion, 2);
         SoulMemoryContractValidation.RequireExact(ContractId, CurrentContractId, nameof(ContractId));
         if (!GBrainProjectionMutationOperation.IsSupported(OperationKind))
             throw new NotSupportedException($"Unsupported GBrain projection mutation '{OperationKind}'.");

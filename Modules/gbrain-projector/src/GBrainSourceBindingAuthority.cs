@@ -46,6 +46,44 @@ public sealed class GBrainSourceBindingAuthority
         _maximumNonce = maximumNonce;
     }
 
+    /// <summary>
+    /// Volatile in-process authority for consumer fixtures that need real allocation,
+    /// collision-retry, and capability behaviour without a PostgreSQL runtime. Production
+    /// must resolve its authority through <see cref="GBrainProjectorPostgresRuntime"/>.
+    /// <para>
+    /// Hazard, stated explicitly because this factory is public: an authority built here
+    /// allocates against an empty per-instance store. Its bindings are never persisted
+    /// and never checked for global Source uniqueness, yet the projections it renders
+    /// still satisfy <c>GBrainProjectionV2.Validate()</c>, so a consumer cannot tell them
+    /// apart from durable ones. Two instances — or one instance after restart — can
+    /// therefore hand the same Soul a different nonce, Source identifier, and binding
+    /// revision than the durable authority already allocated, and a downstream adapter
+    /// will prepare that projection anyway. Use this only where no durable binding
+    /// exists or is expected: fixtures.
+    /// </para>
+    /// The backing store stays internal, so a caller can pre-occupy candidates through
+    /// <paramref name="reservedSourceIds"/> but can neither read nor tamper with an
+    /// allocated binding.
+    /// </summary>
+    /// <param name="reservedSourceIds">
+    /// Canonical Source candidates that are already taken. Reserving a Soul's nonce-0
+    /// candidate is how a fixture exercises the collision-retry path.
+    /// </param>
+    public static GBrainSourceBindingAuthority CreateInMemory(
+        TimeProvider timeProvider,
+        IReadOnlyCollection<string>? reservedSourceIds = null,
+        long maximumNonce = MaximumNonce)
+    {
+        ArgumentNullException.ThrowIfNull(timeProvider);
+        var store = new InMemorySourceBindingStore();
+        foreach (var sourceId in reservedSourceIds ?? Array.Empty<string>())
+        {
+            store.ReserveSourceForTest(sourceId);
+        }
+
+        return new GBrainSourceBindingAuthority(store, timeProvider, maximumNonce);
+    }
+
     public async Task<VerifiedGBrainSourceBinding> ResolveAsync(
         string soulId,
         CancellationToken cancellationToken = default)

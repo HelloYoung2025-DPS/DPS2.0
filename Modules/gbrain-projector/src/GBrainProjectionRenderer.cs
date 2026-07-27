@@ -10,7 +10,13 @@ public sealed class GBrainProjectionRenderer
 {
     private readonly GBrainSourceBindingAuthority _bindingAuthority;
 
-    internal GBrainProjectionRenderer(GBrainSourceBindingAuthority bindingAuthority)
+    /// <summary>
+    /// The renderer is a pure function over a Source binding capability that only the
+    /// supplied authority can issue, so a public constructor grants no authority the
+    /// caller did not already hold: <see cref="Render"/> still refuses any capability
+    /// issued by a different authority instance.
+    /// </summary>
+    public GBrainProjectionRenderer(GBrainSourceBindingAuthority bindingAuthority)
     {
         ArgumentNullException.ThrowIfNull(bindingAuthority);
         _bindingAuthority = bindingAuthority;
