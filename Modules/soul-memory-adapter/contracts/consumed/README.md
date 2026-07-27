@@ -1,5 +1,5 @@
 # Consumed contracts and protocol fixtures
 
-The adapter consumes `gbrain.projection/v1` as the sole native Source binding and projection definition. It preserves `source_id`, `projection_schema_version`, `projection_revision`, and `projection_checksum` exactly; it does not derive replacements or consume raw identity aliases or credentials.
+The adapter consumes `gbrain.projection/v2` as the sole native Source binding and projection definition. It preserves `source_id`, `projection_schema_version`, `projection_revision`, and `projection_checksum` exactly; it does not derive replacements or consume raw identity aliases or credentials.
 
 `gbrain-0.42.42.0.mcp-capabilities.fixture.json` is a checked-in compatibility fixture for the fixed GBrain HTTP/MCP adapter. It pins the diagnostic server version, MCP version allowlist, schema pack, exact required tools, input-property shapes, and local package provenance used during development. It is not a public DPS contract, not a secret, not live evidence, and not a signed Release BOM. A deployed server whose initialize identity, negotiated protocol, or paginated `tools/list` shape differs from the approved profile is rejected before a domain tool call; the schema pack is then checked on the exact provisioned Source-binding page before any projection operation.

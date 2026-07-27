@@ -20,14 +20,15 @@ public sealed record GBrainReadbackObservation(
         SoulMemoryContractValidation.RequirePlatformAccountId(
             PlatformAccountId,
             nameof(PlatformAccountId));
-        SoulMemoryContractValidation.RequireExact(
-            SourceId,
-            GBrainSourceIds.ForSoul(SoulId),
-            nameof(SourceId));
-        SoulMemoryContractValidation.RequireMajor(ProjectionSchemaVersion, 1);
+        // Format-only check by design: the v2 source_id derivation requires the binding
+        // nonce, which an external read-back never carries. The authoritative binding
+        // proof is GBrainProjectionV2.Validate() on the projection; prepared/readback
+        // equality is enforced field-by-field in EnsureExactReadback.
+        SoulMemoryContractValidation.RequireSourceId(SourceId, nameof(SourceId));
+        SoulMemoryContractValidation.RequireMajor(ProjectionSchemaVersion, 2);
         SoulMemoryContractValidation.RequireExact(
             ProjectionContractId,
-            GBrainProjectionV1.CurrentContractId,
+            GBrainProjectionV2.CurrentContractId,
             nameof(ProjectionContractId));
         SoulMemoryContractValidation.RequireSha256(ProjectionRevision, nameof(ProjectionRevision));
         SoulMemoryContractValidation.RequireSha256(ReadbackChecksum, nameof(ReadbackChecksum));
@@ -47,12 +48,15 @@ public sealed class DeterministicSoulMemoryAdapter
     private readonly Dictionary<string, (string Payload, SoulMemoryReadbackV1 Result)> _idempotency =
         new(StringComparer.Ordinal);
 
-    public SoulMemoryReadbackV1 Prepare(GBrainProjectionV1 projection)
+    public SoulMemoryReadbackV1 Prepare(GBrainProjectionV2 projection)
     {
         ArgumentNullException.ThrowIfNull(projection);
         projection.Validate();
 
         var operationKey = OperationKey("prepare", projection.IdempotencyKey);
+        // The idempotency payload is a tamper-comparison set: it may only grow. The v2
+        // source binding fields are pinned here so a replayed prepare cannot rebind the
+        // same key to a different Source binding proof.
         var payload = string.Join(
             ':',
             projection.ContractId,
@@ -60,6 +64,14 @@ public sealed class DeterministicSoulMemoryAdapter
             projection.DeviceBindingId,
             projection.PlatformAccountId,
             projection.SourceId,
+            projection.SourceBindingAlgorithm,
+            projection.SourceBindingNonce.ToString(
+                System.Globalization.CultureInfo.InvariantCulture),
+            projection.SourceBindingSoulHash,
+            projection.SourceBindingAllocatedAt.UtcTicks.ToString(
+                System.Globalization.CultureInfo.InvariantCulture),
+            projection.SourceBindingRevision,
+            projection.SourceBindingChecksum,
             projection.ProjectionRevision,
             projection.ProjectionChecksum);
 

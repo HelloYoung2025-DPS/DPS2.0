@@ -40,7 +40,7 @@ public static class VerticalSliceEvidenceComposer
         SoulResolved soul,
         IReadOnlyList<MemoryEventV1> memoryEvents,
         InterestSnapshotV1 interestSnapshot,
-        GBrainProjectionV1 projection,
+        GBrainProjectionV2 projection,
         VerticalSliceEvidenceMetadata metadata)
     {
         ArgumentNullException.ThrowIfNull(soul);
@@ -68,8 +68,8 @@ public static class VerticalSliceEvidenceComposer
                 "receipt:interest.snapshot-v1",
                 InterestSnapshotCanonicalizer.Serialize(interestSnapshot)),
             RawEvidenceArtifact.FromUtf8(
-                "receipt:gbrain.projection-v1",
-                GBrainProjectionCanonicalizer.Serialize(projection))
+                "receipt:gbrain.projection-v2",
+                GBrainProjectionV2Canonicalizer.Serialize(projection))
         };
         var artifactMetadata = rawArtifacts.Select(static raw => new EvidenceArtifactV1(
             raw.ArtifactId,
@@ -151,7 +151,7 @@ public static class VerticalSliceEvidenceComposer
         SoulResolved soul,
         IReadOnlyList<MemoryEventV1> memoryEvents,
         InterestSnapshotV1 interestSnapshot,
-        GBrainProjectionV1 projection)
+        GBrainProjectionV2 projection)
     {
         var receipts = memoryEvents
             .Select(static memoryEvent => (
@@ -180,16 +180,23 @@ public static class VerticalSliceEvidenceComposer
             throw new InvalidOperationException("SOUL-ISO-001: evidence source receipts crossed Soul, device, account, or trace scope.");
         }
 
-        if (!string.Equals(projection.SourceId, GBrainSourceIds.ForSoul(soul.SoulId), StringComparison.Ordinal))
+        // gbrain.projection/v2 derives source_id from (soul, nonce); the nonce is not
+        // re-derivable here, so this layer enforces canonical format only. The
+        // authoritative SourceId<->Soul binding proof is projection.Validate() (already
+        // invoked by Compose), combined with the exact SoulId scope equality above.
+        if (projection.SourceId is null ||
+            projection.SourceId.Length != 32 ||
+            !projection.SourceId.StartsWith("dps-", StringComparison.Ordinal) ||
+            projection.SourceId.AsSpan(4).ContainsAnyExcept("0123456789abcdef"))
         {
-            throw new InvalidOperationException("GBrain projection source is not bound to the resolved Soul.");
+            throw new InvalidOperationException("GBrain projection source is not a canonical Source identifier.");
         }
     }
 
     private static IReadOnlyList<MemoryEventV1> ValidateEventSet(
         IReadOnlyList<MemoryEventV1> memoryEvents,
         InterestSnapshotV1 interestSnapshot,
-        GBrainProjectionV1 projection)
+        GBrainProjectionV2 projection)
     {
         if (memoryEvents.Count == 0)
         {

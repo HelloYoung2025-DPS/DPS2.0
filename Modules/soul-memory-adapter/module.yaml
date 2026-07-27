@@ -56,8 +56,8 @@
     "consumed": [
       {
         "contractId": "gbrain.projection",
-        "major": 1,
-        "source": "Modules/gbrain-projector/contracts/provided/gbrain.projection.v1.schema.json",
+        "major": 2,
+        "source": "Modules/gbrain-projector/contracts/provided/gbrain.projection.v2.schema.json",
         "status": "proposed",
         "mode": "active",
         "ownerModule": "gbrain-projector"
@@ -69,7 +69,7 @@
       {
         "peerModule": "gbrain-projector",
         "contractId": "gbrain.projection",
-        "major": 1,
+        "major": 2,
         "direction": "inbound",
         "transport": "soul-memory-adapter",
         "timeoutMs": 5000,
@@ -136,12 +136,12 @@
     "privacyClasses": ["personal", "sensitive"],
     "retention": "prepared DTOs are transient; receipts follow Control Plane audit retention; GBrain retention is operator policy outside this module",
     "export": "export exact scoped checksums and source identifiers without credentials",
-    "correction": "consume a corrected gbrain.projection/v1 revision; never mutate a verified receipt",
+    "correction": "consume a corrected gbrain.projection/v2 revision; never mutate a verified receipt",
     "deletion": "soft-delete and exact include-deleted verification are supported; hard purge, chunk, embedding, cache, and backup erasure remain explicitly unverified"
   },
   "security": {
     "trustBoundaries": [
-      "gbrain.projection/v1 to per-Soul fixed GBrain Source",
+      "gbrain.projection/v2 to per-Soul fixed GBrain Source",
       "external secret source to zeroized transient OAuth credential lease",
       "Control Plane durable mutation journal and fenced loss-signalling per-Soul mutation lease to GBrain side effects",
       "RFC 9728 protected-resource metadata to RFC 8414 or OIDC authorization-server discovery",
@@ -149,7 +149,7 @@
     ],
     "secretScopes": ["per-Soul OAuth client credentials with exactly read and write"],
     "untrustedInputs": [
-      "gbrain.projection/v1 payload",
+      "gbrain.projection/v2 payload",
       "OAuth metadata and token response",
       "MCP initialize and tools/list response",
       "MCP tool result and SSE event",
@@ -233,7 +233,7 @@
     "track": "modern",
     "moduleMajor": 0,
     "supportedContractMajors": {
-      "gbrain.projection": [1],
+      "gbrain.projection": [2],
       "soul.memory.readback": [1]
     },
     "unknownMajorBehavior": "reject",

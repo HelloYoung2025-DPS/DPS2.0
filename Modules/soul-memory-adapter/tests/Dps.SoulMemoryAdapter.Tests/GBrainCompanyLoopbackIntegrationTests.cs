@@ -10,8 +10,10 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
 {
     private const string SoulA = "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private const string SoulB = "soul_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    private const long FixtureNonce = 0;
     private static readonly DateTimeOffset Now =
         new(2026, 7, 15, 3, 4, 5, TimeSpan.Zero);
+    private static readonly DateTimeOffset BindingTime = Now.AddMinutes(-10);
 
     [Fact]
     [Trait("Category", "SecuritySimulation")]
@@ -22,8 +24,8 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         await using var simulator = new GBrainLoopbackSimulator(scope, Now);
         using var client = CreateClient(simulator, scope);
 
-        var first = await client.WriteProjectionAsync(projection);
-        var duplicate = await client.WriteProjectionAsync(projection);
+        var first = await client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken);
+        var duplicate = await client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken);
 
         Assert.Equal(SoulMemoryReadbackV1.VerifiedStatus, first.Status);
         Assert.Equal(projection.ProjectionChecksum, first.ReadbackChecksum);
@@ -54,7 +56,7 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         };
         using var client = CreateClient(simulator, scope);
 
-        var result = await client.WriteProjectionAsync(projection);
+        var result = await client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken);
 
         Assert.Equal(SoulMemoryReadbackV1.VerifiedStatus, result.Status);
         Assert.Equal(1, simulator.PutCalls);
@@ -72,7 +74,7 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         };
         using var client = CreateClient(simulator, scope);
 
-        var result = await client.WriteProjectionAsync(projection);
+        var result = await client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken);
 
         Assert.Equal(SoulMemoryReadbackV1.VerifiedStatus, result.Status);
         Assert.Equal(1, simulator.PutCalls);
@@ -109,7 +111,7 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         using var client = CreateClient(simulator, scope);
 
         await Assert.ThrowsAsync<GBrainUnknownOutcomeException>(() =>
-            client.WriteProjectionAsync(projection));
+            client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken));
         Assert.Equal(1, simulator.PutCalls);
     }
 
@@ -126,7 +128,7 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         using var client = CreateClient(simulator, scope);
 
         await Assert.ThrowsAsync<GBrainCapabilityException>(() =>
-            client.WriteProjectionAsync(projection));
+            client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken));
         Assert.Equal(0, simulator.PutCalls);
     }
 
@@ -143,7 +145,7 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         using var client = CreateClient(simulator, scope);
 
         await Assert.ThrowsAsync<GBrainProtocolException>(() =>
-            client.WriteProjectionAsync(projection));
+            client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken));
         Assert.Equal(0, simulator.PutCalls);
     }
 
@@ -155,12 +157,12 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         var scope = ScopeFor(projection);
         await using var simulator = new GBrainLoopbackSimulator(scope, Now)
         {
-            ProjectionReadSourceOverride = GBrainSourceIds.ForSoul(SoulB)
+            ProjectionReadSourceOverride = GBrainSourceIdCandidates.Compute(SoulB, FixtureNonce)
         };
         using var client = CreateClient(simulator, scope);
 
         await Assert.ThrowsAsync<GBrainUnknownOutcomeException>(() =>
-            client.WriteProjectionAsync(projection));
+            client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken));
         Assert.Equal(1, simulator.PutCalls);
     }
 
@@ -173,12 +175,12 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         await using (var simulator = new GBrainLoopbackSimulator(scope, Now))
         {
             using var client = CreateClient(simulator, scope);
-            _ = await client.WriteProjectionAsync(projection);
+            _ = await client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken);
             simulator.MarkPageSoftDeleted(GBrainCompanyProtocolV1.ProjectionCurrentSlug);
             simulator.IgnoreDeletedFilter = true;
 
             await Assert.ThrowsAsync<GBrainReadbackMismatchException>(() =>
-                client.ReadProjectionExactAsync(projection));
+                client.ReadProjectionExactAsync(projection, TestContext.Current.CancellationToken));
         }
 
         await using (var simulator = new GBrainLoopbackSimulator(scope, Now))
@@ -188,7 +190,7 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
             using var client = CreateClient(simulator, scope);
 
             await Assert.ThrowsAsync<GBrainReadbackMismatchException>(() =>
-                client.WriteProjectionAsync(projection));
+                client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken));
             Assert.Equal(0, simulator.PutCalls);
         }
     }
@@ -203,11 +205,11 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         var scope = ScopeFor(first);
         await using var simulator = new GBrainLoopbackSimulator(scope, Now);
         using var client = CreateClient(simulator, scope);
-        _ = await client.WriteProjectionAsync(first);
-        _ = await client.WriteProjectionAsync(replacement);
+        _ = await client.WriteProjectionAsync(first, TestContext.Current.CancellationToken);
+        _ = await client.WriteProjectionAsync(replacement, TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            client.WriteProjectionAsync(conflict));
+            client.WriteProjectionAsync(conflict, TestContext.Current.CancellationToken));
         Assert.Equal(2, simulator.PutCalls);
     }
 
@@ -246,7 +248,7 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
 
         var newestReceipt = await newerTask;
         var olderFailure = await olderTask;
-        var finalReceipt = await client.ReadProjectionExactAsync(newer);
+        var finalReceipt = await client.ReadProjectionExactAsync(newer, TestContext.Current.CancellationToken);
 
         Assert.Equal(newer.ProjectionChecksum, newestReceipt.ReadbackChecksum);
         Assert.Equal(newer.ProjectionChecksum, finalReceipt.ReadbackChecksum);
@@ -262,13 +264,13 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         var scope = ScopeFor(projection);
         await using var simulator = new GBrainLoopbackSimulator(scope, Now);
         using var client = CreateClient(simulator, scope);
-        _ = await client.WriteProjectionAsync(projection);
+        _ = await client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken);
 
         var deleteIntent = CreateDeleteIntent(projection, 'd', Now.AddSeconds(-30));
         var rebuildIntent = CreateRebuildIntent('f', Now);
-        var deleted = await client.SoftDeleteProjectionAsync(deleteIntent);
-        var duplicateDelete = await client.SoftDeleteProjectionAsync(deleteIntent);
-        var rebuilt = await client.RebuildProjectionAsync(projection, rebuildIntent);
+        var deleted = await client.SoftDeleteProjectionAsync(deleteIntent, TestContext.Current.CancellationToken);
+        var duplicateDelete = await client.SoftDeleteProjectionAsync(deleteIntent, TestContext.Current.CancellationToken);
+        var rebuilt = await client.RebuildProjectionAsync(projection, rebuildIntent, TestContext.Current.CancellationToken);
 
         Assert.Equal(GBrainProjectionDeleteOutcome.SoftDeletedStatus, deleted.Status);
         Assert.True(deleted.ExactSoftDeleteReadback);
@@ -295,13 +297,13 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         var rebuildIntent = CreateRebuildIntent('4', Now.AddMinutes(-1));
         await using var simulator = new GBrainLoopbackSimulator(scope, Now);
         using var client = CreateClient(simulator, scope);
-        _ = await client.WriteProjectionAsync(original);
-        _ = await client.SoftDeleteProjectionAsync(deleteIntent);
-        _ = await client.RebuildProjectionAsync(newer, rebuildIntent);
+        _ = await client.WriteProjectionAsync(original, TestContext.Current.CancellationToken);
+        _ = await client.SoftDeleteProjectionAsync(deleteIntent, TestContext.Current.CancellationToken);
+        _ = await client.RebuildProjectionAsync(newer, rebuildIntent, TestContext.Current.CancellationToken);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
-            client.SoftDeleteProjectionAsync(deleteIntent));
-        var current = await client.ReadProjectionExactAsync(newer);
+            client.SoftDeleteProjectionAsync(deleteIntent, TestContext.Current.CancellationToken));
+        var current = await client.ReadProjectionExactAsync(newer, TestContext.Current.CancellationToken);
 
         Assert.Equal(newer.ProjectionChecksum, current.ReadbackChecksum);
         Assert.Equal(1, simulator.DeleteCalls);
@@ -325,13 +327,13 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         using var client = CreateClient(simulator, scope, journal, leases);
 
         await Assert.ThrowsAsync<GBrainUnknownOutcomeException>(() =>
-            client.WriteProjectionAsync(older));
+            client.WriteProjectionAsync(older, TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<GBrainMutationQuarantinedException>(() =>
-            client.WriteProjectionAsync(newer));
+            client.WriteProjectionAsync(newer, TestContext.Current.CancellationToken));
         Assert.Equal(1, simulator.PutCalls);
 
-        var reconciled = await client.WriteProjectionAsync(older);
-        var advanced = await client.WriteProjectionAsync(newer);
+        var reconciled = await client.WriteProjectionAsync(older, TestContext.Current.CancellationToken);
+        var advanced = await client.WriteProjectionAsync(newer, TestContext.Current.CancellationToken);
 
         Assert.Equal(older.ProjectionChecksum, reconciled.ReadbackChecksum);
         Assert.Equal(newer.ProjectionChecksum, advanced.ReadbackChecksum);
@@ -354,12 +356,12 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         using var client = CreateClient(simulator, scope, journal, leases);
 
         await Assert.ThrowsAsync<GBrainUnknownOutcomeException>(() =>
-            client.WriteProjectionAsync(older));
+            client.WriteProjectionAsync(older, TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<GBrainMutationQuarantinedException>(() =>
-            client.WriteProjectionAsync(newer));
+            client.WriteProjectionAsync(newer, TestContext.Current.CancellationToken));
 
         Assert.Equal(1, simulator.PutCalls);
-        var reconciled = await client.WriteProjectionAsync(older);
+        var reconciled = await client.WriteProjectionAsync(older, TestContext.Current.CancellationToken);
         Assert.Equal(older.ProjectionChecksum, reconciled.ReadbackChecksum);
         Assert.Equal(1, simulator.PutCalls);
     }
@@ -378,6 +380,7 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
             scope.SoulId,
             scope.DeviceBindingId,
             scope.PlatformAccountId,
+            scope.SourceBindingNonce,
             new string('9', 64),
             payload,
             Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(payload))),
@@ -387,7 +390,10 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         simulator.SeedPersona(persona);
         using var client = CreateClient(simulator, scope);
 
-        var result = await client.ReadPersonaCurrentExactAsync(scope, Now.AddMinutes(-2));
+        var result = await client.ReadPersonaCurrentExactAsync(
+            scope,
+            Now.AddMinutes(-2),
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(persona, result);
         Assert.Equal(1, simulator.PersonaGetCalls);
@@ -402,18 +408,23 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         var scope = ScopeFor(projection);
         await using var simulator = new GBrainLoopbackSimulator(scope, Now);
         using var client = CreateClient(simulator, scope);
-        _ = await client.WriteProjectionAsync(projection);
+        _ = await client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken);
 
         var result = await client.SearchProjectionAsync(
             scope,
             "fixture interest",
-            Now.AddMinutes(-2));
+            Now.AddMinutes(-2),
+            cancellationToken: TestContext.Current.CancellationToken);
         Assert.Single(result);
         Assert.Equal(projection.ProjectionChecksum, result[0].Projection.ProjectionChecksum);
 
         simulator.TamperProjectionBodyOnRead = true;
         await Assert.ThrowsAsync<GBrainReadbackMismatchException>(() =>
-            client.SearchProjectionAsync(scope, "fixture interest", Now.AddMinutes(-2)));
+            client.SearchProjectionAsync(
+                scope,
+                "fixture interest",
+                Now.AddMinutes(-2),
+                cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -424,16 +435,48 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         var scope = ScopeFor(projection);
         await using var simulator = new GBrainLoopbackSimulator(scope, Now);
         using var client = CreateClient(simulator, scope);
-        _ = await client.WriteProjectionAsync(projection);
+        _ = await client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken);
 
         simulator.OmitSearchSource = true;
         await Assert.ThrowsAsync<GBrainAuthorizationException>(() =>
-            client.SearchProjectionAsync(scope, "fixture interest", Now.AddMinutes(-2)));
+            client.SearchProjectionAsync(
+                scope,
+                "fixture interest",
+                Now.AddMinutes(-2),
+                cancellationToken: TestContext.Current.CancellationToken));
 
         simulator.OmitSearchSource = false;
-        simulator.SearchSourceOverride = GBrainSourceIds.ForSoul(SoulB);
+        simulator.SearchSourceOverride = GBrainSourceIdCandidates.Compute(SoulB, FixtureNonce);
         await Assert.ThrowsAsync<GBrainAuthorizationException>(() =>
-            client.SearchProjectionAsync(scope, "fixture interest", Now.AddMinutes(-2)));
+            client.SearchProjectionAsync(
+                scope,
+                "fixture interest",
+                Now.AddMinutes(-2),
+                cancellationToken: TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    [Trait("Category", "SecuritySimulation")]
+    public async Task TamperedBindingPageNonceIsRejectedBeforeAnyMutation()
+    {
+        var projection = CreateProjection(SoulA, 'b');
+        var scope = ScopeFor(projection);
+        var genuine = GBrainCompanyProvisioning.CreateSourceBindingMarkdown(scope);
+        // The binding page is the only accepted immutable Source/Soul binding record;
+        // it must carry the nonce witness, because a binding record without it cannot
+        // pin the (soul, nonce) -> source_id pairing.
+        Assert.Contains("\"source_binding_nonce\":0", genuine, StringComparison.Ordinal);
+        var tampered = genuine.Replace(
+            "\"source_binding_nonce\":0",
+            "\"source_binding_nonce\":1",
+            StringComparison.Ordinal);
+        await using var simulator = new GBrainLoopbackSimulator(scope, Now);
+        simulator.SeedRawPage(GBrainCompanyProtocolV1.SourceBindingSlug, tampered);
+        using var client = CreateClient(simulator, scope);
+
+        await Assert.ThrowsAsync<GBrainAuthorizationException>(() =>
+            client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken));
+        Assert.Equal(0, simulator.PutCalls);
     }
 
     [Fact]
@@ -449,7 +492,7 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         using var client = CreateClient(simulator, scope);
 
         var exception = await Assert.ThrowsAsync<GBrainProtocolException>(() =>
-            client.WriteProjectionAsync(projection));
+            client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken));
         Assert.DoesNotContain("loopback-secret", exception.ToString(), StringComparison.Ordinal);
         Assert.Equal(0, simulator.TokenCalls);
         Assert.Equal(0, simulator.PutCalls);
@@ -479,7 +522,7 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
             ownsHttpClient: true);
 
         await Assert.ThrowsAsync<GBrainProtocolException>(() =>
-            client.WriteProjectionAsync(projection));
+            client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken));
         Assert.Equal(0, simulator.PutCalls);
     }
 
@@ -496,7 +539,7 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
         using var client = CreateClient(simulator, scope);
 
         await Assert.ThrowsAsync<GBrainProtocolException>(() =>
-            client.WriteProjectionAsync(projection));
+            client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken));
         Assert.Equal(0, simulator.PutCalls);
     }
 
@@ -522,7 +565,7 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
             ownsHttpClient: true);
 
         await Assert.ThrowsAsync<GBrainAuthorizationException>(() =>
-            client.WriteProjectionAsync(projection));
+            client.WriteProjectionAsync(projection, TestContext.Current.CancellationToken));
         Assert.Equal(0, simulator.RequestCount);
     }
 
@@ -566,15 +609,16 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
             ownsHttpClient: true);
     }
 
-    private static GBrainSoulScope ScopeFor(GBrainProjectionV1 projection) =>
+    private static GBrainSoulScope ScopeFor(GBrainProjectionV2 projection) =>
         new(
             projection.SourceId,
             projection.SoulId,
             projection.DeviceBindingId,
-            projection.PlatformAccountId);
+            projection.PlatformAccountId,
+            projection.SourceBindingNonce);
 
     private static GBrainProjectionDeleteIntent CreateDeleteIntent(
-        GBrainProjectionV1 projection,
+        GBrainProjectionV2 projection,
         char idempotencyHex,
         DateTimeOffset occurredAt) =>
         new(
@@ -588,7 +632,8 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
             "idem_" + new string(idempotencyHex, 64),
             occurredAt,
             projection.ProjectionRevision,
-            projection.ProjectionChecksum);
+            projection.ProjectionChecksum,
+            projection.SourceBindingNonce);
 
     private static GBrainProjectionRebuildIntent CreateRebuildIntent(
         char idempotencyHex,
@@ -600,16 +645,21 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
             "idem_" + new string(idempotencyHex, 64),
             occurredAt);
 
-    private static GBrainProjectionV1 CreateProjection(
+    private static GBrainProjectionV2 CreateProjection(
         string soulId,
         char revisionHex,
         DateTimeOffset? occurredAt = null,
         char? idempotencyHex = null)
     {
-        var withoutChecksum = new GBrainProjectionV1(
-            GBrainProjectionV1.CurrentSchemaVersion,
-            GBrainProjectionV1.CurrentContractId,
-            GBrainProjectionV1.CurrentProducerModule,
+        var binding = GBrainSourceBindingV1.Create(
+            soulId,
+            GBrainSourceIdCandidates.Compute(soulId, FixtureNonce),
+            FixtureNonce,
+            BindingTime);
+        var withoutChecksum = new GBrainProjectionV2(
+            GBrainProjectionV2.CurrentSchemaVersion,
+            GBrainProjectionV2.CurrentContractId,
+            GBrainProjectionV2.CurrentProducerModule,
             soulId,
             "db_" + new string(soulId[5], 32),
             "pa_" + new string(soulId[5], 32),
@@ -617,16 +667,22 @@ public sealed class GBrainCompanyLoopbackIntegrationTests
             "idem_" + new string(idempotencyHex ?? revisionHex, 64),
             occurredAt ?? Now.AddMinutes(-1),
             "personal",
-            GBrainSourceIds.ForSoul(soulId),
+            binding.SourceId,
+            binding.Algorithm,
+            binding.Nonce,
+            binding.SoulHash,
+            binding.AllocatedAt,
+            binding.BindingRevision,
+            binding.BindingChecksum,
             new string(revisionHex, 64),
             new string('0', 64),
-            GBrainProjectionV1.RenderedNotWrittenStatus,
+            GBrainProjectionV2.RenderedNotWrittenStatus,
             0,
             Array.Empty<ProjectionEventV1>(),
             Array.Empty<ProjectionInterestV1>());
         var projection = withoutChecksum with
         {
-            ProjectionChecksum = GBrainProjectionCanonicalizer.ComputeSha256(withoutChecksum)
+            ProjectionChecksum = GBrainProjectionV2Canonicalizer.ComputeSha256(withoutChecksum)
         };
         projection.Validate();
         return projection;

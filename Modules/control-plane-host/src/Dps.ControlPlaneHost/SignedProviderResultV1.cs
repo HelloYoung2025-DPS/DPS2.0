@@ -117,7 +117,7 @@ internal static class ProviderResultAuthorization
                 "platform.account.authorized/v1" => ValidatePlatformAccount(fields, schemaVersion),
                 "identity.binding/v1" => ValidateBinding(fields, schemaVersion),
                 "persona.revision/v1" => ValidatePersona(fields, occurredAt),
-                "soul.memory.readback/v1" => ValidateGBrainReadback(fields, soulId),
+                "soul.memory.readback/v1" => ValidateGBrainReadback(fields),
                 _ => throw new NotSupportedException("Unknown provider contract.")
             };
             var payloadSha256 = Sha256(payload);
@@ -385,8 +385,7 @@ internal static class ProviderResultAuthorization
     }
 
     private static string ValidateGBrainReadback(
-        IReadOnlyDictionary<string, JsonElement> fields,
-        string soulId)
+        IReadOnlyDictionary<string, JsonElement> fields)
     {
         RequireExactKeys(fields,
         [
@@ -402,14 +401,16 @@ internal static class ProviderResultAuthorization
                 "SoulMemory readback occurred_at must use its canonical Zulu wire.");
         }
         ControlContractValidation.RequireExact(String(fields, "privacy_class"), "personal", "privacy_class");
-        ControlContractValidation.RequireExact(
-            String(fields, "source_id"),
-            "dps-" + soulId.AsSpan("soul_".Length, 28).ToString(),
-            "source_id");
-        ControlContractValidation.RequireMajor(String(fields, "projection_schema_version"), 1);
+        // gbrain.projection/v2 derives source_id from (soul, nonce) with a domain-
+        // separated SHA-256; the nonce never reaches this receipt, so the truncated-soul
+        // re-derivation is gone. This layer enforces canonical format only; the binding
+        // proof lives in GBrainProjectionV2.Validate() upstream, and Soul isolation here
+        // remains keyed on the full soul_id scope.
+        ControlContractValidation.RequireHex(String(fields, "source_id"), "dps-", 28, "source_id");
+        ControlContractValidation.RequireMajor(String(fields, "projection_schema_version"), 2);
         ControlContractValidation.RequireExact(
             String(fields, "projection_contract_id"),
-            "gbrain.projection/v1",
+            "gbrain.projection/v2",
             "projection_contract_id");
         ControlContractValidation.RequireSha256(String(fields, "projection_revision"), "projection_revision");
         var projectionChecksum = String(fields, "projection_checksum");

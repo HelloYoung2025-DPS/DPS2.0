@@ -49,14 +49,20 @@ public sealed record SoulMemoryReadbackV1(
         SoulMemoryContractValidation.RequireIdempotencyKey(IdempotencyKey, nameof(IdempotencyKey));
         SoulMemoryContractValidation.RequireUtc(OccurredAt, nameof(OccurredAt));
         SoulMemoryContractValidation.RequireExact(PrivacyClass, "personal", nameof(PrivacyClass));
-        SoulMemoryContractValidation.RequireExact(
-            SourceId,
-            GBrainSourceIds.ForSoul(SoulId),
-            nameof(SourceId));
-        SoulMemoryContractValidation.RequireMajor(ProjectionSchemaVersion, 1);
+        // gbrain.projection/v2 derives source_id from (soul, nonce) via domain-separated
+        // SHA-256; the nonce never travels on this receipt, so no consumer can re-derive
+        // the binding locally. This layer therefore enforces canonical format only; the
+        // authoritative SourceId<->(SoulHash,Nonce) binding proof is GBrainProjectionV2
+        // .Validate() on the projection itself, and prepared/readback consistency is the
+        // adapter's exact field-by-field comparison.
+        SoulMemoryContractValidation.RequireSourceId(SourceId, nameof(SourceId));
+        // soul.memory.readback/v1 deliberately keeps its own major and exact 17-field
+        // wire shape across the gbrain.projection v1->v2 migration; only the expected
+        // values of the embedded projection metadata below moved to the v2 contract.
+        SoulMemoryContractValidation.RequireMajor(ProjectionSchemaVersion, 2);
         SoulMemoryContractValidation.RequireExact(
             ProjectionContractId,
-            GBrainProjectionV1.CurrentContractId,
+            GBrainProjectionV2.CurrentContractId,
             nameof(ProjectionContractId));
         SoulMemoryContractValidation.RequireSha256(ProjectionRevision, nameof(ProjectionRevision));
         SoulMemoryContractValidation.RequireSha256(ProjectionChecksum, nameof(ProjectionChecksum));
@@ -207,6 +213,17 @@ public static class SoulMemoryContractValidation
     public static void RequireSha256(string value, string name)
     {
         RequireHex(value, string.Empty, 64, name);
+    }
+
+    /// <summary>
+    /// Canonical GBrain Source identifier format: "dps-" + 28 lowercase hex characters
+    /// (32 total, matching GBrainSourceBindingV1.SourceIdLength). Format-only by design:
+    /// the v2 derivation needs the binding nonce, so the cryptographic binding proof
+    /// lives in GBrainProjectionV2.Validate(), not here.
+    /// </summary>
+    public static void RequireSourceId(string value, string name)
+    {
+        RequireHex(value, "dps-", 28, name);
     }
 
     private static void RequireHex(string value, string prefix, int length, string name)
