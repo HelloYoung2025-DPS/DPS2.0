@@ -278,6 +278,84 @@ public sealed class SoulMemoryAdapterTests
 
     [Fact]
     [Trait("Category", "Contract")]
+    public void LegacyMajor1IntentRecordsAreQuarantinedByContractMajorNotMisdiagnosed()
+    {
+        // A faithful major-1 delete record: v1 had no nonce field (so it replays as 0)
+        // and derived the Source identifier by truncating the Soul. The v2 contract must
+        // refuse it by name at RequireMajor. Refusing it later, at the nonce-witness
+        // recomputation, would report an ArgumentException about a mismatched SourceId
+        // and hide the real cause, which is that the record is a different major.
+        var legacyDelete = new GBrainProjectionDeleteIntent(
+            LegacyIntentSchemaVersion,
+            LegacyDeleteIntentContractId,
+            GBrainSourceIds.ForSoul(SoulA),
+            SoulA,
+            "db_" + new string(SoulA[5], 32),
+            "pa_" + new string(SoulA[5], 32),
+            "trace_88888888888888888888888888888888",
+            CanonicalIdempotency("legacy-delete-intent"),
+            ProjectionTime.AddMinutes(1),
+            new string('c', 64),
+            new string('d', 64),
+            LegacyIntentSourceBindingNonce);
+        var deleteFailure = Assert.Throws<NotSupportedException>(legacyDelete.Validate);
+        Assert.Contains(LegacyIntentSchemaVersion, deleteFailure.Message, StringComparison.Ordinal);
+        Assert.Contains("Expected major 2", deleteFailure.Message, StringComparison.Ordinal);
+
+        var legacyMutation = LegacyMutationIntent();
+        var mutationFailure = Assert.Throws<NotSupportedException>(legacyMutation.Validate);
+        Assert.Contains(LegacyIntentSchemaVersion, mutationFailure.Message, StringComparison.Ordinal);
+        Assert.Contains("Expected major 2", mutationFailure.Message, StringComparison.Ordinal);
+
+        // Relabelling one half of the pair does not smuggle a legacy record through:
+        // a v1 major keeps failing on the major, and a v2 major on a v1 contract id
+        // fails on the contract id by name.
+        var majorOnlyRelabel = Assert.Throws<NotSupportedException>(
+            (legacyDelete with { ContractId = GBrainProjectionDeleteIntent.CurrentContractId }).Validate);
+        Assert.Contains("Expected major 2", majorOnlyRelabel.Message, StringComparison.Ordinal);
+        var contractOnlyRelabel = Assert.Throws<NotSupportedException>(
+            (legacyDelete with { SchemaVersion = GBrainProjectionDeleteIntent.CurrentSchemaVersion }).Validate);
+        Assert.Contains(LegacyDeleteIntentContractId, contractOnlyRelabel.Message, StringComparison.Ordinal);
+        Assert.Contains(GBrainProjectionDeleteIntent.CurrentContractId, contractOnlyRelabel.Message, StringComparison.Ordinal);
+
+        // The rebuild envelope carries no Source, Soul, or nonce, so it was not part of
+        // the break and still validates as major 1.
+        new GBrainProjectionRebuildIntent(
+            GBrainProjectionRebuildIntent.CurrentSchemaVersion,
+            GBrainProjectionRebuildIntent.CurrentContractId,
+            "trace_88888888888888888888888888888888",
+            CanonicalIdempotency("legacy-rebuild-intent"),
+            ProjectionTime.AddMinutes(1)).Validate();
+        Assert.Equal("gbrain.projection.rebuild-intent/v1", GBrainProjectionRebuildIntent.CurrentContractId);
+    }
+
+    [Fact]
+    [Trait("Category", "Contract")]
+    public async Task JournalReplayOfALegacyMajor1MutationRecordFailsClosed()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var journal = new FixedGBrainProjectionMutationJournal();
+        const string fence = "fence_11111111111111111111111111111111";
+
+        // ReserveOrReadAsync is the journal's replay/reconcile entry point. A stored
+        // major-1 tuple replayed through it must be refused before it can reserve,
+        // reconcile, or resolve anything.
+        var failure = await Assert.ThrowsAsync<NotSupportedException>(() =>
+            journal.ReserveOrReadAsync(LegacyMutationIntent(), fence, cancellationToken).AsTask());
+        Assert.Contains("Expected major 2", failure.Message, StringComparison.Ordinal);
+
+        // Fail-closed means refused at the door: the rejected record left no unresolved
+        // reservation behind, so the Soul is not silently quarantined by a replay the
+        // journal never accepted.
+        var current = GBrainProjectionMutationIntent.FromProjection(
+            CreateProjection(SoulA, "journal-replay-current", 'c'));
+        var reservation = await journal.ReserveOrReadAsync(current, fence, cancellationToken);
+        Assert.True(reservation.Created);
+        Assert.Equal(GBrainProjectionMutationReservation.ReservedStatus, reservation.Status);
+    }
+
+    [Fact]
+    [Trait("Category", "Contract")]
     public void PinnedGBrainCapabilityFixtureMatchesTheRuntimeFailClosedProfile()
     {
         var resourceName = typeof(SoulMemoryAdapterTests).Assembly
@@ -395,6 +473,30 @@ public sealed class SoulMemoryAdapterTests
         projection.Validate();
         return projection;
     }
+
+    // The exact wire shape a durable major-1 record replays as: v1 carried no nonce
+    // field, so deserialization yields 0, and its Source identifier was the truncated
+    // Soul derivation rather than a nonce-witnessed candidate.
+    private const string LegacyIntentSchemaVersion = "1.1";
+    private const string LegacyDeleteIntentContractId = "gbrain.projection.delete-intent/v1";
+    private const string LegacyMutationIntentContractId = "gbrain.projection.mutation-intent/v1";
+    private const long LegacyIntentSourceBindingNonce = 0;
+
+    private static GBrainProjectionMutationIntent LegacyMutationIntent() =>
+        new(
+            LegacyIntentSchemaVersion,
+            LegacyMutationIntentContractId,
+            GBrainProjectionMutationOperation.SoftDelete,
+            GBrainSourceIds.ForSoul(SoulA),
+            SoulA,
+            "db_" + new string(SoulA[5], 32),
+            "pa_" + new string(SoulA[5], 32),
+            "trace_88888888888888888888888888888888",
+            CanonicalIdempotency("legacy-mutation-intent"),
+            ProjectionTime.AddMinutes(1),
+            new string('c', 64),
+            new string('d', 64),
+            LegacyIntentSourceBindingNonce);
 
     private static string CanonicalIdempotency(string discriminator) =>
         "idem_" + Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(

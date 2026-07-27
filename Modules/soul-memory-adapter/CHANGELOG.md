@@ -3,6 +3,7 @@
 ## Unreleased - 2026-07-27
 
 - Migrated the consumed projection contract: as of this batch the adapter consumes `gbrain.projection/v2` (nonce-witnessed Source binding). Earlier entries below describe the `gbrain.projection/v1` consumption that was current at their dates and are unchanged.
+- 2026-07-27: Breaking. As of this batch `gbrain.projection.delete-intent` and `gbrain.projection.mutation-intent` are major 2 (`2.0`, `.../v2`). The required Source-binding nonce witness makes every major-1 record invalid, so major 1 is refused by name instead of being accepted and then misdiagnosed as a Source mismatch; the durable mutation journal fails closed on replay of a major-1 record. No migration or dual-accept path is provided because there is nothing to migrate: all 23 `module.yaml` manifests in this repository declare `releaseEligible: false`, and `IGBrainProjectionMutationJournal` — the only durable home for these records — has no implementation outside the test assembly, so no major-1 record was ever persisted. `gbrain.projection.rebuild-intent/v1` is unchanged — it carries no Source, Soul, or nonce. This entry claims no historical v2 consumption; v2 begins with this batch.
 
 ## 0.2.0 - 2026-07-15 (proposed)
 

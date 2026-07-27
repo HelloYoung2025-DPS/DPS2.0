@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json;
+using Dps.GBrainProjector;
 using Dps.GBrainProjector.Contracts;
 using Dps.InterestReducer;
 using Dps.InterestReducer.Contracts;
@@ -329,6 +330,70 @@ public sealed class SoulMemoryAdapterPostgresIntegrationTests
         Assert.Equal(1, await database.CountProjectionsAsync(soul.SoulId, cancellationToken));
     }
 
+    /// <summary>
+    /// Executes the producer-backed offline fixture without PostgreSQL, so the Source
+    /// binding allocation and collision-retry behaviour the adapter depends on is
+    /// actually run and asserted rather than only reached from the ledger-gated
+    /// integration tests.
+    /// </summary>
+    [Fact]
+    [Trait("Category", "Contract")]
+    public async Task ProducerBackedOfflineFixtureAllocatesAndRetriesSourceBindingNonces()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var soul = CreateSoul('a');
+        var memoryEvent = CreateEvent(
+            soul,
+            Guid.Parse("00000000-0000-0000-0000-00000000f7f7"),
+            "event-producer-backed",
+            'c',
+            "systems",
+            0.9m);
+        var snapshot = new DeterministicInterestReducer().Reduce(
+            new InterestReductionRequest(
+                soul.SoulId,
+                soul.DeviceBindingId,
+                soul.PlatformAccountId,
+                soul.TraceId,
+                CanonicalIdempotency("reduce-producer-backed"),
+                ProjectionTime,
+                [memoryEvent]),
+            new InterestReducerOptions(86_400m));
+
+        var atNonceZero = await RenderOfflineProjectionAsync(
+            [memoryEvent],
+            snapshot,
+            cancellationToken: cancellationToken);
+        // Pre-occupying the Soul's nonce-0 candidate forces the authority down the
+        // collision-retry branch, which the hand-built projection could not reach.
+        var afterCollision = await RenderOfflineProjectionAsync(
+            [memoryEvent],
+            snapshot,
+            [GBrainSourceIdCandidates.Compute(soul.SoulId, FixtureNonce)],
+            cancellationToken);
+
+        Assert.Equal(FixtureNonce, atNonceZero.SourceBindingNonce);
+        Assert.Equal(GBrainSourceIdCandidates.Compute(soul.SoulId, FixtureNonce), atNonceZero.SourceId);
+        Assert.Equal(FixtureNonce + 1, afterCollision.SourceBindingNonce);
+        Assert.Equal(GBrainSourceIdCandidates.Compute(soul.SoulId, FixtureNonce + 1), afterCollision.SourceId);
+        Assert.NotEqual(atNonceZero.SourceId, afterCollision.SourceId);
+
+        var replayed = await RenderOfflineProjectionAsync(
+            [memoryEvent],
+            snapshot,
+            cancellationToken: cancellationToken);
+        Assert.Equal(
+            GBrainProjectionV2Canonicalizer.Serialize(atNonceZero),
+            GBrainProjectionV2Canonicalizer.Serialize(replayed));
+
+        // The adapter must prepare a genuinely allocated non-zero-nonce Source; under
+        // the v1 truncated derivation this Source identifier did not exist at all.
+        var adapter = new DeterministicSoulMemoryAdapter();
+        var prepared = adapter.Prepare(afterCollision);
+        Assert.Equal(afterCollision.SourceId, prepared.SourceId);
+        Assert.Equal(SoulMemoryReadbackV1.PreparedStatus, prepared.Status);
+    }
+
     private static async Task<ProjectionFlowResult> ProjectPersistedSoulAsync(
         OfflineProjectionDatabase database,
         PostgresMemoryEventLedger ledger,
@@ -362,7 +427,10 @@ public sealed class SoulMemoryAdapterPostgresIntegrationTests
                 asOf,
                 persistedEvents),
             new InterestReducerOptions(86_400m));
-        var projection = RenderOfflineProjection(persistedEvents, snapshot);
+        var projection = await RenderOfflineProjectionAsync(
+            persistedEvents,
+            snapshot,
+            cancellationToken: cancellationToken);
         var adapter = new DeterministicSoulMemoryAdapter();
         var prepared = adapter.Prepare(projection);
         var writeDisposition = await database.StoreProjectionAsync(projection, cancellationToken);
@@ -390,108 +458,34 @@ public sealed class SoulMemoryAdapterPostgresIntegrationTests
     }
 
     /// <summary>
-    /// Deterministic offline v2 projection fixture. The producer's renderer is no
-    /// longer publicly constructible (its runtime demands a dedicated least-privilege
-    /// PostgreSQL role pair), so this fixture assembles the same event/interest
-    /// mapping from public contract APIs. Its correctness proof is the final
-    /// projection.Validate(), which recomputes the source-binding and checksum chain.
+    /// Producer-backed offline v2 projection fixture: the Source binding is really
+    /// allocated by <see cref="GBrainSourceBindingAuthority"/> (including collision
+    /// retry) and the projection is really rendered by
+    /// <see cref="GBrainProjectionRenderer"/>. Neither needs PostgreSQL — allocation is
+    /// in-process and Render is a pure function; only the durable PostgreSQL store
+    /// behind <c>GBrainProjectorPostgresRuntime</c> demands the least-privilege role
+    /// pair. A fresh authority per call over a fixed clock keeps a replay of identical
+    /// inputs byte-identical.
     /// </summary>
-    private static GBrainProjectionV2 RenderOfflineProjection(
+    /// <param name="reservedSourceIds">
+    /// Source candidates to pre-occupy, so a caller can force the allocator off nonce 0.
+    /// </param>
+    private static async Task<GBrainProjectionV2> RenderOfflineProjectionAsync(
         IReadOnlyList<MemoryEventV1> memoryEvents,
-        InterestSnapshotV1 snapshot)
+        InterestSnapshotV1 snapshot,
+        IReadOnlyCollection<string>? reservedSourceIds = null,
+        CancellationToken cancellationToken = default)
     {
-        snapshot.Validate();
-        var binding = GBrainSourceBindingV1.Create(
-            snapshot.SoulId,
-            GBrainSourceIdCandidates.Compute(snapshot.SoulId, FixtureNonce),
-            FixtureNonce,
-            BindingTime);
-        var uniqueEvents = new Dictionary<Guid, (MemoryEventV1 Event, string Hash)>();
-        foreach (var memoryEvent in memoryEvents)
-        {
-            memoryEvent.Validate();
-            var hash = MemoryEventCanonicalizer.ComputeSha256(memoryEvent);
-            if (uniqueEvents.TryGetValue(memoryEvent.EventId, out var existing))
-            {
-                Assert.Equal(existing.Hash, hash);
-                continue;
-            }
+        var authority = GBrainSourceBindingAuthority.CreateInMemory(
+            new FixtureTimeProvider(BindingTime),
+            reservedSourceIds);
+        var binding = await authority.ResolveAsync(snapshot.SoulId, cancellationToken);
+        return new GBrainProjectionRenderer(authority).Render(binding, memoryEvents, snapshot);
+    }
 
-            uniqueEvents.Add(memoryEvent.EventId, (memoryEvent, hash));
-        }
-
-        Assert.Equal(snapshot.SourceEventCount, uniqueEvents.Count);
-        var projectedEvents = uniqueEvents.Values
-            .Select(static item => new ProjectionEventV1(
-                item.Event.EventId,
-                item.Hash,
-                item.Event.Observation.ContentDigest.ToLowerInvariant(),
-                item.Event.OccurredAt))
-            .OrderBy(static item => item.OccurredAt)
-            .ThenBy(static item => item.EventId)
-            .ToArray();
-        var projectedInterests = snapshot.Interests
-            .Select(static item => new ProjectionInterestV1(
-                item.Topic,
-                item.OriginalConfidence,
-                item.DecayedConfidence,
-                item.HalfLifeSeconds,
-                item.AlgorithmVersion,
-                item.Evidence.Select(static evidence => new ProjectionInterestEvidenceV1(
-                        evidence.EventId,
-                        evidence.EventHash.ToLowerInvariant(),
-                        evidence.OccurredAt,
-                        evidence.OriginalConfidence,
-                        evidence.DecayedConfidence))
-                    .OrderBy(static evidence => evidence.OccurredAt)
-                    .ThenBy(static evidence => evidence.EventId)
-                    .ToArray()))
-            .OrderBy(static item => item.Topic, StringComparer.Ordinal)
-            .ToArray();
-        // Deterministic fixture revision derived from the binding proof and the exact
-        // input set, so a replay over identical inputs yields an identical projection.
-        var revision = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(
-            Encoding.UTF8.GetBytes(string.Join(
-                '\n',
-                binding.BindingRevision,
-                binding.BindingChecksum,
-                snapshot.SoulId,
-                snapshot.DeviceBindingId,
-                snapshot.PlatformAccountId,
-                InterestSnapshotCanonicalizer.ComputeSha256(snapshot),
-                string.Join(
-                    ',',
-                    projectedEvents.Select(static item => item.EventId + ":" + item.EventHash))))));
-        var withoutChecksum = new GBrainProjectionV2(
-            GBrainProjectionV2.CurrentSchemaVersion,
-            GBrainProjectionV2.CurrentContractId,
-            GBrainProjectionV2.CurrentProducerModule,
-            snapshot.SoulId,
-            snapshot.DeviceBindingId,
-            snapshot.PlatformAccountId,
-            snapshot.TraceId,
-            snapshot.IdempotencyKey,
-            snapshot.AsOf,
-            snapshot.PrivacyClass,
-            binding.SourceId,
-            binding.Algorithm,
-            binding.Nonce,
-            binding.SoulHash,
-            binding.AllocatedAt,
-            binding.BindingRevision,
-            binding.BindingChecksum,
-            revision,
-            new string('0', 64),
-            GBrainProjectionV2.RenderedNotWrittenStatus,
-            projectedEvents.Length,
-            projectedEvents,
-            projectedInterests);
-        var projection = withoutChecksum with
-        {
-            ProjectionChecksum = GBrainProjectionV2Canonicalizer.ComputeSha256(withoutChecksum)
-        };
-        projection.Validate();
-        return projection;
+    private sealed class FixtureTimeProvider(DateTimeOffset value) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => value;
     }
 
     private static GBrainReadbackObservation ObservationFrom(OfflineProjectionReadback readback)
