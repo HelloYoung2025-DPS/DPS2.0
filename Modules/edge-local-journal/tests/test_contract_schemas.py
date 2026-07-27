@@ -35,7 +35,7 @@ class EdgeJournalContractSchemaTests(unittest.TestCase):
                     instance.update(case["patch"])
                     errors = list(validator.iter_errors(instance))
                     self.assertEqual(case["expected"] == "FAIL", bool(errors))
-        self.assertEqual(48, total)
+        self.assertEqual(50, total)
 
     def test_receipt_sequence_preserves_raw_int64_boundaries(self) -> None:
         corpus = json.loads(

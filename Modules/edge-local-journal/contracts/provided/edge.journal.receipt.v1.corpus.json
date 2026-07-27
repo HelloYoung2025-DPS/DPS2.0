@@ -7,7 +7,7 @@
     "schema_version": "1.0",
     "contract_id": "edge.journal.receipt/v1",
     "producer_module": "edge-local-journal",
-    "request_producer_module": "windows-edge-supervisor",
+    "request_producer_module": "windows-edge-worker",
     "soul_id": "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "device_binding_id": "db_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "platform_account_id": "pa_cccccccccccccccccccccccccccccccc",
@@ -27,6 +27,7 @@
   },
   "cases": [
     {"id": "canonical-receipt", "expected": "PASS", "patch": {}},
+    {"id": "request-producer-supervisor-rejected", "expected": "FAIL", "patch": {"request_producer_module": "windows-edge-supervisor"}},
     {"id": "safe-ascii-command-and-entry-tokens", "expected": "PASS", "patch": {"command_id": "command:A-1_test.ok", "entry_id": "worker:idem_abc:EVENT-1"}},
     {"id": "command-id-terminal-newline", "expected": "FAIL", "patch": {"command_id": "command-1\n"}},
     {"id": "entry-id-terminal-newline", "expected": "FAIL", "patch": {"entry_id": "entry-1\n"}},

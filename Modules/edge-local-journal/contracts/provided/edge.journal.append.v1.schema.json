@@ -24,7 +24,7 @@
   "properties": {
     "schema_version": {"const": "1.0"},
     "contract_id": {"const": "edge.journal.append/v1"},
-    "producer_module": {"enum": ["windows-edge-supervisor", "windows-edge-worker"]},
+    "producer_module": {"enum": ["windows-edge-worker"]},
     "soul_id": {"type": "string", "pattern": "^soul_[a-f0-9]{64}$(?![\\s\\S])"},
     "device_binding_id": {"type": "string", "pattern": "^db_[a-f0-9]{32}$(?![\\s\\S])"},
     "platform_account_id": {"type": "string", "pattern": "^pa_[a-f0-9]{32}$(?![\\s\\S])"},

@@ -242,7 +242,7 @@
         "type": "contract",
         "required": true,
         "command": "python3.12 -m unittest discover -s Modules/windows-edge-worker/tests -p test_provider_contracts.py",
-        "environment": "repository-pinned Python 3.12.13 with locked jsonschema; exact 55-case Supervisor and Journal owner corpora, both drain auth profiles, final Journal checksum profile, and Executor-owned native.stop.proof/v1 bounded quarantine vectors with no local schema fork or runtime emission edge",
+        "environment": "repository-pinned Python 3.12.13 with locked jsonschema; exact 57-case Supervisor and Journal owner corpora, both drain auth profiles, final Journal checksum profile, and Executor-owned native.stop.proof/v1 bounded quarantine vectors with no local schema fork or runtime emission edge",
         "evidenceLevel": "CONTRACT_VERIFIED"
       },
       {

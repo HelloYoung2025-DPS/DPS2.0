@@ -39,6 +39,8 @@ public sealed class JournalTests
             () => store.AppendAsync(request with { EntryType = "AB" }, token));
         await Assert.ThrowsAsync<ArgumentException>(
             () => store.AppendAsync(request with { EntryType = "COMMAND_STATE\n" }, token));
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => store.AppendAsync(request with { ProducerModule = "windows-edge-supervisor" }, token));
         await Assert.ThrowsAsync<JsonException>(
             () => store.AppendAsync(Request("entry-duplicate-json", "{\"a\":1,\"a\":1}"), token));
 
@@ -76,7 +78,6 @@ public sealed class JournalTests
             request => request with { DeviceBindingId = "db_" + new string('b', 32) },
             request => request with { PlatformAccountId = "pa_" + new string('c', 32) },
             request => request with { IdempotencyKey = "idem_" + new string('d', 64) },
-            request => request with { ProducerModule = "windows-edge-worker" },
             _ => Request("entry-1", "{\"changed\":true}")
         ];
 
@@ -107,7 +108,7 @@ public sealed class JournalTests
         Assert.False(receipt.RootElement.GetProperty("additionalProperties").GetBoolean());
         Assert.Equal("edge.journal.append/v1", append.RootElement.GetProperty("properties").GetProperty("contract_id").GetProperty("const").GetString());
         Assert.Equal(
-            new[] { "windows-edge-supervisor", "windows-edge-worker" },
+            new[] { "windows-edge-worker" },
             append.RootElement.GetProperty("properties").GetProperty("producer_module").GetProperty("enum").EnumerateArray().Select(item => item.GetString()).ToArray());
         Assert.Equal("edge.journal.receipt/v1", receipt.RootElement.GetProperty("properties").GetProperty("contract_id").GetProperty("const").GetString());
         Assert.Equal("edge-local-journal", receipt.RootElement.GetProperty("properties").GetProperty("producer_module").GetProperty("const").GetString());
@@ -217,6 +218,89 @@ public sealed class JournalTests
     [Fact]
     [Trait("Category", "Integration")]
     [Trait("EvidenceKind", "SIMULATION")]
+    public async Task Committed_supervisor_records_stay_readable_while_new_supervisor_appends_are_rejected()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var directory = TestDirectory.Create();
+        var path = Path.Combine(directory, "journal.jsonl");
+        await using (var writer = await JournalStore.OpenAsync(path, token))
+        {
+            await writer.AppendAsync(Request("entry-1", "{\"state\":\"ACCEPTED\"}"), token);
+        }
+
+        var legacyPath = Path.Combine(directory, "legacy-supervisor.jsonl");
+        await File.WriteAllTextAsync(
+            legacyPath,
+            RewriteProducer(
+                (await File.ReadAllLinesAsync(path, token))[0],
+                "windows-edge-supervisor") + "\n",
+            token);
+
+        await using var recovered = await JournalStore.OpenAsync(legacyPath, token);
+        Assert.Equal(1, recovered.Count);
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => recovered.AppendAsync(
+                Request("entry-2", "{}") with { ProducerModule = "windows-edge-supervisor" },
+                token));
+        var receipt = await recovered.AppendAsync(Request("entry-2", "{}"), token);
+        Assert.Equal(2L, receipt.Sequence);
+    }
+
+    // Mirrors the durable record format of the writer so a committed line can be restated
+    // under the withdrawn Supervisor producer; both digests cover producer_module.
+    private static string RewriteProducer(string line, string producerModule)
+    {
+        var fields = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(line)!;
+        string Text(string name) => fields[name].GetString()!;
+        fields["producer_module"] = JsonSerializer.SerializeToElement(producerModule);
+
+        var identity = JournalChecksumEncoding.ComputeSha256(
+            "dps.edge-local-journal.identity-sha256/v1",
+            Text("schema_version"),
+            Text("contract_id"),
+            producerModule,
+            Text("command_id"),
+            Text("entry_id"),
+            Text("entry_type"),
+            Text("trace_id"),
+            Text("idempotency_key"),
+            Text("privacy_class"),
+            Text("soul_id"),
+            Text("device_binding_id"),
+            Text("platform_account_id"),
+            Text("occurred_at"),
+            Text("payload_sha256"),
+            Text("payload_json"));
+        fields["identity_sha256"] = JsonSerializer.SerializeToElement(identity);
+
+        fields["entry_checksum"] = JsonSerializer.SerializeToElement(
+            JournalChecksumEncoding.ComputeSha256(
+                "dps.edge-local-journal.entry-sha256/v1",
+                fields["sequence"].GetInt64().ToString(System.Globalization.CultureInfo.InvariantCulture),
+                Text("previous_checksum"),
+                Text("schema_version"),
+                Text("contract_id"),
+                producerModule,
+                Text("command_id"),
+                Text("entry_id"),
+                Text("entry_type"),
+                Text("trace_id"),
+                Text("idempotency_key"),
+                Text("privacy_class"),
+                Text("soul_id"),
+                Text("device_binding_id"),
+                Text("platform_account_id"),
+                Text("occurred_at"),
+                Text("payload_sha256"),
+                Text("checksum_encoding"),
+                identity));
+
+        return JsonSerializer.Serialize(fields);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    [Trait("EvidenceKind", "SIMULATION")]
     public async Task Conflicting_duplicate_persists_quarantine_across_restart_until_exact_digest_release()
     {
         var token = TestContext.Current.CancellationToken;
@@ -229,7 +313,7 @@ public sealed class JournalTests
             await store.AppendAsync(request, token);
             await Assert.ThrowsAsync<JournalConflictException>(
                 () => store.AppendAsync(
-                    request with { ProducerModule = "windows-edge-worker" },
+                    Request("entry-1", "{\"state\":\"TAMPERED\"}"),
                     token));
             var status = Assert.IsType<JournalQuarantineStatus>(
                 await store.GetQuarantineStatusAsync(token));
@@ -263,7 +347,7 @@ public sealed class JournalTests
         return new JournalAppendRequest(
             "1.0",
             "edge.journal.append/v1",
-            "windows-edge-supervisor",
+            "windows-edge-worker",
             "command-1",
             entryId,
             "COMMAND_STATE",

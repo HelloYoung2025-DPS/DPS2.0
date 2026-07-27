@@ -95,6 +95,7 @@ class WindowsEdgeWorkerProviderContractTests(unittest.TestCase):
             },
             journal / "edge.journal.append.v1.corpus.json": {
                 "canonical-append",
+                "producer-supervisor-rejected",
                 "safe-ascii-command-and-entry-tokens",
                 "command-id-terminal-newline",
                 "entry-id-terminal-newline",
@@ -109,6 +110,7 @@ class WindowsEdgeWorkerProviderContractTests(unittest.TestCase):
             },
             journal / "edge.journal.receipt.v1.corpus.json": {
                 "canonical-receipt",
+                "request-producer-supervisor-rejected",
                 "safe-ascii-command-and-entry-tokens",
                 "command-id-terminal-newline",
                 "entry-id-terminal-newline",

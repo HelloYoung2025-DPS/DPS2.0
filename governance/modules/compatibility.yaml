@@ -676,7 +676,6 @@
       "mode": "active",
       "ownerModule": "edge-local-journal",
       "schemaProducers": [
-        "windows-edge-supervisor",
         "windows-edge-worker"
       ],
       "candidateGreenEligible": true
@@ -691,7 +690,6 @@
       "mode": "active",
       "ownerModule": "edge-local-journal",
       "schemaProducers": [
-        "windows-edge-supervisor",
         "windows-edge-worker"
       ],
       "candidateGreenEligible": true
@@ -895,34 +893,6 @@
       "candidateGreenEligible": true
     },
     {
-      "moduleId": "evidence-service",
-      "declarationKind": "consumed",
-      "contractId": "gbrain.projection",
-      "major": 1,
-      "source": "Modules/gbrain-projector/contracts/provided/gbrain.projection.v1.schema.json",
-      "status": "proposed",
-      "mode": "active",
-      "ownerModule": "gbrain-projector",
-      "schemaProducers": [
-        "gbrain-projector"
-      ],
-      "candidateGreenEligible": true
-    },
-    {
-      "moduleId": "soul-memory-adapter",
-      "declarationKind": "consumed",
-      "contractId": "gbrain.projection",
-      "major": 1,
-      "source": "Modules/gbrain-projector/contracts/provided/gbrain.projection.v1.schema.json",
-      "status": "proposed",
-      "mode": "active",
-      "ownerModule": "gbrain-projector",
-      "schemaProducers": [
-        "gbrain-projector"
-      ],
-      "candidateGreenEligible": true
-    },
-    {
       "moduleId": "gbrain-projector",
       "declarationKind": "provided",
       "contractId": "gbrain.projection",
@@ -935,6 +905,34 @@
         "gbrain-projector"
       ],
       "candidateGreenEligible": false
+    },
+    {
+      "moduleId": "evidence-service",
+      "declarationKind": "consumed",
+      "contractId": "gbrain.projection",
+      "major": 2,
+      "source": "Modules/gbrain-projector/contracts/provided/gbrain.projection.v2.schema.json",
+      "status": "proposed",
+      "mode": "active",
+      "ownerModule": "gbrain-projector",
+      "schemaProducers": [
+        "gbrain-projector"
+      ],
+      "candidateGreenEligible": true
+    },
+    {
+      "moduleId": "soul-memory-adapter",
+      "declarationKind": "consumed",
+      "contractId": "gbrain.projection",
+      "major": 2,
+      "source": "Modules/gbrain-projector/contracts/provided/gbrain.projection.v2.schema.json",
+      "status": "proposed",
+      "mode": "active",
+      "ownerModule": "gbrain-projector",
+      "schemaProducers": [
+        "gbrain-projector"
+      ],
+      "candidateGreenEligible": true
     },
     {
       "moduleId": "gbrain-projector",
@@ -2141,35 +2139,6 @@
       "major": 1,
       "ownerModule": "edge-local-journal",
       "ownerMode": "active",
-      "producerModule": "windows-edge-supervisor",
-      "producerDeclarationKind": null,
-      "producerMode": null,
-      "transportSenderModule": "windows-edge-supervisor",
-      "transportSenderMode": null,
-      "transportSenderDeclarationKind": null,
-      "transportReceiverModule": "edge-local-journal",
-      "transportPreservesProducer": false,
-      "consumerModule": "edge-local-journal",
-      "consumerDeclarationKind": "provided",
-      "consumerMode": "active",
-      "producerResolution": "unresolved",
-      "communicationPairSha256": null,
-      "reciprocalResolved": false,
-      "direction": "current-producer-to-current-consumer",
-      "executionClass": "missing-declaration",
-      "readCompatible": false,
-      "runnable": false,
-      "deployable": false,
-      "independentDeployable": false,
-      "compatibilityGroupRequired": false,
-      "activeProducerConsumer": false,
-      "candidateGreenEligible": false
-    },
-    {
-      "contractId": "edge.journal.append",
-      "major": 1,
-      "ownerModule": "edge-local-journal",
-      "ownerMode": "active",
       "producerModule": "windows-edge-worker",
       "producerDeclarationKind": "consumed",
       "producerMode": "active",
@@ -2440,18 +2409,18 @@
       "transportReceiverModule": "evidence-service",
       "transportPreservesProducer": false,
       "consumerModule": "evidence-service",
-      "consumerDeclarationKind": "consumed",
-      "consumerMode": "active",
+      "consumerDeclarationKind": null,
+      "consumerMode": null,
       "producerResolution": "unresolved",
       "communicationPairSha256": null,
       "reciprocalResolved": false,
       "direction": "previous-producer-to-current-consumer",
-      "executionClass": "quarantine-only",
+      "executionClass": "missing-declaration",
       "readCompatible": false,
       "runnable": false,
       "deployable": false,
       "independentDeployable": false,
-      "compatibilityGroupRequired": false,
+      "compatibilityGroupRequired": true,
       "activeProducerConsumer": false,
       "candidateGreenEligible": false
     },
@@ -2469,18 +2438,18 @@
       "transportReceiverModule": "soul-memory-adapter",
       "transportPreservesProducer": false,
       "consumerModule": "soul-memory-adapter",
-      "consumerDeclarationKind": "consumed",
-      "consumerMode": "active",
+      "consumerDeclarationKind": null,
+      "consumerMode": null,
       "producerResolution": "unresolved",
       "communicationPairSha256": null,
       "reciprocalResolved": false,
       "direction": "previous-producer-to-current-consumer",
-      "executionClass": "quarantine-only",
+      "executionClass": "missing-declaration",
       "readCompatible": false,
       "runnable": false,
       "deployable": false,
       "independentDeployable": false,
-      "compatibilityGroupRequired": false,
+      "compatibilityGroupRequired": true,
       "activeProducerConsumer": false,
       "candidateGreenEligible": false
     },
@@ -2498,19 +2467,19 @@
       "transportReceiverModule": "evidence-service",
       "transportPreservesProducer": false,
       "consumerModule": "evidence-service",
-      "consumerDeclarationKind": null,
-      "consumerMode": null,
-      "producerResolution": "unresolved",
-      "communicationPairSha256": null,
-      "reciprocalResolved": false,
+      "consumerDeclarationKind": "consumed",
+      "consumerMode": "active",
+      "producerResolution": "schema-producer-is-transport-sender",
+      "communicationPairSha256": "4f6d0ad314ce5351a23b7dbcb49e988d4fa87e20a2e07487c9ea36d60666b9be",
+      "reciprocalResolved": true,
       "direction": "current-producer-to-current-consumer",
-      "executionClass": "missing-declaration",
+      "executionClass": "active-runtime",
       "readCompatible": false,
-      "runnable": false,
-      "deployable": false,
+      "runnable": true,
+      "deployable": true,
       "independentDeployable": false,
-      "compatibilityGroupRequired": false,
-      "activeProducerConsumer": false,
+      "compatibilityGroupRequired": true,
+      "activeProducerConsumer": true,
       "candidateGreenEligible": false
     },
     {
@@ -2527,19 +2496,19 @@
       "transportReceiverModule": "soul-memory-adapter",
       "transportPreservesProducer": false,
       "consumerModule": "soul-memory-adapter",
-      "consumerDeclarationKind": null,
-      "consumerMode": null,
-      "producerResolution": "unresolved",
-      "communicationPairSha256": null,
-      "reciprocalResolved": false,
+      "consumerDeclarationKind": "consumed",
+      "consumerMode": "active",
+      "producerResolution": "schema-producer-is-transport-sender",
+      "communicationPairSha256": "9ce68f8349589bc679668f03d742aaa77b1cb0a1d9ae9ea9286221960d53b3e3",
+      "reciprocalResolved": true,
       "direction": "current-producer-to-current-consumer",
-      "executionClass": "missing-declaration",
+      "executionClass": "active-runtime",
       "readCompatible": false,
-      "runnable": false,
-      "deployable": false,
+      "runnable": true,
+      "deployable": true,
       "independentDeployable": false,
-      "compatibilityGroupRequired": false,
-      "activeProducerConsumer": false,
+      "compatibilityGroupRequired": true,
+      "activeProducerConsumer": true,
       "candidateGreenEligible": false
     },
     {
@@ -3255,6 +3224,6 @@
     }
   ],
   "independentDeployable": false,
-  "compatibilityGroupRequired": false,
+  "compatibilityGroupRequired": true,
   "candidateGreenEligible": false
 }

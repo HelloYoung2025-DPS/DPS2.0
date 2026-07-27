@@ -182,7 +182,7 @@
         "type": "contract",
         "required": true,
         "command": "python3.12 -m unittest discover -s Modules/edge-local-journal/tests -p test_contract_schemas.py",
-        "environment": "repository-pinned Python 3.12.13 with locked jsonschema; provider-owned 48-case append/receipt/drain-attestation corpora, independent Worker-wire correlation, strict journal IDs, length-prefixed checksum profile, exact UTC and raw Int64 boundaries",
+        "environment": "repository-pinned Python 3.12.13 with locked jsonschema; provider-owned 50-case append/receipt/drain-attestation corpora, independent Worker-wire correlation, strict journal IDs, length-prefixed checksum profile, exact UTC and raw Int64 boundaries",
         "evidenceLevel": "CONTRACT_VERIFIED"
       },
       {

@@ -54,7 +54,7 @@ if (mode is "append" or "rebind-gate-append")
     await store.AppendAsync(new JournalAppendRequest(
         "1.0",
         "edge.journal.append/v1",
-        "windows-edge-supervisor",
+        "windows-edge-worker",
         "probe-command",
         "probe-entry-" + Guid.NewGuid().ToString("N"),
         "COMMAND_STATE",

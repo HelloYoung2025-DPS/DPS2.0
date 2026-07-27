@@ -131,18 +131,6 @@
         "idempotencyKey": "trace_id:idempotency_key",
         "authScope": "module:soul-registry",
         "failureMode": "fail-closed-and-record-evidence"
-      },
-      {
-        "peerModule": "executor-gateway",
-        "contractId": "command.receipt.signed",
-        "major": 1,
-        "direction": "inbound",
-        "transport": "receipt",
-        "timeoutMs": 5000,
-        "retryPolicy": "identical-signed-receipt-only",
-        "idempotencyKey": "command_id:receipt_id:event_id",
-        "authScope": "memory-event-ledger:verified-observation",
-        "failureMode": "unknown-failed-stale-revoked-or-unbound-receipt-fails-closed"
       }
     ],
     "outbound": [

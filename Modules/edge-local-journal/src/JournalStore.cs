@@ -595,9 +595,11 @@ public sealed partial class JournalStore :
 
     private void ValidateRecoveredLine(JournalLine line)
     {
+        // N/N-1 reader (AGENTS.md): committed records may carry the withdrawn Supervisor
+        // producer; only new appends are Worker-only.
         if (line.SchemaVersion != "1.0" ||
             line.ContractId != "edge.journal.append/v1" ||
-            line.ProducerModule is not ("windows-edge-supervisor" or "windows-edge-worker") ||
+            line.ProducerModule is not ("windows-edge-worker" or "windows-edge-supervisor") ||
             line.ChecksumEncoding != ChecksumEncoding)
         {
             throw new JournalCorruptionException("unknown journal schema or checksum encoding");
@@ -664,7 +666,7 @@ public sealed partial class JournalStore :
                 "O",
                 CultureInfo.InvariantCulture,
                 DateTimeStyles.None));
-        ValidateRequest(recoveredRequest);
+        ValidateRequest(recoveredRequest, retainedRecord: true);
         var identity = ComputeIdentityChecksum(recoveredRequest, canonical, payloadHash);
         if (identity != line.IdentitySha256)
         {
@@ -672,12 +674,15 @@ public sealed partial class JournalStore :
         }
     }
 
-    private static void ValidateRequest(JournalAppendRequest request)
+    private static void ValidateRequest(JournalAppendRequest request, bool retainedRecord = false)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var producerAccepted = retainedRecord
+            ? request.ProducerModule is "windows-edge-worker" or "windows-edge-supervisor"
+            : request.ProducerModule is "windows-edge-worker";
         if (request.SchemaVersion != "1.0" ||
             request.ContractId != "edge.journal.append/v1" ||
-            request.ProducerModule is not ("windows-edge-supervisor" or "windows-edge-worker"))
+            !producerAccepted)
         {
             throw new ArgumentException("unknown journal contract identity");
         }
