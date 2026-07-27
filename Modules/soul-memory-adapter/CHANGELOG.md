@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased - 2026-07-27
+
+- Migrated the consumed projection contract: as of this batch the adapter consumes `gbrain.projection/v2` (nonce-witnessed Source binding). Earlier entries below describe the `gbrain.projection/v1` consumption that was current at their dates and are unchanged.
+
 ## 0.2.0 - 2026-07-15 (proposed)
 
 - Added a strict GBrain Company HTTP/OAuth/MCP adapter with HTTPS-only production endpoints, exact issuer/resource/token authority, disabled redirects/proxies/cookies/decompression, bounded requests/responses/concurrency/timeouts, and no caller-selected URL or tool name.

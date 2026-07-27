@@ -10,7 +10,7 @@ applies_to: .
 
 ## Scope
 
-This module is the only domain-facing abstraction for SoulMemory projection preparation and exact GBrain Company read-back verification. It consumes the complete `gbrain.projection/v1` DTO and never derives a second Source identifier, projection revision, or projection checksum. It owns the fixed OAuth/MCP adapter and exact page-validation rules, but it owns no GBrain data, credential store, Persona truth, identity binding truth, planner decision, or device action.
+This module is the only domain-facing abstraction for SoulMemory projection preparation and exact GBrain Company read-back verification. It consumes the complete `gbrain.projection/v2` DTO and never derives a second Source identifier, projection revision, or projection checksum. It owns the fixed OAuth/MCP adapter and exact page-validation rules, but it owns no GBrain data, credential store, Persona truth, identity binding truth, planner decision, or device action.
 
 ## Required reading
 
@@ -32,7 +32,7 @@ Before writing, read the root rules, this file, `module.yaml`, all provided and 
 
 ## Communication and boundaries
 
-Consume `gbrain.projection/v1`; provide `soul.memory.readback/v1`. The projection contract is the single Source binding and projection truth. OAuth protected-resource and authorization-server discovery, token audience, MCP protocol version, session, capability schemas, tool results, Source binding, and page provenance are untrusted and must be checked exactly. Unknown majors, tools, actions, scopes, endpoints, versions, capability shapes, or mismatched read-back fail closed.
+Consume `gbrain.projection/v2`; provide `soul.memory.readback/v1`. The projection contract is the single Source binding and projection truth. OAuth protected-resource and authorization-server discovery, token audience, MCP protocol version, session, capability schemas, tool results, Source binding, and page provenance are untrusted and must be checked exactly. Unknown majors, tools, actions, scopes, endpoints, versions, capability shapes, or mismatched read-back fail closed.
 
 The only remotely callable operations are the module's fixed `get_page`, `put_page`, `search`, `delete_page`, `restore_page`, and `whoami` flows. Callers may select a domain operation and bounded query, not an MCP operation name, URL, slug, credential, or raw protocol payload.
 

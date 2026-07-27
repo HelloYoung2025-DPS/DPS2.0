@@ -82,8 +82,8 @@
       },
       {
         "contractId": "gbrain.projection",
-        "major": 1,
-        "source": "Modules/gbrain-projector/contracts/provided/gbrain.projection.v1.schema.json",
+        "major": 2,
+        "source": "Modules/gbrain-projector/contracts/provided/gbrain.projection.v2.schema.json",
         "status": "proposed",
         "mode": "active",
         "ownerModule": "gbrain-projector"
@@ -131,7 +131,7 @@
       {
         "peerModule": "gbrain-projector",
         "contractId": "gbrain.projection",
-        "major": 1,
+        "major": 2,
         "direction": "inbound",
         "transport": "receipt",
         "timeoutMs": 5000,
@@ -283,7 +283,7 @@
         1
       ],
       "gbrain.projection": [
-        1
+        2
       ]
     },
     "unknownMajorBehavior": "reject",

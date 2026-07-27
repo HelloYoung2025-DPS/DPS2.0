@@ -260,17 +260,32 @@ public sealed record GBrainSoulScope(
     string SourceId,
     string SoulId,
     string DeviceBindingId,
-    string PlatformAccountId)
+    string PlatformAccountId,
+    long SourceBindingNonce)
 {
     public void Validate()
     {
         SoulMemoryContractValidation.RequireSoulId(SoulId, nameof(SoulId));
         SoulMemoryContractValidation.RequireDeviceBindingId(DeviceBindingId, nameof(DeviceBindingId));
         SoulMemoryContractValidation.RequirePlatformAccountId(PlatformAccountId, nameof(PlatformAccountId));
-        SoulMemoryContractValidation.RequireExact(
-            SourceId,
-            Dps.GBrainProjector.Contracts.GBrainSourceIds.ForSoul(SoulId),
-            nameof(SourceId));
+        // The scope carries its own binding witness: what was the single-candidate v1
+        // derivation becomes, under v2, a nonce-witnessed candidate derivation whose
+        // pairing proof is recomputed locally (Compute also enforces the fixed nonce
+        // window and the canonical source_id format). To bind a Soul to a Source
+        // identifier that is not its own, an attacker would need a nonce in
+        // [0, MaximumNonce] whose domain-separated SHA-256 candidate collides with the
+        // foreign identifier, which is computationally infeasible. This restores the
+        // v1 property that the (soul, source) pair is locally provable; allocation
+        // freshness (which nonce is durably allocated to the Soul) remains the durable
+        // authority's concern via GBrainProjectionV2.Validate() and the provisioned
+        // binding page.
+        var expectedSourceId = GBrainSourceIdCandidates.Compute(SoulId, SourceBindingNonce);
+        if (!string.Equals(SourceId, expectedSourceId, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "SourceId is not the Soul's nonce-witnessed source binding candidate.",
+                nameof(SourceId));
+        }
     }
 }
 
@@ -316,16 +331,21 @@ public sealed record GBrainProjectionDeleteIntent(
     string IdempotencyKey,
     DateTimeOffset OccurredAt,
     string ExpectedProjectionRevision,
-    string ExpectedProjectionChecksum)
+    string ExpectedProjectionChecksum,
+    long SourceBindingNonce)
 {
-    public const string CurrentSchemaVersion = "1.0";
+    // 1.1 (additive minor): the intent now carries the source-binding nonce witness so
+    // its (soul, source, nonce) triple is locally provable; RequireMajor(…, 1) keeps
+    // major-1 compatibility.
+    public const string CurrentSchemaVersion = "1.1";
     public const string CurrentContractId = "gbrain.projection.delete-intent/v1";
 
     public void Validate()
     {
         SoulMemoryContractValidation.RequireMajor(SchemaVersion, 1);
         SoulMemoryContractValidation.RequireExact(ContractId, CurrentContractId, nameof(ContractId));
-        new GBrainSoulScope(SourceId, SoulId, DeviceBindingId, PlatformAccountId).Validate();
+        new GBrainSoulScope(SourceId, SoulId, DeviceBindingId, PlatformAccountId, SourceBindingNonce)
+            .Validate();
         SoulMemoryContractValidation.RequireTraceId(TraceId, nameof(TraceId));
         SoulMemoryContractValidation.RequireIdempotencyKey(IdempotencyKey, nameof(IdempotencyKey));
         SoulMemoryContractValidation.RequireUtc(OccurredAt, nameof(OccurredAt));
@@ -352,7 +372,8 @@ public sealed record GBrainProjectionDeleteIntent(
             IdempotencyKey,
             OccurredAt,
             ExpectedProjectionRevision,
-            ExpectedProjectionChecksum);
+            ExpectedProjectionChecksum,
+            SourceBindingNonce);
     }
 }
 
@@ -398,12 +419,16 @@ public sealed record GBrainProjectionMutationIntent(
     string IdempotencyKey,
     DateTimeOffset OccurredAt,
     string ExpectedProjectionRevision,
-    string ExpectedProjectionChecksum)
+    string ExpectedProjectionChecksum,
+    long SourceBindingNonce)
 {
-    public const string CurrentSchemaVersion = "1.0";
+    // 1.1 (additive minor): the journaled tuple now pins the source-binding nonce
+    // witness alongside the Source identifier; RequireMajor(…, 1) keeps major-1
+    // compatibility.
+    public const string CurrentSchemaVersion = "1.1";
     public const string CurrentContractId = "gbrain.projection.mutation-intent/v1";
 
-    public static GBrainProjectionMutationIntent FromProjection(GBrainProjectionV1 projection)
+    public static GBrainProjectionMutationIntent FromProjection(GBrainProjectionV2 projection)
     {
         ArgumentNullException.ThrowIfNull(projection);
         projection.Validate();
@@ -419,11 +444,12 @@ public sealed record GBrainProjectionMutationIntent(
             projection.IdempotencyKey,
             projection.OccurredAt,
             projection.ProjectionRevision,
-            projection.ProjectionChecksum);
+            projection.ProjectionChecksum,
+            projection.SourceBindingNonce);
     }
 
     public static GBrainProjectionMutationIntent FromRebuild(
-        GBrainProjectionV1 projection,
+        GBrainProjectionV2 projection,
         GBrainProjectionRebuildIntent rebuild)
     {
         ArgumentNullException.ThrowIfNull(projection);
@@ -442,7 +468,8 @@ public sealed record GBrainProjectionMutationIntent(
             rebuild.IdempotencyKey,
             rebuild.OccurredAt,
             projection.ProjectionRevision,
-            projection.ProjectionChecksum);
+            projection.ProjectionChecksum,
+            projection.SourceBindingNonce);
     }
 
     public void Validate()
@@ -451,7 +478,8 @@ public sealed record GBrainProjectionMutationIntent(
         SoulMemoryContractValidation.RequireExact(ContractId, CurrentContractId, nameof(ContractId));
         if (!GBrainProjectionMutationOperation.IsSupported(OperationKind))
             throw new NotSupportedException($"Unsupported GBrain projection mutation '{OperationKind}'.");
-        new GBrainSoulScope(SourceId, SoulId, DeviceBindingId, PlatformAccountId).Validate();
+        new GBrainSoulScope(SourceId, SoulId, DeviceBindingId, PlatformAccountId, SourceBindingNonce)
+            .Validate();
         SoulMemoryContractValidation.RequireTraceId(TraceId, nameof(TraceId));
         SoulMemoryContractValidation.RequireIdempotencyKey(IdempotencyKey, nameof(IdempotencyKey));
         SoulMemoryContractValidation.RequireUtc(OccurredAt, nameof(OccurredAt));
@@ -656,10 +684,13 @@ public sealed class GBrainOAuthClientCredentialLease : IDisposable
     private static void ValidateSourceAndSoul(string sourceId, string soulId)
     {
         SoulMemoryContractValidation.RequireSoulId(soulId, nameof(soulId));
-        SoulMemoryContractValidation.RequireExact(
-            sourceId,
-            Dps.GBrainProjector.Contracts.GBrainSourceIds.ForSoul(soulId),
-            nameof(sourceId));
+        // Format check only here: the credential pair does not carry the nonce, so the
+        // pairing proof arrives by equality transduction. ValidateFor requires exact
+        // SourceId/SoulId equality against a requested pair taken from a
+        // GBrainSoulScope that has already proven its (soul, nonce) -> source_id
+        // derivation in Validate(); byte equality with a proven pair carries that
+        // proof onto the lease.
+        SoulMemoryContractValidation.RequireSourceId(sourceId, nameof(sourceId));
     }
 }
 

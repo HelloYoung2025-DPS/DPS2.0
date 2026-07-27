@@ -449,12 +449,16 @@ public sealed class PostgresControlPlaneTruthStoreIntegrationTests
             database.WrapUntrustedJson(json),
             TestCancellation));
 
+        // gbrain.projection/v2: a well-formed foreign source_id is no longer locally
+        // refutable (the derivation nonce never reaches the receipt), so the fail-closed
+        // check here is the canonical-format gate; binding proof lives upstream in
+        // GBrainProjectionV2.Validate().
         var wrongSource = ReplaceExact(
             BuildPayloadJson(Spec(
                 "soul.memory.readback/v1",
                 idempotencyKey: IdempotencyFor("gbrain-wrong-source"))),
             "\"source_id\":\"dps-" + new string('a', 28) + "\"",
-            "\"source_id\":\"dps-" + new string('b', 28) + "\"");
+            "\"source_id\":\"dps-" + new string('B', 28) + "\"");
         await Assert.ThrowsAnyAsync<Exception>(() => database.Store.IngestAsync(
             database.WrapUntrustedJson(wrongSource),
             TestCancellation));
@@ -707,8 +711,8 @@ public sealed class PostgresControlPlaneTruthStoreIntegrationTests
                 values["privacy_class"] = "personal";
                 values["source_id"] =
                     "dps-" + payload.SoulId.AsSpan("soul_".Length, 28).ToString();
-                values["projection_schema_version"] = "1.0.0";
-                values["projection_contract_id"] = "gbrain.projection/v1";
+                values["projection_schema_version"] = "2.0.0";
+                values["projection_contract_id"] = "gbrain.projection/v2";
                 values["projection_revision"] = new string('6', 64);
                 values["projection_checksum"] = new string('c', 64);
                 values["readback_checksum"] = new string('c', 64);

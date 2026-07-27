@@ -75,6 +75,9 @@ internal sealed class GBrainLoopbackSimulator : HttpMessageHandler, IAsyncDispos
             GBrainCompanyPageCodec.RenderPersonaMarkdown(persona));
     }
 
+    /// <summary>Adversarial fixture hook: overwrite a page with attacker-shaped markdown.</summary>
+    internal void SeedRawPage(string slug, string markdown) => SeedMarkdown(slug, markdown);
+
     internal void MarkPageSoftDeleted(string slug)
     {
         lock (_gate)

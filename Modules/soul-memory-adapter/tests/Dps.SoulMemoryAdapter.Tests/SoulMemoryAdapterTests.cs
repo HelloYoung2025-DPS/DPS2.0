@@ -10,8 +10,10 @@ public sealed class SoulMemoryAdapterTests
 {
     private const string SoulA = "soul_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     private const string SoulB = "soul_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    private const long FixtureNonce = 0;
     private static readonly DateTimeOffset ProjectionTime =
         new(2026, 7, 14, 1, 2, 3, TimeSpan.Zero);
+    private static readonly DateTimeOffset BindingTime = ProjectionTime.AddMinutes(-5);
 
     [Fact]
     [Trait("Category", "Unit")]
@@ -93,24 +95,32 @@ public sealed class SoulMemoryAdapterTests
         AssertMismatch(adapter, prepared, exact with
         {
             SoulId = SoulB,
-            SourceId = GBrainSourceIds.ForSoul(SoulB)
+            SourceId = GBrainSourceIdCandidates.Compute(SoulB, FixtureNonce)
         }, "wrong-soul");
         AssertMismatch(adapter, prepared, exact with { DeviceBindingId = "db_other" }, "wrong-binding");
         AssertMismatch(adapter, prepared, exact with { PlatformAccountId = "pa_other" }, "wrong-account");
-        AssertMismatch(adapter, prepared, exact with { SourceId = GBrainSourceIds.ForSoul(SoulB) }, "wrong-source");
-        AssertMismatch(adapter, prepared, exact with { ProjectionSchemaVersion = "1.1.0" }, "wrong-schema");
-        AssertMismatch(adapter, prepared, exact with { ProjectionContractId = "gbrain.projection/v2" }, "wrong-contract");
+        AssertMismatch(
+            adapter,
+            prepared,
+            exact with { SourceId = GBrainSourceIdCandidates.Compute(SoulB, FixtureNonce) },
+            "wrong-source");
+        AssertMismatch(adapter, prepared, exact with { ProjectionSchemaVersion = "2.1.0" }, "wrong-schema");
+        AssertMismatch(adapter, prepared, exact with { ProjectionContractId = "gbrain.projection/v1" }, "wrong-contract");
         AssertMismatch(adapter, prepared, exact with { ProjectionRevision = new string('e', 64) }, "wrong-revision");
         AssertMismatch(adapter, prepared, exact with { ReadbackChecksum = new string('f', 64) }, "wrong-checksum");
     }
 
     [Fact]
     [Trait("Category", "Contract")]
-    public void TruncatedSourceCollisionStillRequiresTheExactFullSoulMetadata()
+    public void SharedPrefixSoulsDeriveDistinctSourcesAndReadbackRequiresTheExactFullSoul()
     {
         var left = "soul_" + new string('a', 28) + new string('b', 36);
         var right = "soul_" + new string('a', 28) + new string('c', 36);
-        Assert.Equal(GBrainSourceIds.ForSoul(left), GBrainSourceIds.ForSoul(right));
+        // The v2 derivation is a domain-separated SHA-256 over the full soul and nonce,
+        // so the v1 truncated-prefix source collision no longer exists.
+        Assert.NotEqual(
+            GBrainSourceIdCandidates.Compute(left, FixtureNonce),
+            GBrainSourceIdCandidates.Compute(right, FixtureNonce));
 
         var adapter = new DeterministicSoulMemoryAdapter();
         var prepared = adapter.Prepare(CreateProjection(left, "collision-left", 'c'));
@@ -130,7 +140,7 @@ public sealed class SoulMemoryAdapterTests
         using var document = JsonDocument.Parse(JsonSerializer.Serialize(value));
         var root = document.RootElement;
 
-        Assert.Equal(GBrainProjectionV1.CurrentContractId,
+        Assert.Equal(GBrainProjectionV2.CurrentContractId,
             root.GetProperty("projection_contract_id").GetString());
         Assert.Equal(value.ProjectionRevision,
             root.GetProperty("projection_revision").GetString());
@@ -142,7 +152,9 @@ public sealed class SoulMemoryAdapterTests
         Assert.False(root.TryGetProperty("schema_id", out _));
         Assert.Throws<NotSupportedException>(() =>
             (value with { SchemaVersion = "2.0.0" }).Validate());
-        Assert.Throws<NotSupportedException>(() =>
+        // The v2 source rule is a canonical-format gate (ArgumentException), because the
+        // (soul, nonce) derivation cannot be recomputed from this receipt alone.
+        Assert.Throws<ArgumentException>(() =>
             (value with { SourceId = "source_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }).Validate());
     }
 
@@ -184,7 +196,7 @@ public sealed class SoulMemoryAdapterTests
         Assert.Throws<NotSupportedException>(() =>
             new DeterministicSoulMemoryAdapter().Prepare(projection with
             {
-                SchemaVersion = "2.0.0"
+                SchemaVersion = "1.0.0"
             }));
         Assert.Throws<InvalidOperationException>(() =>
             new DeterministicSoulMemoryAdapter().Prepare(projection with
@@ -202,6 +214,66 @@ public sealed class SoulMemoryAdapterTests
                 string.Equals(parameter.Name, "operation", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(parameter.Name, "tool", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(parameter.Name, "url", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    [Fact]
+    [Trait("Category", "Contract")]
+    public void ScopeRejectsACanonicalButForeignSourcePairing()
+    {
+        // A canonical dps-* value that is not the supplied Soul's own nonce-derived
+        // candidate must never validate as that Soul's scope: this false
+        // (soul, source) pairing is the entry point for a forged binding page via
+        // CreateSourceBindingMarkdown/VerifySourceBinding, and the nonce witness
+        // closes it locally.
+        var scope = new GBrainSoulScope(
+            GBrainSourceIdCandidates.Compute(SoulB, FixtureNonce),
+            SoulA,
+            "db_" + new string('a', 32),
+            "pa_" + new string('a', 32),
+            FixtureNonce);
+
+        var forged = Assert.Throws<ArgumentException>(() => scope.Validate());
+        Assert.Equal("SourceId", forged.ParamName);
+
+        // A different in-window nonce cannot rescue the foreign pairing either.
+        Assert.Throws<ArgumentException>(() =>
+            (scope with { SourceBindingNonce = 7 }).Validate());
+
+        // The Soul's own witnessed candidate is the only accepted pairing.
+        (scope with { SourceId = GBrainSourceIdCandidates.Compute(SoulA, FixtureNonce) })
+            .Validate();
+    }
+
+    [Fact]
+    [Trait("Category", "Contract")]
+    public void DeleteIntentRejectsAnInconsistentSoulSourceNonceTriple()
+    {
+        var projection = CreateProjection(SoulA, "delete-triple", 'c');
+        var intent = new GBrainProjectionDeleteIntent(
+            GBrainProjectionDeleteIntent.CurrentSchemaVersion,
+            GBrainProjectionDeleteIntent.CurrentContractId,
+            projection.SourceId,
+            projection.SoulId,
+            projection.DeviceBindingId,
+            projection.PlatformAccountId,
+            "trace_88888888888888888888888888888888",
+            CanonicalIdempotency("delete-triple-intent"),
+            ProjectionTime.AddMinutes(1),
+            projection.ProjectionRevision,
+            projection.ProjectionChecksum,
+            projection.SourceBindingNonce);
+        intent.Validate();
+
+        // Same (soul, source) pair but a different claimed witness: the triple is not
+        // self-consistent and must fail before any lease, journal, or page use.
+        Assert.Throws<ArgumentException>(() =>
+            (intent with { SourceBindingNonce = FixtureNonce + 1 }).Validate());
+        // A nonce outside the fixed window fails the witness recomputation itself.
+        Assert.ThrowsAny<ArgumentException>(() =>
+            (intent with { SourceBindingNonce = GBrainSourceBindingV1.MaximumNonce + 1 }).Validate());
+        // A foreign source with the original witness is equally refused.
+        Assert.Throws<ArgumentException>(() =>
+            (intent with { SourceId = GBrainSourceIdCandidates.Compute(SoulB, FixtureNonce) }).Validate());
     }
 
     [Fact]
@@ -281,15 +353,20 @@ public sealed class SoulMemoryAdapterTests
             prepared.ProjectionChecksum);
     }
 
-    private static GBrainProjectionV1 CreateProjection(
+    private static GBrainProjectionV2 CreateProjection(
         string soulId,
         string idempotencyKey,
         char revisionHex)
     {
-        var withoutChecksum = new GBrainProjectionV1(
-            GBrainProjectionV1.CurrentSchemaVersion,
-            GBrainProjectionV1.CurrentContractId,
-            GBrainProjectionV1.CurrentProducerModule,
+        var binding = GBrainSourceBindingV1.Create(
+            soulId,
+            GBrainSourceIdCandidates.Compute(soulId, FixtureNonce),
+            FixtureNonce,
+            BindingTime);
+        var withoutChecksum = new GBrainProjectionV2(
+            GBrainProjectionV2.CurrentSchemaVersion,
+            GBrainProjectionV2.CurrentContractId,
+            GBrainProjectionV2.CurrentProducerModule,
             soulId,
             "db_" + new string(soulId[5], 32),
             "pa_" + new string(soulId[5], 32),
@@ -297,17 +374,23 @@ public sealed class SoulMemoryAdapterTests
             CanonicalIdempotency(idempotencyKey),
             ProjectionTime,
             "personal",
-            GBrainSourceIds.ForSoul(soulId),
+            binding.SourceId,
+            binding.Algorithm,
+            binding.Nonce,
+            binding.SoulHash,
+            binding.AllocatedAt,
+            binding.BindingRevision,
+            binding.BindingChecksum,
             new string(revisionHex, 64),
             new string('0', 64),
-            GBrainProjectionV1.RenderedNotWrittenStatus,
+            GBrainProjectionV2.RenderedNotWrittenStatus,
             0,
             Array.Empty<ProjectionEventV1>(),
             Array.Empty<ProjectionInterestV1>());
 
         var projection = withoutChecksum with
         {
-            ProjectionChecksum = GBrainProjectionCanonicalizer.ComputeSha256(withoutChecksum)
+            ProjectionChecksum = GBrainProjectionV2Canonicalizer.ComputeSha256(withoutChecksum)
         };
         projection.Validate();
         return projection;

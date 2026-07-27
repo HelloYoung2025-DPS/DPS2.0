@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using Dps.EvidenceService.Contracts;
-using Dps.GBrainProjector;
 using Dps.GBrainProjector.Contracts;
 using Dps.InterestReducer;
 using Dps.InterestReducer.Contracts;
@@ -15,6 +14,10 @@ namespace Dps.EvidenceService.Tests;
 
 public sealed class EvidenceVerticalSlicePostgresIntegrationTests
 {
+    private const long FixtureNonce = 0;
+    private static readonly DateTimeOffset FixtureBindingTime =
+        new(2026, 7, 14, 1, 55, 0, TimeSpan.Zero);
+
     [Fact]
     [Trait("Category", "Integration")]
     public async Task Real_postgres_18_4_proves_scoped_replayable_vertical_slice_and_signed_evidence()
@@ -130,11 +133,12 @@ public sealed class EvidenceVerticalSlicePostgresIntegrationTests
                 InterestSnapshotCanonicalizer.ComputeSha256(snapshotA),
                 InterestSnapshotCanonicalizer.ComputeSha256(replayedSnapshotA));
 
-            var renderer = new GBrainProjectionRenderer();
-            var projectionA = renderer.Render(GBrainSourceIds.ForSoul(soulA.SoulId), persistedA, snapshotA);
-            var replayedProjectionA = renderer.Render(GBrainSourceIds.ForSoul(soulA.SoulId), replayedA, replayedSnapshotA);
+            var projectionA = RenderProjectionFixture(persistedA, snapshotA);
+            var replayedProjectionA = RenderProjectionFixture(replayedA, replayedSnapshotA);
             Assert.Equal(projectionA.ProjectionChecksum, replayedProjectionA.ProjectionChecksum);
-            Assert.Equal(GBrainSourceIds.ForSoul(soulA.SoulId), projectionA.SourceId);
+            Assert.Equal(
+                GBrainSourceIdCandidates.Compute(soulA.SoulId, FixtureNonce),
+                projectionA.SourceId);
             Assert.DoesNotContain(projectionA.Events, item => item.EventId == eventB.EventId);
 
             var evidenceId = Guid.NewGuid();
@@ -252,6 +256,108 @@ public sealed class EvidenceVerticalSlicePostgresIntegrationTests
                 "idem_" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes("resolve:" + suffix))),
                 baseTime),
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Deterministic v2 projection fixture built from public contract APIs; the
+    /// producer's renderer now requires its own least-privilege PostgreSQL runtime.
+    /// The final projection.Validate() recomputes the source-binding and checksum
+    /// chain, which is the fixture's correctness proof.
+    /// </summary>
+    private static GBrainProjectionV2 RenderProjectionFixture(
+        IReadOnlyList<MemoryEventV1> memoryEvents,
+        InterestSnapshotV1 snapshot)
+    {
+        snapshot.Validate();
+        var binding = GBrainSourceBindingV1.Create(
+            snapshot.SoulId,
+            GBrainSourceIdCandidates.Compute(snapshot.SoulId, FixtureNonce),
+            FixtureNonce,
+            FixtureBindingTime);
+        var uniqueEvents = new Dictionary<Guid, (MemoryEventV1 Event, string Hash)>();
+        foreach (var memoryEvent in memoryEvents)
+        {
+            memoryEvent.Validate();
+            var hash = MemoryEventCanonicalizer.ComputeSha256(memoryEvent);
+            if (uniqueEvents.TryGetValue(memoryEvent.EventId, out var existing))
+            {
+                Assert.Equal(existing.Hash, hash);
+                continue;
+            }
+
+            uniqueEvents.Add(memoryEvent.EventId, (memoryEvent, hash));
+        }
+
+        Assert.Equal(snapshot.SourceEventCount, uniqueEvents.Count);
+        var projectedEvents = uniqueEvents.Values
+            .Select(static item => new ProjectionEventV1(
+                item.Event.EventId,
+                item.Hash,
+                item.Event.Observation.ContentDigest.ToLowerInvariant(),
+                item.Event.OccurredAt))
+            .OrderBy(static item => item.OccurredAt)
+            .ThenBy(static item => item.EventId)
+            .ToArray();
+        var projectedInterests = snapshot.Interests
+            .Select(static item => new ProjectionInterestV1(
+                item.Topic,
+                item.OriginalConfidence,
+                item.DecayedConfidence,
+                item.HalfLifeSeconds,
+                item.AlgorithmVersion,
+                item.Evidence.Select(static evidence => new ProjectionInterestEvidenceV1(
+                        evidence.EventId,
+                        evidence.EventHash.ToLowerInvariant(),
+                        evidence.OccurredAt,
+                        evidence.OriginalConfidence,
+                        evidence.DecayedConfidence))
+                    .OrderBy(static evidence => evidence.OccurredAt)
+                    .ThenBy(static evidence => evidence.EventId)
+                    .ToArray()))
+            .OrderBy(static item => item.Topic, StringComparer.Ordinal)
+            .ToArray();
+        var revision = Convert.ToHexStringLower(SHA256.HashData(
+            Encoding.UTF8.GetBytes(string.Join(
+                '\n',
+                binding.BindingRevision,
+                binding.BindingChecksum,
+                snapshot.SoulId,
+                snapshot.DeviceBindingId,
+                snapshot.PlatformAccountId,
+                InterestSnapshotCanonicalizer.ComputeSha256(snapshot),
+                string.Join(
+                    ',',
+                    projectedEvents.Select(static item => item.EventId + ":" + item.EventHash))))));
+        var withoutChecksum = new GBrainProjectionV2(
+            GBrainProjectionV2.CurrentSchemaVersion,
+            GBrainProjectionV2.CurrentContractId,
+            GBrainProjectionV2.CurrentProducerModule,
+            snapshot.SoulId,
+            snapshot.DeviceBindingId,
+            snapshot.PlatformAccountId,
+            snapshot.TraceId,
+            snapshot.IdempotencyKey,
+            snapshot.AsOf,
+            snapshot.PrivacyClass,
+            binding.SourceId,
+            binding.Algorithm,
+            binding.Nonce,
+            binding.SoulHash,
+            binding.AllocatedAt,
+            binding.BindingRevision,
+            binding.BindingChecksum,
+            revision,
+            new string('0', 64),
+            GBrainProjectionV2.RenderedNotWrittenStatus,
+            projectedEvents.Length,
+            projectedEvents,
+            projectedInterests);
+        var projection = withoutChecksum with
+        {
+            ProjectionChecksum = GBrainProjectionV2Canonicalizer.ComputeSha256(withoutChecksum)
+        };
+        projection.Validate();
+        return projection;
     }
 
     private static MemoryEventV1 CreateMemoryEvent(

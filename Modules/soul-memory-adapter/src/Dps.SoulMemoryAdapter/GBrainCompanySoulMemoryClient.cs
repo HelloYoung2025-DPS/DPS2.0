@@ -9,7 +9,7 @@ using Dps.SoulMemoryAdapter.Contracts;
 namespace Dps.SoulMemoryAdapter;
 
 public sealed record GBrainProjectionSearchResult(
-    GBrainProjectionV1 Projection,
+    GBrainProjectionV2 Projection,
     DateTimeOffset PageUpdatedAt,
     DateTimeOffset VerifiedAt);
 
@@ -20,6 +20,7 @@ public sealed record GBrainPersonaCurrentDocument(
     [property: JsonPropertyName("soul_id")] string SoulId,
     [property: JsonPropertyName("device_binding_id")] string DeviceBindingId,
     [property: JsonPropertyName("platform_account_id")] string PlatformAccountId,
+    [property: JsonPropertyName("source_binding_nonce")] long SourceBindingNonce,
     [property: JsonPropertyName("revision")] string Revision,
     [property: JsonPropertyName("payload_json")] string PayloadJson,
     [property: JsonPropertyName("payload_checksum")] string PayloadChecksum,
@@ -33,7 +34,12 @@ public sealed record GBrainPersonaCurrentDocument(
             ContractId,
             GBrainCompanyProtocolV1.PersonaCurrentContractId,
             nameof(ContractId));
-        var scope = new GBrainSoulScope(SourceId, SoulId, DeviceBindingId, PlatformAccountId);
+        var scope = new GBrainSoulScope(
+            SourceId,
+            SoulId,
+            DeviceBindingId,
+            PlatformAccountId,
+            SourceBindingNonce);
         scope.Validate();
         SoulMemoryContractValidation.RequireSha256(Revision, nameof(Revision));
         SoulMemoryContractValidation.RequireSha256(PayloadChecksum, nameof(PayloadChecksum));
@@ -149,7 +155,7 @@ public sealed class GBrainCompanySoulMemoryClient : IDisposable
     }
 
     public async Task<SoulMemoryReadbackV1> WriteProjectionAsync(
-        GBrainProjectionV1 projection,
+        GBrainProjectionV2 projection,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(projection);
@@ -211,7 +217,7 @@ public sealed class GBrainCompanySoulMemoryClient : IDisposable
     }
 
     public async Task<SoulMemoryReadbackV1> ReadProjectionExactAsync(
-        GBrainProjectionV1 expectedProjection,
+        GBrainProjectionV2 expectedProjection,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(expectedProjection);
@@ -325,7 +331,8 @@ public sealed class GBrainCompanySoulMemoryClient : IDisposable
             deleteIntent.SourceId,
             deleteIntent.SoulId,
             deleteIntent.DeviceBindingId,
-            deleteIntent.PlatformAccountId);
+            deleteIntent.PlatformAccountId,
+            deleteIntent.SourceBindingNonce);
         var mutationIntent = deleteIntent.ToMutationIntent();
         using var operation = await EnterOperationAsync(cancellationToken).ConfigureAwait(false);
         var operationToken = operation.Token;
@@ -447,7 +454,7 @@ public sealed class GBrainCompanySoulMemoryClient : IDisposable
     }
 
     public async Task<GBrainProjectionRebuildOutcome> RebuildProjectionAsync(
-        GBrainProjectionV1 projection,
+        GBrainProjectionV2 projection,
         GBrainProjectionRebuildIntent rebuildIntent,
         CancellationToken cancellationToken = default)
     {
@@ -666,7 +673,8 @@ public sealed class GBrainCompanySoulMemoryClient : IDisposable
             intent.SourceId,
             intent.SoulId,
             intent.DeviceBindingId,
-            intent.PlatformAccountId));
+            intent.PlatformAccountId,
+            intent.SourceBindingNonce));
         var reservation = await _mutationJournal.ReserveOrReadAsync(
             intent,
             lease.FenceToken,
@@ -778,7 +786,7 @@ public sealed class GBrainCompanySoulMemoryClient : IDisposable
     private async Task<SoulMemoryReadbackV1> PutAndVerifyAsync(
         GBrainMcpSession session,
         GBrainSoulScope scope,
-        GBrainProjectionV1 projection,
+        GBrainProjectionV2 projection,
         GBrainProjectionMutationReservation reservation,
         GBrainSoulMutationLease lease,
         bool alreadyDispatched,
@@ -834,7 +842,7 @@ public sealed class GBrainCompanySoulMemoryClient : IDisposable
         return VerifyReceipt(projection);
     }
 
-    private SoulMemoryReadbackV1 VerifyReceipt(GBrainProjectionV1 projection)
+    private SoulMemoryReadbackV1 VerifyReceipt(GBrainProjectionV2 projection)
     {
         var adapter = new DeterministicSoulMemoryAdapter();
         var prepared = adapter.Prepare(projection);
@@ -890,12 +898,13 @@ public sealed class GBrainCompanySoulMemoryClient : IDisposable
         }
     }
 
-    private static GBrainSoulScope ScopeFor(GBrainProjectionV1 projection) =>
+    private static GBrainSoulScope ScopeFor(GBrainProjectionV2 projection) =>
         new(
             projection.SourceId,
             projection.SoulId,
             projection.DeviceBindingId,
-            projection.PlatformAccountId);
+            projection.PlatformAccountId,
+            projection.SourceBindingNonce);
 
     private static CancellationTokenSource CreateMutationCancellation(
         CancellationToken operationToken,
@@ -907,7 +916,7 @@ public sealed class GBrainCompanySoulMemoryClient : IDisposable
 
     private static void EnsureDeleteTargetExact(
         GBrainProjectionDeleteIntent deleteIntent,
-        GBrainProjectionV1 current)
+        GBrainProjectionV2 current)
     {
         if (!string.Equals(
                 deleteIntent.ExpectedProjectionRevision,
@@ -942,12 +951,12 @@ public sealed class GBrainCompanySoulMemoryClient : IDisposable
             false);
 
     private static void EnsureProjectionExact(
-        GBrainProjectionV1 expected,
-        GBrainProjectionV1 actual)
+        GBrainProjectionV2 expected,
+        GBrainProjectionV2 actual)
     {
         if (!string.Equals(
-                GBrainProjectionCanonicalizer.Serialize(expected),
-                GBrainProjectionCanonicalizer.Serialize(actual),
+                GBrainProjectionV2Canonicalizer.Serialize(expected),
+                GBrainProjectionV2Canonicalizer.Serialize(actual),
                 StringComparison.Ordinal))
         {
             throw new GBrainReadbackMismatchException(
@@ -956,8 +965,8 @@ public sealed class GBrainCompanySoulMemoryClient : IDisposable
     }
 
     private static void EnsureForwardOnlyReplacement(
-        GBrainProjectionV1 current,
-        GBrainProjectionV1 candidate)
+        GBrainProjectionV2 current,
+        GBrainProjectionV2 candidate)
     {
         if (string.Equals(current.IdempotencyKey, candidate.IdempotencyKey, StringComparison.Ordinal))
             throw new InvalidOperationException(
@@ -1082,14 +1091,15 @@ internal static class GBrainCompanyPageCodec
             BindingProvenance) + body;
     }
 
-    internal static string RenderProjectionMarkdown(GBrainProjectionV1 projection)
+    internal static string RenderProjectionMarkdown(GBrainProjectionV2 projection)
     {
         projection.Validate();
         var scope = new GBrainSoulScope(
             projection.SourceId,
             projection.SoulId,
             projection.DeviceBindingId,
-            projection.PlatformAccountId);
+            projection.PlatformAccountId,
+            projection.SourceBindingNonce);
         return Frontmatter(
             "DPS Soul Projection",
             GBrainCompanyProtocolV1.ProjectionPageContractId,
@@ -1097,7 +1107,7 @@ internal static class GBrainCompanyPageCodec
             projection.ProjectionChecksum,
             GBrainCompanyProtocolV1.DpsProvenance,
             projection.ProjectionRevision) +
-            GBrainProjectionCanonicalizer.Serialize(projection);
+            GBrainProjectionV2Canonicalizer.Serialize(projection);
     }
 
     internal static string RenderPersonaMarkdown(GBrainPersonaCurrentDocument persona)
@@ -1107,7 +1117,8 @@ internal static class GBrainCompanyPageCodec
             persona.SourceId,
             persona.SoulId,
             persona.DeviceBindingId,
-            persona.PlatformAccountId);
+            persona.PlatformAccountId,
+            persona.SourceBindingNonce);
         return Frontmatter(
             "DPS Persona Current",
             GBrainCompanyProtocolV1.PersonaCurrentContractId,
@@ -1137,7 +1148,7 @@ internal static class GBrainCompanyPageCodec
             throw new GBrainAuthorizationException("GBrain Source binding page is not the exact provisioned binding.");
     }
 
-    internal static GBrainProjectionV1 ReadProjection(
+    internal static GBrainProjectionV2 ReadProjection(
         GBrainPage page,
         GBrainSoulScope scope,
         GBrainCompanyOptions options,
@@ -1151,10 +1162,10 @@ internal static class GBrainCompanyPageCodec
             options,
             timeProvider,
             notOlderThan);
-        GBrainProjectionV1 projection;
+        GBrainProjectionV2 projection;
         try
         {
-            projection = JsonSerializer.Deserialize<GBrainProjectionV1>(page.CompiledTruth)
+            projection = JsonSerializer.Deserialize<GBrainProjectionV2>(page.CompiledTruth)
                 ?? throw new JsonException("Projection was null.");
             projection.Validate();
         }
@@ -1163,7 +1174,7 @@ internal static class GBrainCompanyPageCodec
             throw new GBrainReadbackMismatchException("GBrain projection page body is invalid.", exception);
         }
         if (!string.Equals(
-                GBrainProjectionCanonicalizer.Serialize(projection),
+                GBrainProjectionV2Canonicalizer.Serialize(projection),
                 page.CompiledTruth,
                 StringComparison.Ordinal))
             throw new GBrainReadbackMismatchException("GBrain projection page is not canonical JSON.");
@@ -1218,6 +1229,12 @@ internal static class GBrainCompanyPageCodec
 
     private static string RenderSourceBindingBody(GBrainSoulScope scope)
     {
+        // The binding page is the only accepted immutable Source/Soul binding record,
+        // so it must carry the source-binding nonce witness: without the nonce the
+        // record is incomplete and cannot pin the (soul, nonce) -> source_id pairing.
+        // VerifySourceBinding compares this body byte-for-byte against a re-render
+        // from the requested (nonce-proven) scope, and the frontmatter checksum
+        // covers the nonce through ComputeBindingChecksum.
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream))
         {
@@ -1228,6 +1245,7 @@ internal static class GBrainCompanyPageCodec
             writer.WriteString("soul_id", scope.SoulId);
             writer.WriteString("device_binding_id", scope.DeviceBindingId);
             writer.WriteString("platform_account_id", scope.PlatformAccountId);
+            writer.WriteNumber("source_binding_nonce", scope.SourceBindingNonce);
             writer.WriteString("schema_pack", GBrainCompanyProtocolV1.ExpectedSchemaPack);
             writer.WriteString("provenance", BindingProvenance);
             writer.WriteString("binding_checksum", ComputeBindingChecksum(scope));
@@ -1248,6 +1266,7 @@ internal static class GBrainCompanyPageCodec
             writer.WriteString("soul_id", persona.SoulId);
             writer.WriteString("device_binding_id", persona.DeviceBindingId);
             writer.WriteString("platform_account_id", persona.PlatformAccountId);
+            writer.WriteNumber("source_binding_nonce", persona.SourceBindingNonce);
             writer.WriteString("revision", persona.Revision);
             writer.WriteString("payload_json", persona.PayloadJson);
             writer.WriteString("payload_checksum", persona.PayloadChecksum);
@@ -1267,6 +1286,7 @@ internal static class GBrainCompanyPageCodec
             scope.SoulId,
             scope.DeviceBindingId,
             scope.PlatformAccountId,
+            scope.SourceBindingNonce.ToString(CultureInfo.InvariantCulture),
             GBrainCompanyProtocolV1.ExpectedSchemaPack,
             BindingProvenance);
         return Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(canonical)));
