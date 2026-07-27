@@ -42,7 +42,7 @@ public sealed class GBrainProjectionPostgresIntegrationTests
                     soul.DeviceBindingId,
                     soul.PlatformAccountId,
                     soul.TraceId,
-                    "reduce-gbrain-integration",
+                    ReduceIdempotency("reduce-gbrain-integration"),
                     eventTime.AddDays(1),
                     persistedEvents),
                 new InterestReducerOptions(86_400m));
@@ -102,6 +102,70 @@ public sealed class GBrainProjectionPostgresIntegrationTests
                 runtime.ResolveSourceBindingAsync(right, token));
             Assert.NotEqual(results[0].SourceId, results[1].SourceId);
             Assert.Equal(2, await CountAsync(environment.RuntimeConnectionString, schema, "source_bindings", token));
+        }
+        finally
+        {
+            await DropSchemaAsync(environment.MigrationConnectionString, schema);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task UnvalidatedNotNullOnAnAdoptedSchemaIsRejected()
+    {
+        // PostgreSQL 18 records every column NOT NULL as a pg_constraint row, and a
+        // constraint re-added NOT VALID tolerates the NULL rows already in the table while
+        // pg_attribute.attnotnull still reads true. Column-shape verification alone
+        // therefore cannot tell this schema apart from a sound one, so the constraint
+        // manifest has to reject it on convalidated.
+        var environment = PostgresTestEnvironment.Require();
+        var schema = NewSchema("dps_gbrain_notvalid_");
+        var token = TestContext.Current.CancellationToken;
+        try
+        {
+            await MigrateAsync(environment, schema, token);
+            await ExecuteAsync(
+                environment.MigrationConnectionString,
+                $"""
+                 ALTER TABLE {schema}.rendered_revisions ALTER COLUMN canonical_json DROP NOT NULL;
+                 ALTER TABLE {schema}.rendered_revisions
+                     ADD CONSTRAINT rendered_revisions_canonical_json_not_null
+                     NOT NULL canonical_json NOT VALID
+                 """,
+                token);
+
+            var failure = await Assert.ThrowsAsync<PostgresSchemaIntegrityException>(() =>
+                MigrateAsync(environment, schema, token));
+            Assert.Contains("rendered_revisions_canonical_json_not_null", failure.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            await DropSchemaAsync(environment.MigrationConnectionString, schema);
+        }
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task DroppedNotNullOnAnAdoptedSchemaIsRejected()
+    {
+        // The end-to-end companion to the NOT VALID case. Verified: this one is caught by
+        // column-shape verification, not by the constraint manifest — dropping the
+        // constraint also clears pg_attribute.attnotnull. It is asserted here so the pair
+        // of tamper shapes is covered from the caller's side, but it does not exercise the
+        // constraint-manifest path and stays green without it.
+        var environment = PostgresTestEnvironment.Require();
+        var schema = NewSchema("dps_gbrain_nonull_");
+        var token = TestContext.Current.CancellationToken;
+        try
+        {
+            await MigrateAsync(environment, schema, token);
+            await ExecuteAsync(
+                environment.MigrationConnectionString,
+                $"ALTER TABLE {schema}.rendered_revisions ALTER COLUMN canonical_json DROP NOT NULL",
+                token);
+
+            await Assert.ThrowsAsync<PostgresSchemaIntegrityException>(() =>
+                MigrateAsync(environment, schema, token));
         }
         finally
         {
@@ -350,7 +414,7 @@ public sealed class GBrainProjectionPostgresIntegrationTests
                     soul.DeviceBindingId,
                     soul.PlatformAccountId,
                     soul.TraceId,
-                    "reduce-gbrain-submicrosecond",
+                    ReduceIdempotency("reduce-gbrain-submicrosecond"),
                     eventTime.AddDays(1).AddTicks(1),
                     [memoryEvent]),
                 new InterestReducerOptions(86_400m));
@@ -441,7 +505,7 @@ public sealed class GBrainProjectionPostgresIntegrationTests
                     soul.DeviceBindingId,
                     soul.PlatformAccountId,
                     soul.TraceId,
-                    "reduce-gbrain-tamper",
+                    ReduceIdempotency("reduce-gbrain-tamper"),
                     eventTime.AddDays(1),
                     [memoryEvent]),
                 new InterestReducerOptions(86_400m));
@@ -477,6 +541,16 @@ public sealed class GBrainProjectionPostgresIntegrationTests
             await DropSchemaAsync(environment.MigrationConnectionString, schema);
         }
     }
+
+    // InterestReductionRequest.Validate requires a canonical opaque identifier
+    // ("idem_" + 64 lower-hex, InterestSnapshotV1.cs:302). These fixtures passed the
+    // call-site discriminator through as free text, so every request that reached the
+    // reducer threw before the test could exercise anything. Hashing the discriminator
+    // keeps each call site distinct while satisfying the contract.
+    private static string ReduceIdempotency(string discriminator) =>
+        "idem_" + Convert.ToHexStringLower(
+            System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(discriminator)));
 
     private static SoulResolved CreateSoul(char marker, DateTimeOffset occurredAt) => new(
         "soul_" + new string(marker, 64),

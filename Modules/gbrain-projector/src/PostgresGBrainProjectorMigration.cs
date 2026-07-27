@@ -693,6 +693,14 @@ internal static class PostgresGBrainProjectorSchemaVerifier
         string schemaName,
         CancellationToken cancellationToken)
     {
+        // PostgreSQL 18 materialises every column NOT NULL as its own pg_constraint row
+        // (contype 'n', auto-named <table>_<column>_not_null). This manifest predates that
+        // and enumerated none of them, so every NOT NULL column read as an unexpected
+        // constraint. They are verified below against the expected column list rather than
+        // filtered out, because pg_attribute.attnotnull alone cannot stand in for them: a
+        // NOT NULL constraint added NOT VALID over pre-existing NULL rows still sets
+        // attnotnull while leaving convalidated false, so skipping these rows would let a
+        // schema that actually contains NULLs pass attestation.
         await using var command = new NpgsqlCommand(
             """
             SELECT c.relname, con.conname, con.contype::text, con.convalidated,
@@ -728,9 +736,36 @@ internal static class PostgresGBrainProjectorSchemaVerifier
         command.Parameters.AddWithValue("schema", schemaName);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         var seen = new HashSet<string>(StringComparer.Ordinal);
+        var seenNotNull = new HashSet<string>(StringComparer.Ordinal);
         while (await reader.ReadAsync(cancellationToken))
         {
             var key = reader.GetString(0) + "." + reader.GetString(1);
+            if (string.Equals(reader.GetString(2), "n", StringComparison.Ordinal))
+            {
+                // A column NOT NULL. It must name exactly one column that the column
+                // manifest declares NOT NULL, carry PostgreSQL's own generated name, and
+                // be both validated and enforced — an unvalidated or unenforced row means
+                // the column tolerates NULLs regardless of what attnotnull reports.
+                var table = reader.GetString(0);
+                var columns = reader.GetFieldValue<string[]>(6);
+                if (columns.Length != 1 ||
+                    !ExpectedColumns.TryGetValue(table, out var tableColumns) ||
+                    !tableColumns.Any(column =>
+                        column.NotNull && string.Equals(column.Name, columns[0], StringComparison.Ordinal)) ||
+                    !string.Equals(reader.GetString(1), $"{table}_{columns[0]}_not_null", StringComparison.Ordinal) ||
+                    !seenNotNull.Add(table + "." + columns[0]) ||
+                    !reader.GetBoolean(3) || reader.GetBoolean(4) || reader.GetBoolean(5) ||
+                    !reader.GetBoolean(10) || !reader.GetBoolean(11) || reader.GetInt16(12) != 0 ||
+                    reader.GetBoolean(13) || reader.GetBoolean(14) ||
+                    !reader.GetBoolean(15) || !reader.GetBoolean(16))
+                {
+                    throw new PostgresSchemaIntegrityException(
+                        $"The PostgreSQL constraint manifest drifted at {key}.");
+                }
+
+                continue;
+            }
+
             if (!ExpectedConstraints.TryGetValue(key, out var expected) ||
                 !seen.Add(key) ||
                 !string.Equals(reader.GetString(2), expected.Type, StringComparison.Ordinal) ||
@@ -740,7 +775,14 @@ internal static class PostgresGBrainProjectorSchemaVerifier
                 !string.Equals(reader.GetString(7), expected.ReferenceTable, StringComparison.Ordinal) ||
                 !reader.GetFieldValue<string[]>(8).SequenceEqual(expected.ReferenceColumns, StringComparer.Ordinal) ||
                 !reader.GetBoolean(10) || !reader.GetBoolean(11) || reader.GetInt16(12) != 0 ||
-                reader.GetBoolean(13) || reader.GetBoolean(14) ||
+                // connoinherit is a deterministic function of the constraint type, not a
+                // free choice: PostgreSQL marks PRIMARY KEY, UNIQUE and FOREIGN KEY
+                // constraints non-inheritable (true) and CHECK constraints inheritable
+                // (false). Requiring false unconditionally rejected every primary key,
+                // so this verifier could never pass on a schema that has one. Pinning it
+                // per type keeps the full tamper-evidence: a flip in either direction
+                // still fails closed.
+                reader.GetBoolean(13) != (expected.Type != "c") || reader.GetBoolean(14) ||
                 !reader.GetBoolean(15) || !reader.GetBoolean(16) ||
                 (expected.Type == "f" &&
                     (!string.Equals(reader.GetString(17), "a", StringComparison.Ordinal) ||
@@ -765,6 +807,22 @@ internal static class PostgresGBrainProjectorSchemaVerifier
             throw new PostgresSchemaIntegrityException(
                 "The PostgreSQL constraint set is incomplete or contains unknown constraints.");
         }
+
+        // Every column the manifest declares NOT NULL must be backed by exactly one such
+        // constraint. On PostgreSQL 18 a dropped constraint also clears attnotnull, so
+        // VerifyTableAndColumnShapeAsync reaches this case first and this assertion is a
+        // backstop rather than the primary guard — it is kept so the constraint manifest
+        // is self-contained if that verification order ever changes.
+        var expectedNotNull = ExpectedColumns
+            .SelectMany(table => table.Value
+                .Where(column => column.NotNull)
+                .Select(column => table.Key + "." + column.Name))
+            .ToHashSet(StringComparer.Ordinal);
+        if (!seenNotNull.SetEquals(expectedNotNull))
+        {
+            throw new PostgresSchemaIntegrityException(
+                "The PostgreSQL NOT NULL constraint set is incomplete or contains unknown columns.");
+        }
     }
 
     private static async Task VerifyIndexesAsync(
@@ -788,7 +846,8 @@ internal static class PostgresGBrainProjectorSchemaVerifier
                        SELECT pg_get_indexdef(index_class.oid, position, true)
                        FROM generate_series(1, idx.indnkeyatts) position
                        ORDER BY position
-                   )::text[]
+                   )::text[],
+                   idx.indoption::int2[]
             FROM pg_index idx
             JOIN pg_class index_class ON index_class.oid = idx.indexrelid
             JOIN pg_class table_class ON table_class.oid = idx.indrelid
@@ -810,7 +869,22 @@ internal static class PostgresGBrainProjectorSchemaVerifier
                 throw new PostgresSchemaIntegrityException($"The PostgreSQL index manifest drifted at {name}.");
             }
 
-            var expectedColumns = expected.DefinitionFragments.Skip(1).ToArray();
+            // A manifest fragment is written the way the DDL reads it ("created_at DESC"),
+            // but pg_get_indexdef returns the bare column name in both pretty and raw
+            // mode — it never emits the direction. Comparing the two directly could
+            // therefore never match, so the direction is pinned where PostgreSQL actually
+            // records it: pg_index.indoption, where bit 0 is DESC and bit 1 is NULLS
+            // FIRST. A plain DESC key is 3 and a plain ascending key is 0, so this pins
+            // the ordering strictly rather than dropping it from the manifest.
+            var expectedFragments = expected.DefinitionFragments.Skip(1).ToArray();
+            var expectedColumns = Array.ConvertAll(
+                expectedFragments,
+                fragment => fragment.EndsWith(" DESC", StringComparison.Ordinal)
+                    ? fragment[..^5]
+                    : fragment);
+            var expectedOptions = Array.ConvertAll(
+                expectedFragments,
+                fragment => (short)(fragment.EndsWith(" DESC", StringComparison.Ordinal) ? 3 : 0));
             if (!seen.Add(name) ||
                 !string.Equals(reader.GetString(1), expected.DefinitionFragments[0], StringComparison.Ordinal) ||
                 reader.GetBoolean(2) != expected.Unique ||
@@ -824,7 +898,8 @@ internal static class PostgresGBrainProjectorSchemaVerifier
                 !string.Equals(reader.GetString(16), "p", StringComparison.Ordinal) ||
                 !reader.GetBoolean(17) || !reader.GetBoolean(18) ||
                 !string.Equals(reader.GetString(19), "btree", StringComparison.Ordinal) ||
-                !reader.GetFieldValue<string[]>(20).SequenceEqual(expectedColumns, StringComparer.Ordinal))
+                !reader.GetFieldValue<string[]>(20).SequenceEqual(expectedColumns, StringComparer.Ordinal) ||
+                !reader.GetFieldValue<short[]>(21).SequenceEqual(expectedOptions))
             {
                 throw new PostgresSchemaIntegrityException($"The PostgreSQL index manifest drifted at {name}.");
             }
