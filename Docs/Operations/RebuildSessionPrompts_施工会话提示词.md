@@ -17,11 +17,11 @@
    **档位≠F 级交付（勿把升档读成达成声称）**：本表的 F0–F2 / F3–F5 / F6–F9 是**施工节奏档位**（决定工作单位、门禁与仪式强度），只是借用技术书 §13 F0–F9 的编号分段；**升档触发条件全部是治理/门禁事实，不含任何 F 级交付本身**（正典 F2 交付——Soul→MemoryEvent→Interest→GBrain 无副作用切片与其 Integration evidence——恰恰是 F3 档工作单位 T5–T8 的产物）。因此**升档不构成、也不得被引用为「已达成技术书 §13 对应 F 级」的声称**；各 F 级交付是否达成，只按技术书 §13 各自的验收判据另行判定。
    | 档位 | 工作单位 | 门禁 | 外审 | 收口审计 |
    |---|---|---|---|---|
-   | **F0–F2** | **一处修复 = 一个 commit**，不必凑成批次、不必一批一会话 | lint 与 Phase 0 静态门。required 语义不变：只有 `PASS` 放行 | 会话收尾自动 review gate（外审机制 §二 第 1 行，每次 stop 强制），**并加合入前绑定精确 head/base 的 Codex 一票**（外审机制 §二「批次收尾」行与 §三-5；信任根/anchor/执行链改动用 `adversarial-review`；`FAIL`/`UNAVAILABLE` 即冻结不合入），**外加所有者平台可见、绑定该精确 head 的批准**——每个进入 main 的提交都须被这一票与该批准覆盖，任何档位不降 | 不作为逐批前置（见硬规则 1 的适用强度段） |
-   | **F3–F5** | **批次**（一个 PR = 一个批次，按 DAG 挑 T# 模板） | required 全套 + 该批模块 suite | 加批次收尾 Codex 一票（绑定 commit/diff；信任根/anchor/执行链等高危批次用 `adversarial-review`） | 里程碑收口审计 T4/T13 按 DAG 执行 |
-   | **F6–F9** | 批次 + §15 条目 4/6 平台授权与具名批准前置 | required + 对应真实环境可执行门（Windows/DEVICE/CANARY/SCALE 各自的门） | 全部启用 | 全部启用，含 T19 终局 DoD |
+   | **F0–F2** | **一处修复 = 一个 commit**，不必凑成批次、不必一批一会话 | lint 与 Phase 0 静态门。required 语义不变：只有 `PASS` 放行 | 正常 stop、空 diff、计划与状态报告不审；非空 diff PR 仅在 head 稳定、计划内测试完成、工作树干净后做一次绑定精确 head/base 的独立异构复审，**外加所有者平台可见、绑定该精确 head 的批准** | 不作为逐批前置（见硬规则 1 的适用强度段） |
+   | **F3–F5** | **批次**（一个 PR = 一个批次，按 DAG 挑 T# 模板） | required 全套 + 该批模块 suite | 同一合入前复审规则；高危批次由 Codex Reviewer 审时用 `adversarial-review` | 里程碑收口审计 T4/T13 按 DAG 执行 |
+   | **F6–F9** | 批次 + §15 条目 4/6 平台授权与具名批准前置 | required + 对应真实环境可执行门（Windows/DEVICE/CANARY/SCALE 各自的门） | 同一合入前复审规则；不增加 stop gate | 全部启用，含 T19 终局 DoD |
 
-   **红线：以下内容任何档位全量适用，不因降档弱化半条。** 计划书 §1.2 D-01…D-12 的全部纠正；§2.2 三个权威边界（Control Plane / GBrain Company / ZennoDroid 各自拥有与明确不拥有的东西）；fail-closed 语义（required 只认 `PASS`，`SKIP/PARTIAL/NOT_RUN/INFRA_ERROR/NOT_APPLICABLE` 与缺证据一律阻断；未知合同 major、action、step、selector、policy、身份与结果全部失败关闭）；`AGENTS.md` 的七级证据等级及其逐级签发条件（等级只由对应可执行门签发，模拟不得替代）；「模型只能提议，不能自我批准、不持签名私钥、不能清除冻结」（D-09、技术书 §2 第 5/11 条）；技术书 §2 全部 15 条不可妥协原则；**每一个将要进入 `main` 的提交，合入前都必须有绑定精确 head/base 的外审一票（`FAIL`/`UNAVAILABLE` 即冻结不合入）与所有者平台可见、绑定该精确 head 的批准**（外审机制 §二「批次收尾」行、§三-5，计划书 §4.1 第 6 条；批准专属所有者，合入的执行动作可代做，两者分开留痕）；**任何 Owner 签署或风险接受都不改变「什么算证据、什么算通过」——`RISK_ACCEPTED` 不折算为 PASS、不折算为证据齐全**。**降档只影响批次仪式的节奏——是否把多处修复凑成批次、是否一批一会话、是否逐批做里程碑收口审计与逐批前置核验审计裁决——不影响「合入前是否有绑定 commit 的一票外审与平台可见批准」，也不降低任何一条通过标准；任何档位都不得把 `FAIL` 记成 `PASS`，不得用没跑过的命令冒充证据，不得用「本档不要求」当作缺证据的解释。**
+   **红线：以下内容任何档位全量适用，不因降档弱化半条。** 计划书 §1.2 D-01…D-12 的全部纠正；§2.2 三个权威边界（Control Plane / GBrain Company / ZennoDroid 各自拥有与明确不拥有的东西）；fail-closed 语义（required 只认 `PASS`，`SKIP/PARTIAL/NOT_RUN/INFRA_ERROR/NOT_APPLICABLE` 与缺证据一律阻断；未知合同 major、action、step、selector、policy、身份与结果全部失败关闭）；`AGENTS.md` 的七级证据等级及其逐级签发条件（等级只由对应可执行门签发，模拟不得替代）；「模型只能提议，不能自我批准、不持签名私钥、不能清除冻结」（D-09、技术书 §2 第 5/11 条）；技术书 §2 全部 15 条不可妥协原则；**每一个将要进入 `main` 的非空 diff PR 候选，仅在 head 稳定、计划内测试完成、工作树干净后触发一次绑定精确 head/base 的独立异构复审（Codex 作者由 Claude Reviewer 审，Claude 作者由 Codex Reviewer 审；`FAIL` 或 Reviewer 工具失败记 `UNAVAILABLE`，均冻结合入但不阻塞正常 stop，工具失败不重复重试）与所有者平台可见、绑定该精确 head 的批准**（外审机制 §二、§三-5，计划书 §4.1 第 6 条；批准专属所有者，合入的执行动作可代做，两者分开留痕）；head/base 任一变化，原票失效并按相同前置条件重跑；空 diff、计划、状态报告不审。**任何 Owner 签署或风险接受都不改变「什么算证据、什么算通过」——`RISK_ACCEPTED` 不折算为 PASS、不折算为证据齐全**。**降档只影响批次仪式的节奏——是否把多处修复凑成批次、是否一批一会话、是否逐批做里程碑收口审计与逐批前置核验审计裁决——不影响合入前独立异构复审与平台可见批准，也不降低任何一条通过标准；任何档位都不得把 `FAIL` 记成 `PASS`，不得用没跑过的命令冒充证据，不得用「本档不要求」当作缺证据的解释。**
 
    **与硬规则 2 的关系（不冲突，勿误读为豁免）**：硬规则 2 的适用条件是「本批触碰候选门禁信任根」，与 F 档无关，F0–F2 照常全量适用。因此 F0–F2 的正确做法是：**优先做不触碰 `CANDIDATE_TRUST_PATHS` 的修复**；确需触碰信任根时仍单批独审串行，取证按 §4.5——「生效条件」成立时于合入前在 PR head 取 required 静态门证据，§4.6 (a) 未签署时回落原两段式——合入走计划书 §4.1 第 6 条路径：批准专属所有者且须平台可见、绑定精确 head 留痕，合入的执行动作按该条现行文字办。
 
@@ -54,7 +54,7 @@
 当前处于 F0–F2 档（判定与红线见本文件硬规则 3）。目标只有一个：把 main tip 的 Phase 0 required 存量 FAIL 清零，让 overall_status 变成 PASS。
 做法：一次只修一个失败 check，一处修复就是一个 commit，不要凑批次、不要顺手重构、不要改无关文件。先跑门禁复现该 FAIL 并贴真实输出，再改，再跑同一条命令贴真实输出；跑不通就说跑不通，不得用"应该能过"代替实际跑过。
 不得触碰 CANDIDATE_TRUST_PATHS（候选门禁自身信任根）；确需触碰就单批独审串行、先停下告诉我，合入走计划书 §4.1 第 6 条路径（批准专属所有者且须平台可见、绑定精确 head 留痕），取证按计划书 §4.5：§4.6 (a) 已签署时于合入前在 PR head 取 required 静态门证据，(a) 未签署时 fail-closed 回落原两段式（合入前 --diagnostic-workspace 记录性验证 + 合入后在后继提交上以 --base D 取首个 clean 候选证据）。该静态门由候选自身携带的校验器执行，见 §4.5 残余披露，不得当作独立于候选的验证。
-本档简化的只有批次仪式：不必把多处修复凑成批次、不必一批一会话、不做里程碑收口审计、不做逐批前置核验审计裁决。合入前的外审与批准一条不减：每个将要进入 main 的提交都必须被一次绑定精确 head/base 的 Codex 外审覆盖（在合入目标 base tip 上 review --base <base tip> --scope branch，信任根/anchor/执行链改动用 adversarial-review，FAIL/UNAVAILABLE 即冻结不合入），并有我本人平台可见、绑定该精确 head 的批准；一个 PR 可以承载多个此类 commit，那一票覆盖该 PR 全部提交即可——简化的是「不必凑批次」，不是「不必有那一票」。合入前你要复核 PR head == 已审 commit、base tip 未变，并用 gh pr merge --match-head-commit <已审-head-oid> 约束 head（外审机制 §三-5）。会话收尾自动 review gate 照常强制。不随档位弱化的红线（D-01…D-12、三条真相边界、fail-closed 语义、七级证据等级、模型不能自我批准/持私钥/清除冻结、技术书 §2 十五条、每个进入 main 的提交都有绑定精确 head/base 的外审与平台可见批准）全量适用。
+本档简化的只有批次仪式：不必把多处修复凑成批次、不必一批一会话、不做里程碑收口审计、不做逐批前置核验审计裁决。合入前的外审与批准一条不减：非空 diff PR 仅在 head 稳定、计划内测试完成、工作树干净后做一次绑定精确 head/base 的独立异构复审（Codex 作者由 Claude Reviewer 审，Claude 作者由 Codex Reviewer 审；由 Codex Reviewer 审高危改动时用 adversarial-review），并有我本人平台可见、绑定该精确 head 的批准；一个 PR 可以承载多个 commit，该票覆盖该 PR 的精确 head/base 集成 diff。`FAIL` 或 Reviewer 工具失败记 `UNAVAILABLE`，均冻结合入，但不阻塞正常 stop，工具失败不重复重试；head/base 任一变化，原票失效，按相同前置条件重跑。合入前复核 PR head/base 与已审 SHA 完全一致，并用 gh pr merge --match-head-commit <已审-head-oid> 约束 head（外审机制 §三-5）。正常 stop、会话收尾、空 diff、计划和状态报告不触发外审。不随档位弱化的红线（D-01…D-12、三条真相边界、fail-closed 语义、七级证据等级、模型不能自我批准/持私钥/清除冻结、技术书 §2 十五条、每个进入 main 的非空 diff PR 候选都有绑定精确 head/base 的外审与平台可见批准）全量适用。
 每个 check 转绿后报告：check 名、修复的根因、跑过的命令与真实输出。全部转绿后停下告诉我——那是 F0–F2 → F3–F5 的升档触发条件之一，由我决定是否升档，你不得自行升档或改用批次模板。
 ```
 
@@ -68,7 +68,7 @@
 按 Docs/RebuildPlan_重构计划书.md 施工批次：R0-B 指令 receipt 迁移（§4.2）。
 开工前先核对 dps2 远程已合入 PR：前序批次（M0/R0-A）未合入则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次，退出条件以 §10 M1A 行为准。上一批证据以 dps2 最新已合入 PR 及其门禁/外审记录为准，自行获取。
 注意：本批触碰候选门禁信任根（Manifest schema、Tools/ci），取证按计划书 §4.5「生效条件」：§4.6 (a) 已签署时于合入前在 PR head 取 required 静态门证据（CI artifact 自动留档）、合入即本批关闭；(a) 未签署时 fail-closed 回落原两段式——合入前 --diagnostic-workspace 记录性验证 + 合入后在后继提交上以 --base D 取首个 clean 候选证据，且上一个信任根批次未取得该证据前不得合入本批，此时下文「我确认合入即本批关闭」不适用。该 required 静态门由候选自身携带的校验器执行（见 §4.5 残余披露），不得当作独立于候选的验证。改动 legacy-runtime-adapter 的 module.yaml 触发 §11 的 anchor 同批重签——DPS_LEGACY_BASELINE_ANCHOR 未签发就停下告诉我。
-完成后：跑 required 门禁、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准；我确认合入即本批关闭。
+完成后：跑 required 门禁、开/更新 PR 到 dps2；确认 PR head 已稳定、计划内测试完成、工作树干净后，按 Docs/Operations/ExternalReview_外审机制.md 对精确 head SHA + base SHA 走一次独立异构复审，然后停下等我批准；我确认合入即本批关闭。
 ```
 
 ### T2 · R0-C Release BOM 权威迁移
@@ -77,7 +77,7 @@
 按 Docs/RebuildPlan_重构计划书.md 施工批次：R0-C Release BOM 权威迁移（§4.3）。
 开工前先核对 dps2 远程已合入 PR：前序批次（R0-B）未合入则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次，退出条件以 §10 M1B 行为准。上一批证据以 dps2 最新已合入 PR 及其门禁/外审记录为准，自行获取。
 注意：本批触碰候选门禁信任根（Tools/ci），取证按计划书 §4.5「生效条件」：§4.6 (a) 已签署时于合入前在 PR head 取 required 静态门证据（CI artifact 自动留档）、合入即本批关闭；(a) 未签署时 fail-closed 回落原两段式——合入前 --diagnostic-workspace 记录性验证 + 合入后在后继提交上以 --base D 取首个 clean 候选证据，且上一个信任根批次未取得该证据前不得合入本批，此时下文「我确认合入即本批关闭」不适用。该 required 静态门由候选自身携带的校验器执行（见 §4.5 残余披露），不得当作独立于候选的验证。Release BOM 由仓外 signer 签发，模型与候选代码不得持签名私钥。本批须以集成测试证明 policy 与 executor 两侧消费代码路径读取同一个 `control-plane-host` 实例的同一 generation/token（仅合同层同源不可替代，见 §4.3 与 M4 的交付边界）；该证明止于工程/集成测试层面，不建、不声称建成生产环境下的真实接线（该义务属 M4）；本批前涉及模块保持 `releaseEligible=false`、无 production composition entrypoint。
-完成后：跑 required 门禁、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准；我确认合入即本批关闭。
+完成后：跑 required 门禁、开/更新 PR 到 dps2；确认 PR head 已稳定、计划内测试完成、工作树干净后，按 Docs/Operations/ExternalReview_外审机制.md 对精确 head SHA + base SHA 走一次独立异构复审，然后停下等我批准；我确认合入即本批关闭。
 ```
 
 ### T3 · R0-D 删除 11 个 factory 模块
@@ -85,8 +85,8 @@
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：R0-D 删除 11 个 factory 模块（§4.4）。
 开工前先核对 dps2 远程已合入 PR：前序批次（R0-B、R0-C）未合入则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次：只删 §4.4 列出的 11 个目录及其专属引用（catalog、Manifest、schema、DAG、compatibility、候选测试 policy、CODEOWNERS、CI、README、operations），不得删除已迁出的 receipt/BOM/回滚能力。退出条件以 §10 M1C 行为准（含 module-impact suite 与 merge queue 验证）。上一批证据以 dps2 最新已合入 PR 及其门禁/外审记录为准，自行获取。
-注意：本批删除多个信任根文件，取证按计划书 §4.5「生效条件」：§4.6 (a) 已签署时于合入前在 PR head 取 required 静态门证据（CI artifact 自动留档）、合入即本批关闭；(a) 未签署时 fail-closed 回落原两段式——合入前 --diagnostic-workspace 记录性验证 + 合入后在后继提交上以 --base D 取首个 clean 候选证据，且上一个信任根批次未取得该证据前不得合入本批，此时下文「我确认合入即本批关闭」不适用。该 required 静态门由候选自身携带的校验器执行（见 §4.5 残余披露），不得当作独立于候选的验证。这是高危批次，批次收尾外审用 adversarial-review。
-完成后：跑 required 门禁、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准；我确认合入即本批关闭。
+注意：本批删除多个信任根文件，取证按计划书 §4.5「生效条件」：§4.6 (a) 已签署时于合入前在 PR head 取 required 静态门证据（CI artifact 自动留档）、合入即本批关闭；(a) 未签署时 fail-closed 回落原两段式——合入前 --diagnostic-workspace 记录性验证 + 合入后在后继提交上以 --base D 取首个 clean 候选证据，且上一个信任根批次未取得该证据前不得合入本批，此时下文「我确认合入即本批关闭」不适用。该 required 静态门由候选自身携带的校验器执行（见 §4.5 残余披露），不得当作独立于候选的验证。这是高危批次；由 Codex Reviewer 审时用 adversarial-review。
+完成后：跑 required 门禁、开/更新 PR 到 dps2；确认 PR head 已稳定、计划内测试完成、工作树干净后，按 Docs/Operations/ExternalReview_外审机制.md 对精确 head SHA + base SHA 走一次独立异构复审，然后停下等我批准；我确认合入即本批关闭。
 ```
 
 ### T4 · M1 里程碑收口审计（只审不改）
@@ -106,7 +106,7 @@
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：M2-1 Persona 投影链（§5.1）。
 开工前先核对 dps2 已合入 PR：M1C 未合入、或 M1 收口审计（T4）的裁决不是可核验的 PASS（未完成、FAIL/UNAVAILABLE、记录不一致或无法核验、有未决 critical，均属非 PASS，一律停），则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次（Persona v1 保持、persona outbox -> GBrain projector -> SoulMemory adapter -> exact readback 链及其独立测试），不触碰 M3 轨模块。上一批证据以 dps2 最新已合入 PR 为准，自行获取。
-完成后：跑 required 门禁、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准；我确认合入即本批关闭。
+完成后：跑 required 门禁、开/更新 PR 到 dps2；确认 PR head 已稳定、计划内测试完成、工作树干净后，按 Docs/Operations/ExternalReview_外审机制.md 对精确 head SHA + base SHA 走一次独立异构复审，然后停下等我批准；我确认合入即本批关闭。
 ```
 
 ### T6 · M2-2 长期记忆合同 memory.event/v3
@@ -114,7 +114,7 @@
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：M2-2 长期记忆合同（§5.2）。
 开工前先核对 dps2 已合入 PR：M2-1 未合入则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次：memory.event/v3 与 gbrain.projection/v3 以 additive major 并存落地，消费者按实际登记的 v1 起步登记 v1/v3 双读（不虚构 v2 消费历史），认知衰减与纠正/删除两条链分开。上一批证据以 dps2 最新已合入 PR 为准，自行获取。
-完成后：跑 required 门禁（memory-lifecycle suite）、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准；我确认合入即本批关闭。
+完成后：跑 required 门禁（memory-lifecycle suite）、开/更新 PR 到 dps2；确认 PR head 已稳定、计划内测试完成、工作树干净后，按 Docs/Operations/ExternalReview_外审机制.md 对精确 head SHA + base SHA 走一次独立异构复审，然后停下等我批准；我确认合入即本批关闭。
 ```
 
 ### T7 · M2-3 兴趣算法 interest v2
@@ -122,7 +122,7 @@
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：M2-3 兴趣算法 v2（§5.3）。
 开工前先核对 dps2 已合入 PR：M2-2 未合入则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次：interest.snapshot/v2 新 major、写码前冻结 weight/a/b/half_life 与 golden vectors、seed 归 interest-reducer。上一批证据以 dps2 最新已合入 PR 为准，自行获取。
-完成后：跑 required 门禁（interest-v2 suite 全 golden vectors）、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准；我确认合入即本批关闭。
+完成后：跑 required 门禁（interest-v2 suite 全 golden vectors）、开/更新 PR 到 dps2；确认 PR head 已稳定、计划内测试完成、工作树干净后，按 Docs/Operations/ExternalReview_外审机制.md 对精确 head SHA + base SHA 走一次独立异构复审，然后停下等我批准；我确认合入即本批关闭。
 ```
 
 ### T8 · M2-4 planner 行为分布与参数采样
@@ -130,7 +130,7 @@
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：M2-4 planner 行为分布与 session nonce 参数采样（§5.4）。
 开工前先核对 dps2 已合入 PR：M2-3 未合入则停下告诉我；本批信封绑定 operation.compiled/v2，其 provider 由 M3-2 引入——M3-2 未合入也停下告诉我（两轨并行时本批必须等 M3-2 合同落地，不得在 M2 轨自造 provider）；本批次已合入则告诉我该用哪个模板。范围只做本批次：planner 按 Soul 生成行为分布（含跨会话宏观节律与动作构成比）、独立 nonce 采样、operation.compiled/v2 信封绑定三类 revision；宏观节律样本不足时按 §5.4 显式标注 DEFERRED。上一批证据以 dps2 最新已合入 PR 为准，自行获取。
-完成后：跑 required 门禁（behavior-params 与 soul-isolation suite）、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准；我确认合入即本批关闭。
+完成后：跑 required 门禁（behavior-params 与 soul-isolation suite）、开/更新 PR 到 dps2；确认 PR head 已稳定、计划内测试完成、工作树干净后，按 Docs/Operations/ExternalReview_外审机制.md 对精确 head SHA + base SHA 走一次独立异构复审，然后停下等我批准；我确认合入即本批关闭。
 ```
 
 ### T9 · M3-1 APP 包与自动探索安全流
@@ -138,7 +138,7 @@
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：M3-1 app.package/v1 与探索安全流（§6.1/§6.2）。
 开工前先核对 dps2 已合入 PR：M1C 未合入、或 M1 收口审计（T4）的裁决不是可核验的 PASS（未完成、FAIL/UNAVAILABLE、记录不一致或无法核验、有未决 critical，均属非 PASS，一律停），则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次：operation-compiler 拥有 app.package/v1 与 canonical 包、app_onboarder 只产隔离候选、至少两个非 IG fixture，不触碰 M2 轨模块。上一批证据以 dps2 最新已合入 PR 为准，自行获取。
-完成后：跑 required 门禁（app-package suite）、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准；我确认合入即本批关闭。
+完成后：跑 required 门禁（app-package suite）、开/更新 PR 到 dps2；确认 PR head 已稳定、计划内测试完成、工作树干净后，按 Docs/Operations/ExternalReview_外审机制.md 对精确 head SHA + base SHA 走一次独立异构复审，然后停下等我批准；我确认合入即本批关闭。
 ```
 
 ### T10 · M3-2 operation.compiled/v2 与唯一 ActionExecutor
@@ -146,8 +146,8 @@
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：M3-2 operation.compiled/v2 与 ActionExecutor 失败关闭改造（§6.3）。
 开工前先核对 dps2 已合入 PR：M3-1 未合入则停下告诉我；WP 探针（T15）未完成也停下告诉我——本批改写受保护 Legacy `ActionExecutor.cs`，按计划书 §11 探针前禁止改写受保护 Legacy C#，CodeDom/Input API 兼容性未知时不得合入该改造；本批次已合入则告诉我该用哪个模板。范围只做本批次：v1/v2 additive 提供、只有 command-orchestrator 登记直接消费、ActionExecutor 空/未知/异常/partial 全失败关闭并逐 step 验证后置条件、信封 delay/typing/trajectory 参数在携带对应参数的 step 上消费生效且越界即拒绝。
-注意：本批触碰 79 文件 Legacy 字节基线（ActionExecutor.cs），按 §11 同批重签 anchor——anchor 不可用就停下告诉我。高危批次，外审用 adversarial-review。上一批证据以 dps2 最新已合入 PR 为准，自行获取。
-完成后：跑 required 门禁（execution-path suite）、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准；我确认合入即本批关闭。
+注意：本批触碰 79 文件 Legacy 字节基线（ActionExecutor.cs），按 §11 同批重签 anchor——anchor 不可用就停下告诉我。高危批次；由 Codex Reviewer 审时用 adversarial-review。上一批证据以 dps2 最新已合入 PR 为准，自行获取。
+完成后：跑 required 门禁（execution-path suite）、开/更新 PR 到 dps2；确认 PR head 已稳定、计划内测试完成、工作树干净后，按 Docs/Operations/ExternalReview_外审机制.md 对精确 head SHA + base SHA 走一次独立异构复审，然后停下等我批准；我确认合入即本批关闭。
 ```
 
 ### T11 · M3-3 edge.bridge.exchange/v2 与薄 C#5 入口
@@ -155,8 +155,8 @@
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：M3-3 brain-to-hand 交接合同与独立 Legacy 入口（§3.4）。
 开工前先核对 dps2 已合入 PR：M3-2 未合入则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次：edge.bridge.exchange/v2、与 SessionRunner.Run 完全分离的薄 C#5 入口（默认落在 Legacy 字节基线作用域之外，如 legacy-runtime-adapter 模块内）、首个 handoff allowlist 只含确定性 primitives、合同测试证明旧入口不可达。不翻转 legacy 三道锁。
-注意：高危批次，外审用 adversarial-review；若探针证明入口必须落入受保护作用域，停下告诉我走 anchor 重签决策。上一批证据以 dps2 最新已合入 PR 为准，自行获取。
-完成后：跑 required 门禁、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准；我确认合入即本批关闭。
+注意：高危批次；由 Codex Reviewer 审时用 adversarial-review；若探针证明入口必须落入受保护作用域，停下告诉我走 anchor 重签决策。上一批证据以 dps2 最新已合入 PR 为准，自行获取。
+完成后：跑 required 门禁、开/更新 PR 到 dps2；确认 PR head 已稳定、计划内测试完成、工作树干净后，按 Docs/Operations/ExternalReview_外审机制.md 对精确 head SHA + base SHA 走一次独立异构复审，然后停下等我批准；我确认合入即本批关闭。
 ```
 
 ### T12 · M3-4 按需视觉提案链
@@ -164,7 +164,7 @@
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：M3-4 按需视觉纠错（§7）。
 开工前先核对 dps2 已合入 PR：M3-3 未合入则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次：确定性失败后的诊断/提案链、脱敏截图 capability（绑定作用域/hash/TTL/删除策略）、IModelBroker 窄端口；模型不能直驱设备、不能改配置、不能宣告成功。上一批证据以 dps2 最新已合入 PR 为准，自行获取。
-完成后：跑 required 门禁（visual-security suite 含 prompt injection 负例）、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准；我确认合入即本批关闭。
+完成后：跑 required 门禁（visual-security suite 含 prompt injection 负例）、开/更新 PR 到 dps2；确认 PR head 已稳定、计划内测试完成、工作树干净后，按 Docs/Operations/ExternalReview_外审机制.md 对精确 head SHA + base SHA 走一次独立异构复审，然后停下等我批准；我确认合入即本批关闭。
 ```
 
 ### T13 · M2/M3 里程碑收口审计（只审不改）
@@ -182,7 +182,7 @@
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：M4 组合与滚动门（§8/§9）。
 开工前先核对 dps2 已合入 PR：M2、M3 未全部合入、或 M2/M3 收口审计（T13）的裁决不是可核验的 PASS（未完成、FAIL/UNAVAILABLE、记录不一致或无法核验、有未决 critical，均属非 PASS，一律停），则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次：composition root（含 §4.3 交付边界移交的同实例义务：policy 与 gateway 须消费同一个 active-binding provider 实例，覆盖 activation/revocation/rollback、restart、并发读与设备隔离）、attempt/receipt/eligibility 合同、session+command 双 300 滚动门、runtime kill switch 与工程 freeze、通知 outbox。退出条件以 §10 M4 行为准（含 kill-notify suite 的未授权清除负例与上述同实例覆盖）。上一批证据以 dps2 最新已合入 PR 为准，自行获取。
-完成后：跑 required 门禁（reliability 与 kill-notify suite）、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准；我确认合入即本批关闭。
+完成后：跑 required 门禁（reliability 与 kill-notify suite）、开/更新 PR 到 dps2；确认 PR head 已稳定、计划内测试完成、工作树干净后，按 Docs/Operations/ExternalReview_外审机制.md 对精确 head SHA + base SHA 走一次独立异构复审，然后停下等我批准；我确认合入即本批关闭。
 ```
 
 ### T15 · WP Windows/Zenno 探针（M0 后任意时点可插入，只探测不改产品码）
@@ -196,7 +196,7 @@
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：M5 macOS AVD + Parallels + ZennoDroid 模拟闭环（§10 M5 行）。
 开工前先核对 dps2 已合入 PR：M4 未合入或 WP 探针未完成则停下告诉我；本批次已合入则告诉我该用哪个模板。范围只做本批次：搭通模拟闭环并产出原始证据，全部标记 SIMULATION，不提升 Windows/DEVICE 等级。上一批证据以 dps2 最新已合入 PR 为准，自行获取。
-完成后：跑 simulation suite、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准；我确认合入即本批关闭。
+完成后：跑 simulation suite、开/更新 PR 到 dps2；确认 PR head 已稳定、计划内测试完成、工作树干净后，按 Docs/Operations/ExternalReview_外审机制.md 对精确 head SHA + base SHA 走一次独立异构复审，然后停下等我批准；我确认合入即本批关闭。
 ```
 
 ### T17 · M6 授权真机与受限 canary（human-required）
@@ -204,14 +204,14 @@
 ```text
 按 Docs/RebuildPlan_重构计划书.md 施工批次：M6 目标 Windows、授权设备、受限 canary（§10 M6 行）。
 开工前先核对：M5 未合入则停下告诉我；§15 条目 4/6 的平台授权与具名批准我是否已给你——没有就停下列出缺哪项，不得触碰任何真实平台写操作。证据等级仅由对应可执行门逐级签发。
-完成后：按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准；我确认合入即本批关闭。
+完成后：开/更新 PR 到 dps2；确认 PR head 已稳定、计划内测试完成、工作树干净后，按 Docs/Operations/ExternalReview_外审机制.md 对精确 head SHA + base SHA 走一次独立异构复审，然后停下等我批准；我确认合入即本批关闭。
 ```
 
 ### T18 · LC Legacy 物理删除（可重复使用，每次删一个对象）
 
 ```text
 按 Docs/RebuildPlan_重构计划书.md 执行一个 Legacy 物理删除批次（§11）：从探针后确认可安全删除的对象中取一个（零入口证明 + Windows 编译/加载原始结果齐备的优先），单独成批：删除 + 验证器清单绑定 + 字节基线制品 + anchor 重签归同一批，附 rollback。WP 探针未完成或 anchor 不可用就停下告诉我。
-完成后：跑 required 门禁、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审（adversarial-review）、开 PR 到 dps2，然后停下等我批准；我确认合入即本批关闭。
+完成后：跑 required 门禁、开/更新 PR 到 dps2；确认 PR head 已稳定、计划内测试完成、工作树干净后，按 Docs/Operations/ExternalReview_外审机制.md 对精确 head SHA + base SHA 走一次独立异构复审（由 Codex Reviewer 审时用 adversarial-review），然后停下等我批准；我确认合入即本批关闭。
 ```
 
 ### T19 · 终局 DoD 审计（只审不改）
@@ -226,5 +226,5 @@
 
 ```text
 先按本文件硬规则 3 判当前档位：若处于 F0–F2（main tip 的 Phase 0 required overall_status 仍是 FAIL），停用本模板、改用 TR，并告诉我为什么。以下只在 F3 档起适用。
-按 Docs/RebuildPlan_重构计划书.md 与 dps2 已合入 PR 推导下一个未合入批次并施工它；范围只做该批次。开工前两项前置缺一即停：①跨里程碑边界时确认对应收口审计（M1 用 T4、M2/M3 用 T13）的裁决是可核验的 PASS——未完成、FAIL/UNAVAILABLE、记录不一致或无法核验、有未决 critical 均属非 PASS，任一即停；②把你推导出的批次名和依据告诉我。完成后跑 required 门禁、按 Docs/Operations/ExternalReview_外审机制.md 走批次收尾 Codex 外审、开 PR 到 dps2，然后停下等我批准；我确认合入即本批关闭。
+按 Docs/RebuildPlan_重构计划书.md 与 dps2 已合入 PR 推导下一个未合入批次并施工它；范围只做该批次。开工前两项前置缺一即停：①跨里程碑边界时确认对应收口审计（M1 用 T4、M2/M3 用 T13）的裁决是可核验的 PASS——未完成、FAIL/UNAVAILABLE、记录不一致或无法核验、有未决 critical 均属非 PASS，任一即停；②把你推导出的批次名和依据告诉我。完成后跑 required 门禁、开/更新 PR 到 dps2；确认 PR head 已稳定、计划内测试完成、工作树干净后，按 Docs/Operations/ExternalReview_外审机制.md 对精确 head SHA + base SHA 走一次独立异构复审，然后停下等我批准；我确认合入即本批关闭。
 ```

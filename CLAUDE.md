@@ -10,8 +10,8 @@
 
 ## 外审（必须）
 
-- 会话收尾：Codex review gate 已启用，stop 前必须有新鲜 review；若本会话未生效，先运行 `/codex:setup --enable-review-gate`。
-- 批次合入前：Codex 一票外审（绑定 commit/diff；高危批次用 adversarial-review），程序见 `Docs/Operations/ExternalReview_外审机制.md`；FAIL/UNAVAILABLE 即冻结不合入。**该一票任何档位不降**：F0–F2 档「一处修复 = 一个 commit」只简化批次仪式，每个进入 main 的提交仍须被一次绑定精确 head/base 的外审覆盖，并有所有者平台可见、绑定该精确 head 的批准（批准专属所有者、合入的执行动作可代做，见计划书 §4.1 第 6 条）。DeepSeek/GLM 是计划书 §9.1 运行时安全网的组件，不参与开发期合入投票。
+- 正常 stop、会话收尾、空 diff、计划和状态报告不触发外审，也不要求新鲜 review；不得把 review gate 当作正常 stop 的前置门。
+- PR 合入前：仅在 PR head 已稳定、计划内测试完成且工作树干净后触发一次独立异构复审，绑定精确 head SHA + base SHA；head/base 任一变化，原票失效并按同样前置条件重跑。Claude 作者由 Codex Reviewer 审（高危批次用 adversarial-review），Codex 作者由 Claude Reviewer 审，作者不自审。程序见 `Docs/Operations/ExternalReview_外审机制.md`；`FAIL` 或 Reviewer 工具失败记 `UNAVAILABLE`，均冻结合入，但不阻塞正常 stop，工具失败不重复重试。**该一票任何档位不降**：F0–F2 档「一处修复 = 一个 commit」只简化批次仪式，每个进入 main 的非空 diff PR 候选仍须被一次绑定精确 head/base 的外审覆盖，并有所有者平台可见、绑定该精确 head 的批准（批准专属所有者、合入的执行动作可代做，见计划书 §4.1 第 6 条）。DeepSeek/GLM 是计划书 §9.1 运行时安全网的组件，不参与开发期合入投票。
 
 ## 硬规则
 
