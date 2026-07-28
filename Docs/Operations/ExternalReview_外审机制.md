@@ -4,22 +4,17 @@
 > 证据状态: `NONE`（本文档描述审查流程本身，不签发任何验证等级）  
 > 上游依据: `Docs/RebuildPlan_重构计划书.md` §9.1（异构模型复核）、§13（停止条件）
 
-本文档定义**重构施工期**的外审程序（用户拍板，2026-07-17）：**批次收尾外审 = Codex 一票**（最新最强模型）。两条核心约束：
+本文档定义**重构施工期**的外审程序：每个非空 diff 的 PR 候选在合入前只触发一次独立异构复审。两条核心约束：
 
-1. **模型只有 advisory/veto 权**——Codex `FAIL/UNAVAILABLE` 即候选冻结，由用户在合入前程序性执行（见 §三-4）；`PASS` 不能替代 required 门禁和具名批准。
-2. **层级不要混淆**：计划书 §9.1 的"每个候选 diff 至少两个异构 reviewer（DeepSeek/GLM）"说的是**项目自身无人值守升级的运行时安全网**——那是要在相应里程碑接线的交付物，其凭证（§15 条目 2）供系统运行时使用。它不是本开发流程的合入门；开发期合入门只有 Codex 一票 + required 门禁 + 用户批准。
+1. **模型只有 advisory/veto 权**——独立 Reviewer 的 `FAIL`，或 Reviewer 工具失败所记的 `UNAVAILABLE`，均冻结候选合入，由用户在合入前程序性执行（见 §三-4）；`PASS` 不能替代 required 门禁和具名批准。
+2. **层级不要混淆**：计划书 §9.1 的"每个候选 diff 至少两个异构 reviewer（DeepSeek/GLM）"说的是**项目自身无人值守升级的运行时安全网**——那是要在相应里程碑接线的交付物，其凭证（§15 条目 2）供系统运行时使用。它不是本开发流程的合入门；开发期合入门只有一次独立异构复审 + required 门禁 + 用户批准。
 
 ## 一、工具与配置（已就绪）
 
-- 审查载体：Claude Code 的 openai-codex 插件（codex-cli，ChatGPT 账号登录）。
+- 审查载体：Claude 作者的 diff 使用 Claude Code 的 openai-codex 插件（Codex Reviewer；codex-cli，ChatGPT 账号登录）；Codex 作者的 diff 改由 Claude Reviewer 审。
 - 模型：由 `~/.codex/config.toml` 的 `model` 字段决定（当前 `gpt-5.6-sol`，`model_reasoning_effort = "xhigh"`，2026-07-17 实测可用）。升级到更新模型只改这一行；companion 的 `review` 子命令无独立模型参数，跟随全局配置。
 - 项目信任：`/Users/younghu/Documents/ZennoDroid_DSP/DSP_ZD` 已登记为 trusted。
-- 会话收尾强制门（review gate）：已对 ZennoDroid_DSP 项目启用——施工会话每次 stop 前必须有新鲜 Codex review。开关命令：
-
-```text
-/codex:setup --enable-review-gate   # 启用
-/codex:setup --disable-review-gate  # 关闭（问答类会话嫌吵时）
-```
+- 正常 stop 与会话收尾不启用、不依赖 review gate；空 diff、计划和状态报告不送审。Reviewer 工具不可用不阻塞正常 stop。
 
 ## 一之二、DeepSeek 复核脚本（运行时安全网预备资产，不是开发期合入门）
 
@@ -34,33 +29,33 @@ python3 ~/dps-authority/second_review_deepseek.py \
   --focus "<本批次范围一句话>"
 ```
 
-## 二、三个触发点
+## 二、触发边界
 
 | 层级 | 触发时机 | 动作 | 失败语义 |
 |---|---|---|---|
-| 会话收尾 | 施工会话每次 stop（review gate 自动强制） | Codex 对 working-tree 变更 review。这是便利层，不是 §9.1 门 | 未通过则不视为本段工作完成 |
-| 批次收尾 | 每个批次门禁全绿后、合入前（计划书 §16 的每个 PR） | **Codex 一票，绑定 commit/diff**：`review --base <上一批合入提交>`（高危批次——信任根、Legacy anchor、执行链——改用 `adversarial-review`） | Codex `FAIL/UNAVAILABLE` = 冻结不合入（程序性规则，由用户在合入前执行） |
+| 正常 stop / 会话收尾 | 任意正常 stop；或只有空 diff、计划、状态报告 | 不触发外审，不要求新鲜 review | 不阻塞正常 stop |
+| PR 合入前 | PR head 已稳定、计划内测试完成、工作树干净，且 PR diff 非空 | **一次独立异构复审，绑定精确 head SHA + base SHA**。Claude 作者由 Codex Reviewer 审（高危批次——信任根、Legacy anchor、执行链——用 `adversarial-review`）；Codex 作者由 Claude Reviewer 审 | `FAIL` = 冻结合入；Reviewer 工具失败记 `UNAVAILABLE` 并冻结合入，但不阻塞正常 stop，也不自动或循环重试 |
 | 里程碑收尾 | M0–M6 每个退出条件评定前 | 多智能体 workflow 交叉审核 + Codex 深审双轨，产出对照裁决表 | 未决 critical 未修订前不得进入下一里程碑 |
 
-异构性由施工分工天然保证：diff 由 Claude 会话产出、Codex（OpenAI）审——作者与审查者不同族。若某批 diff 改由 Codex 产出，则该批外审换 Claude 或其他非 OpenAI 模型担任，作者不自审。
+“head 已稳定”指送审开始后不再 push、amend 或 rebase；计划内测试必须针对该精确 head 完成，`git status --porcelain` 必须为空。异构路由固定为：Codex 作者由 Claude Reviewer 审；Claude 作者由 Codex Reviewer 审。作者不自审。
 
-批次收尾命令（在仓库内执行；companion 脚本路径中的版本号随插件升级变化，以实际安装为准）：
+Claude 作者触发 Codex Reviewer 的合入前命令（在仓库内执行；companion 脚本路径中的版本号随插件升级变化，以实际安装为准）：
 
 ```text
 node ~/.claude/plugins/cache/openai-codex/codex/<版本>/scripts/codex-companion.mjs \
-  review --wait --base <ref> --scope branch
+  review --wait --base <base-sha> --scope branch
 ```
 
-在 Claude Code 会话内可直接用插件命令触发，无需记路径。
+报告必须同时记录送审时的精确 head SHA 与 `<base-sha>`。在 Claude Code 会话内可直接用插件命令触发，无需记路径。
 
 ## 三、审核意见的处置纪律
 
-1. **版本绑定**：每份外审报告开头必须记录被审文档/代码的版本与 commit。采信任何意见前先核对它审的是不是当前版本——v2/v3 版本错位曾导致两条 critical 中的一条（"恢复 stub"）变成反向建议。
+1. **版本绑定**：每份外审报告开头必须记录被审 PR 的精确 head SHA 与 base SHA。采信任何意见前先核对它审的是不是当前 head/base 组合——v2/v3 版本错位曾导致两条 critical 中的一条（"恢复 stub"）变成反向建议。
 2. **逐条裁决**：意见只有四种处置——采纳（给最小编辑）/ 已覆盖（引现文行号）/ 失效（针对已废弃机制，说明为何不采纳）/ 驳回（对仓库事实不成立，给证据）。不许"顺手改"驳回项。
 3. **证据要求**：采纳与驳回都必须给 `文件:行号` 级证据；无法核验的意见按"未复核"单列，采信前自行核验。
-4. **权限边界与冻结的现状**：目前只有会话收尾的 review gate 是机器强制（review 不过，会话无法正常收尾）；批次级"冻结不合入"是程序性规则，由用户在合入前人工执行——计划书 §9.1 的确定性控制器（自动比对 schema 判决并置位冻结）尚未建成，本文档不得被解读为该控制器已存在。解除冻结、合入批准、里程碑评定始终是用户/具名批准者的动作；模型不持密钥、不能自批准（§9.1）。
+4. **权限边界与冻结的现状**：当前没有会话收尾 review gate；正常 stop 不因缺少外审或 Reviewer 工具失败而受阻。合入前的"冻结不合入"是程序性规则，由用户人工执行——计划书 §9.1 的确定性控制器（自动比对 schema 判决并置位冻结）尚未建成，本文档不得被解读为该控制器已存在。Reviewer 工具失败只记录一次 `UNAVAILABLE`，本次不自动或循环重试；候选保持冻结，待工具恢复后由用户重新触发完整复审。解除冻结、合入批准、里程碑评定始终是用户/具名批准者的动作；模型不持密钥、不能自批准（§9.1）。
 
-5. **合入前绑定已审提交（程序性合入下限；合入是用户/具名批准者的动作）**：当前阶段采程序性合入下限，不宣称已具备 §9.1 的确定性控制器能力。外审 `PASS` **仅对『已审 head commit + 已审 base tip 的组合』有效**——合入前由用户人工复核 PR head==已审 commit、base tip 未发生变化；任一不符即使原 `PASS` 失效，冻结合入、重新生成集成 diff 并复审。合入时用 `gh pr merge --match-head-commit <已审-head-oid>` 约束 head。
+5. **合入前绑定已审提交（程序性合入下限；合入是用户/具名批准者的动作）**：当前阶段采程序性合入下限，不宣称已具备 §9.1 的确定性控制器能力。外审 `PASS` **仅对『已审 head SHA + 已审 base SHA 的组合』有效**——合入前由用户人工复核 PR head==已审 head SHA、base tip==已审 base SHA；任一变化即使原 `PASS` 也失效，冻结合入，重新生成集成 diff，并在 PR head 重新稳定、计划内测试完成、工作树干净后重跑一次完整复审。合入时用 `gh pr merge --match-head-commit <已审-head-oid>` 约束 head。
    - **能力界定与延期（声明，非本文新增操作门）**：`--match-head-commit` 只绑 head，**不构成 base OID / merge-group 的机器绑定**。R0 段按计划书 §16 一次只推进一个施工 PR（真实施工串行、无并行 base-race）。R0-D 的合入退出门以计划书 §10 M1C 与 T3 为准——它含 module-impact 必需套件与外部配置的 merge queue（模拟并行冲突 + merge-HEAD 重跑）两类**并列且独立**的强制验证,本节不复述其构成、更不以其中一类顶替另一类,也不以"真实合入串行"替代或折抵其中任何一项。**并行轨（M2∥M3）的安全并行合并编排与原子 head/base/merge-group fail-closed 绑定，属 R0 后 §9.1 专门批次的交付物，尚未建成;本文档不宣称其存在**——到达 M2∥M3 阶段时按该批次是否就绪裁定能否并行，未就绪则退化为串行推进。
 
 ## 四、给每个施工会话的固定开工输入
@@ -71,4 +66,4 @@ node ~/.claude/plugins/cache/openai-codex/codex/<版本>/scripts/codex-companion
 2. 涉及模块的 `AGENTS.md`（`receiptRequired` 机制会强制核对）；
 3. 上一批次的验收证据（门禁输出 + 外审结论）。
 
-会话产出合入前必须走"批次收尾"外审；推送目标锁定 `dps2` 远程。
+非空 diff 的 PR 候选在满足 §二前置条件后、合入前必须走一次独立异构复审；推送目标锁定 `dps2` 远程。
